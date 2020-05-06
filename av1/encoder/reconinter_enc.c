@@ -243,7 +243,13 @@ static INLINE void build_obmc_prediction(MACROBLOCKD *xd, int rel_mi_row,
     if (av1_skip_u4x4_pred_in_obmc(bsize, pd, dir)) continue;
 
     const struct buf_2d *const pre_buf = &pd->pre[0];
+#if CONFIG_DERIVED_MV
+    const MV mv = (above_mbmi->derived_mv_allowed && above_mbmi->use_derived_mv)
+                      ? above_mbmi->derived_mv[0]
+                      : above_mbmi->mv[0].as_mv;
+#else
     const MV mv = above_mbmi->mv[0].as_mv;
+#endif  // CONFIG_DERIVED_MV
 
     av1_init_inter_params(&inter_pred_params, bw, bh, mi_y >> pd->subsampling_y,
                           mi_x >> pd->subsampling_x, pd->subsampling_x,
@@ -343,7 +349,13 @@ void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
   av1_init_warp_params(&inter_pred_params, &warp_types, ref, xd, mi);
 
   uint8_t *const dst = get_buf_by_bd(xd, ext_dst);
+#if CONFIG_DERIVED_MV
+  const MV mv = (mi->derived_mv_allowed && mi->use_derived_mv)
+                    ? mi->derived_mv[ref]
+                    : mi->mv[ref].as_mv;
+#else
   const MV mv = mi->mv[ref].as_mv;
+#endif  // CONFIG_DERIVED_MV
 
   av1_enc_build_one_inter_predictor(dst, ext_dst_stride, &mv,
                                     &inter_pred_params);

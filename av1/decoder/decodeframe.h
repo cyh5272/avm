@@ -26,6 +26,7 @@ extern int max_bits;
 extern int64_t tot_bits;
 extern int tot_frames;
 #endif  // CONFIG_THROUGHPUT_ANALYSIS
+#include "av1/common/reconinter.h"
 
 struct AV1Decoder;
 struct aom_read_bit_buffer;
