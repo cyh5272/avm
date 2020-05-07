@@ -240,6 +240,7 @@ set_aom_config_var(CONFIG_BAWP 1 "Enable block adaptive weighted prediction")
 set_aom_config_var(CONFIG_WARPMV 1 "Enable warpmv modes")
 set_aom_config_var(CONFIG_TEMPORAL_GLOBAL_MV 0
                    "AV2 experiment flag for temporal global MV")
+set_aom_config_var(CONFIG_EXT_WARP 1 "Enable extended warp filter")
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1
