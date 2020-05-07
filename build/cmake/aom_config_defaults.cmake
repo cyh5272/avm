@@ -263,6 +263,7 @@ set_aom_config_var(CONFIG_SKIP_ME_FOR_OPFL_MODES 1
 
 set_aom_config_var(CONFIG_CWG_D067_IMPROVED_WARP 1
                    "Improvement of warp motions")
+set_aom_config_var(CONFIG_EXT_WARP_FILTER 1 "Enable extended warp filter")
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1
