@@ -266,7 +266,8 @@ void av1_set_rd_speed_thresholds(struct AV1_COMP *cpi);
 
 void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
                                int (*fact)[MAX_MODES], int rd_thresh,
-                               BLOCK_SIZE bsize, THR_MODES best_mode_index);
+                               BLOCK_SIZE bsize, MV_REFERENCE_FRAME *ref_frames,
+                               PREDICTION_MODE best_mode);
 
 static INLINE void reset_thresh_freq_fact(MACROBLOCK *const x) {
   for (int i = 0; i < BLOCK_SIZES_ALL; ++i) {

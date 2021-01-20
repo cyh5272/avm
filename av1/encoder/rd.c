@@ -41,6 +41,7 @@
 #include "av1/encoder/mcomp.h"
 #include "av1/encoder/ratectrl.h"
 #include "av1/encoder/rd.h"
+#include "av1/encoder/rdopt_utils.h"
 #include "av1/encoder/tokenize.h"
 
 #define RD_THRESH_POW 1.25
@@ -1679,9 +1680,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
 void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
                                int (*factor_buf)[MAX_MODES],
                                int use_adaptive_rd_thresh, BLOCK_SIZE bsize,
-                               THR_MODES best_mode_index) {
+                               MV_REFERENCE_FRAME *ref_frames,
+                               PREDICTION_MODE best_mode) {
   assert(use_adaptive_rd_thresh > 0);
   const THR_MODES top_mode = MAX_MODES;
+  const int best_mode_index =
+      get_prediction_mode_idx(best_mode, ref_frames[0], ref_frames[1]);
   const int max_rd_thresh_factor = use_adaptive_rd_thresh * RD_THRESH_MAX_FACT;
 
   const int bsize_is_1_to_4 = bsize > cm->seq_params.sb_size;
