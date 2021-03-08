@@ -139,6 +139,13 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
 # AV2 experiment flags.
 set_aom_config_var(CONFIG_FORWARDSKIP 1
                    "AV2 enable forward skip residual coding.")
+set_aom_config_var(CONFIG_CNN_RESTORATION 0 NUMBER
+                   "AV2 CNN Restoration experiment flag")
+set_aom_config_var(CONFIG_LOOP_RESTORE_CNN 0 NUMBER
+                   "AV2 CNN in Loop Restoration experiment flag")
+set_aom_config_var(CONFIG_CNN_RESTORATION_SMALL_MODELS 0 NUMBER
+                   "AV2 CNN restoration with smaller models experiment flag")
+
 set_aom_config_var(CONFIG_COMPOUND_WARP_SAMPLES 1 NUMBER
                    "AV2 compound warped motion samples experiment flag")
 set_aom_config_var(CONFIG_NEW_TX_PARTITION 0
