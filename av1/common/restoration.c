@@ -19,6 +19,9 @@
 
 #include "aom_mem/aom_mem.h"
 #include "av1/common/av1_common_int.h"
+#if CONFIG_LOOP_RESTORE_CNN
+#include "av1/common/cnn_tflite.h"
+#endif  // CONFIG_LOOP_RESTORE_CNN
 #include "av1/common/resize.h"
 #include "av1/common/restoration.h"
 #include "aom_dsp/aom_dsp_common.h"
@@ -915,18 +918,33 @@ typedef void (*stripe_filter_fun)(const RestorationUnitInfo *rui,
                                   int src_stride, uint8_t *dst, int dst_stride,
                                   int32_t *tmpbuf, int bit_depth);
 
+#if CONFIG_LOOP_RESTORE_CNN
+#define NUM_STRIPE_FILTERS 3
+static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
+  wiener_filter_stripe_highbd,
+  sgrproj_filter_stripe_highbd,
+  cnn_filter_stripe_highbd
+};
+#else
 #define NUM_STRIPE_FILTERS 2
 static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
   wiener_filter_stripe_highbd, sgrproj_filter_stripe_highbd
 };
+#endif  // CONFIG_LOOP_RESTORE_CNN
 
 // Filter one restoration unit
-void av1_loop_restoration_filter_unit(
-    const RestorationTileLimits *limits, const RestorationUnitInfo *rui,
-    const RestorationStripeBoundaries *rsb, RestorationLineBuffers *rlbs,
-    const AV1PixelRect *tile_rect, int tile_stripe0, int ss_x, int ss_y,
-    int bit_depth, uint8_t *data8, int stride, uint8_t *dst8, int dst_stride,
-    int32_t *tmpbuf, int optimized_lr) {
+void av1_loop_restoration_filter_unit(const RestorationTileLimits *limits,
+                                      const RestorationUnitInfo *rui,
+                                      const RestorationStripeBoundaries *rsb,
+#if CONFIG_LOOP_RESTORE_CNN
+                                      int restoration_unit_size,
+#endif  // CONFIG_LOOP_RESTORE_CNN
+                                      RestorationLineBuffers *rlbs,
+                                      const AV1PixelRect *tile_rect,
+                                      int tile_stripe0, int ss_x, int ss_y,
+                                      int bit_depth, uint8_t *data8,
+                                      int stride, uint8_t *dst8, int dst_stride,
+                                      int32_t *tmpbuf, int optimized_lr) {
   RestorationType unit_rtype = rui->restoration_type;
 
   int unit_h = limits->v_end - limits->v_start;
@@ -955,7 +973,13 @@ void av1_loop_restoration_filter_unit(
     get_stripe_boundary_info(&remaining_stripes, tile_rect, ss_y, &copy_above,
                              &copy_below);
 
+#if CONFIG_LOOP_RESTORE_CNN
+    const int full_stripe_height = (unit_rtype == RESTORE_CNN)
+                                       ? restoration_unit_size >> ss_y
+                                       : RESTORATION_PROC_UNIT_SIZE >> ss_y;
+#else
     const int full_stripe_height = RESTORATION_PROC_UNIT_SIZE >> ss_y;
+#endif  // CONFIG_LOOP_RESTORE_CNN
     const int runit_offset = RESTORATION_UNIT_OFFSET >> ss_y;
 
     // Work out where this stripe's boundaries are within
@@ -996,11 +1020,23 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
   FilterFrameCtxt *ctxt = (FilterFrameCtxt *)priv;
   const RestorationInfo *rsi = ctxt->rsi;
 
+#if CONFIG_LOOP_RESTORE_CNN
+  RestorationType rtype = rsi->unit_info[rest_unit_idx].restoration_type;
+  if (rtype == RESTORE_CNN) {
+    rsi->unit_info[rest_unit_idx].cnn_info.base_qindex = ctxt->base_qindex;
+    rsi->unit_info[rest_unit_idx].cnn_info.frame_type = ctxt->frame_type;
+    rsi->unit_info[rest_unit_idx].cnn_info.is_luma = ctxt->is_luma;
+  }
+#endif  // CONFIG_LOOP_RESTORE_CNN
+
   av1_loop_restoration_filter_unit(
-      limits, &rsi->unit_info[rest_unit_idx], &rsi->boundaries, rlbs, tile_rect,
-      ctxt->tile_stripe0, ctxt->ss_x, ctxt->ss_y, ctxt->bit_depth, ctxt->data8,
-      ctxt->data_stride, ctxt->dst8, ctxt->dst_stride, tmpbuf,
-      rsi->optimized_lr);
+      limits, &rsi->unit_info[rest_unit_idx], &rsi->boundaries,
+#if CONFIG_LOOP_RESTORE_CNN
+      rsi->restoration_unit_size,
+#endif  // CONFIG_LOOP_RESTORE_CNN
+      rlbs, tile_rect, ctxt->tile_stripe0, ctxt->ss_x, ctxt->ss_y,
+      ctxt->bit_depth, ctxt->data8, ctxt->data_stride, ctxt->dst8,
+      ctxt->dst_stride, tmpbuf, rsi->optimized_lr);
 }
 
 void av1_loop_restoration_filter_frame_init(AV1LrStruct *lr_ctxt,
@@ -1050,6 +1086,11 @@ void av1_loop_restoration_filter_frame_init(AV1LrStruct *lr_ctxt,
     lr_plane_ctxt->dst_stride = lr_ctxt->dst->strides[is_uv];
     lr_plane_ctxt->tile_rect = av1_whole_frame_rect(cm, is_uv);
     lr_plane_ctxt->tile_stripe0 = 0;
+#if CONFIG_LOOP_RESTORE_CNN
+    lr_plane_ctxt->base_qindex = cm->quant_params.base_qindex;
+    lr_plane_ctxt->frame_type = cm->current_frame.frame_type;
+    lr_plane_ctxt->is_luma = (plane == AOM_PLANE_Y);
+#endif  // CONFIG_LOOP_RESTORE_CNN
   }
 }
 

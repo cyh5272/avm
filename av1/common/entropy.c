@@ -214,7 +214,13 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #endif  // CONFIG_FORWARDSKIP
   RESET_CDF_COUNTER(fc->filter_intra_cdfs, 2);
   RESET_CDF_COUNTER(fc->filter_intra_mode_cdf, FILTER_INTRA_MODES);
+#if CONFIG_LOOP_RESTORE_CNN
+  RESET_CDF_COUNTER(fc->switchable_restore_cdf[0],
+                    RESTORE_SWITCHABLE_TYPES - 1);
+  RESET_CDF_COUNTER(fc->switchable_restore_cdf[1], RESTORE_SWITCHABLE_TYPES);
+#else
   RESET_CDF_COUNTER(fc->switchable_restore_cdf, RESTORE_SWITCHABLE_TYPES);
+#endif  // CONFIG_LOOP_RESTORE_CNN
   RESET_CDF_COUNTER(fc->wiener_restore_cdf, 2);
 #if CONFIG_CCSO_EXT
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
@@ -222,6 +228,9 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   }
 #endif
   RESET_CDF_COUNTER(fc->sgrproj_restore_cdf, 2);
+#if CONFIG_LOOP_RESTORE_CNN
+  RESET_CDF_COUNTER(fc->cnn_restore_cdf, 2);
+#endif  // CONFIG_LOOP_RESTORE_CNN
 #if CONFIG_AIMC
   RESET_CDF_COUNTER(fc->y_mode_set_cdf, INTRA_MODE_SETS);
   RESET_CDF_COUNTER(fc->y_mode_idx_cdf_0, FIRST_MODE_COUNT);
