@@ -1492,6 +1492,16 @@ typedef struct AV1Common {
    */
   TIP tip_ref;
 #endif  // CONFIG_TIP
+#if CONFIG_CNN_RESTORATION || CONFIG_LOOP_RESTORE_CNN
+  /*!
+   * True if luma channel is using CNN restoration.
+   */
+  int use_cnn_y;
+  /*!
+   * True if chroma channels are using CNN restoration.
+   */
+  int use_cnn_uv;
+#endif  // CONFIG_CNN_RESTORATION || CONFIG_LOOP_RESTORE_CNN
 } AV1_COMMON;
 
 /*!\cond */
