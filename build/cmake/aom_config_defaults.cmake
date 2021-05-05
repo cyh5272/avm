@@ -145,6 +145,10 @@ set_aom_config_var(CONFIG_LOOP_RESTORE_CNN 0 NUMBER
                    "AV2 CNN in Loop Restoration experiment flag")
 set_aom_config_var(CONFIG_CNN_RESTORATION_SMALL_MODELS 0 NUMBER
                    "AV2 CNN restoration with smaller models experiment flag")
+set_aom_config_var(CONFIG_WIENER_NONSEP 0 NUMBER
+                   "AV2 nonsep Wiener filter experiment flag")
+set_aom_config_var(CONFIG_WIENER_NONSEP_CROSS_FILT 0 NUMBER
+                   "AV2 nonsep Wiener cross filter experiment flag")
 
 set_aom_config_var(CONFIG_SDP 1 NUMBER "AV2 Semi-Decoupled Partitioning.")
 set_aom_config_var(CONFIG_EXTQUANT 1
