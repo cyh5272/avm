@@ -1158,9 +1158,6 @@ typedef struct macroblock {
   // processing.
   struct inter_modes_info *inter_modes_info;
 
-  //! How to blend the compound predictions.
-  uint8_t compound_idx;
-
   //! A caches of results of compound type search so they can be reused later.
   COMP_RD_STATS comp_rd_stats[MAX_COMP_RD_STATS];
   //! The idx for the latest compound mode in the cache \ref comp_rd_stats.

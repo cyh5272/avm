@@ -1998,7 +1998,6 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 
   // init
   mbmi->comp_group_idx = 0;
-  mbmi->compound_idx = 1;
   mbmi->interinter_comp.type = COMPOUND_AVERAGE;
 
   if (has_second_ref(mbmi) &&
@@ -2017,8 +2016,6 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     }
 
     if (mbmi->comp_group_idx == 0) {
-      // Distance-weighted compound is disabled, so always use average
-      mbmi->compound_idx = 1;
       mbmi->interinter_comp.type = COMPOUND_AVERAGE;
     } else {
       assert(cm->current_frame.reference_mode != SINGLE_REFERENCE &&

@@ -1411,7 +1411,6 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       // aomenc1
       if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
           !valid_mv0 || !valid_mv1) {
-        mbmi->compound_idx = 1;
         // uint8_t mask_value = 32;
         av1_joint_motion_search(cpi, x, bsize, cur_mv, NULL, 0, rate_mv);
       } else {
@@ -1633,9 +1632,8 @@ static int64_t motion_mode_rd(
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   uint8_t best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   const int rate_mv0 = *rate_mv;
-  const int interintra_allowed = cm->seq_params.enable_interintra_compound &&
-                                 is_interintra_allowed(mbmi) &&
-                                 mbmi->compound_idx;
+  const int interintra_allowed =
+      cm->seq_params.enable_interintra_compound && is_interintra_allowed(mbmi);
   int pts0[SAMPLES_ARRAY_SIZE], pts_inref0[SAMPLES_ARRAY_SIZE];
 
   assert(mbmi->ref_frame[1] != INTRA_FRAME);
@@ -2389,7 +2387,6 @@ static int64_t simple_translation_pred_rd(
 
   mbmi->interinter_comp.type = COMPOUND_AVERAGE;
   mbmi->comp_group_idx = 0;
-  mbmi->compound_idx = 1;
   if (mbmi->ref_frame[1] == INTRA_FRAME) {
     mbmi->ref_frame[1] = NONE_FRAME;
   }
@@ -2436,7 +2433,6 @@ static int64_t simple_translation_pred_rd(
     // Only compound_average
     mbmi->interinter_comp.type = COMPOUND_AVERAGE;
     mbmi->comp_group_idx = 0;
-    mbmi->compound_idx = 1;
   }
   set_default_interp_filters(mbmi,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -3252,7 +3248,6 @@ static int64_t handle_inter_mode(
     // Initialize compound mode data
     mbmi->interinter_comp.type = COMPOUND_AVERAGE;
     mbmi->comp_group_idx = 0;
-    mbmi->compound_idx = 1;
     if (mbmi->ref_frame[1] == INTRA_FRAME) mbmi->ref_frame[1] = NONE_FRAME;
 
     mbmi->num_proj_ref = 0;
@@ -3834,7 +3829,6 @@ static AOM_INLINE void rd_pick_skip_mode(
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const TxfmSearchParams *txfm_params = &x->txfm_search_params;
 
-  x->compound_idx = 1;  // COMPOUND_AVERAGE
   RD_STATS skip_mode_rd_stats;
   av1_invalid_rd_stats(&skip_mode_rd_stats);
 
@@ -3903,7 +3897,6 @@ static AOM_INLINE void rd_pick_skip_mode(
   mbmi->filter_intra_mode_info.use_filter_intra = 0;
   mbmi->interintra_mode = (INTERINTRA_MODE)(II_DC_PRED - 1);
   mbmi->comp_group_idx = 0;
-  mbmi->compound_idx = x->compound_idx;
   mbmi->interinter_comp.type = COMPOUND_AVERAGE;
   mbmi->motion_mode = SIMPLE_TRANSLATION;
   mbmi->ref_mv_idx = 0;
@@ -3994,7 +3987,6 @@ static AOM_INLINE void rd_pick_skip_mode(
     search_state->best_mbmode.palette_mode_info.palette_size[1] = 0;
 
     search_state->best_mbmode.comp_group_idx = 0;
-    search_state->best_mbmode.compound_idx = x->compound_idx;
     search_state->best_mbmode.interinter_comp.type = COMPOUND_AVERAGE;
     search_state->best_mbmode.motion_mode = SIMPLE_TRANSLATION;
 
@@ -5600,9 +5592,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     0,
     interintra_modes,
 #if CONFIG_REMOVE_DUAL_FILTER
-    { { 0, { { 0 } }, { 0 }, 0, 0, 0, 0 } },
+    { { 0, { { 0 } }, { 0 }, 0, 0, 0 } },
 #else
-    { { { 0 }, { { 0 } }, { 0 }, 0, 0, 0, 0 } },
+    { { { 0 }, { { 0 } }, { 0 }, 0, 0, 0 } },
 #endif  // CONFIG_REMOVE_DUAL_FILTER
     0
   };

@@ -916,7 +916,6 @@ static INLINE void update_mbmi_for_compound_type(MB_MODE_INFO *mbmi,
                                                  COMPOUND_TYPE cur_type) {
   mbmi->interinter_comp.type = cur_type;
   mbmi->comp_group_idx = (cur_type >= COMPOUND_WEDGE);
-  mbmi->compound_idx = 1;
 }
 
 // When match is found, populate the compound type data
@@ -1447,7 +1446,6 @@ int av1_compound_type_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   if (mbmi->interinter_comp.type != best_type_stats.best_compound_data.type) {
     mbmi->comp_group_idx =
         (best_type_stats.best_compound_data.type < COMPOUND_WEDGE) ? 0 : 1;
-    mbmi->compound_idx = 1;
     mbmi->interinter_comp = best_type_stats.best_compound_data;
     memcpy(xd->seg_mask, buffers->tmp_best_mask_buf, mask_len);
   }

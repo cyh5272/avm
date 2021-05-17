@@ -1305,9 +1305,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                      mbmi->comp_group_idx, 2);
         }
 
-        if (mbmi->comp_group_idx == 0) {
-          assert(mbmi->compound_idx == 1);
-        } else {
+        if (mbmi->comp_group_idx == 1) {
           assert(masked_compound_used);
           if (is_interinter_compound_used(COMPOUND_WEDGE, bsize)) {
 #if CONFIG_ENTROPY_STATS
@@ -1537,8 +1535,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       mbmi->delta_lf_from_base = xd->delta_lf_from_base;
     }
     if (has_second_ref(mbmi)) {
-      if (mbmi->compound_idx == 0 ||
-          mbmi->interinter_comp.type == COMPOUND_AVERAGE)
+      if (mbmi->interinter_comp.type == COMPOUND_AVERAGE)
         mbmi->comp_group_idx = 0;
       else
         mbmi->comp_group_idx = 1;

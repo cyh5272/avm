@@ -1760,10 +1760,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       }
 
       if (mbmi->comp_group_idx == 0) {
-        if (mbmi->compound_idx)
-          assert(mbmi->interinter_comp.type == COMPOUND_AVERAGE);
-
-        assert(mbmi->compound_idx == 1);
+        assert(mbmi->interinter_comp.type == COMPOUND_AVERAGE);
       } else {
         assert(cpi->common.current_frame.reference_mode != SINGLE_REFERENCE &&
                is_inter_compound_mode(mbmi->mode) &&
