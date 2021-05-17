@@ -1412,19 +1412,8 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
           !valid_mv0 || !valid_mv1) {
         mbmi->compound_idx = 1;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-        InterPredParams inter_pred_params;
-        av1_dist_wtd_comp_weight_assign(
-            &cpi->common, mbmi, &inter_pred_params.conv_params.fwd_offset,
-            &inter_pred_params.conv_params.bck_offset, 1);
-        uint8_t mask_value = inter_pred_params.conv_params.fwd_offset * 4;
-        memset(xd->seg_mask, mask_value, sizeof(xd->seg_mask));
-        av1_joint_motion_search(cpi, x, bsize, cur_mv, xd->seg_mask,
-                                block_size_wide[bsize], rate_mv);
-#else
         // uint8_t mask_value = 32;
         av1_joint_motion_search(cpi, x, bsize, cur_mv, NULL, 0, rate_mv);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
       } else {
         *rate_mv = 0;
         for (int i = 0; i < 2; ++i) {
@@ -2987,11 +2976,8 @@ static int process_compound_inter_mode(
   const AV1_COMMON *cm = &cpi->common;
   const int masked_compound_used = is_any_masked_compound_used(bsize) &&
                                    cm->seq_params.enable_masked_compound;
-  int mode_search_mask = (1 << COMPOUND_AVERAGE) |
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-                         (1 << COMPOUND_DISTWTD) |
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
-                         (1 << COMPOUND_WEDGE) | (1 << COMPOUND_DIFFWTD);
+  int mode_search_mask =
+      (1 << COMPOUND_AVERAGE) | (1 << COMPOUND_WEDGE) | (1 << COMPOUND_DIFFWTD);
 
   const int num_planes = av1_num_planes(cm);
   const int mi_row = xd->mi_row;
