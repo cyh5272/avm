@@ -338,6 +338,11 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
                   &txfm_param);
   assert(av1_ext_tx_used[txfm_param.tx_set_type][txfm_param.tx_type]);
 
+#if CONFIG_DST7_16X16 || CONFIG_DST_32X32
+  uint16_t allowed_tx_mask = 0xF1FE;
+  allowed_tx_mask &= (1 << txfm_param.tx_type);
+#endif
+
 #if CONFIG_IST
   MB_MODE_INFO *const mbmi = xd->mi[0];
   PREDICTION_MODE intra_mode =
@@ -349,7 +354,22 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
   av1_inv_stxfm(dqcoeff, &txfm_param);
 #endif
 
+#if CONFIG_DST_32X32
+  if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
+       tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
+      allowed_tx_mask)
+    av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+  else
+    av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST7_16X16
+  if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16) &&
+      allowed_tx_mask)
+    av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+  else
+    av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#else
   av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#endif  // CONFIG_DST7_16X16 && CONFIG_DST_32X32
 }
 
 // Inverse secondary transform
