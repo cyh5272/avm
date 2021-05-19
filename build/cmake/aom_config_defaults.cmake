@@ -162,6 +162,9 @@ set_aom_config_var(
   CONFIG_CCSO 1 "AV2 experiment flag to enable cross component sample offset.")
 set_aom_config_var(CONFIG_QBASED_QP_OFFSET 1
                    "AV2 experiment flag to adjust q_offset based on QP.")
+# Primary Transforms
+set_aom_config_var(CONFIG_DST7_16X16 0 NUMBER "AV2 DST7 16x16 experiment flag.")
+set_aom_config_var(CONFIG_DST_32X32 0 NUMBER "AV2 DST7 32x32 experiment flag.")
 #
 # Variables in this section control optional features of the build system.
 #
