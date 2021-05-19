@@ -200,6 +200,9 @@ set_aom_config_var(CONFIG_NEW_DF 1
                    "AV2 experiment flag on new deblocking filter.")
 set_aom_config_var(CONFIG_TIP 1 "Enable temporal interpolated prediction (TIP)")
 
+# Primary Transforms
+set_aom_config_var(CONFIG_DST7_16X16 0 NUMBER "AV2 DST7 16x16 experiment flag.")
+set_aom_config_var(CONFIG_DST_32X32 0 NUMBER "AV2 DST7 32x32 experiment flag.")
 #
 # Variables in this section control optional features of the build system.
 #
