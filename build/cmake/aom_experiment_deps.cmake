@@ -65,5 +65,8 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_CCSO AND CONFIG_CCSO_EXT)
     change_config_and_warn(CONFIG_CCSO_EXT 0 !CONFIG_CCSO)
   endif()
+  if(CONFIG_DST_32X32)
+    change_config_and_warn(CONFIG_DST7_16X16 1 CONFIG_DST_32X32)
+  endif()
 
 endmacro()
