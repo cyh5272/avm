@@ -1215,7 +1215,7 @@ typedef struct AV1Common {
   FILE *fDecCoeffLog;
 #endif
 
-#if CONFIG_CNN_RESTORATION || CONFIG_LOOP_RESTORE_CNN
+#if CONFIG_CNN_RESTORATION
   /*!
    * True if luma channel is using CNN restoration.
    */
@@ -1224,7 +1224,7 @@ typedef struct AV1Common {
    * True if chroma channels are using CNN restoration.
    */
   int use_cnn_uv;
-#endif  // CONFIG_CNN_RESTORATION || CONFIG_LOOP_RESTORE_CNN
+#endif  // CONFIG_CNN_RESTORATION
 } AV1_COMMON;
 
 /*!\cond */

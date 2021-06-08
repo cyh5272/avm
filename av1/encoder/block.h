@@ -830,11 +830,7 @@ typedef struct {
    ****************************************************************************/
   /**@{*/
   //! switchable_restore_cost
-#if CONFIG_LOOP_RESTORE_CNN
-  int switchable_restore_cost[2][RESTORE_SWITCHABLE_TYPES];
-#else
   int switchable_restore_cost[RESTORE_SWITCHABLE_TYPES];
-#endif  // CONFIG_LOOP_RESTORE_CNN
   //! wiener_restore_cost
   int wiener_restore_cost[2];
 #if CONFIG_RST_MERGECOEFFS
@@ -845,10 +841,6 @@ typedef struct {
 #endif  // CONFIG_RST_MERGECOEFFS
   //! sgrproj_restore_cost
   int sgrproj_restore_cost[2];
-#if CONFIG_LOOP_RESTORE_CNN
-  //! cnn_restore_cost
-  int cnn_restore_cost[2];
-#endif  // CONFIG_LOOP_RESTORE_CNN
 #if CONFIG_WIENER_NONSEP
   /*!
    * wiener_nonsep_restore_cost
