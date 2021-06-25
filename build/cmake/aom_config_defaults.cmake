@@ -148,6 +148,8 @@ set_aom_config_var(CONFIG_WIENER_NONSEP_CROSS_FILT 0 NUMBER
 set_aom_config_var(
   CONFIG_RST_MERGECOEFFS 0 NUMBER
   "AV2 in-loop restoration merging coefficients experiment flag")
+set_aom_config_var(CONFIG_EXT_SUPERRES 0 NUMBER
+                   "AV2 super resolution experiment flag")
 
 set_aom_config_var(CONFIG_COMPOUND_WARP_SAMPLES 1 NUMBER
                    "AV2 compound warped motion samples experiment flag")
