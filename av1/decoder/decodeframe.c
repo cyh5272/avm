@@ -3180,6 +3180,15 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
   av1_reset_loop_filter_delta(xd, num_planes);
   av1_reset_loop_restoration(xd, num_planes);
 
+#if CONFIG_REF_MV_BANK
+  av1_zero(xd->ref_mv_bank_left);
+  xd->ref_mv_bank_left_pt = &td->ref_mv_bank_left;
+#if REF_MV_BANK_COLS
+  av1_zero(xd->ref_mv_bank_above);
+  xd->ref_mv_bank_above_pt = td->ref_mv_bank_above;
+#endif  // REF_MV_BANK_COLS
+#endif  // CONFIG_REF_MV_BANK
+
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += cm->seq_params.mib_size) {
     av1_zero_left_context(xd);
@@ -3187,6 +3196,15 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
          mi_col += cm->seq_params.mib_size) {
       set_cb_buffer(pbi, dcb, &td->cb_buffer_base, num_planes, 0, 0);
+#if CONFIG_REF_MV_BANK
+      // td->ref_mv_bank_left is initialized as xd->ref_mv_bank_left, and used
+      // for MV referencing during decoding the tile.
+      // xd->ref_mv_bank_left is updated as decoding goes.
+      td->ref_mv_bank_left = xd->ref_mv_bank_left;
+#if REF_MV_BANK_COLS
+      av1_copy(td->ref_mv_bank_above, xd->ref_mv_bank_above);
+#endif  // REF_MV_BANK_COLS
+#endif  // CONFIG_REF_MV_BANK
 #if CONFIG_SDP
       decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
                           cm->seq_params.sb_size, 0x3);
