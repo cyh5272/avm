@@ -802,6 +802,9 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   cm->features.interp_filter =
       oxcf->tile_cfg.enable_large_scale_tile ? EIGHTTAP_REGULAR : SWITCHABLE;
   cm->features.switchable_motion_mode = 1;
+#if CONFIG_OPTFLOW_REFINEMENT
+  cm->features.opfl_refine_type = REFINE_SWITCHABLE;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   if (frm_dim_cfg->render_width > 0 && frm_dim_cfg->render_height > 0) {
     cm->render_width = frm_dim_cfg->render_width;

@@ -1526,6 +1526,10 @@ void av1_encode_frame(AV1_COMP *cpi) {
     rdc->compound_ref_used_flag = 0;
     rdc->skip_mode_used_flag = 0;
 
+#if CONFIG_OPTFLOW_REFINEMENT
+    features->opfl_refine_type = REFINE_SWITCHABLE;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+
     encode_frame_internal(cpi);
 
     if (current_frame->reference_mode == REFERENCE_MODE_SELECT) {

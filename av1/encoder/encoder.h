@@ -1191,8 +1191,14 @@ typedef struct FRAME_COUNTS {
   unsigned int refmv_mode[REFMV_MODE_CONTEXTS][2];
   unsigned int drl_mode[DRL_MODE_CONTEXTS][2];
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  unsigned int use_optflow[INTER_COMPOUND_MODE_CONTEXTS][2];
+  unsigned int inter_compound_mode[INTER_COMPOUND_MODE_CONTEXTS]
+                                  [INTER_COMPOUND_REF_TYPES];
+#else
   unsigned int inter_compound_mode[INTER_COMPOUND_MODE_CONTEXTS]
                                   [INTER_COMPOUND_MODES];
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   unsigned int wedge_idx[BLOCK_SIZES_ALL][16];
   unsigned int interintra[BLOCK_SIZE_GROUPS][2];
   unsigned int interintra_mode[BLOCK_SIZE_GROUPS][INTERINTRA_MODES];
@@ -1267,7 +1273,11 @@ typedef struct {
 } RdIdxPair;
 // TODO(angiebird): This is an estimated size. We still need to figure what is
 // the maximum number of modes.
+#if CONFIG_OPTFLOW_REFINEMENT
+#define MAX_INTER_MODES 1536
+#else
 #define MAX_INTER_MODES 1024
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 // TODO(any): rename this struct to something else. There is already another
 // struct called inter_mode_info, which makes this terribly confusing.
 /*!\endcond */

@@ -213,6 +213,23 @@ typedef struct {
   int cdef_bits; /*!< Number of CDEF strength values in bits */
 } CdefInfo;
 
+#if CONFIG_OPTFLOW_REFINEMENT
+enum {
+  /*!
+   * MV refinement disabled for the current frame.
+   */
+  REFINE_NONE = 0,
+  /*!
+   * MV refinement is switchable per block for the current frame.
+   */
+  REFINE_SWITCHABLE = 1,
+  /*!
+   * MV refinement applied to all compound blocks for the current frame.
+   */
+  REFINE_ALL = 2,
+} UENUM1BYTE(OPTFLOW_REFINE_TYPE);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+
 #if CONFIG_CCSO
 /** ccso info */
 typedef struct {
@@ -460,6 +477,13 @@ typedef struct {
    */
   int max_drl_bits;
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  /*!
+   * Ternary symbol for optical flow refinement type. 0: do not refine,
+   * 1: always refine, 2: switchable at block level.
+   */
+  OPTFLOW_REFINE_TYPE opfl_refine_type;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 } FeatureFlags;
 
 /*!
@@ -1285,6 +1309,21 @@ static INLINE RefCntBuffer *get_primary_ref_frame_buf(
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
 
+static INLINE int get_relative_dist(const OrderHintInfo *oh, int a, int b) {
+  if (!oh->enable_order_hint) return 0;
+
+  const int bits = oh->order_hint_bits_minus_1 + 1;
+
+  assert(bits >= 1);
+  assert(a >= 0 && a < (1 << bits));
+  assert(b >= 0 && b < (1 << bits));
+
+  int diff = a - b;
+  const int m = 1 << (bits - 1);
+  diff = (diff & (m - 1)) - (diff & m);
+  return diff;
+}
+
 // Returns 1 if this frame might allow mvs from some reference frame.
 static INLINE int frame_might_allow_ref_frame_mvs(const AV1_COMMON *cm) {
   return !cm->features.error_resilient_mode &&
@@ -1298,6 +1337,14 @@ static INLINE int frame_might_allow_warped_motion(const AV1_COMMON *cm) {
   return !cm->features.error_resilient_mode && !frame_is_intra_only(cm) &&
          cm->seq_params.enable_warped_motion;
 }
+
+#if CONFIG_OPTFLOW_REFINEMENT
+// Returns 1 if this frame might use optical flow refinement
+static INLINE int frame_might_allow_opfl_refine(const AV1_COMMON *cm) {
+  return !cm->features.error_resilient_mode && !frame_is_intra_only(cm) &&
+         cm->seq_params.order_hint_info.enable_order_hint;
+}
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
 static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
   const int buf_rows = buf->mi_rows;
