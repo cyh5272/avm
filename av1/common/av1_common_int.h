@@ -1519,6 +1519,7 @@ typedef struct AV1Common {
   /*!
    * True if chroma channels are using CNN restoration.
    */
+  // TODO(urvang): Separate out U and V?
   int use_cnn_uv;
 #endif  // CONFIG_CNN_RESTORATION
 } AV1_COMMON;
