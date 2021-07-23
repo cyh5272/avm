@@ -167,6 +167,10 @@ set_aom_config_var(CONFIG_QBASED_QP_OFFSET 1
                    "AV2 experiment flag to adjust q_offset based on QP.")
 set_aom_config_var(CONFIG_OPTFLOW_REFINEMENT 1
                    "AV2 experiment flag for optical flow MV refinement")
+set_aom_config_var(CONFIG_IBP_DIR 0
+                   "AV2 experiment flag to enable intra bi-prediction for directional modes.")
+set_aom_config_var(CONFIG_IBP_DC 0
+                   "AV2 experiment flag to enable intra bi-prediction for DC mode.")
 
 #
 # Variables in this section control optional features of the build system.
