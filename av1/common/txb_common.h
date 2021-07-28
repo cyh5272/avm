@@ -354,11 +354,19 @@ static INLINE void get_txb_ctx(const BLOCK_SIZE plane_bsize,
     }
   } else {
     const int ctx_base = get_entropy_context(tx_size, a, l);
+#if CONFIG_ALL_ZERO_CONTEXT
     const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
                             num_pels_log2_lookup[txsize_to_bsize[tx_size]])
                                ? 10
                                : 7;
     txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
+#else
+    const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                            num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                               ? 10
+                               : 7;
+    txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
+#endif
   }
 #undef MAX_TX_SIZE_UNIT
 }

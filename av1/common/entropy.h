@@ -27,7 +27,11 @@ extern "C" {
 
 #define TOKEN_CDF_Q_CTXS 4
 
+#if CONFIG_ALL_ZERO_CONTEXT
+#define TXB_SKIP_CONTEXTS 25
+#else
 #define TXB_SKIP_CONTEXTS 13
+#endif
 
 #define EOB_COEF_CONTEXTS 9
 

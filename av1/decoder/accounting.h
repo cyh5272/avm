@@ -17,6 +17,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+#define DUMP_BIN_BIT 1
+
 #define AOM_ACCOUNTING_HASH_SIZE (1021)
 
 /* Max number of entries for symbol types in the dictionary (increase as

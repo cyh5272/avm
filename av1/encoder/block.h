@@ -181,6 +181,12 @@ typedef struct {
   int eob_extra_cost[EOB_COEF_CONTEXTS][2];
   //! Cost for encoding the dc_sign
   int dc_sign_cost[DC_SIGN_CONTEXTS][2];
+#if CONFIG_SIGN_PRED_CONTEXT
+  //! Cost for encoding the v dc_sign
+  int dc_v_sign_cost[3][DC_SIGN_CONTEXTS][2];
+  //! Cost for encoding the v ac_sign
+  int ac_v_sign_cost[3][2];
+#endif
   //! Cost for encoding an increment to the coefficient
   int lps_cost[LEVEL_CONTEXTS][COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
 } LV_MAP_COEFF_COST;
@@ -733,7 +739,11 @@ typedef struct {
    ****************************************************************************/
   /**@{*/
   //! intra_inter_cost
+#if CONFIG_IS_INTER_CONTEXT
+  int intra_inter_cost[2][INTRA_INTER_CONTEXTS][2];
+#else
   int intra_inter_cost[INTRA_INTER_CONTEXTS][2];
+#endif
   //! inter_compound_mode_cost
   int inter_compound_mode_cost[INTER_COMPOUND_MODE_CONTEXTS]
                               [INTER_COMPOUND_MODES];

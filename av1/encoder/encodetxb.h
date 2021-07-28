@@ -25,8 +25,13 @@ extern "C" {
 #endif
 
 /*!\cond */
+#if CONFIG_ALL_ZERO_CONTEXT
+#define TXB_SKIP_CTX_MASK 31
+#define DC_SIGN_CTX_SHIFT 5
+#else
 #define TXB_SKIP_CTX_MASK 15
 #define DC_SIGN_CTX_SHIFT 4
+#endif
 #define DC_SIGN_CTX_MASK 3
 
 typedef struct TxbInfo {
@@ -362,6 +367,22 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 CB_COEFF_BUFFER *av1_get_cb_coeff_buffer(const struct AV1_COMP *cpi, int mi_row,
                                          int mi_col);
 
+#if CONFIG_ALL_ZERO_CONTEXT
+/*!\brief Returns the entropy cost associated with skipping the current
+ * transform block.
+ *
+ * \ingroup coefficient_coding
+ *
+ * \param[in]    coeff_costs    Table of entropy cost for coefficient coding.
+ * \param[in]    txb_ctx        Context info for entropy coding transform block
+ * skip flag (tx_skip) and the sign of DC coefficient (dc_sign).
+ * \param[in]    plane          The index of the current plane
+ * \param[in]    tx_size        The transform size
+ * \param[in]    x              Pointer to structure holding the data for the
+                                current encoding macroblock
+ * \param[in]    block          The index of the current transform block
+ */
+#else
 /*!\brief Returns the entropy cost associated with skipping the current
  * transform block.
  *
@@ -373,14 +394,27 @@ CB_COEFF_BUFFER *av1_get_cb_coeff_buffer(const struct AV1_COMP *cpi, int mi_row,
  * \param[in]    plane          The index of the current plane
  * \param[in]    tx_size        The transform size
  */
+#endif
 static INLINE int av1_cost_skip_txb(const CoeffCosts *coeff_costs,
                                     const TXB_CTX *const txb_ctx, int plane,
-                                    TX_SIZE tx_size) {
+                                    TX_SIZE tx_size
+#if CONFIG_ALL_ZERO_CONTEXT
+                                    ,
+                                    MACROBLOCK *x, int block
+#endif
+) {
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const LV_MAP_COEFF_COST *const coeff_costs_ =
       &coeff_costs->coeff_costs[txs_ctx][plane_type];
+#if CONFIG_ALL_ZERO_CONTEXT
+  const int txb_skip_ctx =
+      txb_ctx->txb_skip_ctx +
+      (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
+  return coeff_costs_->txb_skip_cost[txb_skip_ctx][1];
+#else
   return coeff_costs_->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
+#endif
 }
 
 /*!\cond */

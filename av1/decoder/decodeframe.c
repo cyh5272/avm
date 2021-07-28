@@ -3346,7 +3346,6 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
     return raw_data_end;
   }
   TileDataDec *const tile_data = pbi->tile_data + end_tile;
-
   return aom_reader_find_end(&tile_data->bit_reader);
 }
 
@@ -3901,6 +3900,7 @@ static AOM_INLINE void reset_dec_workers(AV1Decoder *pbi,
   }
 #if CONFIG_ACCOUNTING
   if (pbi->acct_enabled) {
+    aom_accounting_dump(&pbi->accounting);
     aom_accounting_reset(&pbi->accounting);
   }
 #endif
