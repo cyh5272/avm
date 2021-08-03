@@ -91,6 +91,14 @@ extern "C" {
 #if CONFIG_MRLS
 #define MRL_LINE_NUMBER 4
 #endif
+#if CONFIG_AIMC
+#define FIRST_MODE_COUNT 13
+#define SECOND_MODE_COUNT 16
+#define Y_MODE_CONTEXTS 3
+#define UV_MODE_CONTEXTS 2
+#define INTRA_MODE_SETS 4
+#define NON_DIRECTIONAL_MODES_COUNT 5
+#endif  // CONFIG_AIMC
 
 // Intra Secondary Transform
 #if CONFIG_IST

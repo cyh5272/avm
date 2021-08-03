@@ -637,6 +637,14 @@ typedef struct {
   //! mrl_index_cost
   int mrl_index_cost[MRL_LINE_NUMBER];
 #endif
+#if CONFIG_AIMC
+  // y mode cost
+  int y_primary_flag_cost[INTRA_MODE_SETS];
+  int y_first_mode_costs[Y_MODE_CONTEXTS][FIRST_MODE_COUNT];
+  int y_second_mode_costs[Y_MODE_CONTEXTS][SECOND_MODE_COUNT];
+  // uv mode cost
+  int uv_first_mode_costs[UV_MODE_CONTEXTS][UV_INTRA_MODES];
+#endif  // CONFIG_AIMC
 
 #if CONFIG_IST
   //! Cost of signaling secondary transform index

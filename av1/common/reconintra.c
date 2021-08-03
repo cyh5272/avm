@@ -543,6 +543,149 @@ static void init_intra_predictors_internal(void) {
 #undef intra_pred_allsizes
 }
 
+#if CONFIG_AIMC
+int get_intra_y_mode_context(MACROBLOCKD *const xd) {
+  const PREDICTION_MODE A = av1_get_block_joint_mode(xd->above_right_mbmi);
+  const PREDICTION_MODE L = av1_get_block_joint_mode(xd->bottom_left_mbmi);
+  const int isAboveAngular = A >= NON_DIRECTIONAL_MODES_COUNT ? 1 : 0;
+  const int isLeftAngular = L >= NON_DIRECTIONAL_MODES_COUNT ? 1 : 0;
+  return isAboveAngular + isLeftAngular;
+}
+/*! \brief set the luma intra mode and delta angles for a given mode index.
+ * \param[in]    mode_idx           mode index in intra mode decision
+ *                                  process.
+ * \param[in]    mbmi               Pointer to structure holding
+ *                                  the mode info for the current macroblock.
+ */
+void set_y_mode_and_delta_angle(const int mode_idx, MB_MODE_INFO *const mbmi) {
+  if (mode_idx < NON_DIRECTIONAL_MODES_COUNT) {
+    mbmi->mode = mode_idx;
+    mbmi->angle_delta[PLANE_TYPE_Y] = 0;
+  } else {
+    mbmi->mode = (mode_idx - NON_DIRECTIONAL_MODES_COUNT) / 7 +
+                 NON_DIRECTIONAL_MODES_COUNT;
+    mbmi->angle_delta[PLANE_TYPE_Y] =
+        (mode_idx - NON_DIRECTIONAL_MODES_COUNT) % 7 - 3;
+  }
+  mbmi->mode = reordered_nominal_mode[mbmi->mode];
+}
+
+void get_luma_intra_prediction_mode_set(MB_MODE_INFO *mi,
+                                        MACROBLOCKD *const xd) {
+  int mappedMode[2];
+  mappedMode[0] = av1_get_block_joint_mode(xd->bottom_left_mbmi);
+  mappedMode[1] = av1_get_block_joint_mode(xd->above_right_mbmi);
+  const int is_left_directional_mode =
+      mappedMode[0] >= NON_DIRECTIONAL_MODES_COUNT ? 1 : 0;
+  const int is_above_directional_mode =
+      mappedMode[1] >= NON_DIRECTIONAL_MODES_COUNT ? 1 : 0;
+  int isModeSelectedList[LUMA_MODE_COUNT];
+
+  const int is_small_block = (mi->sb_type[PLANE_TYPE_Y] < BLOCK_8X8);
+
+  int i, j;
+  int selectedModeIdx = 0;
+  for (i = 0; i < LUMA_MODE_COUNT; i++) {
+    isModeSelectedList[i] = -1;
+    mi->y_intra_mode_list[i] = -1;
+  }
+
+  // always put non-directional modes into the first positions of the mode list
+  for (i = 0; i < NON_DIRECTIONAL_MODES_COUNT; ++i) {
+    mi->y_intra_mode_list[selectedModeIdx++] = i;
+    isModeSelectedList[i] = 1;
+  }
+  if (is_small_block == 0) {
+    int directional_mode_cnt =
+        is_above_directional_mode + is_left_directional_mode;
+    if (directional_mode_cnt == 2 && mappedMode[0] == mappedMode[1])
+      directional_mode_cnt = 1;
+    // copy above mode to left mode, if left mode is non-directiona mode and
+    // above mode is directional mode
+    if (directional_mode_cnt == 1 && is_left_directional_mode == 0) {
+      mappedMode[0] = mappedMode[1];
+    }
+    for (i = 0; i < directional_mode_cnt; ++i) {
+      mi->y_intra_mode_list[selectedModeIdx++] = mappedMode[i];
+      isModeSelectedList[mappedMode[i]] = 1;
+    }
+
+    // Add offsets to derive the neighboring modes
+    for (i = 0; i < 4; ++i) {
+      for (j = 0; j < directional_mode_cnt; ++j) {
+        int leftDerivedMode =
+            (mappedMode[j] - i + (56 - NON_DIRECTIONAL_MODES_COUNT - 1)) % 56 +
+            NON_DIRECTIONAL_MODES_COUNT;
+        int rightDerivedMode =
+            (mappedMode[j] + i - (NON_DIRECTIONAL_MODES_COUNT - 1)) % 56 +
+            NON_DIRECTIONAL_MODES_COUNT;
+
+        if (isModeSelectedList[leftDerivedMode] == -1) {
+          mi->y_intra_mode_list[selectedModeIdx++] = leftDerivedMode;
+          isModeSelectedList[leftDerivedMode] = 1;
+        }
+        if (isModeSelectedList[rightDerivedMode] == -1) {
+          mi->y_intra_mode_list[selectedModeIdx++] = rightDerivedMode;
+          isModeSelectedList[rightDerivedMode] = 1;
+        }
+      }
+    }
+  }
+
+  // fill the remaining list with default modes
+  for (i = 0; i < LUMA_MODE_COUNT - NON_DIRECTIONAL_MODES_COUNT &&
+              selectedModeIdx < LUMA_MODE_COUNT;
+       ++i) {
+    if (isModeSelectedList[default_mode_list_y[i] +
+                           NON_DIRECTIONAL_MODES_COUNT] == -1) {
+      mi->y_intra_mode_list[selectedModeIdx++] =
+          default_mode_list_y[i] + NON_DIRECTIONAL_MODES_COUNT;
+      isModeSelectedList[default_mode_list_y[i] + NON_DIRECTIONAL_MODES_COUNT] =
+          1;
+    }
+  }
+}
+
+void get_uv_intra_prediction_mode_set(MB_MODE_INFO *mi) {
+  int isModeSelectedList[UV_INTRA_MODES];
+  int i;
+  int selectedModeIdx = 0;
+  for (i = 0; i < UV_INTRA_MODES; i++) {
+    isModeSelectedList[i] = -1;
+    mi->uv_intra_mode_list[i] = -1;
+  }
+  // put cfl mode into the mode list
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_CFL_PRED;
+  isModeSelectedList[UV_CFL_PRED] = 1;
+
+  if (av1_is_directional_mode(mi->mode)) {
+    mi->uv_intra_mode_list[selectedModeIdx++] = mi->mode;
+    isModeSelectedList[mi->mode] = 1;
+  }
+
+  // put non-directional modes into the mode list
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_DC_PRED;
+  isModeSelectedList[UV_DC_PRED] = 1;
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_SMOOTH_PRED;
+  isModeSelectedList[UV_SMOOTH_PRED] = 1;
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_SMOOTH_V_PRED;
+  isModeSelectedList[UV_SMOOTH_V_PRED] = 1;
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_SMOOTH_H_PRED;
+  isModeSelectedList[UV_SMOOTH_H_PRED] = 1;
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_PAETH_PRED;
+  isModeSelectedList[UV_PAETH_PRED] = 1;
+
+  // fill the remaining list with default modes
+  const int directional_mode_count = DIR_MODE_END - DIR_MODE_START;
+  for (i = 0; i < directional_mode_count; ++i) {
+    if (isModeSelectedList[default_mode_list_uv[i]] == -1) {
+      mi->uv_intra_mode_list[selectedModeIdx++] = default_mode_list_uv[i];
+      isModeSelectedList[default_mode_list_uv[i]] = 1;
+    }
+  }
+}
+#endif  // CONFIG_AIMC
+
 // Directional prediction, zone 1: 0 < angle < 90
 void av1_dr_prediction_z1_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
                             const uint8_t *above, const uint8_t *left,
@@ -1814,15 +1957,16 @@ static void build_intra_predictors_high(
 #endif
 }
 
-static void build_intra_predictors(
-    const MACROBLOCKD *xd, const uint8_t *ref, int ref_stride, uint8_t *dst,
-    int dst_stride, PREDICTION_MODE mode, int angle_delta,
-    FILTER_INTRA_MODE filter_intra_mode, TX_SIZE tx_size,
-    int disable_edge_filter, int n_top_px, int n_topright_px, int n_left_px,
-    int n_bottomleft_px, int plane
+static void build_intra_predictors(const MACROBLOCKD *xd, const uint8_t *ref,
+                                   int ref_stride, uint8_t *dst, int dst_stride,
+                                   PREDICTION_MODE mode, int angle_delta,
+                                   FILTER_INTRA_MODE filter_intra_mode,
+                                   TX_SIZE tx_size, int disable_edge_filter,
+                                   int n_top_px, int n_topright_px,
+                                   int n_left_px, int n_bottomleft_px, int plane
 #if CONFIG_MRLS
-    ,
-    int is_sb_boundary
+                                   ,
+                                   int is_sb_boundary
 #endif
 #if CONFIG_ORIP
     ,
