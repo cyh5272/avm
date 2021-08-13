@@ -1161,55 +1161,22 @@ static AOM_INLINE void setup_ref_mv_list(
       AOMMIN(cm->features.max_drl_bits + 1, MAX_REF_MV_STACK_SIZE);
   // If open slots are available, fetch reference MVs from the ref mv banks.
   if (*refmv_count < ref_mv_limit && ref_frame != INTRA_FRAME) {
-    const REF_MV_BANK *ref_mv_bank_left = xd->ref_mv_bank_left_pt;
-    const CANDIDATE_MV *queue_left = ref_mv_bank_left->rmb_buffer[ref_frame];
-    const int count_left = ref_mv_bank_left->rmb_count[ref_frame];
-    const int start_idx_left = ref_mv_bank_left->rmb_start_idx[ref_frame];
-    int idx_left = 0;
-#if REF_MV_BANK_COLS
-    const int col_bank_idx = av1_get_column_bank_index(cm, xd->mi_col);
-    // const int col_bank_idx = xd->mi_col / cm->seq_params.mib_size;
-    const REF_MV_BANK *ref_mv_bank_above =
-        &xd->ref_mv_bank_above_pt[col_bank_idx];
-    const int count_above = ref_mv_bank_above->rmb_count[ref_frame];
-    const CANDIDATE_MV *queue_above = ref_mv_bank_above->rmb_buffer[ref_frame];
-    const int start_idx_above = ref_mv_bank_above->rmb_start_idx[ref_frame];
-    int idx_above = 0;
-#endif  // REF_MV_BANK_COLS
+    const REF_MV_BANK *ref_mv_bank = xd->ref_mv_bank_pt;
+    const CANDIDATE_MV *queue = ref_mv_bank->rmb_buffer[ref_frame];
+    const int count = ref_mv_bank->rmb_count[ref_frame];
+    const int start_idx = ref_mv_bank->rmb_start_idx[ref_frame];
     const int is_comp = rf[1] > INTRA_FRAME;
     const int block_width = xd->width * MI_SIZE;
     const int block_height = xd->height * MI_SIZE;
 
-    do {
-      for (; idx_left < count_left && *refmv_count < ref_mv_limit; ++idx_left) {
-        const int idx =
-            (start_idx_left + count_left - 1 - idx_left) % REF_MV_BANK_SIZE;
-        const CANDIDATE_MV cand_mv = queue_left[idx];
-        if (check_rmb_cand(cand_mv, ref_mv_stack, ref_mv_weight, refmv_count,
-                           is_comp, xd->mi_row, xd->mi_col, block_width,
-                           block_height, cm->width, cm->height)) {
-          break;
-        }
-      }
-
-#if REF_MV_BANK_COLS
-      for (; idx_above < count_above && *refmv_count < ref_mv_limit;
-           ++idx_above) {
-        const int idx =
-            (start_idx_above + count_above - 1 - idx_above) % REF_MV_BANK_SIZE;
-        const CANDIDATE_MV cand_mv = queue_above[idx];
-        if (check_rmb_cand(cand_mv, ref_mv_stack, ref_mv_weight, refmv_count,
-                           is_comp, xd->mi_row, xd->mi_col, block_width,
-                           block_height, cm->width, cm->height)) {
-          break;
-        }
-      }
-
-      if (idx_left >= count_left && idx_above >= count_above) break;
-#else
-      if (idx_left >= count_left) break;
-#endif  // REF_MV_BANK_COLS
-    } while (*refmv_count < ref_mv_limit);
+    for (int idx_bank = 0; idx_bank < count && *refmv_count < ref_mv_limit;
+         ++idx_bank) {
+      const int idx = (start_idx + count - 1 - idx_bank) % REF_MV_BANK_SIZE;
+      const CANDIDATE_MV cand_mv = queue[idx];
+      check_rmb_cand(cand_mv, ref_mv_stack, ref_mv_weight, refmv_count, is_comp,
+                     xd->mi_row, xd->mi_col, block_width, block_height,
+                     cm->width, cm->height);
+    }
   }
 #endif  // CONFIG_REF_MV_BANK
 }
@@ -2255,12 +2222,7 @@ static INLINE void update_ref_mv_bank(const MB_MODE_INFO *const mbmi,
 
 void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi) {
-  update_ref_mv_bank(mbmi, &xd->ref_mv_bank_left);
-#if REF_MV_BANK_COLS
-  const int col_bank_idx = av1_get_column_bank_index(cm, xd->mi_col);
-  update_ref_mv_bank(mbmi, &xd->ref_mv_bank_above[col_bank_idx]);
-#else
+  update_ref_mv_bank(mbmi, &xd->ref_mv_bank);
   (void)cm;
-#endif  // REF_MV_BANK_COLS
 }
 #endif  // CONFIG_REF_MV_BANK

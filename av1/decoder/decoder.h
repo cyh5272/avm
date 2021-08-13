@@ -129,10 +129,7 @@ typedef struct ThreadData {
   cfl_store_inter_block_visitor_fn_t cfl_store_inter_block_visit;
 
 #if CONFIG_REF_MV_BANK
-  REF_MV_BANK ref_mv_bank_left;
-#if REF_MV_BANK_COLS
-  REF_MV_BANK ref_mv_bank_above[32];
-#endif  // REF_MV_BANK_COLS
+  REF_MV_BANK ref_mv_bank;
 #endif  // CONFIG_REF_MV_BANK
 } ThreadData;
 
