@@ -515,7 +515,7 @@ Example Test (x86_64):
           ;;
       esac
     - |
-      filter="-*Large:*MD5Test*:*TestVectorTest*:*InvalidFile*:*ExternalFrameBuffer*"
+      filter="-*Large*:*MD5Test*:*TestVectorTest*:*InvalidFile*:*ExternalFrameBuffer*"
       case $AOM_SANITIZER_TYPE in
         thread)
           filter="*Thread*:${filter}"
