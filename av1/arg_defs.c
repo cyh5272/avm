@@ -333,6 +333,10 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
                          "Enable cross component sample offset (0: false "
                          "1: true)"),
 #endif
+  .disable_ml_partition_speed_features =
+      ARG_DEF(NULL, "disable-ml-partition-speed-features", 1,
+              "Disable ML partition speed features "
+              "(0: false (default), 1: true)"),
   .enable_rect_partitions = ARG_DEF(NULL, "enable-rect-partitions", 1,
                                     "Enable rectangular partitions "
                                     "(0: false, 1: true (default))"),
@@ -342,6 +346,10 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
   .enable_1to4_partitions = ARG_DEF(NULL, "enable-1to4-partitions", 1,
                                     "Enable 1:4 and 4:1 partitions "
                                     "(0: false, 1: true (default))"),
+  .disable_ml_transform_speed_features =
+      ARG_DEF(NULL, "disable-ml-transform-speed-features", 1,
+              "Disable ML transform speed features "
+              "(0: false (default), 1: true)"),
 #if CONFIG_SDP
   .enable_sdp = ARG_DEF(NULL, "enable-sdp", 1,
                         "Enable semi decoupled partitioning for key frame"

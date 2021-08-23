@@ -201,6 +201,11 @@ typedef struct {
  */
 typedef struct {
   /*!
+   * Flag to indicate if ml-based speed-up for partition search should be
+   * disabled.
+   */
+  bool disable_ml_partition_speed_features;
+  /*!
    * Flag to indicate if rectanguar partitions should be enabled.
    */
   bool enable_rect_partitions;
@@ -279,6 +284,10 @@ typedef struct {
  * \brief Encoder flags for transform sizes and types.
  */
 typedef struct {
+  /*!
+   * Flag to disable ml based transform speed features.
+   */
+  bool disable_ml_transform_speed_features;
   /*!
    * Flag to indicate if 64-pt transform should be enabled.
    */
