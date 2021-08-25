@@ -44,10 +44,8 @@ README.md                {#LREADME}
 
 ### Get the code {#get-the-code}
 
-The AVM project source code is stored in the Alliance of Open Media’s GitLab 
-[repository](https://gitlab.com/AOMediaCodec/avm).
+The AVM project source code is stored in the Alliance of Open Media’s GitLab [repository](https://gitlab.com/AOMediaCodec/avm).
 To get the code, 
-
 
 ~~~
     $ git clone https://gitlab.com/AOMediaCodec/avm.git
@@ -137,10 +135,10 @@ generic at generation time:
 
 ### Cross compiling {#cross-compiling}
 
-For the purposes of building the AVM codec and applications, relative to the scope of this guide, 
+For the purposes of building the AVM codec and applications, relative to the scope of this guide,
 all builds for architectures differing from the native host architecture will be considered cross compiles.
-The AVM CMake build handles cross compiling via the use of toolchain files included in the 
-AVM repository. The available toolchain files can be found at cmake folder in the AVM repository. 
+The AVM CMake build handles cross compiling via the use of toolchain files included in the AVM repository.
+The available toolchain files can be found at cmake folder in the AVM repository.
 The following example demonstrates use of the x86-linux.cmake toolchain file on a x86_64 linux host:
 
 ~~~
@@ -279,12 +277,12 @@ rule:
 
 The above make command will only download and verify the test data.
 
-Additional input data for testing the encoder can be obtained from: 
-[AV2 - CTC](https://media.xiph.org/video/aomctc/test_set/) 
+Additional input data for testing the encoder can be obtained from:
+[AV2 - CTC](https://media.xiph.org/video/aomctc/test_set/)
 
 ### Sharded testing {#sharded-testing}
 
-The AVM codec library unit tests are built upon gtest which supports sharding of test jobs. 
+The AVM codec library unit tests are built upon gtest which supports sharding of test jobs.
 Sharded test runs can be achieved in a couple of ways. Below is one example:
 
 ~~~
@@ -297,7 +295,7 @@ Sharded test runs can be achieved in a couple of ways. Below is one example:
 ~~~
 
 To create a test shard for each CPU core available on the current system set
-`GTEST_TOTAL_SHARDS` to the number of CPU cores on your system minus one. 
+`GTEST_TOTAL_SHARDS` to the number of CPU cores on your system minus one.
 The maximum number of test targets that can run concurrently is determined by
 the number of CPUs on the system where the build is configured as detected by
 CMake. A system with 24 cores can run 24 test shards using a value of 24 with
@@ -317,7 +315,7 @@ file in the root of the repository.
 You can download clang-format using your system's package manager, or directly
 from [llvm.org](http://llvm.org/releases/download.html). You can also view the
 [documentation](https://clang.llvm.org/docs/ClangFormat.html) on llvm.org.
-Output from clang-format varies by clang-format version, 
+Output from clang-format varies by clang-format version,
 for best results your version should match the one used by Gitlab CI. You can find the clang-format
 version by reading the comment in the `.clang-format` file linked above.
 
@@ -347,20 +345,20 @@ Some Git installations have clang-format integration. Here are some examples:
 
 ## Submitting patches {#submitting-patches}
 
-We manage the submission of patches using Gitlab's 
-[merge request](https://docs.gitlab.com/ee/user/project/merge_requests/) process. 
-This tool implements a workflow on top of the Git version control system to ensure that 
+We manage the submission of patches using Gitlab's
+[merge request](https://docs.gitlab.com/ee/user/project/merge_requests/) process.
+This tool implements a workflow on top of the Git version control system to ensure that
 all changes get peer reviewed and tested prior to their distribution. 
 
 - Follow the one-time set-up steps as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#1-one-time-setup).
-- For pushing your code modifications, follow the steps detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#2-develop-a-tool-feature-bugfix-in-your-fork). 
-- Once the code is pushed into a branch, create a merge request as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#3-create-a-merge-request-mr). 
-    - The code review, approval and CI/CD process will be initiated after the MR is created. 
+- For pushing your code modifications, follow the steps detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#2-develop-a-tool-feature-bugfix-in-your-fork).
+- Once the code is pushed into a branch, create a merge request as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#3-create-a-merge-request-mr).
+    - The code review, approval and CI/CD process will be initiated after the MR is created.
     - Once the MR is approved, the software co-ordinators will merge the MR to the main branch.
-
+    
 Note: If you are not able to submit an MR, please contact SW coordinators to make sure necessary contributor agreements are signed for the AOMedia Project.
 
-Follow the Merge request page to check the status of the changes, review comments etc. 
+Follow the Merge request page to check the status of the changes, review comments etc.
 
 
 ### Testing your code {#testing-your-code}
