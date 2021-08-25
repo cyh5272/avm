@@ -368,8 +368,7 @@ Follow the Merge request page to check the status of the changes, review comment
 The testing basics are covered in the [testing section](#testing-the-avm-codec)
 above.
 
-In addition to the local tests, many more (e.g. asan, tsan, valgrind) will run
-through Jenkins instances upon upload to gerrit.
+In addition to the local tests, many more tests and/or configurations will run through Gitlab CI.
 
 ## Support {#support}
 
