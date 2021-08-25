@@ -1,6 +1,6 @@
 README.md                {#LREADME}
 =========
-# AV1 Codec Library
+# AVM Codec Library
 
 ## Contents
 1. [Building the lib and applications](#building-the-library-and-applications)
@@ -14,21 +14,13 @@ README.md                {#LREADME}
     - [Sanitizer support](#sanitizers)
     - [MSVC builds](#microsoft-visual-studio-builds)
     - [Xcode builds](#xcode-builds)
-    - [Emscripten builds](#emscripten-builds)
-    - [Extra Build Flags](#extra-build-flags)
     - [Build with VMAF support](#build-with-vmaf)
-2. [Testing the library](#testing-the-av1-codec)
+2. [Testing the library](#testing-the-avm-codec)
     - [Basics](#testing-basics)
         - [Unit tests](#1_unit-tests)
         - [Example tests](#2_example-tests)
-        - [Encoder tests](#3_encoder-tests)
-    - [IDE hosted tests](#ide-hosted-tests)
     - [Downloading test data](#downloading-the-test-data)
-    - [Adding a new test data file](#adding-a-new-test-data-file)
-    - [Additional test data](#additional-test-data)
     - [Sharded testing](#sharded-testing)
-        - [Running tests directly](#1_running-test_libaom-directly)
-        - [Running tests via CMake](#2_running-the-tests-via-the-cmake-build)
 3. [Coding style](#coding-style)
 4. [Submitting patches](#submitting-patches)
     - [Testing your code](#testing-your-code)
@@ -49,18 +41,18 @@ README.md                {#LREADME}
  5. Building the documentation requires
    [doxygen version 1.8.10 or newer](http://doxygen.org).
  6. Building the unit tests requires [Python](https://www.python.org/).
- 7. Emscripten builds require the portable
-   [EMSDK](https://kripken.github.io/emscripten-site/index.html).
 
 ### Get the code {#get-the-code}
 
-The AV1 library source code is stored in the Alliance for Open Media Git
-repository:
+The AVM project source code is stored in the Alliance of Open Media’s GitLab 
+[repository](https://gitlab.com/AOMediaCodec/avm).
+To get the code, 
+
 
 ~~~
-    $ git clone https://aomedia.googlesource.com/aom
-    # By default, the above command stores the source in the aom directory:
-    $ cd aom
+    $ git clone https://gitlab.com/AOMediaCodec/avm.git
+    # By default, the above command stores the source in the avm directory:
+    $ cd avm
 ~~~
 
 ### Basic build {#basic-build}
@@ -71,11 +63,11 @@ generator. For most systems the default generator is Unix Makefiles. The basic
 form of a makefile build is the following:
 
 ~~~
-    $ cmake path/to/aom
+    $ cmake path/to/avm
     $ make
 ~~~
 
-The above will generate a makefile build that produces the AV1 library and
+The above will generate a makefile build that produces the AVM library and
 applications for the current host system after the make step completes
 successfully. The compiler chosen varies by host platform, but a general rule
 applies: On systems where cc and c++ are present in $PATH at the time CMake is
@@ -83,32 +75,32 @@ run the generated build will use cc and c++ by default.
 
 ### Configuration options {#configuration-options}
 
-The AV1 codec library has a great many configuration options. These come in two
+The AVM codec library has a great many configuration options. These come in two
 varieties:
 
  1. Build system configuration options. These have the form `ENABLE_FEATURE`.
- 2. AV1 codec configuration options. These have the form `CONFIG_FEATURE`.
+ 2. AVM codec configuration options. These have the form `CONFIG_FEATURE`.
 
 Both types of options are set at the time CMake is run. The following example
-enables ccache and disables the AV1 encoder:
+enables ccache and disables the AVM encoder:
 
 ~~~
-    $ cmake path/to/aom -DENABLE_CCACHE=1 -DCONFIG_AV1_ENCODER=0
+    $ cmake path/to/avm -DENABLE_CCACHE=1 -DCONFIG_MULTITHREAD=0
     $ make
 ~~~
 
 The available configuration options are too numerous to list here. Build system
 configuration options can be found at the top of the CMakeLists.txt file found
-in the root of the AV1 repository, and AV1 codec configuration options can
+in the root of the AVM repository, and AVM codec configuration options can
 currently be found in the file `build/cmake/aom_config_defaults.cmake`.
 
 ### Dylib builds {#dylib-builds}
 
-A dylib (shared object) build of the AV1 codec library can be enabled via the
+A dylib (shared object) build of the AVM codec library can be enabled via the
 CMake built in variable `BUILD_SHARED_LIBS`:
 
 ~~~
-    $ cmake path/to/aom -DBUILD_SHARED_LIBS=1
+    $ cmake path/to/avm -DBUILD_SHARED_LIBS=1
     $ make
 ~~~
 
@@ -117,11 +109,11 @@ This is currently only supported on non-Windows targets.
 ### Debugging {#debugging}
 
 Depending on the generator used there are multiple ways of going about
-debugging AV1 components. For single configuration generators like the Unix
+debugging AVM components. For single configuration generators like the Unix
 Makefiles generator, setting `CMAKE_BUILD_TYPE` to Debug is sufficient:
 
 ~~~
-    $ cmake path/to/aom -DCMAKE_BUILD_TYPE=Debug
+    $ cmake path/to/avm -DCMAKE_BUILD_TYPE=Debug
 ~~~
 
 For Xcode, mainly because configuration controls for Xcode builds are buried two
@@ -129,7 +121,7 @@ configuration windows deep and must be set for each subproject within the Xcode
 IDE individually, `CMAKE_CONFIGURATION_TYPES` should be set to Debug:
 
 ~~~
-    $ cmake path/to/aom -G Xcode -DCMAKE_CONFIGURATION_TYPES=Debug
+    $ cmake path/to/avm -G Xcode -DCMAKE_CONFIGURATION_TYPES=Debug
 ~~~
 
 For Visual Studio the in-IDE configuration controls should be used. Simply set
@@ -140,52 +132,33 @@ code. To disable all assembly code and intrinsics set `AOM_TARGET_CPU` to
 generic at generation time:
 
 ~~~
-    $ cmake path/to/aom -DAOM_TARGET_CPU=generic
+    $ cmake path/to/avm -DAOM_TARGET_CPU=generic
 ~~~
 
 ### Cross compiling {#cross-compiling}
 
-For the purposes of building the AV1 codec and applications and relative to the
-scope of this guide, all builds for architectures differing from the native host
-architecture will be considered cross compiles. The AV1 CMake build handles
-cross compiling via the use of toolchain files included in the AV1 repository.
-The toolchain files available at the time of this writing are:
-
- - arm64-ios.cmake
- - arm64-linux-gcc.cmake
- - arm64-mingw-gcc.cmake
- - armv7-ios.cmake
- - armv7-linux-gcc.cmake
- - armv7-mingw-gcc.cmake
- - armv7s-ios.cmake
- - mips32-linux-gcc.cmake
- - mips64-linux-gcc.cmake
- - x86-ios-simulator.cmake
- - x86-linux.cmake
- - x86-macos.cmake
- - x86-mingw-gcc.cmake
- - x86\_64-ios-simulator.cmake
- - x86\_64-mingw-gcc.cmake
-
-The following example demonstrates use of the x86-macos.cmake toolchain file on
-a x86\_64 MacOS host:
+For the purposes of building the AVM codec and applications, relative to the scope of this guide, 
+all builds for architectures differing from the native host architecture will be considered cross compiles.
+The AVM CMake build handles cross compiling via the use of toolchain files included in the 
+AVM repository. The available toolchain files can be found at cmake folder in the AVM repository. 
+The following example demonstrates use of the x86-linux.cmake toolchain file on a x86_64 linux host:
 
 ~~~
-    $ cmake path/to/aom \
-      -DCMAKE_TOOLCHAIN_FILE=path/to/aom/build/cmake/toolchains/x86-macos.cmake
+    $ cmake path/to/avm \
+      -DCMAKE_TOOLCHAIN_FILE=path/to/avm/build/cmake/toolchains/x86-linux.cmake
     $ make
 ~~~
 
 To build for an unlisted target creation of a new toolchain file is the best
 solution. The existing toolchain files can be used a starting point for a new
 toolchain file since each one exposes the basic requirements for toolchain files
-as used in the AV1 codec build.
+as used in the AVM codec build.
 
-As a temporary work around an unoptimized AV1 configuration that builds only C
+As a temporary work around an unoptimized AVM configuration that builds only C
 and C++ sources can be produced using the following commands:
 
 ~~~
-    $ cmake path/to/aom -DAOM_TARGET_CPU=generic
+    $ cmake path/to/avm -DAOM_TARGET_CPU=generic
     $ make
 ~~~
 
@@ -200,7 +173,7 @@ sanitizer, add `-DSANITIZE=<type>` to the CMake command line. For example, to
 enable address sanitizer:
 
 ~~~
-    $ cmake path/to/aom -DSANITIZE=address
+    $ cmake path/to/avm -DSANITIZE=address
     $ make
 ~~~
 
@@ -209,7 +182,7 @@ compiler documentation to determine which, if any, are available.
 
 ### Microsoft Visual Studio builds {#microsoft-visual-studio-builds}
 
-Building the AV1 codec library in Microsoft Visual Studio is supported. Visual
+Building the AVM codec library in Microsoft Visual Studio is supported. Visual
 Studio 2019 (16.7) or later is required. The following example demonstrates
 generating projects and a solution for the Microsoft IDE:
 
@@ -218,11 +191,11 @@ generating projects and a solution for the Microsoft IDE:
     # This assumes the build host is a Windows x64 computer.
 
     # To build with Visual Studio 2019 for the x64 target:
-    $ cmake path/to/aom -G "Visual Studio 16 2019"
+    $ cmake path/to/avm -G "Visual Studio 16 2019"
     $ cmake --build .
 
     # To build with Visual Studio 2019 for the 32-bit x86 target:
-    $ cmake path/to/aom -G "Visual Studio 16 2019" -A Win32
+    $ cmake path/to/avm -G "Visual Studio 16 2019" -A Win32
     $ cmake --build .
 ~~~
 
@@ -231,99 +204,36 @@ NOTE: The build system targets Windows 7 or later by compiling files with
 
 ### Xcode builds {#xcode-builds}
 
-Building the AV1 codec library in Xcode is supported. The following example
+Building the AVM codec library in Xcode is supported. The following example
 demonstrates generating an Xcode project:
 
 ~~~
-    $ cmake path/to/aom -G Xcode
-~~~
-
-### Emscripten builds {#emscripten-builds}
-
-Building the AV1 codec library with Emscripten is supported. Typically this is
-used to hook into the AOMAnalyzer GUI application. These instructions focus on
-using the inspector with AOMAnalyzer, but all tools can be built with
-Emscripten.
-
-It is assumed here that you have already downloaded and installed the EMSDK,
-installed and activated at least one toolchain, and setup your environment
-appropriately using the emsdk\_env script.
-
-1. Download [AOMAnalyzer](https://people.xiph.org/~mbebenita/analyzer/).
-
-2. Configure the build:
-
-~~~
-    $ cmake path/to/aom \
-        -DENABLE_CCACHE=1 \
-        -DAOM_TARGET_CPU=generic \
-        -DENABLE_DOCS=0 \
-        -DENABLE_TESTS=0 \
-        -DCONFIG_ACCOUNTING=1 \
-        -DCONFIG_INSPECTION=1 \
-        -DCONFIG_MULTITHREAD=0 \
-        -DCONFIG_RUNTIME_CPU_DETECT=0 \
-        -DCONFIG_WEBM_IO=0 \
-        -DCMAKE_TOOLCHAIN_FILE=path/to/emsdk-portable/.../Emscripten.cmake
-~~~
-
-3. Build it: run make if that's your generator of choice:
-
-~~~
-    $ make inspect
-~~~
-
-4. Run the analyzer:
-
-~~~
-    # inspect.js is in the examples sub directory of the directory in which you
-    # executed cmake.
-    $ path/to/AOMAnalyzer path/to/examples/inspect.js path/to/av1/input/file
-~~~
-
-### Extra build flags {#extra-build-flags}
-
-Three variables allow for passing of additional flags to the build system.
-
-- AOM\_EXTRA\_C\_FLAGS
-- AOM\_EXTRA\_CXX\_FLAGS
-- AOM\_EXTRA\_EXE\_LINKER\_FLAGS
-
-The build system attempts to ensure the flags passed through the above variables
-are passed to tools last in order to allow for override of default behavior.
-These flags can be used, for example, to enable asserts in a release build:
-
-~~~
-    $ cmake path/to/aom \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DAOM_EXTRA_C_FLAGS=-UNDEBUG \
-        -DAOM_EXTRA_CXX_FLAGS=-UNDEBUG
+    $ cmake path/to/avm -G Xcode
 ~~~
 
 ### Build with VMAF support {#build-with-vmaf}
 
 After installing
-[libvmaf.a](https://github.com/Netflix/vmaf/blob/master/resource/doc/libvmaf.md),
+[libvmaf.a](https://github.com/Netflix/vmaf/blob/master/libvmaf/README.md),
 you can use it with the encoder:
 
 ~~~
-    $ cmake path/to/aom -DCONFIG_TUNE_VMAF=1
+    $ cmake path/to/avm -DCONFIG_TUNE_VMAF=1
 ~~~
 
 Please note that the default VMAF model
-("/usr/local/share/model/vmaf_v0.6.1.pkl")
 will be used unless you set the following flag when running the encoder:
 
 ~~~
     # --vmaf-model-path=path/to/model
 ~~~
 
-## Testing the AV1 codec {#testing-the-av1-codec}
+## Testing the AVM codec {#testing-the-avm-codec}
 
 ### Testing basics {#testing-basics}
 
-There are several methods of testing the AV1 codec. All of these methods require
-the presence of the AV1 source code and a working build of the AV1 library and
+There are several methods of testing the AVM codec. All of these methods require
+the presence of the AVM source code and a working build of the AVM library and
 applications.
 
 #### 1. Unit tests: {#1_unit-tests}
@@ -334,8 +244,8 @@ The unit tests can be run at build time:
     # Before running the make command the LIBAOM_TEST_DATA_PATH environment
     # variable should be set to avoid downloading the test files to the
     # cmake build configuration directory.
-    $ cmake path/to/aom
-    # Note: The AV1 CMake build creates many test targets. Running make
+    $ cmake path/to/avm
+    # Note: The AVM CMake build creates many test targets. Running make
     # with multiple jobs will speed up the test run significantly.
     $ make runtests
 ~~~
@@ -346,80 +256,13 @@ The example tests require a bash shell and can be run in the following manner:
 
 ~~~
     # See the note above about LIBAOM_TEST_DATA_PATH above.
-    $ cmake path/to/aom
+    $ cmake path/to/avm
     $ make
     # It's best to build the testdata target using many make jobs.
     # Running it like this will verify and download (if necessary)
     # one at a time, which takes a while.
     $ make testdata
-    $ path/to/aom/test/examples.sh --bin-path examples
-~~~
-
-#### 3. Encoder tests: {#3_encoder-tests}
-
-When making a change to the encoder run encoder tests to confirm that your
-change has a positive or negligible impact on encode quality. When running these
-tests the build configuration should be changed to enable internal encoder
-statistics:
-
-~~~
-    $ cmake path/to/aom -DCONFIG_INTERNAL_STATS=1
-    $ make
-~~~
-
-The repository contains scripts intended to make running these tests as simple
-as possible. The following example demonstrates creating a set of baseline clips
-for comparison to results produced after making your change to libaom:
-
-~~~
-    # This will encode all Y4M files in the current directory using the
-    # settings specified to create the encoder baseline statistical data:
-    $ cd path/to/test/inputs
-    # This command line assumes that run_encodes.sh, its helper script
-    # best_encode.sh, and the aomenc you intend to test are all within a
-    # directory in your PATH.
-    $ run_encodes.sh 200 500 50 baseline
-~~~
-
-After making your change and creating the baseline clips, you'll need to run
-encodes that include your change(s) to confirm that things are working as
-intended:
-
-~~~
-    # This will encode all Y4M files in the current directory using the
-    # settings specified to create the statistical data for your change:
-    $ cd path/to/test/inputs
-    # This command line assumes that run_encodes.sh, its helper script
-    # best_encode.sh, and the aomenc you intend to test are all within a
-    # directory in your PATH.
-    $ run_encodes.sh 200 500 50 mytweak
-~~~
-
-After creating both data sets you can use `test/visual_metrics.py` to generate a
-report that can be viewed in a web browser:
-
-~~~
-    $ visual_metrics.py metrics_template.html "*stt" baseline mytweak \
-      > mytweak.html
-~~~
-
-You can view the report by opening mytweak.html in a web browser.
-
-
-### IDE hosted tests {#ide-hosted-tests}
-
-By default the generated projects files created by CMake will not include the
-runtests and testdata rules when generating for IDEs like Microsoft Visual
-Studio and Xcode. This is done to avoid intolerably long build cycles in the
-IDEs-- IDE behavior is to build all targets when selecting the build project
-options in MSVS and Xcode. To enable the test rules in IDEs the
-`ENABLE_IDE_TEST_HOSTING` variable must be enabled at CMake generation time:
-
-~~~
-    # This example uses Xcode. To get a list of the generators
-    # available, run cmake with the -G argument missing its
-    # value.
-    $ cmake path/to/aom -DENABLE_IDE_TEST_HOSTING=1 -G Xcode
+    $ path/to/avm/test/examples.sh --bin-path examples
 ~~~
 
 ### Downloading the test data {#downloading-the-test-data}
@@ -429,48 +272,20 @@ a build using the Unix Makefiles generator, and then to build only the testdata
 rule:
 
 ~~~
-    $ cmake path/to/aom -G "Unix Makefiles"
+    $ cmake path/to/avm -G "Unix Makefiles"
     # 28 is used because there are 28 test files as of this writing.
     $ make -j28 testdata
 ~~~
 
 The above make command will only download and verify the test data.
 
-### Adding a new test data file {#adding-a-new-test-data-file}
-
-First, add the new test data file to the `aom-test-data` bucket of the
-`aomedia-testing` project on Google Cloud Platform. You may need to ask someone
-with the necessary access permissions to do this for you.
-
-NOTE: When a new test data file is added to the `aom-test-data` bucket, its
-"Public access" is initially "Not public". We need to change its
-"Public access" to "Public" by using the following
-[`gsutil`](https://cloud.google.com/storage/docs/gsutil_install) command:
-~~~
-    $ gsutil acl ch -g all:R gs://aom-test-data/test-data-file-name
-~~~
-This command grants the `AllUsers` group READ access to the file named
-"test-data-file-name" in the `aom-test-data` bucket.
-
-Once the new test data file has been added to `aom-test-data`, create a CL to
-add the name of the new test data file to `test/test_data_util.cmake` and add
-the SHA1 checksum of the new test data file to `test/test-data.sha1`. (The SHA1
-checksum of a file can be calculated by running the `sha1sum` command on the
-file.)
-
-### Additional test data {#additional-test-data}
-
-The test data mentioned above is strictly intended for unit testing.
-
-Additional input data for testing the encoder can be obtained from:
-https://media.xiph.org/video/derf/
+Additional input data for testing the encoder can be obtained from: 
+[AV2 - CTC](https://media.xiph.org/video/aomctc/test_set/) 
 
 ### Sharded testing {#sharded-testing}
 
-The AV1 codec library unit tests are built upon gtest which supports sharding of
-test jobs. Sharded test runs can be achieved in a couple of ways.
-
-#### 1. Running test\_libaom directly: {#1_running-test_libaom-directly}
+The AVM codec library unit tests are built upon gtest which supports sharding of test jobs. 
+Sharded test runs can be achieved in a couple of ways. Below is one example:
 
 ~~~
    # Set the environment variable GTEST_TOTAL_SHARDS to control the number of
@@ -482,21 +297,7 @@ test jobs. Sharded test runs can be achieved in a couple of ways.
 ~~~
 
 To create a test shard for each CPU core available on the current system set
-`GTEST_TOTAL_SHARDS` to the number of CPU cores on your system minus one.
-
-#### 2. Running the tests via the CMake build: {#2_running-the-tests-via-the-cmake-build}
-
-~~~
-    # For IDE based builds, ENABLE_IDE_TEST_HOSTING must be enabled. See
-    # the IDE hosted tests section above for more information. If the IDE
-    # supports building targets concurrently tests will be sharded by default.
-
-    # For make and ninja builds the -j parameter controls the number of shards
-    # at test run time. This example will run the tests using 10 shards via
-    # make.
-    $ make -j10 runtests
-~~~
-
+`GTEST_TOTAL_SHARDS` to the number of CPU cores on your system minus one. 
 The maximum number of test targets that can run concurrently is determined by
 the number of CPUs on the system where the build is configured as detected by
 CMake. A system with 24 cores can run 24 test shards using a value of 24 with
@@ -564,7 +365,7 @@ Follow the Merge request page to check the status of the changes, review comment
 
 ### Testing your code {#testing-your-code}
 
-The testing basics are covered in the [testing section](#testing-the-av1-codec)
+The testing basics are covered in the [testing section](#testing-the-avm-codec)
 above.
 
 In addition to the local tests, many more (e.g. asan, tsan, valgrind) will run
