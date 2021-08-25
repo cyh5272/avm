@@ -31,14 +31,7 @@ README.md                {#LREADME}
         - [Running tests via CMake](#2_running-the-tests-via-the-cmake-build)
 3. [Coding style](#coding-style)
 4. [Submitting patches](#submitting-patches)
-    - [Login cookie](#login-cookie)
-    - [Contributor agreement](#contributor-agreement)
     - [Testing your code](#testing-your-code)
-    - [Commit message hook](#commit-message-hook)
-    - [Upload your change](#upload-your-change)
-    - [Incorporating Reviewer Comments](#incorporating-reviewer-comments)
-    - [Submitting your change](#submitting-your-change)
-    - [Viewing change status](#viewing-the-status-of-uploaded-changes)
 5. [Support](#support)
 6. [Bug reports](#bug-reports)
 
@@ -517,14 +510,14 @@ We are using the Google C Coding Style defined by the
 
 The coding style used by this project is enforced with clang-format using the
 configuration contained in the
-[.clang-format](https://chromium.googlesource.com/webm/aom/+/master/.clang-format)
+[.clang-format](https://gitlab.com/AOMediaCodec/avm/-/blob/main/.clang-format)
 file in the root of the repository.
 
 You can download clang-format using your system's package manager, or directly
 from [llvm.org](http://llvm.org/releases/download.html). You can also view the
 [documentation](https://clang.llvm.org/docs/ClangFormat.html) on llvm.org.
-Output from clang-format varies by clang-format version, for best results your
-version should match the one used on Jenkins. You can find the clang-format
+Output from clang-format varies by clang-format version, 
+for best results your version should match the one used by Gitlab CI. You can find the clang-format
 version by reading the comment in the `.clang-format` file linked above.
 
 Before pushing changes for review you can format your code with:
@@ -553,23 +546,21 @@ Some Git installations have clang-format integration. Here are some examples:
 
 ## Submitting patches {#submitting-patches}
 
-We manage the submission of patches using the
-[Gerrit](https://www.gerritcodereview.com/) code review tool. This tool
-implements a workflow on top of the Git version control system to ensure that
-all changes get peer reviewed and tested prior to their distribution.
+We manage the submission of patches using Gitlab's 
+[merge request](https://docs.gitlab.com/ee/user/project/merge_requests/) process. 
+This tool implements a workflow on top of the Git version control system to ensure that 
+all changes get peer reviewed and tested prior to their distribution. 
 
-### Login cookie {#login-cookie}
+- Follow the one-time set-up steps as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#1-one-time-setup).
+- For pushing your code modifications, follow the steps detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#2-develop-a-tool-feature-bugfix-in-your-fork). 
+- Once the code is pushed into a branch, create a merge request as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#3-create-a-merge-request-mr). 
+    - The code review, approval and CI/CD process will be initiated after the MR is created. 
+    - Once the MR is approved, the software co-ordinators will merge the MR to the main branch.
 
-Browse to [AOMedia Git index](https://aomedia.googlesource.com/) and login with
-your account (Gmail credentials, for example). Next, follow the
-`Generate Password` Password link at the top of the page. You’ll be given
-instructions for creating a cookie to use with our Git repos.
+Note: If you are not able to submit an MR, please contact SW coordinators to make sure necessary contributor agreements are signed for the AOMedia Project.
 
-### Contributor agreement {#contributor-agreement}
+Follow the Merge request page to check the status of the changes, review comments etc. 
 
-You will be required to execute a
-[contributor agreement](http://aomedia.org/license) to ensure that the AOMedia
-Project has the right to distribute your changes.
 
 ### Testing your code {#testing-your-code}
 
@@ -578,76 +569,6 @@ above.
 
 In addition to the local tests, many more (e.g. asan, tsan, valgrind) will run
 through Jenkins instances upon upload to gerrit.
-
-### Commit message hook {#commit-message-hook}
-
-Gerrit requires that each submission include a unique Change-Id. You can assign
-one manually using git commit --amend, but it’s easier to automate it with the
-commit-msg hook provided by Gerrit.
-
-Copy commit-msg to the `.git/hooks` directory of your local repo. Here's an
-example:
-
-~~~
-    $ curl -Lo aom/.git/hooks/commit-msg https://chromium-review.googlesource.com/tools/hooks/commit-msg
-
-    # Next, ensure that the downloaded commit-msg script is executable:
-    $ chmod u+x aom/.git/hooks/commit-msg
-~~~
-
-See the Gerrit
-[documentation](https://gerrit-review.googlesource.com/Documentation/user-changeid.html)
-for more information.
-
-### Upload your change {#upload-your-change}
-
-The command line to upload your patch looks like this:
-
-~~~
-    $ git push https://aomedia-review.googlesource.com/aom HEAD:refs/for/master
-~~~
-
-### Incorporating reviewer comments {#incorporating-reviewer-comments}
-
-If you previously uploaded a change to Gerrit and the Approver has asked for
-changes, follow these steps:
-
-1. Edit the files to make the changes the reviewer has requested.
-2. Recommit your edits using the --amend flag, for example:
-
-~~~
-   $ git commit -a --amend
-~~~
-
-3. Use the same git push command as above to upload to Gerrit again for another
-   review cycle.
-
-In general, you should not rebase your changes when doing updates in response to
-review. Doing so can make it harder to follow the evolution of your change in
-the diff view.
-
-### Submitting your change {#submitting-your-change}
-
-Once your change has been Approved and Verified, you can “submit” it through the
-Gerrit UI. This will usually automatically rebase your change onto the branch
-specified.
-
-Sometimes this can’t be done automatically. If you run into this problem, you
-must rebase your changes manually:
-
-~~~
-    $ git fetch
-    $ git rebase origin/branchname
-~~~
-
-If there are any conflicts, resolve them as you normally would with Git. When
-you’re done, reupload your change.
-
-### Viewing the status of uploaded changes {#viewing-the-status-of-uploaded-changes}
-
-To check the status of a change that you uploaded, open
-[Gerrit](https://aomedia-review.googlesource.com/), sign in, and click My >
-Changes.
 
 ## Support {#support}
 
