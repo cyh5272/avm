@@ -44,9 +44,7 @@ README.md                {#LREADME}
 
 ### Get the code {#get-the-code}
 
-The AVM project source code is stored in the Alliance of Open Media’s GitLab [repository](https://gitlab.com/AOMediaCodec/avm).
-To get the code, 
-
+The AVM project source code is stored in the Alliance of Open Media’s GitLab [repository](https://gitlab.com/AOMediaCodec/avm). To get the code,
 ~~~
     $ git clone https://gitlab.com/AOMediaCodec/avm.git
     # By default, the above command stores the source in the avm directory:
@@ -348,15 +346,15 @@ Some Git installations have clang-format integration. Here are some examples:
 We manage the submission of patches using Gitlab's
 [merge request](https://docs.gitlab.com/ee/user/project/merge_requests/) process.
 This tool implements a workflow on top of the Git version control system to ensure that
-all changes get peer reviewed and tested prior to their distribution. 
+all changes get peer reviewed and tested prior to their distribution.
+If you are not able to submit an MR, please contact SW coordinators to make sure necessary
+contributor agreements are signed for the AOMedia Project.
 
 - Follow the one-time set-up steps as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#1-one-time-setup).
 - For pushing your code modifications, follow the steps detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#2-develop-a-tool-feature-bugfix-in-your-fork).
 - Once the code is pushed into a branch, create a merge request as detailed [here](https://gitlab.com/AOMediaCodec/avm/-/wikis/AVM:-Software-Development-Workflow#3-create-a-merge-request-mr).
     - The code review, approval and CI/CD process will be initiated after the MR is created.
     - Once the MR is approved, the software co-ordinators will merge the MR to the main branch.
-    
-Note: If you are not able to submit an MR, please contact SW coordinators to make sure necessary contributor agreements are signed for the AOMedia Project.
 
 Follow the Merge request page to check the status of the changes, review comments etc.
 
