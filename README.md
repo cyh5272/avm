@@ -651,10 +651,10 @@ Changes.
 
 ## Support {#support}
 
-This library is an open source project supported by its community. Please
-please email aomediacodec@jointdevelopment.kavi.com for help.
+This library is an open source project supported by its community.
+Please please email https://aomedia.org/contact/ for help.
 
 ## Bug reports {#bug-reports}
 
 Bug reports can be filed in the Alliance for Open Media
-[issue tracker](https://bugs.chromium.org/p/aomedia/issues/list).
+[Gitlab issue tracker](https://gitlab.com/AOMediaCodec/avm/-/issues).
