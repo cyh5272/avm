@@ -450,6 +450,9 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #if CONFIG_CCSO
   seq->enable_ccso = tool_cfg->enable_ccso;
 #endif
+#if CONFIG_OPTFLOW_REFINEMENT
+  seq->enable_opfl_refine = tool_cfg->enable_opfl_refine;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
   seq->enable_masked_compound = oxcf->comp_type_cfg.enable_masked_comp;

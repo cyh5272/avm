@@ -1527,7 +1527,15 @@ void av1_encode_frame(AV1_COMP *cpi) {
     rdc->skip_mode_used_flag = 0;
 
 #if CONFIG_OPTFLOW_REFINEMENT
-    features->opfl_refine_type = REFINE_SWITCHABLE;
+    if (cm->seq_params.enable_opfl_refine == 3) {
+      // Auto mode: encoder decides which refine type to use for each frame.
+      // For now, set all frame to REFINE_SWITCHABLE. The search or heuristic
+      // that encoder can use is left for future work.
+      features->opfl_refine_type = REFINE_SWITCHABLE;
+    } else {
+      // 0: REFINE_NONE, 1: REFINE_SWTICHABLE, 2: REFINE_ALL
+      features->opfl_refine_type = cm->seq_params.enable_opfl_refine;
+    }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
     encode_frame_internal(cpi);

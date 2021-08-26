@@ -3427,6 +3427,10 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #if CONFIG_ORIP
   aom_wb_write_bit(wb, seq_params->enable_orip);
 #endif
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (seq_params->order_hint_info.enable_order_hint)
+    aom_wb_write_literal(wb, seq_params->enable_opfl_refine, 2);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 }
 
 static AOM_INLINE void write_global_motion_params(
@@ -3821,12 +3825,8 @@ static AOM_INLINE void write_uncompressed_header_obu(
       write_frame_interp_filter(features->interp_filter, wb);
       aom_wb_write_bit(wb, features->switchable_motion_mode);
 #if CONFIG_OPTFLOW_REFINEMENT
-      if (frame_might_allow_opfl_refine(cm)) {
-        aom_wb_write_bit(wb, features->opfl_refine_type & 1);
-        if (features->opfl_refine_type == 0)
-          aom_wb_write_bit(wb, features->opfl_refine_type >> 1);
-      } else {
-        assert(features->opfl_refine_type == 0);
+      if (cm->seq_params.enable_opfl_refine == 3) {
+        aom_wb_write_literal(wb, features->opfl_refine_type, 2);
       }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       if (frame_might_allow_ref_frame_mvs(cm)) {

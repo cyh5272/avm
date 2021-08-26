@@ -352,6 +352,12 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_angle_delta;
+#if CONFIG_OPTFLOW_REFINEMENT
+  /*!\brief enable optical flow refinement
+   *
+   */
+  unsigned int enable_opfl_refine;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   /*!\brief enable intra edge filter
    *
    */
