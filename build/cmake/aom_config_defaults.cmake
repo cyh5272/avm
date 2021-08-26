@@ -152,11 +152,11 @@ set_aom_config_var(
 set_aom_config_var(
   CONFIG_ORIP 1
   "AV2 experiment flag to enable offset based refinement of intra prediction.")
-set_aom_config_var(CONFIG_IST 1 NUMBER
+set_aom_config_var(CONFIG_IST 0 NUMBER
                    "AV2 experiment flag to enable intra secondary transform.")
-set_aom_config_var(CONFIG_NEW_INTER_MODES 1 NUMBER
+set_aom_config_var(CONFIG_NEW_INTER_MODES 0 NUMBER
                    "AV2 inter mode consolidation experiment flag")
-set_aom_config_var(CONFIG_SMVP_IMPROVEMENT 1 "Enable SMVP improvement")
+set_aom_config_var(CONFIG_SMVP_IMPROVEMENT 0 "Enable SMVP improvement")
 set_aom_config_var(CONFIG_TMVP_IMPROVEMENT 1 "Enable TMVP improvement")
 set_aom_config_var(
   CONFIG_CCSO 1 "AV2 experiment flag to enable cross component sample offset.")
