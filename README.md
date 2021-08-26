@@ -1,6 +1,8 @@
+# AVM
+
 [TOC]
 
-## Building the library and applications
+## Building
 
 ### Prerequisites
 
@@ -180,7 +182,7 @@ will be used unless you set the following flag when running the encoder:
     # --vmaf-model-path=path/to/model
 ~~~
 
-## Testing the AVM codec
+## Testing
 
 ### Testing basics
 
@@ -314,13 +316,6 @@ contributor agreements are signed for the AOMedia Project.
 
 Follow the Merge request page to check the status of the changes, review comments etc.
 
-
-### Testing your code
-
-The testing basics are covered in the [testing section](#testing-the-avm-codec)
-above.
-
-In addition to the local tests, many more tests and/or configurations will run through Gitlab CI.
 
 ## Support
 
