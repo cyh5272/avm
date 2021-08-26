@@ -140,8 +140,8 @@ set_aom_config_var(CONFIG_REMOVE_DIST_WTD_COMP 1
 set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
                    "AV2 experiment flag to remove dual filter.")
 
-set_aom_config_var(CONFIG_SDP 1 NUMBER "AV2 Semi-Decoupled Partitioning.")
-set_aom_config_var(CONFIG_EXTQUANT 1
+set_aom_config_var(CONFIG_SDP 0 NUMBER "AV2 Semi-Decoupled Partitioning.")
+set_aom_config_var(CONFIG_EXTQUANT 0
                    "AV2 extended quantization experiment flag")
 set_aom_config_var(CONFIG_COMPOUND_WARP_SAMPLES 1 NUMBER
                    "AV2 compound warped motion samples experiment flag")
