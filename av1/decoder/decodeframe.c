@@ -3104,7 +3104,12 @@ static AOM_INLINE void decode_tile_sb_row(AV1Decoder *pbi, ThreadData *const td,
 
     sync_read(&tile_data->dec_row_mt_sync, sb_row_in_tile, sb_col_in_tile);
 
-    // Decoding of the super-block
+#if CONFIG_REF_MV_BANK
+    DecoderCodingBlock *const dcb = &td->dcb;
+    MACROBLOCKD *const xd = &dcb->xd;
+    xd->ref_mv_bank.rmb_sb_hits = 0;
+#endif  // CONFIG_REF_MV_BANK
+        // Decoding of the super-block
 #if CONFIG_SDP
     decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
                         cm->seq_params.sb_size, 0x2);
@@ -3196,6 +3201,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
       // td->ref_mv_bank is initialized as xd->ref_mv_bank, and used
       // for MV referencing during decoding the tile.
       // xd->ref_mv_bank is updated as decoding goes.
+      xd->ref_mv_bank.rmb_sb_hits = 0;
       td->ref_mv_bank = xd->ref_mv_bank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_SDP
@@ -3639,7 +3645,10 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
          mi_col += cm->seq_params.mib_size) {
       set_cb_buffer(pbi, dcb, pbi->cb_buffer_base, num_planes, mi_row, mi_col);
 
-      // Bit-stream parsing of the superblock
+#if CONFIG_REF_MV_BANK
+      xd->ref_mv_bank.rmb_sb_hits = 0;
+#endif  // CONFIG_REF_MV_BANK
+        // Bit-stream parsing of the superblock
 #if CONFIG_SDP
       decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
                           cm->seq_params.sb_size, 0x1);

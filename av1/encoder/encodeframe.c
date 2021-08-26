@@ -739,6 +739,10 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
     x->source_variance = UINT_MAX;
     td->mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
 
+#if CONFIG_REF_MV_BANK
+    xd->ref_mv_bank.rmb_sb_hits = 0;
+#endif  // CONFIG_REF_MV_BANK
+
     // Get segment id and skip flag
     const struct segmentation *const seg = &cm->seg;
     int seg_skip = 0;

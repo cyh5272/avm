@@ -374,6 +374,7 @@ static INLINE int av1_is_dv_valid(const MV dv, const AV1_COMMON *cm,
 }
 
 #if CONFIG_REF_MV_BANK
+#define MAX_RMB_SB_HITS 64
 void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi);
 #endif  // CONFIG_REF_MV_BANK

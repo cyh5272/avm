@@ -2184,6 +2184,11 @@ static INLINE void update_ref_mv_bank(const MB_MODE_INFO *const mbmi,
   const int count = ref_mv_bank->rmb_count[ref_frame];
   int found = -1;
 
+  // If max hits have been reached return.
+  if (ref_mv_bank->rmb_sb_hits >= MAX_RMB_SB_HITS) return;
+  // else increment count and proceed with updating.
+  ++ref_mv_bank->rmb_sb_hits;
+
   // Check if current MV is already existing in the buffer.
   for (int i = 0; i < count; ++i) {
     const int idx = (start_idx + i) % REF_MV_BANK_SIZE;

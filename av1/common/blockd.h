@@ -664,6 +664,10 @@ typedef struct {
    * Circular buffer storing the ref MVs.
    */
   CANDIDATE_MV rmb_buffer[MODE_CTX_REF_FRAMES][REF_MV_BANK_SIZE];
+  /*!
+   * Total number of mbmi updates conducted in SB
+   */
+  int rmb_sb_hits;
 } REF_MV_BANK;
 #endif  // CONFIG_REF_MV_BANK
 
