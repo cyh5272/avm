@@ -135,9 +135,9 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
-set_aom_config_var(CONFIG_REMOVE_DIST_WTD_COMP 1
+set_aom_config_var(CONFIG_REMOVE_DIST_WTD_COMP 0
                    "AV2 experiment flag to remove dist_wtd_comp tool.")
-set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
+set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 0
                    "AV2 experiment flag to remove dual filter.")
 
 set_aom_config_var(CONFIG_SDP 1 NUMBER "AV2 Semi-Decoupled Partitioning.")
