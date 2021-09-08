@@ -1462,6 +1462,10 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
     tx_type = idx_map[idx];
     txfm_param.tx_type = tx_type;
 
+#if CONFIG_IST
+    txfm_param.sec_tx_type = 0;
+#endif
+
     av1_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
                     &quant_param);
 
@@ -1491,6 +1495,10 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   for (idx = start_v; idx < end_v; ++idx) {
     tx_type = idx_map_v[idx_v[idx] * 4];
     txfm_param.tx_type = tx_type;
+
+#if CONFIG_IST
+    txfm_param.sec_tx_type = 0;
+#endif
 
     av1_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
                     &quant_param);
@@ -1579,6 +1587,10 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       continue;
     }
     txfm_param.tx_type = tx_type;
+
+#if CONFIG_IST
+    txfm_param.sec_tx_type = 0;
+#endif
 
     // do txfm and quantization
     av1_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,

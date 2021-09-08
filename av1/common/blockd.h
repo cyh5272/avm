@@ -1431,8 +1431,8 @@ static INLINE int block_signals_sec_tx_type(const MACROBLOCKD *xd,
   const int height = tx_size_high[tx_size];
   const int sb_size = (width >= 8 && height >= 8) ? 8 : 4;
   bool ist_eob = 1;
-  if (((sb_size == 4) && (eob > IST_4x4_HEIGHT - 1)) ||
-      ((sb_size == 8) && (eob > IST_8x8_HEIGHT - 1))) {
+  if (((sb_size == 4) && (eob > IST_4x4_HEIGHT)) ||
+      ((sb_size == 8) && (eob > IST_8x8_HEIGHT))) {
     ist_eob = 0;
   }
   const int depth = tx_size_to_depth(tx_size, bs);
