@@ -1522,7 +1522,7 @@ static void build_intra_predictors_high(
     }
 #endif
 
-#if CONFIG_ORIP
+#if CONFIG_ORIP && !CONFIG_ORIP_NONDC_DISABLED
     if (apply_sub_block_based_refinement_filter &&
         (p_angle == 90 || p_angle == 180) &&
         !disable_intra_pred_filter_for_hor_ver_mode) {
@@ -1777,6 +1777,7 @@ static void build_intra_predictors_high(
     }
 #endif
 #if CONFIG_ORIP
+#if !CONFIG_ORIP_NONDC_DISABLED
     // Apply sub-block based filter for horizontal/vertical intra mode
     apply_sub_block_based_refinement_filter &=
         av1_allow_orip_dir(p_angle, disable_intra_pred_filter_for_hor_ver_mode);
@@ -1784,6 +1785,7 @@ static void build_intra_predictors_high(
       av1_apply_orip_4x4subblock_hbd(dst, dst_stride, tx_size, above_row,
                                      left_col, mode, xd->bd);
     }
+#endif
 #endif
     return;
   }
@@ -1917,7 +1919,7 @@ static void build_intra_predictors(
     }
 #endif
 
-#if CONFIG_ORIP
+#if CONFIG_ORIP && !CONFIG_ORIP_NONDC_DISABLED
     if (apply_sub_block_based_refinement_filter &&
         (p_angle == 90 || p_angle == 180) &&
         !disable_intra_pred_filter_for_hor_ver_mode) {
@@ -2168,6 +2170,7 @@ static void build_intra_predictors(
 #endif
 
 #if CONFIG_ORIP
+#if !CONFIG_ORIP_NONDC_DISABLED
     // Apply sub-block based filter for horizontal/vertical intra mode
     apply_sub_block_based_refinement_filter &=
         av1_allow_orip_dir(p_angle, disable_intra_pred_filter_for_hor_ver_mode);
@@ -2175,6 +2178,7 @@ static void build_intra_predictors(
       av1_apply_orip_4x4subblock(dst, dst_stride, tx_size, above_row, left_col,
                                  mode);
     }
+#endif
 #endif
     return;
   }

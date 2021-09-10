@@ -154,6 +154,10 @@ set_aom_config_var(
 set_aom_config_var(
   CONFIG_ORIP 1
   "AV2 experiment flag to enable offset based refinement of intra prediction.")
+set_aom_config_var(CONFIG_ORIP_DC_DISABLED 0
+                   "AV2 experiment flag to disable ORIP for DC mode.")
+set_aom_config_var(CONFIG_ORIP_NONDC_DISABLED 0
+                   "AV2 experiment flag to disable ORIP for non-DC modes.")
 set_aom_config_var(CONFIG_IST 1 NUMBER
                    "AV2 experiment flag to enable intra secondary transform.")
 set_aom_config_var(CONFIG_NEW_INTER_MODES 1 NUMBER
