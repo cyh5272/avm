@@ -19,8 +19,9 @@
 #include "common/tf_lite_includes.h"
 
 #define CFG_MAX_LEN 256
-#define NUM_MODELS 6
-#define NUM_LEVELS 3
+#define NUM_MODELS 4
+#define NUM_LEVELS 6
+#define DEF_LEVEL 1
 
 #define Y4M_HDR_MAX_LEN 256
 #define Y4M_HDR_MAX_WORDS 16
@@ -38,24 +39,33 @@
 
 namespace {
 
-#include "examples/cnn_restore/sr2by1_tflite.h"
 #include "examples/cnn_restore/sr2by1_1_tflite.h"
 #include "examples/cnn_restore/sr2by1_2_tflite.h"
-#include "examples/cnn_restore/sr3by2_tflite.h"
+#include "examples/cnn_restore/sr2by1_3_tflite.h"
+#include "examples/cnn_restore/sr2by1_4_tflite.h"
+#include "examples/cnn_restore/sr2by1_5_tflite.h"
+#include "examples/cnn_restore/sr2by1_6_tflite.h"
+
 #include "examples/cnn_restore/sr3by2_1_tflite.h"
 #include "examples/cnn_restore/sr3by2_2_tflite.h"
-#include "examples/cnn_restore/sr4by3_tflite.h"
+#include "examples/cnn_restore/sr3by2_3_tflite.h"
+#include "examples/cnn_restore/sr3by2_4_tflite.h"
+#include "examples/cnn_restore/sr3by2_5_tflite.h"
+#include "examples/cnn_restore/sr3by2_6_tflite.h"
+
 #include "examples/cnn_restore/sr4by3_1_tflite.h"
 #include "examples/cnn_restore/sr4by3_2_tflite.h"
-#include "examples/cnn_restore/sr5by4_tflite.h"
+#include "examples/cnn_restore/sr4by3_3_tflite.h"
+#include "examples/cnn_restore/sr4by3_4_tflite.h"
+#include "examples/cnn_restore/sr4by3_5_tflite.h"
+#include "examples/cnn_restore/sr4by3_6_tflite.h"
+
 #include "examples/cnn_restore/sr5by4_1_tflite.h"
 #include "examples/cnn_restore/sr5by4_2_tflite.h"
-#include "examples/cnn_restore/sr6by5_tflite.h"
-#include "examples/cnn_restore/sr6by5_1_tflite.h"
-#include "examples/cnn_restore/sr6by5_2_tflite.h"
-#include "examples/cnn_restore/sr7by6_tflite.h"
-#include "examples/cnn_restore/sr7by6_1_tflite.h"
-#include "examples/cnn_restore/sr7by6_2_tflite.h"
+#include "examples/cnn_restore/sr5by4_3_tflite.h"
+#include "examples/cnn_restore/sr5by4_4_tflite.h"
+#include "examples/cnn_restore/sr5by4_5_tflite.h"
+#include "examples/cnn_restore/sr5by4_6_tflite.h"
 
 void RegisterSelectedOps(::tflite::MutableOpResolver *resolver) {
   resolver->AddBuiltin(::tflite::BuiltinOperator_ADD,
@@ -78,10 +88,13 @@ static void usage_and_exit(char *prog) {
   printf("      <upsampling_ratio>\n");
   printf("          in form <p>:<q>[:<c>] where <p>/<q> is the upsampling\n");
   printf("          ratio with <p> greater than <q>.\n");
-  printf("          <c> is optional compression level in [0, 1, 2]\n");
-  printf("              0: no compression (default)\n");
-  printf("              1: light compression\n");
-  printf("              2: heavy compression\n");
+  printf("          <c> is optional compression level in [1 - 6]\n");
+  printf("              1: light inter compression\n");
+  printf("              2: medium inter compression\n");
+  printf("              3: heavy inter compression\n");
+  printf("              4: light intra compression\n");
+  printf("              5: medium intra compression\n");
+  printf("              6: heavy intra compression\n");
   printf("      <y4m_output>\n");
   printf("      \n");
   exit(EXIT_FAILURE);
@@ -113,10 +126,10 @@ static int parse_rational_config(char *cfg, int *p, int *q, int *c) {
   *p = atoi(cfgwords[0]);
   *q = atoi(cfgwords[1]);
   if (*p <= 0 || *q <= 0 || *p < *q) return 0;
-  *c = 0;
+  *c = DEF_LEVEL;
   if (ncfgwords < 3) return 1;
   *c = atoi(cfgwords[2]);
-  if (*c < 0 || *c >= NUM_LEVELS) return 0;
+  if (*c < 1 || *c > NUM_LEVELS) return 0;
   return 1;
 }
 
@@ -149,22 +162,23 @@ static int parse_info(char *hdrwords[], int nhdrwords, int *width, int *height,
 }
 
 static const double model_ratios[NUM_MODELS] = { 2.0 / 1.0, 3.0 / 2.0,
-                                                 4.0 / 3.0, 5.0 / 4.0,
-                                                 6.0 / 5.0, 7.0 / 6.0 };
+                                                 4.0 / 3.0, 5.0 / 4.0 };
 
 const unsigned char *tflite_data[NUM_MODELS][NUM_LEVELS] = {
-  { _tmp_sr2by1_tflite, _tmp_sr2by1_1_tflite, _tmp_sr2by1_2_tflite },
-  { _tmp_sr3by2_tflite, _tmp_sr3by2_1_tflite, _tmp_sr3by2_2_tflite },
-  { _tmp_sr4by3_tflite, _tmp_sr4by3_1_tflite, _tmp_sr4by3_2_tflite },
-  { _tmp_sr5by4_tflite, _tmp_sr5by4_1_tflite, _tmp_sr5by4_2_tflite },
-  { _tmp_sr6by5_tflite, _tmp_sr6by5_1_tflite, _tmp_sr6by5_2_tflite },
-  { _tmp_sr7by6_tflite, _tmp_sr7by6_1_tflite, _tmp_sr7by6_2_tflite },
+  { sr2by1_1_tflite, sr2by1_2_tflite, sr2by1_3_tflite, sr2by1_4_tflite,
+    sr2by1_5_tflite, sr2by1_6_tflite },
+  { sr3by2_1_tflite, sr3by2_2_tflite, sr3by2_3_tflite, sr3by2_4_tflite,
+    sr3by2_5_tflite, sr3by2_6_tflite },
+  { sr4by3_1_tflite, sr4by3_2_tflite, sr4by3_3_tflite, sr4by3_4_tflite,
+    sr4by3_5_tflite, sr4by3_6_tflite },
+  { sr5by4_1_tflite, sr5by4_2_tflite, sr5by4_3_tflite, sr5by4_4_tflite,
+    sr5by4_5_tflite, sr5by4_6_tflite },
 };
 
 static const unsigned char *get_model(int code, int level) {
   if (code == -1 || code >= NUM_MODELS) return NULL;
-  if (level < 0 || level >= NUM_LEVELS) return NULL;
-  return tflite_data[code][level];
+  if (level < 1 || level > NUM_LEVELS) return NULL;
+  return tflite_data[code][level - 1];
 }
 
 static int search_best_model(int p, int q) {

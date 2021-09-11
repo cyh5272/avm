@@ -37,10 +37,11 @@ UTILITY
 The utility produced by the source above is cnn_restore_y4m, which
 can be used to restore the y-channel of an input y4m video. Currently
 the models supported are meant to be used after down-compress-up
-processing where the down/up ratio is one of {2:1, 3:2, 4:3, 5:4, 6:5, 7:6}.
+processing where the down/up ratio is one of {2:1, 3:2, 4:3, 5:4}.
 Further for each ratio three compression levels are supported:
-{no compression, light compression, heavy compression}. Thus a total
-of 18 models can be used.
+{light compression, medium compression, heavy compression}. In addition
+for each ratio-conpression pair, two separate models are used for
+inter frames and intra-only frames. Thus a total of 24 models are used.
 
 Usage:
   ./cnn_restore_y4m
@@ -49,30 +50,33 @@ Usage:
       <upsampling_ratio>
           in form <p>:<q>[:<c>] where <p>/<q> is the upsampling
           ratio with <p> greater than <q>.
-          <c> is optional compression level in [0, 1, 2]
-              0: no compression (default)
-              1: light compression
-              2: heavy compression
+          <c> is optional compression level in [1 - 6]
+              1: light inter compression (default)
+              2: medium inter compression
+              3: heavy inter compression
+              4: light intra compression
+              5: medium intra compression
+              6: heavy intra compression
       <y4m_output>
 
 Examples:
   ./cnn_restore_y4m /tmp/my_downup.y4m 128 4:3 /tmp/my_downup_sr.y4m
 
     Restore 128 frames of /tmp/my_downup.y4m into /tmp/my_downup_sr.y4m assuming
-    the source was downsampled by 4:3, not compressed, upsampled by 4:3 to
+    the source was downsampled by 4:3, lightly compressed, upsampled by 4:3 to
     get back to the original resolution.
 
-  ./cnn_restore_y4m /tmp/my_downup.y4m 128 3:2:1 /tmp/my_downup_sr.y4m
+  ./cnn_restore_y4m /tmp/my_downup.y4m 128 3:2:2 /tmp/my_downup_sr.y4m
 
     Restore 128 frames of /tmp/my_downup.y4m into /tmp/my_downup_sr.y4m assuming
-    the source was downsampled by 3:2, compressed lightly, upsampled by 3:2 to
-    get back to the original resolution.]
+    the source was downsampled by 3:2, compressed medium in inter mode,
+    upsampled by 3:2 to get back to the original resolution.]
 
-  ./cnn_restore_y4m /tmp/my_downup.y4m 128 5:4:2 /tmp/my_downup_sr.y4m
+  ./cnn_restore_y4m /tmp/my_downup.y4m 128 5:4:6 /tmp/my_downup_sr.y4m
 
     Restore 128 frames of /tmp/my_downup.y4m into /tmp/my_downup_sr.y4m assuming
-    the source was downsampled by 5:4, compressed heavily, upsampled by 5:4 to
-    get back to the original resolution.]
+    the source was downsampled by 5:4, compressed heavily in intra mode,
+    upsampled by 5:4 to get back to the original resolution.]
 
 
 Note, the utility lanczos_resample_y4m built from source in tools/lanczos

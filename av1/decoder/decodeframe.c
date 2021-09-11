@@ -42,6 +42,9 @@
 #if CONFIG_INSPECTION
 #include "av1/decoder/inspection.h"
 #endif
+#if CONFIG_CNN_RESTORATION
+#include "av1/common/cnn_tflite.h"
+#endif  // CONFIG_CNN_RESTORATION
 #include "av1/common/common.h"
 #include "av1/common/entropy.h"
 #include "av1/common/entropymode.h"
@@ -1724,6 +1727,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #else
     for (int plane = 0; plane < num_planes; ++plane) {
 #endif
+#if CONFIG_CNN_RESTORATION
+      if (cm->use_cnn[plane]) continue;
+#endif  // CONFIG_CNN_RESTORATION
       int rcol0, rcol1, rrow0, rrow1;
       if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
                                              &rcol0, &rcol1, &rrow0, &rrow1)) {
@@ -1959,6 +1965,18 @@ static AOM_INLINE void setup_segmentation(AV1_COMMON *const cm,
   segfeatures_copy(&cm->cur_frame->seg, seg);
 }
 
+#if CONFIG_CNN_RESTORATION
+static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
+  if (av1_use_cnn(cm)) {
+    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+      cm->use_cnn[plane] = aom_rb_read_bit(rb);
+    }
+  } else {
+    memset(cm->use_cnn, 0, sizeof(cm->use_cnn));
+  }
+}
+#endif  // CONFIG_CNN_RESTORATION
+
 static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
                                                struct aom_read_bit_buffer *rb) {
   assert(!cm->features.all_lossless);
@@ -1967,12 +1985,29 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
     RestorationInfo *rsi = &cm->rst_info[p];
+#if CONFIG_CNN_RESTORATION
+    if (cm->use_cnn[p]) {
+      rsi->frame_restoration_type = RESTORE_NONE;
+      continue;
+    }
+#endif  // CONFIG_CNN_RESTORATION
     if (aom_rb_read_bit(rb)) {
-      rsi->frame_restoration_type =
-          aom_rb_read_bit(rb) ? RESTORE_SGRPROJ : RESTORE_WIENER;
+      if (aom_rb_read_bit(rb)) {
+        rsi->frame_restoration_type = RESTORE_SGRPROJ;
+      } else {
+        rsi->frame_restoration_type = RESTORE_WIENER;
+      }
     } else {
-      rsi->frame_restoration_type =
-          aom_rb_read_bit(rb) ? RESTORE_SWITCHABLE : RESTORE_NONE;
+      if (aom_rb_read_bit(rb)) {
+        rsi->frame_restoration_type = RESTORE_SWITCHABLE;
+      } else {
+#if CONFIG_WIENER_NONSEP
+        rsi->frame_restoration_type =
+            aom_rb_read_bit(rb) ? RESTORE_WIENER_NONSEP : RESTORE_NONE;
+#else
+        rsi->frame_restoration_type = RESTORE_NONE;
+#endif  // CONFIG_WIENER_NONSEP
+      }
     }
     if (rsi->frame_restoration_type != RESTORE_NONE) {
       all_none = 0;
@@ -1988,7 +2023,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       cm->rst_info[p].restoration_unit_size = sb_size;
 
     RestorationInfo *rsi = &cm->rst_info[0];
-
+    // TODO(urvang): Could save some bits by not reading restoration unit size
+    // for Y plane, when use_cnn_plane = 1.
     if (sb_size == 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }
@@ -2015,10 +2051,20 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
   }
 }
 
-static AOM_INLINE void read_wiener_filter(int wiener_win,
+static AOM_INLINE void read_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                           WienerInfo *wiener_info,
                                           WienerInfo *ref_wiener_info,
                                           aom_reader *rb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal =
+      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
+  if (equal) {
+    memcpy(wiener_info, ref_wiener_info, sizeof(*wiener_info));
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
   memset(wiener_info->vfilter, 0, sizeof(wiener_info->vfilter));
   memset(wiener_info->hfilter, 0, sizeof(wiener_info->hfilter));
 
@@ -2076,9 +2122,20 @@ static AOM_INLINE void read_wiener_filter(int wiener_win,
   memcpy(ref_wiener_info, wiener_info, sizeof(*wiener_info));
 }
 
-static AOM_INLINE void read_sgrproj_filter(SgrprojInfo *sgrproj_info,
+static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
+                                           SgrprojInfo *sgrproj_info,
                                            SgrprojInfo *ref_sgrproj_info,
                                            aom_reader *rb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal =
+      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
+  if (equal) {
+    memcpy(sgrproj_info, ref_sgrproj_info, sizeof(*sgrproj_info));
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
   sgrproj_info->ep = aom_read_literal(rb, SGRPROJ_PARAMS_BITS, ACCT_STR);
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
 
@@ -2113,6 +2170,38 @@ static AOM_INLINE void read_sgrproj_filter(SgrprojInfo *sgrproj_info,
   memcpy(ref_sgrproj_info, sgrproj_info, sizeof(*sgrproj_info));
 }
 
+#if CONFIG_WIENER_NONSEP
+static void read_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
+                                 WienerNonsepInfo *wienerns_info,
+                                 WienerNonsepInfo *ref_wienerns_info,
+                                 aom_reader *rb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal =
+      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
+  if (equal) {
+    memcpy(wienerns_info, ref_wienerns_info, sizeof(*wienerns_info));
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
+  int beg_feat = is_uv ? wienerns_y : 0;
+  int end_feat = is_uv ? wienerns_y + wienerns_uv : wienerns_y;
+  const int(*wienerns_coeffs)[3] = is_uv ? wienerns_coeff_uv : wienerns_coeff_y;
+
+  set_default_wiener_nonsep(wienerns_info);
+  for (int i = beg_feat; i < end_feat; ++i) {
+    wienerns_info->nsfilter[i] += aom_read_primitive_refsubexpfin(
+        rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+        wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+        ref_wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        ACCT_STR);
+  }
+  memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
+}
+#endif  // CONFIG_WIENER_NONSEP
+
 static AOM_INLINE void loop_restoration_read_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, aom_reader *const r, int plane,
     int runit_idx) {
@@ -2123,8 +2212,14 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
   assert(!cm->features.all_lossless);
 
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
+#if CONFIG_WIENER_NONSEP
+  const int is_uv = (plane > 0);
+#endif  // CONFIG_WIENER_NONSEP
   WienerInfo *wiener_info = xd->wiener_info + plane;
   SgrprojInfo *sgrproj_info = xd->sgrproj_info + plane;
+#if CONFIG_WIENER_NONSEP
+  WienerNonsepInfo *wiener_nonsep_info = xd->wiener_nonsep_info + plane;
+#endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
     rui->restoration_type =
@@ -2132,27 +2227,44 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
                         RESTORE_SWITCHABLE_TYPES, ACCT_STR);
     switch (rui->restoration_type) {
       case RESTORE_WIENER:
-        read_wiener_filter(wiener_win, &rui->wiener_info, wiener_info, r);
+        read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
         break;
       case RESTORE_SGRPROJ:
-        read_sgrproj_filter(&rui->sgrproj_info, sgrproj_info, r);
+        read_sgrproj_filter(xd, &rui->sgrproj_info, sgrproj_info, r);
         break;
+#if CONFIG_WIENER_NONSEP
+      case RESTORE_WIENER_NONSEP:
+        read_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+                             wiener_nonsep_info, r);
+        break;
+#endif  // CONFIG_WIENER_NONSEP
       default: assert(rui->restoration_type == RESTORE_NONE); break;
     }
   } else if (rsi->frame_restoration_type == RESTORE_WIENER) {
     if (aom_read_symbol(r, xd->tile_ctx->wiener_restore_cdf, 2, ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER;
-      read_wiener_filter(wiener_win, &rui->wiener_info, wiener_info, r);
+      read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
   } else if (rsi->frame_restoration_type == RESTORE_SGRPROJ) {
     if (aom_read_symbol(r, xd->tile_ctx->sgrproj_restore_cdf, 2, ACCT_STR)) {
       rui->restoration_type = RESTORE_SGRPROJ;
-      read_sgrproj_filter(&rui->sgrproj_info, sgrproj_info, r);
+      read_sgrproj_filter(xd, &rui->sgrproj_info, sgrproj_info, r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
+#if CONFIG_WIENER_NONSEP
+  } else if (rsi->frame_restoration_type == RESTORE_WIENER_NONSEP) {
+    if (aom_read_symbol(r, xd->tile_ctx->wiener_nonsep_restore_cdf, 2,
+                        ACCT_STR)) {
+      rui->restoration_type = RESTORE_WIENER_NONSEP;
+      read_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+                           wiener_nonsep_info, r);
+    } else {
+      rui->restoration_type = RESTORE_NONE;
+    }
+#endif  // CONFIG_WIENER_NONSEP
   }
 }
 
@@ -2215,6 +2327,7 @@ static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
   CdefInfo *const cdef_info = &cm->cdef_info;
 
   if (cm->features.allow_intrabc) return;
+
   cdef_info->cdef_damping = aom_rb_read_literal(rb, 2) + 3;
   cdef_info->cdef_bits = aom_rb_read_literal(rb, 2);
   cdef_info->nb_cdef_strengths = 1 << cdef_info->cdef_bits;
@@ -5567,7 +5680,10 @@ static int read_uncompressed_header(AV1Decoder *pbi,
     cm->rst_info[2].frame_restoration_type = RESTORE_NONE;
   }
   setup_loopfilter(cm, rb);
-
+#if CONFIG_CNN_RESTORATION
+  memset(cm->use_cnn, 0, sizeof(cm->use_cnn));
+  if (!features->coded_lossless) decode_cnn(cm, rb);
+#endif  // CONFIG_CNN_RESTORATION
   if (!features->coded_lossless && seq_params->enable_cdef) {
     setup_cdef(cm, rb);
   }
@@ -5836,6 +5952,15 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
     }
 #endif
 
+#if CONFIG_CNN_RESTORATION
+    assert(IMPLIES(cm->use_cnn[0],
+                   cm->rst_info[0].frame_restoration_type == RESTORE_NONE));
+    assert(IMPLIES(cm->use_cnn[1],
+                   cm->rst_info[1].frame_restoration_type == RESTORE_NONE));
+    assert(IMPLIES(cm->use_cnn[2],
+                   cm->rst_info[2].frame_restoration_type == RESTORE_NONE));
+#endif  // CONFIG_CNN_RESTORATION
+
     const int do_loop_restoration =
         cm->rst_info[0].frame_restoration_type != RESTORE_NONE ||
         cm->rst_info[1].frame_restoration_type != RESTORE_NONE ||
@@ -5870,6 +5995,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 
       superres_post_decode(pbi);
 
+#if CONFIG_CNN_RESTORATION
+      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn);
+#endif  // CONFIG_CNN_RESTORATION
+
       if (do_loop_restoration) {
         av1_loop_restoration_save_boundary_lines(&pbi->common.cur_frame->buf,
                                                  cm, 1);
@@ -5893,6 +6022,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 #endif
       // In no cdef and no superres case. Provide an optimized version of
       // loop_restoration_filter.
+#if CONFIG_CNN_RESTORATION
+      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn);
+#endif  // CONFIG_CNN_RESTORATION
+
       if (do_loop_restoration) {
         if (pbi->num_workers > 1) {
           av1_loop_restoration_filter_frame_mt(

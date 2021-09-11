@@ -25,4 +25,13 @@ macro(fix_experiment_configs)
     change_config_and_warn(CONFIG_DIST_8X8 0 CONFIG_MULTITHREAD)
   endif()
 
+  if(CONFIG_WIENER_NONSEP_CROSS_FILT)
+    change_config_and_warn(CONFIG_WIENER_NONSEP 1
+                           CONFIG_WIENER_NONSEP_CROSS_FILT)
+  endif()
+
+  if(CONFIG_CNN_RESTORATION)
+    change_config_and_warn(CONFIG_TENSORFLOW_LITE 1 CONFIG_CNN_RESTORATION)
+  endif()
+
 endmacro()

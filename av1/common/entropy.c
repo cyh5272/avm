@@ -164,6 +164,12 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->switchable_restore_cdf, RESTORE_SWITCHABLE_TYPES);
   RESET_CDF_COUNTER(fc->wiener_restore_cdf, 2);
   RESET_CDF_COUNTER(fc->sgrproj_restore_cdf, 2);
+#if CONFIG_WIENER_NONSEP
+  RESET_CDF_COUNTER(fc->wiener_nonsep_restore_cdf, 2);
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_RST_MERGECOEFFS
+  RESET_CDF_COUNTER(fc->merged_param_cdf, 2);
+#endif  // CONFIG_RST_MERGECOEFFS
   RESET_CDF_COUNTER(fc->y_mode_cdf, INTRA_MODES);
   RESET_CDF_COUNTER_STRIDE(fc->uv_mode_cdf[0], UV_INTRA_MODES - 1,
                            CDF_SIZE(UV_INTRA_MODES));

@@ -139,6 +139,19 @@ set_aom_config_var(CONFIG_REMOVE_DIST_WTD_COMP 1
                    "AV2 experiment flag to remove dist_wtd_comp tool.")
 set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
                    "AV2 experiment flag to remove dual filter.")
+set_aom_config_var(CONFIG_CNN_RESTORATION 0 NUMBER
+                   "AV2 CNN Restoration experiment flag")
+set_aom_config_var(CONFIG_WIENER_NONSEP 0 NUMBER
+                   "AV2 nonsep Wiener filter experiment flag")
+set_aom_config_var(CONFIG_WIENER_NONSEP_CROSS_FILT 0 NUMBER
+                   "AV2 nonsep Wiener cross filter experiment flag")
+set_aom_config_var(
+  CONFIG_RST_MERGECOEFFS 0 NUMBER
+  "AV2 in-loop restoration merging coefficients experiment flag")
+set_aom_config_var(CONFIG_SAVE_IN_LOOP_DATA 0 NUMBER
+                   "AV2 in-loop data save experiment flag")
+set_aom_config_var(CONFIG_EXT_SUPERRES 0 NUMBER
+                   "AV2 super resolution experiment flag")
 
 set_aom_config_var(CONFIG_SDP 1 NUMBER "AV2 Semi-Decoupled Partitioning.")
 set_aom_config_var(CONFIG_EXTQUANT 1

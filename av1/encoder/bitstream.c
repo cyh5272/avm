@@ -31,6 +31,9 @@
 #include "av1/common/ccso.h"
 #endif
 #include "av1/common/cfl.h"
+#if CONFIG_CNN_RESTORATION
+#include "av1/common/cnn_tflite.h"
+#endif  // CONFIG_CNN_RESTORATION
 #include "av1/common/entropy.h"
 #include "av1/common/entropymode.h"
 #include "av1/common/entropymv.h"
@@ -2237,6 +2240,9 @@ static AOM_INLINE void write_modes_sb(
 #else
   for (int plane = 0; plane < num_planes; ++plane) {
 #endif
+#if CONFIG_CNN_RESTORATION
+    if (cm->use_cnn[plane]) continue;
+#endif  // CONFIG_CNN_RESTORATION
     int rcol0, rcol1, rrow0, rrow1;
     if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
                                            &rcol0, &rcol1, &rrow0, &rrow1)) {
@@ -2386,14 +2392,21 @@ static AOM_INLINE void encode_restoration_mode(
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
     RestorationInfo *rsi = &cm->rst_info[p];
+#if CONFIG_CNN_RESTORATION
+    if (cm->use_cnn[p]) {
+      assert(rsi->frame_restoration_type == RESTORE_NONE);
+      continue;
+    }
+#endif  // CONFIG_CNN_RESTORATION
     if (rsi->frame_restoration_type != RESTORE_NONE) {
       all_none = 0;
       chroma_none &= p == 0;
     }
     switch (rsi->frame_restoration_type) {
-      case RESTORE_NONE:
+      case RESTORE_NONE: aom_wb_write_bit(wb, 0); aom_wb_write_bit(wb, 0);
+#if CONFIG_WIENER_NONSEP
         aom_wb_write_bit(wb, 0);
-        aom_wb_write_bit(wb, 0);
+#endif  // CONFIG_WIENER_NONSEP
         break;
       case RESTORE_WIENER:
         aom_wb_write_bit(wb, 1);
@@ -2403,6 +2416,13 @@ static AOM_INLINE void encode_restoration_mode(
         aom_wb_write_bit(wb, 1);
         aom_wb_write_bit(wb, 1);
         break;
+#if CONFIG_WIENER_NONSEP
+      case RESTORE_WIENER_NONSEP:
+        aom_wb_write_bit(wb, 0);
+        aom_wb_write_bit(wb, 0);
+        aom_wb_write_bit(wb, 1);
+        break;
+#endif  // CONFIG_WIENER_NONSEP
       case RESTORE_SWITCHABLE:
         aom_wb_write_bit(wb, 0);
         aom_wb_write_bit(wb, 1);
@@ -2448,10 +2468,19 @@ static AOM_INLINE void encode_restoration_mode(
   }
 }
 
-static AOM_INLINE void write_wiener_filter(int wiener_win,
+static AOM_INLINE void write_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                            const WienerInfo *wiener_info,
                                            WienerInfo *ref_wiener_info,
                                            aom_writer *wb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal = check_wiener_eq(wiener_info, ref_wiener_info);
+  aom_write_symbol(wb, equal, xd->tile_ctx->merged_param_cdf, 2);
+  if (equal) {
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
   if (wiener_win == WIENER_WIN)
     aom_write_primitive_refsubexpfin(
         wb, WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
@@ -2493,9 +2522,20 @@ static AOM_INLINE void write_wiener_filter(int wiener_win,
   memcpy(ref_wiener_info, wiener_info, sizeof(*wiener_info));
 }
 
-static AOM_INLINE void write_sgrproj_filter(const SgrprojInfo *sgrproj_info,
+static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
+                                            const SgrprojInfo *sgrproj_info,
                                             SgrprojInfo *ref_sgrproj_info,
                                             aom_writer *wb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal = check_sgrproj_eq(sgrproj_info, ref_sgrproj_info);
+  aom_write_symbol(wb, equal, xd->tile_ctx->merged_param_cdf, 2);
+  if (equal) {
+    memcpy(ref_sgrproj_info, sgrproj_info, sizeof(*sgrproj_info));
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
   aom_write_literal(wb, sgrproj_info->ep, SGRPROJ_PARAMS_BITS);
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
 
@@ -2524,6 +2564,38 @@ static AOM_INLINE void write_sgrproj_filter(const SgrprojInfo *sgrproj_info,
   memcpy(ref_sgrproj_info, sgrproj_info, sizeof(*sgrproj_info));
 }
 
+#if CONFIG_WIENER_NONSEP
+static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
+                                  const WienerNonsepInfo *wienerns_info,
+                                  WienerNonsepInfo *ref_wienerns_info,
+                                  aom_writer *wb) {
+#if CONFIG_RST_MERGECOEFFS
+  const int equal = check_wienerns_eq(is_uv, wienerns_info, ref_wienerns_info);
+  aom_write_symbol(wb, equal, xd->tile_ctx->merged_param_cdf, 2);
+  if (equal) {
+    memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
+    return;
+  }
+#else
+  (void)xd;
+#endif  // CONFIG_RST_MERGECOEFFS
+  int beg_feat = is_uv ? wienerns_y : 0;
+  int end_feat = is_uv ? wienerns_y + wienerns_uv : wienerns_y;
+  const int(*wienerns_coeffs)[3] = is_uv ? wienerns_coeff_uv : wienerns_coeff_y;
+
+  for (int i = beg_feat; i < end_feat; ++i) {
+    aom_write_primitive_refsubexpfin(
+        wb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+        wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+        ref_wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID]);
+  }
+  memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
+}
+#endif  // CONFIG_WIENER_NONSEP
+
 static AOM_INLINE void loop_restoration_write_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, const RestorationUnitInfo *rui,
     aom_writer *const w, int plane, FRAME_COUNTS *counts) {
@@ -2535,8 +2607,15 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
   assert(!cm->features.all_lossless);
 
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
+#if CONFIG_WIENER_NONSEP
+  const int is_uv = (plane > 0);
+#endif  // CONFIG_WIENER_NONSEP
   WienerInfo *ref_wiener_info = &xd->wiener_info[plane];
   SgrprojInfo *ref_sgrproj_info = &xd->sgrproj_info[plane];
+#if CONFIG_WIENER_NONSEP
+  WienerNonsepInfo *ref_wiener_nonsep_info = &xd->wiener_nonsep_info[plane];
+#endif  // CONFIG_WIENER_NONSEP
+
   RestorationType unit_rtype = rui->restoration_type;
 
   if (frame_rtype == RESTORE_SWITCHABLE) {
@@ -2544,14 +2623,22 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
                      RESTORE_SWITCHABLE_TYPES);
 #if CONFIG_ENTROPY_STATS
     ++counts->switchable_restore[unit_rtype];
-#endif
+#endif  // CONFIG_ENTROPY_STATS
+
     switch (unit_rtype) {
       case RESTORE_WIENER:
-        write_wiener_filter(wiener_win, &rui->wiener_info, ref_wiener_info, w);
+        write_wiener_filter(xd, wiener_win, &rui->wiener_info, ref_wiener_info,
+                            w);
         break;
       case RESTORE_SGRPROJ:
-        write_sgrproj_filter(&rui->sgrproj_info, ref_sgrproj_info, w);
+        write_sgrproj_filter(xd, &rui->sgrproj_info, ref_sgrproj_info, w);
         break;
+#if CONFIG_WIENER_NONSEP
+      case RESTORE_WIENER_NONSEP:
+        write_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+                              ref_wiener_nonsep_info, w);
+        break;
+#endif  // CONFIG_WIENER_NONSEP
       default: assert(unit_rtype == RESTORE_NONE); break;
     }
   } else if (frame_rtype == RESTORE_WIENER) {
@@ -2561,7 +2648,8 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->wiener_restore[unit_rtype != RESTORE_NONE];
 #endif
     if (unit_rtype != RESTORE_NONE) {
-      write_wiener_filter(wiener_win, &rui->wiener_info, ref_wiener_info, w);
+      write_wiener_filter(xd, wiener_win, &rui->wiener_info, ref_wiener_info,
+                          w);
     }
   } else if (frame_rtype == RESTORE_SGRPROJ) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
@@ -2570,8 +2658,20 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->sgrproj_restore[unit_rtype != RESTORE_NONE];
 #endif
     if (unit_rtype != RESTORE_NONE) {
-      write_sgrproj_filter(&rui->sgrproj_info, ref_sgrproj_info, w);
+      write_sgrproj_filter(xd, &rui->sgrproj_info, ref_sgrproj_info, w);
     }
+#if CONFIG_WIENER_NONSEP
+  } else if (frame_rtype == RESTORE_WIENER_NONSEP) {
+    aom_write_symbol(w, unit_rtype != RESTORE_NONE,
+                     xd->tile_ctx->wiener_nonsep_restore_cdf, 2);
+#if CONFIG_ENTROPY_STATS
+    ++counts->wiener_nonsep_restore[unit_rtype != RESTORE_NONE];
+#endif  // CONFIG_ENTROPY_STATS
+    if (unit_rtype != RESTORE_NONE) {
+      write_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+                            ref_wiener_nonsep_info, w);
+    }
+#endif  // CONFIG_WIENER_NONSEP
   }
 }
 
@@ -2604,6 +2704,20 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
   }
   return false;
 }
+
+#if CONFIG_CNN_RESTORATION
+static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
+  if (av1_use_cnn(cm)) {
+    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+      aom_wb_write_bit(wb, cm->use_cnn[plane]);
+    }
+  } else {
+    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+      assert(!cm->use_cnn[plane]);
+    }
+  }
+}
+#endif  // CONFIG_CNN_RESTORATION
 
 static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
                                          struct aom_write_bit_buffer *wb) {
@@ -2662,16 +2776,17 @@ static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
   assert(!cm->features.coded_lossless);
   if (!cm->seq_params.enable_cdef) return;
   if (cm->features.allow_intrabc) return;
+
   const int num_planes = av1_num_planes(cm);
-  int i;
   aom_wb_write_literal(wb, cm->cdef_info.cdef_damping - 3, 2);
   aom_wb_write_literal(wb, cm->cdef_info.cdef_bits, 2);
-  for (i = 0; i < cm->cdef_info.nb_cdef_strengths; i++) {
+  for (int i = 0; i < cm->cdef_info.nb_cdef_strengths; i++) {
     aom_wb_write_literal(wb, cm->cdef_info.cdef_strengths[i],
                          CDEF_STRENGTH_BITS);
-    if (num_planes > 1)
+    if (num_planes > 1) {
       aom_wb_write_literal(wb, cm->cdef_info.cdef_uv_strengths[i],
                            CDEF_STRENGTH_BITS);
+    }
   }
 }
 
@@ -3814,6 +3929,9 @@ static AOM_INLINE void write_uncompressed_header_obu(
   } else {
     if (!features->coded_lossless) {
       encode_loopfilter(cm, wb);
+#if CONFIG_CNN_RESTORATION
+      encode_cnn(cm, wb);
+#endif  // CONFIG_CNN_RESTORATION
       encode_cdef(cm, wb);
     }
     encode_restoration_mode(cm, wb);

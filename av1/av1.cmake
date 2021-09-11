@@ -424,6 +424,62 @@ if(CONFIG_INTERNAL_STATS)
   list(APPEND AOM_AV1_ENCODER_SOURCES "${AOM_ROOT}/av1/encoder/blockiness.c")
 endif()
 
+if(CONFIG_CNN_RESTORATION)
+  list(APPEND AOM_AV1_COMMON_SOURCES
+              "${AOM_ROOT}/av1/common/cnn_tflite.cc"
+              "${AOM_ROOT}/av1/common/cnn_tflite.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp0_67.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp0_67.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp68_107.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp68_107.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp108_147.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp108_147.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp148_191.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp148_191.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp192_231.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp192_231.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp232_255.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/uv_qp232_255.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp0_90.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp0_90.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp91_120.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp91_120.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp121_145.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp121_145.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp146_175.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp146_175.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp176_205.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp176_205.h"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp206_255.cc"
+              "${AOM_ROOT}/av1/tflite_models/inter_frame_model/qp206_255.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp12.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp12.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp22.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp22.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp32.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp32.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp43.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp43.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp53.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp53.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp63.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/uv_qp63.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp0_90.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp0_90.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp91_120.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp91_120.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp121_145.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp121_145.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp146_175.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp146_175.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp176_205.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp176_205.h"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp206_255.cc"
+              "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp206_255.h"
+              "${AOM_ROOT}/av1/tflite_models/op_registrations.cc"
+              "${AOM_ROOT}/av1/tflite_models/op_registrations.h")
+endif()
+
 # Setup AV1 common/decoder/encoder targets. The libaom target must exist before
 # this function is called.
 function(setup_av1_targets)

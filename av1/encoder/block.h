@@ -813,8 +813,20 @@ typedef struct {
   int switchable_restore_cost[RESTORE_SWITCHABLE_TYPES];
   //! wiener_restore_cost
   int wiener_restore_cost[2];
+#if CONFIG_RST_MERGECOEFFS
+  /*!
+   * merged_param_cost
+   */
+  int merged_param_cost[2];
+#endif  // CONFIG_RST_MERGECOEFFS
   //! sgrproj_restore_cost
   int sgrproj_restore_cost[2];
+#if CONFIG_WIENER_NONSEP
+  /*!
+   * wiener_nonsep_restore_cost
+   */
+  int wiener_nonsep_restore_cost[2];
+#endif  // CONFIG_WIENER_NONSEP
   /**@}*/
 } ModeCosts;
 

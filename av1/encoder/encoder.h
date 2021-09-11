@@ -1232,6 +1232,9 @@ typedef struct FRAME_COUNTS {
   unsigned int switchable_restore[RESTORE_SWITCHABLE_TYPES];
   unsigned int wiener_restore[2];
   unsigned int sgrproj_restore[2];
+#if CONFIG_WIENER_NONSEP
+  unsigned int wiener_nonsep_restore[2];
+#endif  // CONFIG_WIENER_NONSEP
 #endif  // CONFIG_ENTROPY_STATS
 
   unsigned int switchable_interp[SWITCHABLE_FILTER_CONTEXTS]
@@ -2295,6 +2298,14 @@ typedef struct AV1_COMP {
    * restoration search.
    */
   YV12_BUFFER_CONFIG trial_frame_rst;
+
+#if CONFIG_CNN_RESTORATION
+  /*!
+   * Temprorary frame buffer used to store CNN filtered frame during RDO, to
+   * compare it against traditionally filtered frame.
+   */
+  YV12_BUFFER_CONFIG cnn_buffer;
+#endif  // CONFIG_CNN_RESTORATION
 
   /*!
    * Ambient reconstruction err target for force key frames.

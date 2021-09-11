@@ -150,6 +150,12 @@ typedef struct frame_contexts {
   aom_cdf_prob switchable_restore_cdf[CDF_SIZE(RESTORE_SWITCHABLE_TYPES)];
   aom_cdf_prob wiener_restore_cdf[CDF_SIZE(2)];
   aom_cdf_prob sgrproj_restore_cdf[CDF_SIZE(2)];
+#if CONFIG_WIENER_NONSEP
+  aom_cdf_prob wiener_nonsep_restore_cdf[CDF_SIZE(2)];
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_RST_MERGECOEFFS
+  aom_cdf_prob merged_param_cdf[CDF_SIZE(2)];
+#endif  // CONFIG_RST_MERGECOEFFS
   aom_cdf_prob y_mode_cdf[BLOCK_SIZE_GROUPS][CDF_SIZE(INTRA_MODES)];
   aom_cdf_prob uv_mode_cdf[CFL_ALLOWED_TYPES][INTRA_MODES]
                           [CDF_SIZE(UV_INTRA_MODES)];
