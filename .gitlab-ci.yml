@@ -6,10 +6,6 @@ stages:
 
 image: registry.gitlab.com/epirat/images/ubuntu2004:20210225223748
 
-default:
-  tags:
-    - docker-x86_64
-
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
