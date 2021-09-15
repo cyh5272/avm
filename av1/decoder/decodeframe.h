@@ -16,6 +16,15 @@
 extern "C" {
 #endif
 
+#if CONFIG_B065_THROUGHPUT
+extern int64_t tot_ctx_syms;
+extern int64_t tot_bypass_syms;
+extern int max_ctx_syms;
+extern int max_bypass_syms;
+extern int64_t tot_bits;
+extern int tot_frames;
+#endif
+
 struct AV1Decoder;
 struct aom_read_bit_buffer;
 struct ThreadData;

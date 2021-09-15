@@ -793,10 +793,33 @@ struct CommonContexts {
   int num_mi_cols;   /*!< Corresponds to cm->mi_params.mi_cols */
 };
 
+#if CONFIG_B065_THROUGHPUT
+struct total_sym_stats {
+  /** Frame number (decoding order)*/
+  int frame_dec_order;
+  /** Total number of bits*/
+  int64_t tot_bits;
+  /** total ctx coded symbols. */
+  int64_t tot_ctx_syms;
+  /** total bypass coded symbols. */
+  int64_t tot_bypass_syms;
+  /** peak ctx coded symbols. */
+  int peak_ctx_syms;
+  /** peak bypass coded symbols. */
+  int peak_bypass_syms;
+};
+#endif
+
 /*!
  * \brief Top level common structure used by both encoder and decoder.
  */
 typedef struct AV1Common {
+#if CONFIG_B065_THROUGHPUT
+  /*!
+   * Symbol stats.
+   */
+  struct total_sym_stats sym_stats;
+#endif
   /*!
    * Information about the current frame that is being coded.
    */

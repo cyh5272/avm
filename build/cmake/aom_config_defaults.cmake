@@ -171,6 +171,9 @@ set_aom_config_var(
 set_aom_config_var(
   CONFIG_ALL_ZERO_CONTEXT 0
   "AV2 experiment flag to enable modified context for all zero flag.")
+set_aom_config_var(
+  CONFIG_B065_THROUGHPUT 0
+  "AV2 experiment flag to measure throughput of B065.")
 #
 # Variables in this section control optional features of the build system.
 #

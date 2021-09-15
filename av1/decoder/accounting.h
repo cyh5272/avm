@@ -17,8 +17,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-#define DUMP_BIN_BIT 1
-
 #define AOM_ACCOUNTING_HASH_SIZE (1021)
 
 /* Max number of entries for symbol types in the dictionary (increase as
@@ -57,6 +55,10 @@ typedef struct {
   int num_multi_syms;
   /** Raw binary symbol decoding calls. */
   int num_binary_syms;
+  /** Bypass coded. */
+  int num_bypass_coded;
+  /** Context coded. */
+  int num_ctx_coded;
   /** Dictionary for translating strings into id. */
   AccountingDictionary dictionary;
 } AccountingSymbols;
