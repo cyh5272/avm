@@ -44,8 +44,6 @@ Style Check:
         cmake-format --check $f
       done
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
     - when: on_success
 
 .commit-checks-common:
