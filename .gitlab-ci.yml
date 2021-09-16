@@ -27,8 +27,6 @@ Style Check:
     - |
       # Run cmake-format
       git ls-files '*.cmake' 'CMakeLists.txt' | grep -v third_party | xargs cmake-format -i
-  rules:
-    - when: on_success
 
 .commit-checks-common:
   stage: check
