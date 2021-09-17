@@ -21,12 +21,12 @@ Style Check:
   script:
     - |
       # Run clang-format
-      for f in $(git diff-index --cached '*.[hc]pp' '*.cc' '*.[ch]' | grep -v third_party); do
+      for f in $(git  diff-index --cached --name-only HEAD '*.[hc]pp' '*.cc' '*.[ch]' | grep -v third_party); do
         clang-format -i --style=file $f
       done
     - |
       # Run cmake-format
-      git diff-index --cached '*.cmake' 'CMakeLists.txt' | grep -v third_party | xargs cmake-format -i
+      git  diff-index --cached --name-only HEAD '*.cmake' 'CMakeLists.txt' | grep -v third_party | xargs cmake-format -i
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
