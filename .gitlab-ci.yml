@@ -13,6 +13,24 @@ workflow:
     - if: '$CI_COMMIT_BRANCH'
       when: never
 
+# Check code style with clang-format and cmake-format
+Style Check:
+  stage: check
+  interruptible: true
+  image: registry.gitlab.com/aomediacodec/aom-testing/alpine3:20210901124702
+  script:
+    - |
+      # Run clang-format
+      for f in $(git diff-index --cached '*.[hc]pp' '*.cc' '*.[ch]' | grep -v third_party); do
+        clang-format -i --style=file $f
+      done
+    - |
+      # Run cmake-format
+      git diff-index --cached '*.cmake' 'CMakeLists.txt' | grep -v third_party | xargs cmake-format -i
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - when: on_success
 
 .commit-checks-common:
   stage: check
