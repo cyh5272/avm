@@ -4760,6 +4760,9 @@ void av1_read_sequence_header(AV1_COMMON *cm, struct aom_read_bit_buffer *rb,
 
 void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
                                          SequenceHeader *seq_params) {
+#if CONFIG_REF_MV_BANK
+  seq_params->enable_refmvbank = aom_rb_read_bit(rb);
+#endif  // CONFIG_REF_MV_BANK
 #if CONFIG_SDP
   seq_params->enable_sdp = aom_rb_read_bit(rb);
 #endif

@@ -1156,7 +1156,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_NEW_INTER_MODES
   }
 #if CONFIG_REF_MV_BANK
-  // TODO(huisu): do we need the AOMMIN? can we just use the first ?
+  if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
       AOMMIN(cm->features.max_drl_bits + 1, MAX_REF_MV_STACK_SIZE);
   // If open slots are available, fetch reference MVs from the ref mv banks.

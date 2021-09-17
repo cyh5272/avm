@@ -549,7 +549,8 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
         ++x->txfm_search_info.txb_split_count;
     }
 #if CONFIG_REF_MV_BANK
-    if (is_inter) av1_update_ref_mv_bank(cm, xd, mbmi);
+    if (cm->seq_params.enable_refmvbank && is_inter)
+      av1_update_ref_mv_bank(cm, xd, mbmi);
 #endif  // CONFIG_REF_MV_BANK
   }
 #if CONFIG_SDP
