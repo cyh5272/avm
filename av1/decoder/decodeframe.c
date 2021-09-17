@@ -3637,6 +3637,11 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
   av1_reset_loop_filter_delta(xd, num_planes);
   av1_reset_loop_restoration(xd, num_planes);
 
+#if CONFIG_REF_MV_BANK
+  av1_zero(xd->ref_mv_bank);
+  xd->ref_mv_bank_pt = &td->ref_mv_bank;
+#endif  // CONFIG_REF_MV_BANK
+
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += cm->seq_params.mib_size) {
     av1_zero_left_context(xd);
@@ -3647,6 +3652,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
 
 #if CONFIG_REF_MV_BANK
       xd->ref_mv_bank.rmb_sb_hits = 0;
+      td->ref_mv_bank = xd->ref_mv_bank;
 #endif  // CONFIG_REF_MV_BANK
         // Bit-stream parsing of the superblock
 #if CONFIG_SDP
