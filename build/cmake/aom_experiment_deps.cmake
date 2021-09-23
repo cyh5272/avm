@@ -25,4 +25,8 @@ macro(fix_experiment_configs)
     change_config_and_warn(CONFIG_DIST_8X8 0 CONFIG_MULTITHREAD)
   endif()
 
+  if(CONFIG_B065_THROUGHPUT)
+    change_config_and_warn(CONFIG_ACCOUNTING 1 CONFIG_B065_THROUGHPUT)
+  endif()
+
 endmacro()

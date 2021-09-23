@@ -89,7 +89,12 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 
   if (eob == 0 || !cpi->optimize_seg_arr[segment_id] ||
       xd->lossless[segment_id]) {
-    *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane, tx_size);
+    *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane, tx_size
+#if CONFIG_ALL_ZERO_CONTEXT
+                                   ,
+                                   x, block
+#endif
+    );
     return eob;
   }
 
@@ -361,6 +366,20 @@ void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
       av1_quantize_skip(n_coeffs, qcoeff, dqcoeff, eob);
     }
   }
+
+#if CONFIG_SIGN_PRED_CONTEXT
+  MACROBLOCKD *const xd = &x->e_mbd;
+  const int16_t *const scan = scan_order->scan;
+  if ((plane == AOM_PLANE_U) && (*eob > 0)) {
+    memset(xd->tmp_sign, 0, 1024 * sizeof(int32_t));
+    for (int c = 0; c < *eob; ++c) {
+      const int pos = scan[c];
+      int sign = (qcoeff[pos] < 0) ? 1 : 0;
+      if (abs(qcoeff[pos])) xd->tmp_sign[pos] = (sign ? 2 : 1);
+    }
+  }
+#endif
+
   // use_optimize_b is true means av1_optimze_b will be called,
   // thus cannot update entropy ctx now (performed in optimize_b)
   if (qparam->use_optimize_b) {

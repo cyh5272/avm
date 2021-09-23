@@ -338,10 +338,19 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
       }
     }
 
+#if CONFIG_IS_INTER_CONTEXT
+    for (j = 0; j < 2; ++j) {
+      for (i = 0; i < INTRA_INTER_CONTEXTS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->intra_inter_cost[j][i],
+                                 fc->intra_inter_cdf[j][i], NULL);
+      }
+    }
+#else
     for (i = 0; i < INTRA_INTER_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->intra_inter_cost[i],
                                fc->intra_inter_cdf[i], NULL);
     }
+#endif
 
 #if CONFIG_NEW_INTER_MODES
     for (i = 0; i < INTER_SINGLE_MODE_CONTEXTS; ++i) {
@@ -752,6 +761,17 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
         av1_cost_tokens_from_cdf(pcost->dc_sign_cost[ctx],
                                  fc->dc_sign_cdf[plane][ctx], NULL);
+#if CONFIG_SIGN_PRED_CONTEXT
+      if (plane == PLANE_TYPE_UV) {
+        for (int i = 0; i < 3; ++i)
+          for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
+            av1_cost_tokens_from_cdf(pcost->dc_v_sign_cost[i][ctx],
+                                     fc->dc_v_sign_cdf[i][ctx], NULL);
+        for (int i = 0; i < 3; ++i)
+          av1_cost_tokens_from_cdf(pcost->ac_v_sign_cost[i],
+                                   fc->ac_v_sign_cdf[i], NULL);
+      }
+#endif
 
       for (int ctx = 0; ctx < LEVEL_CONTEXTS; ++ctx) {
         int br_rate[BR_CDF_SIZE];

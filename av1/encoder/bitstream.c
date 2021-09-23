@@ -393,7 +393,12 @@ static int write_skip_mode(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
 static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd, int segment_id,
-                                      aom_writer *w, const int is_inter) {
+                                      aom_writer *w, const int is_inter
+#if CONFIG_IS_INTER_CONTEXT
+                                      ,
+                                      const int skip_txfm
+#endif
+) {
   if (!segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME)) {
     if (segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
       assert(is_inter);
@@ -401,7 +406,11 @@ static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
     }
     const int ctx = av1_get_intra_inter_context(xd);
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+#if CONFIG_IS_INTER_CONTEXT
+    aom_write_symbol(w, is_inter, ec_ctx->intra_inter_cdf[skip_txfm][ctx], 2);
+#else
     aom_write_symbol(w, is_inter, ec_ctx->intra_inter_cdf[ctx], 2);
+#endif
   }
 }
 
@@ -1556,7 +1565,13 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
   write_delta_q_params(cpi, skip, w);
 
-  if (!mbmi->skip_mode) write_is_inter(cm, xd, mbmi->segment_id, w, is_inter);
+  if (!mbmi->skip_mode)
+    write_is_inter(cm, xd, mbmi->segment_id, w, is_inter
+#if CONFIG_IS_INTER_CONTEXT
+                   ,
+                   skip
+#endif
+    );
 
   if (mbmi->skip_mode) return;
 
