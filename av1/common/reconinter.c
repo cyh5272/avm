@@ -71,8 +71,8 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
   inter_pred_params->block_width = block_width;
   inter_pred_params->block_height = block_height;
 #if CONFIG_OPTFLOW_REFINEMENT
-  inter_pred_params->orig_width = block_width;
-  inter_pred_params->orig_height = block_height;
+  inter_pred_params->orig_block_width = block_width;
+  inter_pred_params->orig_block_height = block_height;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   inter_pred_params->pix_row = pix_row;
   inter_pred_params->pix_col = pix_col;
@@ -1020,11 +1020,11 @@ void av1_compute_subpel_gradients_interp(int16_t *pred_dst, int bw, int bh,
 // gx0, gy0: x and y gradients for p0
 // gx1, gy1: x and y gradients for p1
 // gstride: stride for all the gradients assumed to be the same
-// bw, bh: block dumensions
-// d0: distance of p0 to current frame, where +ve value refers to
-//     p0 before the current frame.
-// d1: distance of p1 to current frame, where +ve value refers to
-//     p1 after the current frame.
+// bw, bh: block dimensions
+// d0: distances of p0 to current frame, where positive value refers to p0
+//     before the current frame.
+// d1: distances of p1 to current frame, where positive value refers to p1
+//     before the current frame.
 // max_prec_bits: maximum offset in bits
 // vx0, vy0: output high resolution mv offset for p0
 // vx1, vy1: output high resolution mv offset for p1
@@ -1606,8 +1606,8 @@ void make_inter_pred_of_nxn(uint8_t *dst, int dst_stride,
                             CalcSubpelParamsFunc calc_subpel_params_func, int n,
                             SubpelParams *subpel_params) {
   int n_blocks = 0;
-  int w = inter_pred_params->orig_width;
-  int h = inter_pred_params->orig_height;
+  int w = inter_pred_params->orig_block_width;
+  int h = inter_pred_params->orig_block_height;
   assert(w % n == 0);
   assert(h % n == 0);
   CONV_BUF_TYPE *orig_conv_dst = inter_pred_params->conv_params.dst;

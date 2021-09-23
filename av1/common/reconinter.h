@@ -112,10 +112,11 @@ typedef struct InterPredParams {
   int block_height;
 #if CONFIG_OPTFLOW_REFINEMENT
   // In optical flow refinement, block_width and block_height will pass the
-  // subblock size into av1_make_inter_predictor, while orig_w and orig_h
-  // keep the original block size that is needed by calc_subpel_params_func
-  int orig_width;
-  int orig_height;
+  // subblock size into av1_make_inter_predictor, while orig_block_width and
+  // orig_block_height keep the original block size that is needed by
+  // calc_subpel_params_func
+  int orig_block_width;
+  int orig_block_height;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   int pix_row;
   int pix_col;
@@ -161,9 +162,7 @@ typedef struct InterPredParams {
 // 4. Solving least squares for vx and vy using gx, gy and tmp1
 // Note that this only requires 2 gradient operators instead of 4 and thus
 // reduces the complexity. However, it is only feasible when gradients are
-// obtained using bilinear or bicubic interpolation. Also, it only work with
-// the 2 motion compensation framework (in the 1 MC framework, gx0, gx1, gy0,
-// gy1 are all required to refine the predicted block). Thus, this flag should
+// obtained using bilinear or bicubic interpolation. Thus, this flag should
 // only be on when either of OPFL_BILINEAR_GRAD and OPFL_BICUBIC_GRAD is on.
 #define OPFL_COMBINE_INTERP_GRAD_LS 1
 
@@ -392,51 +391,54 @@ static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
 }
 
 #define OPTFLOW_INTEGER_MULT_DIVIDE 1
-static INLINE int32_t divide_and_round_signed(int64_t P, int64_t D) {
+// Integer division based on lookup table.
+// num: numerator
+// den: denominator
+static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
 #if OPTFLOW_INTEGER_MULT_DIVIDE
-  if (llabs(D) == 1) return (int32_t)(D < 0 ? -P : P);
+  if (llabs(den) == 1) return (int32_t)(den < 0 ? -num : num);
   static const int optflow_prec_bits = 16;
   int16_t shift;
-  const int signD = (D < 0 ? -1 : 1);
-  uint16_t iD = resolve_divisor_64(llabs(D), &shift);
+  const int sign_den = (den < 0 ? -1 : 1);
+  uint16_t inverse_den = resolve_divisor_64(llabs(den), &shift);
   shift -= optflow_prec_bits;
   if (shift < 0) {
-    iD <<= (-shift);
+    inverse_den <<= (-shift);
     shift = 0;
   }
   int32_t v;
   // Make sure 1) the bits for right shift is < 63 and 2) the bit depth
-  // of P is < 48 to avoid overflow in P * iD
+  // of num is < 48 to avoid overflow in num * inverse_den
   if (optflow_prec_bits + shift >= 63 ||
-      ROUND_POWER_OF_TWO_SIGNED_64(P, 63 - optflow_prec_bits) != 0) {
-    int64_t v_tmp = ROUND_POWER_OF_TWO_SIGNED_64(P, optflow_prec_bits);
-    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(v_tmp * (int64_t)iD * signD,
-                                              shift);
+      ROUND_POWER_OF_TWO_SIGNED_64(num, 63 - optflow_prec_bits) != 0) {
+    int64_t v_tmp = ROUND_POWER_OF_TWO_SIGNED_64(num, optflow_prec_bits);
+    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
+        v_tmp * (int64_t)inverse_den * sign_den, shift);
   } else {
-    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(P * (int64_t)iD * signD,
-                                              optflow_prec_bits + shift);
+    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
+        num * (int64_t)inverse_den * sign_den, optflow_prec_bits + shift);
   }
 #ifndef NDEBUG
   // Quick overflow check
-  int32_t v0 =
-      (llabs(P) + llabs(D) < 0)
-          ? (int32_t)DIVIDE_AND_ROUND_SIGNED(ROUND_POWER_OF_TWO_SIGNED_64(P, 2),
-                                             ROUND_POWER_OF_TWO_SIGNED_64(D, 2))
-          : (int32_t)DIVIDE_AND_ROUND_SIGNED(P, D);
+  int32_t v0 = (llabs(num) + llabs(den) < 0)
+                   ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
+                         ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
+                         ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
+                   : (int32_t)DIVIDE_AND_ROUND_SIGNED(nun, den);
   if (abs(v0 - v) > 1 &&
       abs(v0) <= 64) {  // check if error is at most 1 at usable values of v0
-    printf("Warning: P = %" PRId64 ", D = %" PRId64
-           ", iD = %d, shift = %d, v0 = %d, v = %d\n",
-           P, D, iD, shift, v0, v);
+    printf("Warning: num = %" PRId64 ", den = %" PRId64
+           ", inverse_den = %d, shift = %d, v0 = %d, v = %d\n",
+           num, den, inverse_den, shift, v0, v);
   }
 #endif  // NDEBUG
 #else
   // Quick overflow check
-  const int32_t v =
-      (llabs(P) + llabs(D) < 0)
-          ? (int32_t)DIVIDE_AND_ROUND_SIGNED(ROUND_POWER_OF_TWO_SIGNED_64(P, 2),
-                                             ROUND_POWER_OF_TWO_SIGNED_64(D, 2))
-          : (int32_t)DIVIDE_AND_ROUND_SIGNED(P, D);
+  const int32_t v = (llabs(num) + llabs(den) < 0)
+                        ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
+                              ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
+                              ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
+                        : (int32_t)DIVIDE_AND_ROUND_SIGNED(num, den);
 #endif  // OPTFLOW_INTEGER_MULT_DIVIDE
   return v;
 }

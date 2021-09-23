@@ -634,9 +634,9 @@ static void dec_calc_subpel_params(
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
 #if CONFIG_OPTFLOW_REFINEMENT
   // Use original block size to clamp MV and to extend block boundary
-  const int bw = use_optflow_refinement ? inter_pred_params->orig_width
+  const int bw = use_optflow_refinement ? inter_pred_params->orig_block_width
                                         : inter_pred_params->block_width;
-  const int bh = use_optflow_refinement ? inter_pred_params->orig_height
+  const int bh = use_optflow_refinement ? inter_pred_params->orig_block_height
                                         : inter_pred_params->block_height;
 #else
   const int bw = inter_pred_params->block_width;
