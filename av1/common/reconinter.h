@@ -394,6 +394,7 @@ static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
 // Integer division based on lookup table.
 // num: numerator
 // den: denominator
+// out: output result (num / den)
 static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
 #if OPTFLOW_INTEGER_MULT_DIVIDE
   if (llabs(den) == 1) return (int32_t)(den < 0 ? -num : num);
@@ -406,41 +407,42 @@ static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
     inverse_den <<= (-shift);
     shift = 0;
   }
-  int32_t v;
+  int32_t out;
   // Make sure 1) the bits for right shift is < 63 and 2) the bit depth
   // of num is < 48 to avoid overflow in num * inverse_den
   if (optflow_prec_bits + shift >= 63 ||
       ROUND_POWER_OF_TWO_SIGNED_64(num, 63 - optflow_prec_bits) != 0) {
-    int64_t v_tmp = ROUND_POWER_OF_TWO_SIGNED_64(num, optflow_prec_bits);
-    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
-        v_tmp * (int64_t)inverse_den * sign_den, shift);
+    int64_t out_tmp = ROUND_POWER_OF_TWO_SIGNED_64(num, optflow_prec_bits);
+    out = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
+        out_tmp * (int64_t)inverse_den * sign_den, shift);
   } else {
-    v = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
+    out = (int32_t)ROUND_POWER_OF_TWO_SIGNED_64(
         num * (int64_t)inverse_den * sign_den, optflow_prec_bits + shift);
   }
 #ifndef NDEBUG
+  // Verify that the result is consistent with built-in division.
   // Quick overflow check
-  int32_t v0 = (llabs(num) + llabs(den) < 0)
-                   ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
-                         ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
-                         ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
-                   : (int32_t)DIVIDE_AND_ROUND_SIGNED(nun, den);
-  if (abs(v0 - v) > 1 &&
-      abs(v0) <= 64) {  // check if error is at most 1 at usable values of v0
-    printf("Warning: num = %" PRId64 ", den = %" PRId64
-           ", inverse_den = %d, shift = %d, v0 = %d, v = %d\n",
-           num, den, inverse_den, shift, v0, v);
-  }
-#endif  // NDEBUG
-#else
-  // Quick overflow check
-  const int32_t v = (llabs(num) + llabs(den) < 0)
+  int32_t out_div = (llabs(num) + llabs(den) < 0)
                         ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
                               ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
                               ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
                         : (int32_t)DIVIDE_AND_ROUND_SIGNED(num, den);
+  // check if error is at most 1 at usable values of out_div
+  if (abs(out_div - out) > 1 && abs(out_div) <= 64) {
+    printf("Warning: num = %" PRId64 ", den = %" PRId64
+           ", inverse_den = %d, shift = %d, v0 = %d, v = %d\n",
+           num, den, inverse_den, shift, out_div, out);
+  }
+#endif  // NDEBUG
+#else
+  // Quick overflow check
+  const int32_t out = (llabs(num) + llabs(den) < 0)
+                          ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
+                                ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
+                                ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
+                          : (int32_t)DIVIDE_AND_ROUND_SIGNED(num, den);
 #endif  // OPTFLOW_INTEGER_MULT_DIVIDE
-  return v;
+  return out;
 }
 
 #endif  // CONFIG_OPTFLOW_REFINEMENT
