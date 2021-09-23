@@ -19,6 +19,7 @@
 
 #include "aom_ports/aom_timer.h"
 #include "av1/common/reconinter.h"
+#include "av1/common/mvref_common.h"
 
 #if CONFIG_OPTFLOW_REFINEMENT
 namespace {

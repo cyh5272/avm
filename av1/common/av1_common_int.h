@@ -1312,21 +1312,6 @@ static INLINE RefCntBuffer *get_primary_ref_frame_buf(
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
 
-static INLINE int get_relative_dist(const OrderHintInfo *oh, int a, int b) {
-  if (!oh->enable_order_hint) return 0;
-
-  const int bits = oh->order_hint_bits_minus_1 + 1;
-
-  assert(bits >= 1);
-  assert(a >= 0 && a < (1 << bits));
-  assert(b >= 0 && b < (1 << bits));
-
-  int diff = a - b;
-  const int m = 1 << (bits - 1);
-  diff = (diff & (m - 1)) - (diff & m);
-  return diff;
-}
-
 // Returns 1 if this frame might allow mvs from some reference frame.
 static INLINE int frame_might_allow_ref_frame_mvs(const AV1_COMMON *cm) {
   return !cm->features.error_resilient_mode &&
