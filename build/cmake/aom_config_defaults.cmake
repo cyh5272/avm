@@ -163,7 +163,7 @@ set_aom_config_var(
   CONFIG_CCSO 1 "AV2 experiment flag to enable cross component sample offset.")
 set_aom_config_var(CONFIG_QBASED_QP_OFFSET 1
                    "AV2 experiment flag to adjust q_offset based on QP.")
-set_aom_config_var(CONFIG_OPTFLOW_REFINEMENT 1
+set_aom_config_var(CONFIG_OPTFLOW_REFINEMENT 0
                    "AV2 experiment flag for optical flow MV refinement")
 
 #
