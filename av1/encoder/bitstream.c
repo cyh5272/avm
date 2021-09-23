@@ -865,7 +865,9 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
 #if CONFIG_OPTFLOW_REFINEMENT
     // In switchable optical flow refinement, use the sharp filter instead
     int mb_interp_filter =
-        mbmi->mode > NEW_NEWMV ? MULTITAP_SHARP : cm->features.interp_filter;
+        (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
+            ? MULTITAP_SHARP
+            : cm->features.interp_filter;
 #else
     int mb_interp_filter = cm->features.interp_filter;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -883,7 +885,18 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   }
   if (cm->features.interp_filter == SWITCHABLE) {
 #if CONFIG_OPTFLOW_REFINEMENT
-    if (mbmi->mode > NEW_NEWMV) return;
+    if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) {
+#if CONFIG_REMOVE_DUAL_FILTER
+      assert(IMPLIES(mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
+                     mbmi->interp_fltr == MULTITAP_SHARP));
+#else
+      assert(IMPLIES(
+          mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
+          mbmi->interp_filters.as_filters.x_filter == MULTITAP_SHARP &&
+              mbmi->interp_filters.as_filters.y_filter == MULTITAP_SHARP));
+#endif
+      return;
+    }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_REMOVE_DUAL_FILTER
     const int ctx = av1_get_pred_context_switchable_interp(xd, 0);
