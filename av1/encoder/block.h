@@ -618,8 +618,10 @@ typedef struct {
   int mbmode_cost[BLOCK_SIZE_GROUPS][INTRA_MODES];
   //! Luma mode cost for intra frame.
   int y_mode_costs[INTRA_MODES][INTRA_MODES][INTRA_MODES];
+#if !CONFIG_AIMC
   //! Chroma mode cost
   int intra_uv_mode_cost[CFL_ALLOWED_TYPES][INTRA_MODES][UV_INTRA_MODES];
+#endif  // !CONFIG_AIMC
   //! filter_intra_cost
   int filter_intra_cost[BLOCK_SIZES_ALL][2];
   //! filter_intra_mode_cost
@@ -643,7 +645,7 @@ typedef struct {
   int y_first_mode_costs[Y_MODE_CONTEXTS][FIRST_MODE_COUNT];
   int y_second_mode_costs[Y_MODE_CONTEXTS][SECOND_MODE_COUNT];
   // uv mode cost
-  int uv_first_mode_costs[UV_MODE_CONTEXTS][UV_INTRA_MODES];
+  int intra_uv_mode_cost[CFL_ALLOWED_TYPES][UV_MODE_CONTEXTS][UV_INTRA_MODES];
 #endif  // CONFIG_AIMC
 
 #if CONFIG_IST

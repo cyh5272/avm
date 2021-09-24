@@ -1401,14 +1401,15 @@ static AOM_INLINE void write_intra_luma_mode(MACROBLOCKD *const xd,
 }
 
 static AOM_INLINE void write_intra_uv_mode(MACROBLOCKD *const xd,
+                                           CFL_ALLOWED_TYPE cfl_allowed,
                                            aom_writer *w) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const int uv_mode_idx = mbmi->uv_mode_idx;
   assert(uv_mode_idx >= 0 && uv_mode_idx < UV_INTRA_MODES);
   const int context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
-  aom_write_symbol(w, uv_mode_idx, ec_ctx->uv_mode_cdf[context],
-                   UV_INTRA_MODES);
+  aom_write_symbol(w, uv_mode_idx, ec_ctx->uv_mode_cdf[cfl_allowed][context],
+                   UV_INTRA_MODES - !cfl_allowed);
 }
 #endif  // CONFIG_AIMC
 
@@ -1477,7 +1478,7 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 #endif
     const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
 #if CONFIG_AIMC
-    write_intra_uv_mode(xd, w);
+    write_intra_uv_mode(xd, is_cfl_allowed(xd), w);
 #else
     write_intra_uv_mode(ec_ctx, uv_mode, mode, is_cfl_allowed(xd), w);
     if (use_angle_delta && av1_is_directional_mode(get_uv_mode(uv_mode))) {

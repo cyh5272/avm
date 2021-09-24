@@ -140,11 +140,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
     av1_cost_tokens_from_cdf(mode_costs->y_second_mode_costs[i],
                              fc->y_mode_idx_cdf_1[i], NULL);
   }
-  for (i = 0; i < UV_MODE_CONTEXTS; ++i) {
-    // uv mode costs
-    av1_cost_tokens_from_cdf(mode_costs->uv_first_mode_costs[i],
-                             fc->uv_mode_cdf[i], NULL);
-  }
 #else
   for (i = 0; i < KF_MODE_CONTEXTS; ++i)
     for (j = 0; j < KF_MODE_CONTEXTS; ++j)
@@ -153,11 +148,17 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
   for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
     av1_cost_tokens_from_cdf(mode_costs->mbmode_cost[i], fc->y_mode_cdf[i],
                              NULL);
+#endif  // CONFIG_AIMC
+
   for (i = 0; i < CFL_ALLOWED_TYPES; ++i)
+#if CONFIG_AIMC
+    for (j = 0; j < UV_MODE_CONTEXTS; ++j)
+#else
     for (j = 0; j < INTRA_MODES; ++j)
+#endif
       av1_cost_tokens_from_cdf(mode_costs->intra_uv_mode_cost[i][j],
                                fc->uv_mode_cdf[i][j], NULL);
-#endif  // CONFIG_AIMC
+
   av1_cost_tokens_from_cdf(mode_costs->filter_intra_mode_cost,
                            fc->filter_intra_mode_cdf, NULL);
   for (i = 0; i < BLOCK_SIZES_ALL; ++i) {

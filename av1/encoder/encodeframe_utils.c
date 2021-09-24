@@ -630,15 +630,14 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
   if (xd->tree_type != LUMA_PART) {
 #endif
     const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
-#if !CONFIG_AIMC
     const CFL_ALLOWED_TYPE cfl_allowed = is_cfl_allowed(xd);
-#endif  // !CONFIG_AIMC
 #if CONFIG_ENTROPY_STATS && !CONFIG_AIMC
     ++counts->uv_mode[cfl_allowed][y_mode][uv_mode];
 #endif  // CONFIG_ENTROPY_STATS && !CONFIG_AIMC
 #if CONFIG_AIMC
     const int uv_context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
-    update_cdf(fc->uv_mode_cdf[uv_context], mbmi->uv_mode_idx, UV_INTRA_MODES);
+    update_cdf(fc->uv_mode_cdf[cfl_allowed][uv_context], mbmi->uv_mode_idx,
+               UV_INTRA_MODES - !cfl_allowed);
 #else
   update_cdf(fc->uv_mode_cdf[cfl_allowed][y_mode], uv_mode,
              UV_INTRA_MODES - !cfl_allowed);
@@ -1338,13 +1337,12 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
               FIRST_MODE_COUNT);
   AVERAGE_CDF(ctx_left->y_mode_idx_cdf_1, ctx_tr->y_mode_idx_cdf_1,
               SECOND_MODE_COUNT);
-  AVERAGE_CDF(ctx_left->uv_mode_cdf, ctx_tr->uv_mode_cdf, UV_INTRA_MODES);
 #else
   AVERAGE_CDF(ctx_left->y_mode_cdf, ctx_tr->y_mode_cdf, INTRA_MODES);
+#endif  // CONFIG_AIMC
   AVG_CDF_STRIDE(ctx_left->uv_mode_cdf[0], ctx_tr->uv_mode_cdf[0],
                  UV_INTRA_MODES - 1, CDF_SIZE(UV_INTRA_MODES));
   AVERAGE_CDF(ctx_left->uv_mode_cdf[1], ctx_tr->uv_mode_cdf[1], UV_INTRA_MODES);
-#endif  // CONFIG_AIMC
 #if CONFIG_SDP
   for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;
        plane_index++) {

@@ -654,9 +654,6 @@ void get_uv_intra_prediction_mode_set(MB_MODE_INFO *mi) {
     isModeSelectedList[i] = -1;
     mi->uv_intra_mode_list[i] = -1;
   }
-  // put cfl mode into the mode list
-  mi->uv_intra_mode_list[selectedModeIdx++] = UV_CFL_PRED;
-  isModeSelectedList[UV_CFL_PRED] = 1;
 
   if (av1_is_directional_mode(mi->mode)) {
     mi->uv_intra_mode_list[selectedModeIdx++] = mi->mode;
@@ -683,6 +680,10 @@ void get_uv_intra_prediction_mode_set(MB_MODE_INFO *mi) {
       isModeSelectedList[default_mode_list_uv[i]] = 1;
     }
   }
+
+  // put cfl mode into the mode list
+  mi->uv_intra_mode_list[selectedModeIdx++] = UV_CFL_PRED;
+  isModeSelectedList[UV_CFL_PRED] = 1;
 }
 #endif  // CONFIG_AIMC
 

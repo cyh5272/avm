@@ -101,7 +101,7 @@ typedef struct IntraModeSearchState {
 
 #if CONFIG_AIMC
 int get_uv_mode_cost(MB_MODE_INFO *mbmi, const ModeCosts mode_costs,
-                     int mode_index);
+                     CFL_ALLOWED_TYPE cfl_allowed, int mode_index);
 #endif  // CONFIG_AIMC
 
 /*!\brief Evaluate a given intra-mode for inter frames.

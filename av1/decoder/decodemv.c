@@ -1049,12 +1049,14 @@ static void read_luma_mode_info(MACROBLOCKD *const xd, aom_reader *r) {
   if (mbmi->joint_y_mode < NON_DIRECTIONAL_MODES_COUNT)
     assert(mbmi->joint_y_mode == mbmi->mode_idx);
 }
-static void read_uv_mode_info(MACROBLOCKD *const xd, aom_reader *r) {
+static void read_uv_mode_info(MACROBLOCKD *const xd,
+                              CFL_ALLOWED_TYPE cfl_allowed, aom_reader *r) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const int context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
-  const int uv_mode_idx = aom_read_symbol(r, ec_ctx->uv_mode_cdf[context],
-                                          UV_INTRA_MODES, ACCT_STR);
+  const int uv_mode_idx =
+      aom_read_symbol(r, ec_ctx->uv_mode_cdf[cfl_allowed][context],
+                      UV_INTRA_MODES - !cfl_allowed, ACCT_STR);
   assert(uv_mode_idx >= 0 && uv_mode_idx < UV_INTRA_MODES);
   get_uv_intra_prediction_mode_set(mbmi);
   mbmi->uv_mode = mbmi->uv_intra_mode_list[uv_mode_idx];
@@ -1187,7 +1189,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 #endif
     if (!cm->seq_params.monochrome && xd->is_chroma_ref) {
 #if CONFIG_AIMC
-      read_uv_mode_info(xd, r);
+      read_uv_mode_info(xd, is_cfl_allowed(xd), r);
 #else
     mbmi->uv_mode =
         read_intra_mode_uv(ec_ctx, r, is_cfl_allowed(xd), mbmi->mode);
@@ -1530,7 +1532,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
 
   if (!cm->seq_params.monochrome && xd->is_chroma_ref) {
 #if CONFIG_AIMC
-    read_uv_mode_info(xd, r);
+    read_uv_mode_info(xd, is_cfl_allowed(xd), r);
 #else
     mbmi->uv_mode =
         read_intra_mode_uv(ec_ctx, r, is_cfl_allowed(xd), mbmi->mode);

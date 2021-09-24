@@ -693,10 +693,11 @@ void av1_rd_pick_palette_intra_sbuv(const AV1_COMP *cpi, MACROBLOCK *x,
   mbmi->uv_mode = UV_DC_PRED;
 #if CONFIG_AIMC
   if (av1_is_directional_mode(mbmi->mode))
-    mbmi->uv_mode_idx = 2;
-  else
     mbmi->uv_mode_idx = 1;
-  dc_mode_cost = get_uv_mode_cost(mbmi, x->mode_costs, mbmi->uv_mode_idx);
+  else
+    mbmi->uv_mode_idx = 0;
+  dc_mode_cost = get_uv_mode_cost(mbmi, x->mode_costs, is_cfl_allowed(xd),
+                                  mbmi->uv_mode_idx);
   assert(mbmi->uv_mode_idx >= 0 && mbmi->uv_mode_idx < UV_INTRA_MODES);
 #endif                         // CONFIG_AIMC
   int count_buf[1 << 12];      // Maximum (1 << 12) color levels.
