@@ -58,6 +58,15 @@ void av1_iidentity16_c(const int32_t *input, int32_t *output, int8_t cos_bit,
 void av1_iidentity32_c(const int32_t *input, int32_t *output, int8_t cos_bit,
                        const int8_t *stage_range);
 
+#if CONFIG_LGT
+void av1_ilgt4(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_ilgt8(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_ilgt16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                const int8_t *stage_range);
+#endif  // CONFIG_LGT
+
 #ifdef __cplusplus
 }
 #endif

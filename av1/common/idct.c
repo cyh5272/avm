@@ -319,7 +319,11 @@ void av1_inv_txfm_add_c(const tran_low_t *dqcoeff, uint8_t *dst, int stride,
       tmp[r * tmp_stride + c] = dst[r * stride + c];
     }
   }
-#if CONFIG_DST_32X32
+
+#if CONFIG_LGT
+  av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                            txfm_param);
+#elif CONFIG_DST_32X32
   if (tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32 ||
       tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16)
     av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
@@ -381,7 +385,9 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #endif
 
   if (txfm_param.is_hbd) {
-#if CONFIG_DST_32X32
+#if CONFIG_LGT
+    av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST_32X32
     if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
          tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
         allowed_tx_mask)
@@ -396,9 +402,11 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
       av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
 #else
     av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
-#endif  // CONFIG_DST7_16X16 && CONFIG_DST_32X32
+#endif  // CONFIG_LGT && CONFIG_DST7_16X16 && CONFIG_DST_32X32
   } else {
-#if CONFIG_DST_32X32
+#if CONFIG_LGT
+    av1_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST_32X32
     if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
          tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
         allowed_tx_mask)
@@ -413,7 +421,7 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
       av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
 #else
     av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
-#endif  // CONFIG_DST7_16X16 && CONFIG_DST_32X32
+#endif  // CONFIG_LGT && CONFIG_DST7_16X16 && CONFIG_DST_32X32
   }
 }
 

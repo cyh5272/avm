@@ -44,6 +44,13 @@ extern const int16_t dst7_32x32[32][32];
 #define DST_32X32_PREC_BITS 7
 #endif  // CONFIG_DST_32X32
 
+#if CONFIG_LGT
+#define LGT_PREC_BITS 10
+extern const int32_t lgt4[4 * 4];
+extern const int32_t lgt8[8 * 8];
+extern const int32_t lgt16[16 * 16];
+#endif  // CONFIG_LGT
+
 #define MAX_TXFM_STAGE_NUM 12
 
 static const int cos_bit_min = 10;
