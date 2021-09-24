@@ -91,7 +91,11 @@ static INLINE bool IsTxSizeTypeValid(TX_SIZE tx_size, TX_TYPE tx_type) {
   } else if (tx_size_sqr_up == TX_32X32) {
     tx_set_type = EXT_TX_SET_DCT_IDTX;
   } else {
+#if CONFIG_DDT_INTER
+    tx_set_type = EXT_TX_SET_ALL24;
+#else
     tx_set_type = EXT_TX_SET_ALL16;
+#endif  // CONFIG_DDT_INTER
   }
   return av1_ext_tx_used[tx_set_type][tx_type] != 0;
 }
