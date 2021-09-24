@@ -354,7 +354,9 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
   av1_inv_stxfm(dqcoeff, &txfm_param);
 #endif
 
-#if CONFIG_DST_32X32
+#if CONFIG_DDT_INTER
+  av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST_32X32
   if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
        tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
       allowed_tx_mask)
@@ -369,7 +371,7 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
     av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
 #else
   av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
-#endif  // CONFIG_DST7_16X16 && CONFIG_DST_32X32
+#endif  // CONFIG_DDT_INTER
 }
 
 // Inverse secondary transform

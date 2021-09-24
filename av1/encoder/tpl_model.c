@@ -70,7 +70,11 @@ static AOM_INLINE void tpl_fwd_txfm(const int16_t *src_diff, int bw,
 #endif
   txfm_param.tx_size = tx_size;
   txfm_param.lossless = 0;
+#if CONFIG_DDT_INTER
+  txfm_param.tx_set_type = EXT_TX_SET_ALL24;
+#else
   txfm_param.tx_set_type = EXT_TX_SET_ALL16;
+#endif  // CONFIG_DDT_INTER
 
   txfm_param.bd = bit_depth;
   av1_fwd_txfm(src_diff, coeff, bw, &txfm_param);

@@ -1286,9 +1286,17 @@ typedef struct FRAME_COUNTS {
   unsigned int delta_lf_multi[FRAME_LF_COUNT][DELTA_LF_PROBS][2];
   unsigned int delta_lf[DELTA_LF_PROBS][2];
 
+#if CONFIG_DDT_INTER
+  unsigned int use_ddtx_inter[EXT_TX_SIZES][2];
+  unsigned int ddtx_type_inter[EXT_TX_SIZES][DDT_TYPES];
+  unsigned int inter_ext_tx[EXT_TX_SETS_INTER][EXT_TX_SIZES][TX_TYPES_TRIG];
+  unsigned int intra_ext_tx[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
+                           [TX_TYPES_TRIG];
+#else
   unsigned int inter_ext_tx[EXT_TX_SETS_INTER][EXT_TX_SIZES][TX_TYPES];
   unsigned int intra_ext_tx[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
                            [TX_TYPES];
+#endif  // CONFIG_DDT_INTER
   unsigned int filter_intra_mode[FILTER_INTRA_MODES];
   unsigned int filter_intra[BLOCK_SIZES_ALL][2];
   unsigned int switchable_restore[RESTORE_SWITCHABLE_TYPES];

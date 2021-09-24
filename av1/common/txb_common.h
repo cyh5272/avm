@@ -42,6 +42,16 @@ static const TX_CLASS tx_type_to_class[TX_TYPES] = {
   TX_CLASS_HORIZ,  // H_ADST
   TX_CLASS_VERT,   // V_FLIPADST
   TX_CLASS_HORIZ,  // H_FLIPADST
+#if CONFIG_DDT_INTER
+  TX_CLASS_2D,  // DDT_DDT
+  TX_CLASS_2D,  // DDT_DCT
+  TX_CLASS_2D,  // DCT_DDT
+  TX_CLASS_2D,  // FLIPDDT_FLIPDDT
+  TX_CLASS_2D,  // FLIPDDT_DCT
+  TX_CLASS_2D,  // DCT_FLIPDDT
+  TX_CLASS_2D,  // FLIPDDT_DDT
+  TX_CLASS_2D,  // DDT_FLIPDDT`
+#endif          // CONFIG_DDT_INTER
 };
 
 static INLINE int get_txb_bwl(TX_SIZE tx_size) {
