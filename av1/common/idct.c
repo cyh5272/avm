@@ -320,7 +320,7 @@ void av1_inv_txfm_add_c(const tran_low_t *dqcoeff, uint8_t *dst, int stride,
     }
   }
 
-#if CONFIG_LGT
+#if CONFIG_DDT_INTER || CONFIG_LGT
   av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
                             txfm_param);
 #elif CONFIG_DST_32X32
@@ -341,7 +341,7 @@ void av1_inv_txfm_add_c(const tran_low_t *dqcoeff, uint8_t *dst, int stride,
 #else
   av1_highbd_inv_txfm_add(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
                           txfm_param);
-#endif
+#endif  // CONFIG_DDT_INTER || CONFIG_LGT
 
   for (int r = 0; r < h; ++r) {
     for (int c = 0; c < w; ++c) {
@@ -385,7 +385,7 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #endif
 
   if (txfm_param.is_hbd) {
-#if CONFIG_LGT
+#if CONFIG_DDT_INTER || CONFIG_LGT
     av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
 #elif CONFIG_DST_32X32
     if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
@@ -402,9 +402,9 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
       av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
 #else
     av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
-#endif  // CONFIG_LGT && CONFIG_DST7_16X16 && CONFIG_DST_32X32
+#endif  // CONFIG_DDT_INTER || CONFIG_LGT
   } else {
-#if CONFIG_LGT
+#if CONFIG_DDT_INTER || CONFIG_LGT
     av1_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
 #elif CONFIG_DST_32X32
     if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
@@ -421,7 +421,7 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
       av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
 #else
     av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
-#endif  // CONFIG_LGT && CONFIG_DST7_16X16 && CONFIG_DST_32X32
+#endif  // CONFIG_DDT_INTER || CONFIG_LGT
   }
 }
 

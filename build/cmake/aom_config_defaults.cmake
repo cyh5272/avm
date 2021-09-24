@@ -167,6 +167,9 @@ set_aom_config_var(CONFIG_DST7_16X16 0 NUMBER "AV2 DST7 16x16 experiment flag.")
 set_aom_config_var(CONFIG_DST_32X32 0 NUMBER "AV2 DST7 32x32 experiment flag.")
 set_aom_config_var(CONFIG_LGT 0 NUMBER
 	           "AV2 line graph transform experiment flag.")
+set_aom_config_var(CONFIG_KLT_INTER 0 NUMBER "AV2 inter KLT experiment flag.")
+set_aom_config_var(CONFIG_DDT_INTER 0 NUMBER
+	           "AV2 data-driven inter transform experiment flag.")
 #
 # Variables in this section control optional features of the build system.
 #
