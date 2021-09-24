@@ -1281,6 +1281,35 @@ static const int av1_num_ext_tx_set[EXT_TX_SET_TYPES] = {
   1, 2, 5, 7, 12, 16,
 };
 
+#if CONFIG_DDT_INTER
+// Whether or not the primary transform is a ddtx
+static INLINE int has_ddtx(TX_TYPE tx_type) {
+  return tx_type >= DDT_DDT && tx_type <= DDT_FLIPDDT;
+}
+
+static INLINE TX_TYPE ddtx_to_trigtx(TX_TYPE tx_type) {
+  switch (tx_type) {
+    case DDT_DDT: return ADST_ADST;
+    case DDT_DCT: return ADST_DCT;
+    case DCT_DDT: return DCT_ADST;
+    case FLIPDDT_FLIPDDT: return FLIPADST_FLIPADST;
+    case FLIPDDT_DCT: return FLIPADST_DCT;
+    case DCT_FLIPDDT: return DCT_FLIPADST;
+    case FLIPDDT_DDT: return FLIPADST_ADST;
+    case DDT_FLIPDDT: return ADST_FLIPADST;
+    default: assert(0); return 0;
+  }
+}
+
+static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
+  { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+};
+#else
 static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
   { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 },
@@ -1289,6 +1318,7 @@ static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
 };
+#endif  // CONFIG_DDT_INTER
 
 static const uint16_t av1_reduced_intra_tx_used_flag[INTRA_MODES] = {
   0x080F,  // DC_PRED:       0000 1000 0000 1111
@@ -1317,7 +1347,11 @@ static const uint16_t av1_ext_tx_used_flag[EXT_TX_SET_TYPES] = {
 
 static const TxSetType av1_ext_tx_set_lookup[2][2] = {
   { EXT_TX_SET_DTT4_IDTX_1DDCT, EXT_TX_SET_DTT4_IDTX },
+#if CONFIG_DDT_INTER
+  { EXT_TX_SET_ALL24, EXT_TX_SET_DTT9_IDTX_1DDCT },
+#else
   { EXT_TX_SET_ALL16, EXT_TX_SET_DTT9_IDTX_1DDCT },
+#endif  // CONFIG_DDT_INTER
 };
 
 #if CONFIG_DST_32X32
@@ -1558,24 +1592,44 @@ static INLINE int tx_size_to_depth(TX_SIZE tx_size, BLOCK_SIZE bsize) {
  *
  */
 static INLINE void disable_secondary_tx_type(TX_TYPE *tx_type) {
+#if CONFIG_DDT_INTER
+  // Mask both secondary tx and ddtx flag
+  *tx_type &= (*tx_type & 0x40) ? 0x1f : 0x0f;
+#else
   *tx_type &= 0x0f;
+#endif  // CONFIG_DDT_INTER
 }
 /*
  * This function masks primary transform type used by the transform block
  */
 static INLINE void disable_primary_tx_type(TX_TYPE *tx_type) {
+#if CONFIG_DDT_INTER
+  *tx_type &= 0x30;  // Set the 6th bit to zero and apply masking
+#else
   *tx_type &= 0xf0;
+#endif
 }
 /*
- * This function returns primary transform type used by the transform block
+ * This function returns primary transform type used by the transform block.
+ * If data-driven transform is enabled (CONFIG_DDT_INTER), bit 6 of
+ * tx_type stores is_ddtx. If it is 1, then take 5 bits (ddtx can be from 16 to
+ * 23). Otherwise, take 4 bits (primary tx ranges from 0 to 16).
  */
 static INLINE TX_TYPE get_primary_tx_type(TX_TYPE tx_type) {
+#if CONFIG_DDT_INTER
+  return (tx_type & 0x40) ? (tx_type & 0x1f) : (tx_type & 0x0f);
+#else
   return tx_type & 0x0f;
+#endif  // CONFIG_DDT_INTER
 }
 /*
  * This function returns secondary transform type used by the transform block
  */
 static INLINE TX_TYPE get_secondary_tx_type(TX_TYPE tx_type) {
+#if CONFIG_DDT_INTER
+  if (tx_type & 0x40) return 0;
+  tx_type &= 0x3f;  // Set the 6th bit to zero
+#endif              // CONFIG_DDT_INTER
   return (tx_type >> 4);
 }
 /*
@@ -1657,6 +1711,12 @@ static INLINE TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
       // Secondary transforms are disabled for chroma
       disable_secondary_tx_type(&tx_type);
 #endif  // CONFIG_IST
+#if CONFIG_DDT_INTER
+      // In DDT_INTER, transform pruning is not applied to ddtx, which causes
+      // a mismatch if uv_tx_type has ddtx in it. In this case, we replace ddtx
+      // by adst as a workaround.
+      if (has_ddtx(tx_type)) tx_type = ddtx_to_trigtx(tx_type);
+#endif  // CONFIG_DDT_INTER
     } else {
       // In intra mode, uv planes don't share the same prediction mode as y
       // plane, so the tx_type should not be shared

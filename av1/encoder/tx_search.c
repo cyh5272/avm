@@ -1449,7 +1449,11 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // to ensure we can try ones even outside of ext_tx_set of current block
   // this function should only be called for size < 16
   assert(txsize_sqr_up_map[tx_size] <= TX_16X16);
+#if CONFIG_DDT_INTER
+  txfm_param.tx_set_type = EXT_TX_SET_ALL24;
+#else
   txfm_param.tx_set_type = EXT_TX_SET_ALL16;
+#endif  // CONFIG_DDT_INTER
 
   int rate_cost = 0;
   int64_t dist = 0, sse = 0;
@@ -1523,7 +1527,12 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // combine rd_h and rd_v to prune tx candidates
   int i_v, i_h;
   int64_t rds[16];
+#if CONFIG_DDT_INTER
+  // Pruning is not applied to DDT for now.
+  int num_cand = 0, last = TX_TYPES_TRIG - 1;
+#else
   int num_cand = 0, last = TX_TYPES - 1;
+#endif  // CONFIG_DDT_INTER
 
   for (int i = 0; i < 16; i++) {
     i_v = sel_pattern_v[i];
@@ -1563,10 +1572,19 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   const AV1_COMMON *cm = &cpi->common;
   int tx_type;
 
+#if CONFIG_DDT_INTER
+  // Pruning is not applied to DDT for now.
+  int64_t rds[TX_TYPES_TRIG];
+#else
   int64_t rds[TX_TYPES];
+#endif  // CONFIG_DDT_INTER
 
   int num_cand = 0;
+#if CONFIG_DDT_INTER
+  int last = TX_TYPES_TRIG - 1;
+#else
   int last = TX_TYPES - 1;
+#endif  // CONFIG_DDT_INTER
 
   TxfmParam txfm_param;
   QUANT_PARAM quant_param;
@@ -1578,7 +1596,11 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   av1_setup_quant(tx_size, 1, AV1_XFORM_QUANT_B, cpi->oxcf.q_cfg.quant_b_adapt,
                   &quant_param);
 
+#if CONFIG_DDT_INTER
+  for (int idx = 0; idx < TX_TYPES_TRIG; idx++) {
+#else
   for (int idx = 0; idx < TX_TYPES; idx++) {
+#endif  // CONFIG_DDT_INTER
     tx_type = idx;
     int rate_cost = 0;
     int64_t dist = 0, sse = 0;
@@ -1722,7 +1744,11 @@ static INLINE float get_adaptive_thresholds(
     { 4, 1 }, { 6, 3 }, { 9, 6 }, { 9, 6 }, { 12, 9 }
   };
   int pruning_aggressiveness = 0;
+#if CONFIG_DDT_INTER
+  if (tx_set_type == EXT_TX_SET_ALL24)
+#else
   if (tx_set_type == EXT_TX_SET_ALL16)
+#endif  // CONFIG_DDT_INTER
     pruning_aggressiveness =
         prune_aggr_table[prune_2d_txfm_mode - TX_TYPE_PRUNE_1][0];
   else if (tx_set_type == EXT_TX_SET_DTT9_IDTX_1DDCT)
@@ -1806,7 +1832,11 @@ static void prune_tx_2D(MACROBLOCK *x, BLOCK_SIZE bsize, TX_SIZE tx_size,
     FLIPADST_DCT, FLIPADST_ADST, FLIPADST_FLIPADST, V_FLIPADST,
     H_DCT,        H_ADST,        H_FLIPADST,        IDTX
   };
+#if CONFIG_DDT_INTER
+  if (tx_set_type != EXT_TX_SET_ALL24 &&
+#else
   if (tx_set_type != EXT_TX_SET_ALL16 &&
+#endif  // CONFIG_DDT_INTER
       tx_set_type != EXT_TX_SET_DTT9_IDTX_1DDCT)
     return;
 #if CONFIG_NN_V2
@@ -1869,7 +1899,11 @@ static void prune_tx_2D(MACROBLOCK *x, BLOCK_SIZE bsize, TX_SIZE tx_size,
   float sum_score = 0.0;
   // Calculate sum of allowed tx type score and Populate allow bit mask based
   // on score_thresh and allowed_tx_mask
+#if CONFIG_DDT_INTER
+  for (int tx_idx = 0; tx_idx < TX_TYPES_TRIG; tx_idx++) {
+#else
   for (int tx_idx = 0; tx_idx < TX_TYPES; tx_idx++) {
+#endif  // CONFIG_DDT_INTER
     int allow_tx_type = *allowed_tx_mask & (1 << tx_type_table_2D[tx_idx]);
     if (scores_2D[tx_idx] > max_score && allow_tx_type) {
       max_score = scores_2D[tx_idx];
@@ -1889,7 +1923,11 @@ static void prune_tx_2D(MACROBLOCK *x, BLOCK_SIZE bsize, TX_SIZE tx_size,
     sum_score += scores_2D[max_score_i];
   }
   // Sort tx type probability of all types
+#if CONFIG_DDT_INTER
+  sort_probability(scores_2D, tx_type_table_2D, TX_TYPES_TRIG);
+#else
   sort_probability(scores_2D, tx_type_table_2D, TX_TYPES);
+#endif  // CONFIG_DDT_INTER
 
   // Enable more pruning based on tx type probability and number of allowed tx
   // types
@@ -1899,7 +1937,11 @@ static void prune_tx_2D(MACROBLOCK *x, BLOCK_SIZE bsize, TX_SIZE tx_size,
     int tx_idx, tx_count = 0;
     const float inv_sum_score = 100 / sum_score;
     // Get allowed tx types based on sorted probability score and tx count
+#if CONFIG_DDT_INTER
+    for (tx_idx = 0; tx_idx < TX_TYPES_TRIG; tx_idx++) {
+#else
     for (tx_idx = 0; tx_idx < TX_TYPES; tx_idx++) {
+#endif  // CONFIG_DDT_INTER
       // Skip the tx type which has more than 30% of cumulative
       // probability and allowed tx type count is more than 2
       if (score_ratio > 30.0 && tx_count >= 2) break;
@@ -1915,7 +1957,11 @@ static void prune_tx_2D(MACROBLOCK *x, BLOCK_SIZE bsize, TX_SIZE tx_size,
       }
     }
     // Set remaining tx types as pruned
+#if CONFIG_DDT_INTER
+    for (; tx_idx < TX_TYPES_TRIG; tx_idx++)
+#else
     for (; tx_idx < TX_TYPES; tx_idx++)
+#endif  // CONFIG_DDT_INTER
       allow_bitmask &= ~(1 << tx_type_table_2D[tx_idx]);
   }
   memcpy(txk_map, tx_type_table_2D, sizeof(tx_type_table_2D));
@@ -2086,7 +2132,11 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
       uint16_t prune = 0;
       int max_prob = -1;
       int max_idx = 0;
+#if CONFIG_DDT_INTER
+      for (i = 0; i < TX_TYPES_TRIG; i++) {
+#else
       for (i = 0; i < TX_TYPES; i++) {
+#endif  // CONFIG_DDT_INTER
         if (tx_type_probs[i] > max_prob && (allowed_tx_mask & (1 << i))) {
           max_prob = tx_type_probs[i];
           max_idx = i;
@@ -2096,7 +2146,11 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
       if ((prune >> max_idx) & 0x01) prune &= ~(1 << max_idx);
       allowed_tx_mask &= (~prune);
     }
+#if CONFIG_DDT_INTER
+    for (i = 0; i < TX_TYPES_TRIG; i++) {
+#else
     for (i = 0; i < TX_TYPES; i++) {
+#endif  // CONFIG_DDT_INTER
       if (allowed_tx_mask & (1 << i)) num_allowed++;
     }
     assert(num_allowed > 0);
@@ -2399,9 +2453,16 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // txk_allowed = TX_TYPES: >1 tx types are allowed
   // txk_allowed < TX_TYPES: only that specific tx type is allowed.
   TX_TYPE txk_allowed = TX_TYPES;
+#if CONFIG_DDT_INTER
+  int txk_map[TX_TYPES] = { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
+                            12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
+  const TxSetType tx_set_type = av1_get_ext_tx_set_type(
+      tx_size, is_inter, cm->features.reduced_tx_set_used);
+#else
   int txk_map[TX_TYPES] = {
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
   };
+#endif  // CONFIG_DDT_INTER
   const int dequant_shift = (is_cur_buf_hbd(xd)) ? xd->bd - 5 : 3;
 
   const int qstep =
@@ -2540,7 +2601,13 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
     const int max_stx = xd->enable_ist ? 4 : 1;
     for (int stx = 0; stx < max_stx; ++stx) {
       TX_TYPE tx_type = (TX_TYPE)txk_map[idx];
+#if CONFIG_DDT_INTER
+      int is_ddtx = has_ddtx(tx_type);
+      if (!is_ddtx && !(allowed_tx_mask & (1 << tx_type))) continue;
+      if (is_ddtx && !av1_ext_tx_used[tx_set_type][tx_type]) continue;
+#else
       if (!(allowed_tx_mask & (1 << tx_type))) continue;
+#endif  // CONFIG_DDT_INTER
       const PREDICTION_MODE intra_mode =
           (plane == AOM_PLANE_Y) ? mbmi->mode : get_uv_mode(mbmi->uv_mode);
       const int filter = mbmi->filter_intra_mode_info.use_filter_intra;
@@ -2555,11 +2622,20 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
            xd->lossless[mbmi->segment_id]);
       if (skip_stx && stx) continue;
       tx_type += (stx << 4);
+#if CONFIG_DDT_INTER
+      tx_type += (is_ddtx << 6);
+#endif  // CONFIG_DDT_INTER
       txfm_param.tx_type = get_primary_tx_type(tx_type);
       txfm_param.sec_tx_type = stx;
 #else
     const TX_TYPE tx_type = (TX_TYPE)txk_map[idx];
+#if CONFIG_DDT_INTER
+    int is_ddtx = has_ddtx(tx_type);
+    if (!is_ddtx && !(allowed_tx_mask & (1 << tx_type))) continue;
+    if (is_ddtx && !av1_ext_tx_used[tx_set_type][tx_type]) continue;
+#else
     if (!(allowed_tx_mask & (1 << tx_type))) continue;
+#endif  // CONFIG_DDT_INTER
     txfm_param.tx_type = tx_type;
 #endif
       if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id)) {

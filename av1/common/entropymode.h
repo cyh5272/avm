@@ -254,10 +254,19 @@ typedef struct frame_contexts {
   aom_cdf_prob delta_q_cdf[CDF_SIZE(DELTA_Q_PROBS + 1)];
   aom_cdf_prob delta_lf_multi_cdf[FRAME_LF_COUNT][CDF_SIZE(DELTA_LF_PROBS + 1)];
   aom_cdf_prob delta_lf_cdf[CDF_SIZE(DELTA_LF_PROBS + 1)];
+#if CONFIG_DDT_INTER
+  aom_cdf_prob ddtx_type_inter_cdf[EXT_TX_SIZES][CDF_SIZE(DDT_TYPES)];
+  aom_cdf_prob use_ddtx_inter_cdf[EXT_TX_SIZES][CDF_SIZE(2)];
+  aom_cdf_prob intra_ext_tx_cdf[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
+                               [CDF_SIZE(TX_TYPES_TRIG)];
+  aom_cdf_prob inter_ext_tx_cdf[EXT_TX_SETS_INTER][EXT_TX_SIZES]
+                               [CDF_SIZE(TX_TYPES_TRIG)];
+#else
   aom_cdf_prob intra_ext_tx_cdf[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
                                [CDF_SIZE(TX_TYPES)];
   aom_cdf_prob inter_ext_tx_cdf[EXT_TX_SETS_INTER][EXT_TX_SIZES]
                                [CDF_SIZE(TX_TYPES)];
+#endif  // CONFIG_DDT_INTER
   aom_cdf_prob cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)];
   aom_cdf_prob cfl_alpha_cdf[CFL_ALPHA_CONTEXTS][CDF_SIZE(CFL_ALPHABET_SIZE)];
 #if CONFIG_IST
@@ -286,7 +295,11 @@ static const int av1_ext_tx_inv_intra[EXT_TX_SET_TYPES][TX_TYPES] = {
 };
 #endif  // CONFIG_FORWARDSKIP
 
+#if CONFIG_DDT_INTER
+static const int av1_ext_tx_ind[EXT_TX_SET_TYPES][TX_TYPES_TRIG] = {
+#else
 static const int av1_ext_tx_ind[EXT_TX_SET_TYPES][TX_TYPES] = {
+#endif  // CONFIG_DDT_INTER
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   { 1, 3, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -295,7 +308,11 @@ static const int av1_ext_tx_ind[EXT_TX_SET_TYPES][TX_TYPES] = {
   { 7, 8, 9, 12, 10, 11, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6 },
 };
 
+#if CONFIG_DDT_INTER
+static const int av1_ext_tx_inv[EXT_TX_SET_TYPES][TX_TYPES_TRIG] = {
+#else
 static const int av1_ext_tx_inv[EXT_TX_SET_TYPES][TX_TYPES] = {
+#endif  // CONFIG_DDT_INTER
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   { 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   { 9, 0, 3, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
