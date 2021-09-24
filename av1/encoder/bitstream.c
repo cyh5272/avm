@@ -1123,9 +1123,33 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
     assert(av1_ext_tx_used[tx_set_type][tx_type]);
 #endif
     if (is_inter) {
-      aom_write_symbol(w, av1_ext_tx_ind[tx_set_type][tx_type],
-                       ec_ctx->inter_ext_tx_cdf[eset][square_tx_size],
-                       av1_num_ext_tx_set[tx_set_type]);
+#if CONFIG_DDT_INTER
+      if (tx_set_type == EXT_TX_SET_ALL24) {
+#if CONFIG_IST
+        TX_TYPE ptx_type = get_primary_tx_type(tx_type);
+#else
+        TX_TYPE ptx_type = tx_type;
+#endif
+        int is_ddtx = has_ddtx(ptx_type);
+        aom_write_symbol(w, is_ddtx, ec_ctx->use_ddtx_inter_cdf[square_tx_size],
+                         2);
+        if (is_ddtx) {
+          aom_write_symbol(w, ptx_type - DDT_DDT,
+                           ec_ctx->ddtx_type_inter_cdf[square_tx_size],
+                           DDT_TYPES);
+        } else {
+          aom_write_symbol(w, av1_ext_tx_ind[tx_set_type][ptx_type],
+                           ec_ctx->inter_ext_tx_cdf[eset][square_tx_size],
+                           av1_num_ext_tx_set[tx_set_type]);
+        }
+      } else {
+#endif  // CONFIG_DDT_INTER
+        aom_write_symbol(w, av1_ext_tx_ind[tx_set_type][tx_type],
+                         ec_ctx->inter_ext_tx_cdf[eset][square_tx_size],
+                         av1_num_ext_tx_set[tx_set_type]);
+#if CONFIG_DDT_INTER
+      }
+#endif  // CONFIG_DDT_INTER
     } else {
 #if CONFIG_FORWARDSKIP
       if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART]) {
