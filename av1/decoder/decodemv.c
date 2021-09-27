@@ -32,6 +32,7 @@
 #define ACCT_STR __func__
 
 #define DEC_MISMATCH_DEBUG 0
+
 #if !CONFIG_AIMC
 static PREDICTION_MODE read_intra_mode(aom_reader *r, aom_cdf_prob *cdf) {
   return (PREDICTION_MODE)aom_read_symbol(r, cdf, INTRA_MODES, ACCT_STR);
@@ -203,6 +204,7 @@ static uint8_t read_mrl_index(FRAME_CONTEXT *ec_ctx, aom_reader *r) {
   return mrl_index;
 }
 #endif
+
 #if !CONFIG_AIMC
 static UV_PREDICTION_MODE read_intra_mode_uv(FRAME_CONTEXT *ec_ctx,
                                              aom_reader *r,
@@ -214,6 +216,7 @@ static UV_PREDICTION_MODE read_intra_mode_uv(FRAME_CONTEXT *ec_ctx,
   return uv_mode;
 }
 #endif  // !CONFIG_AIMC
+
 static uint8_t read_cfl_alphas(FRAME_CONTEXT *const ec_ctx, aom_reader *r,
                                int8_t *signs_out) {
   const int8_t joint_sign =
@@ -754,12 +757,14 @@ static void read_palette_mode_info(AV1_COMMON *const cm, MACROBLOCKD *const xd,
     }
   }
 }
+
 #if !CONFIG_AIMC
 static int read_angle_delta(aom_reader *r, aom_cdf_prob *cdf) {
   const int sym = aom_read_symbol(r, cdf, 2 * MAX_ANGLE_DELTA + 1, ACCT_STR);
   return sym - MAX_ANGLE_DELTA;
 }
 #endif  // !CONFIG_AIMC
+
 static void read_filter_intra_mode_info(const AV1_COMMON *const cm,
                                         MACROBLOCKD *const xd, aom_reader *r) {
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -1026,11 +1031,13 @@ static void read_delta_q_params(AV1_COMMON *const cm, MACROBLOCKD *const xd,
 }
 
 #if CONFIG_AIMC
-static void read_luma_mode_info(MACROBLOCKD *const xd, aom_reader *r) {
+// read mode set index and mode index in set for y component,
+// and map it to y mode and delta angle
+static void read_intra_luma_mode(MACROBLOCKD *const xd, aom_reader *r) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   uint8_t mode_idx = 0;
-  const int context = get_intra_y_mode_context(xd);
+  const int context = get_y_mode_idx_ctx(xd);
   int mode_set_index =
       aom_read_symbol(r, ec_ctx->y_mode_set_cdf, INTRA_MODE_SETS, ACCT_STR);
   if (mode_set_index == 0) {
@@ -1042,15 +1049,17 @@ static void read_luma_mode_info(MACROBLOCKD *const xd, aom_reader *r) {
                                SECOND_MODE_COUNT, ACCT_STR);
   }
   assert(mode_idx >= 0 && mode_idx < LUMA_MODE_COUNT);
-  get_luma_intra_prediction_mode_set(mbmi, xd);
-  mbmi->joint_y_mode = mbmi->y_intra_mode_list[mode_idx];
-  set_y_mode_and_delta_angle(mbmi->joint_y_mode, mbmi);
-  mbmi->mode_idx = mode_idx;
-  if (mbmi->joint_y_mode < NON_DIRECTIONAL_MODES_COUNT)
-    assert(mbmi->joint_y_mode == mbmi->mode_idx);
+  get_y_intra_mode_set(mbmi, xd);
+  mbmi->joint_y_mode_delta_angle = mbmi->y_intra_mode_list[mode_idx];
+  set_y_mode_and_delta_angle(mbmi->joint_y_mode_delta_angle, mbmi);
+  mbmi->y_mode_idx = mode_idx;
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
 }
-static void read_uv_mode_info(MACROBLOCKD *const xd,
-                              CFL_ALLOWED_TYPE cfl_allowed, aom_reader *r) {
+
+// read mode index for uv component and map it to uv mode and delta angle
+static void read_intra_uv_mode(MACROBLOCKD *const xd,
+                               CFL_ALLOWED_TYPE cfl_allowed, aom_reader *r) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const int context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
@@ -1058,13 +1067,12 @@ static void read_uv_mode_info(MACROBLOCKD *const xd,
       aom_read_symbol(r, ec_ctx->uv_mode_cdf[cfl_allowed][context],
                       UV_INTRA_MODES - !cfl_allowed, ACCT_STR);
   assert(uv_mode_idx >= 0 && uv_mode_idx < UV_INTRA_MODES);
-  get_uv_intra_prediction_mode_set(mbmi);
+  get_uv_intra_mode_set(mbmi);
   mbmi->uv_mode = mbmi->uv_intra_mode_list[uv_mode_idx];
   if (mbmi->uv_mode == mbmi->mode)
     mbmi->angle_delta[PLANE_TYPE_UV] = mbmi->angle_delta[PLANE_TYPE_Y];
   else
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
-  // mbmi->uv_mode_idx = uv_mode_idx;
 }
 #endif  // CONFIG_AIMC
 
@@ -1157,7 +1165,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   if (xd->tree_type != CHROMA_PART) {
 #endif  // CONFIG_SDP
 #if CONFIG_AIMC
-    read_luma_mode_info(xd, r);
+    read_intra_luma_mode(xd, r);
 #else
   mbmi->mode = read_intra_mode(r, get_y_mode_cdf(ec_ctx, above_mi, left_mi));
 #if CONFIG_SDP
@@ -1189,7 +1197,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 #endif
     if (!cm->seq_params.monochrome && xd->is_chroma_ref) {
 #if CONFIG_AIMC
-      read_uv_mode_info(xd, is_cfl_allowed(xd), r);
+      read_intra_uv_mode(xd, is_cfl_allowed(xd), r);
 #else
     mbmi->uv_mode =
         read_intra_mode_uv(ec_ctx, r, is_cfl_allowed(xd), mbmi->mode);
@@ -1499,8 +1507,9 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   mbmi->ref_frame[1] = NONE_FRAME;
 
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+
 #if CONFIG_AIMC
-  read_luma_mode_info(xd, r);
+  read_intra_luma_mode(xd, r);
 #else
   const int use_angle_delta = av1_use_angle_delta(bsize);
   mbmi->mode = read_intra_mode(r, ec_ctx->y_mode_cdf[size_group_lookup[bsize]]);
@@ -1532,7 +1541,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
 
   if (!cm->seq_params.monochrome && xd->is_chroma_ref) {
 #if CONFIG_AIMC
-    read_uv_mode_info(xd, is_cfl_allowed(xd), r);
+    read_intra_uv_mode(xd, is_cfl_allowed(xd), r);
 #else
     mbmi->uv_mode =
         read_intra_mode_uv(ec_ctx, r, is_cfl_allowed(xd), mbmi->mode);

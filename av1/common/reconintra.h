@@ -31,12 +31,10 @@ extern "C" {
  *                                  the mode info for the current macroblock.
  */
 void set_y_mode_and_delta_angle(const int mode_idx, MB_MODE_INFO *const mbmi);
-void set_uv_mode_and_delta_angle(MB_MODE_INFO *mi);
-int get_intra_y_mode_context(MACROBLOCKD *const xd);
-void get_luma_intra_prediction_mode_set(MB_MODE_INFO *mi,
-                                        MACROBLOCKD *const xd);
-void get_uv_intra_prediction_mode_set(MB_MODE_INFO *mi);
-static const PREDICTION_MODE reordered_nominal_mode[INTRA_MODES] = {
+int get_y_mode_idx_ctx(MACROBLOCKD *const xd);
+void get_y_intra_mode_set(MB_MODE_INFO *mi, MACROBLOCKD *const xd);
+void get_uv_intra_mode_set(MB_MODE_INFO *mi);
+static const PREDICTION_MODE reordered_y_mode[INTRA_MODES] = {
   DC_PRED,   SMOOTH_PRED, SMOOTH_V_PRED, SMOOTH_H_PRED, PAETH_PRED,
   D45_PRED,  D67_PRED,    V_PRED,        D113_PRED,     D135_PRED,
   D157_PRED, H_PRED,      D203_PRED

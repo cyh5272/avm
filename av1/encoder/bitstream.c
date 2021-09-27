@@ -1374,16 +1374,18 @@ static AOM_INLINE void write_delta_q_params(AV1_COMP *cpi, int skip,
 }
 
 #if CONFIG_AIMC
+// write mode set index and mode index in set for y component
 static AOM_INLINE void write_intra_luma_mode(MACROBLOCKD *const xd,
                                              aom_writer *w) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   MB_MODE_INFO *const mbmi = xd->mi[0];
-  const int mode_idx = mbmi->mode_idx;
+  const int mode_idx = mbmi->y_mode_idx;
   assert(mode_idx >= 0 && mode_idx < LUMA_MODE_COUNT);
-  assert(mbmi->joint_y_mode >= 0 && mbmi->joint_y_mode < LUMA_MODE_COUNT);
-  if (mbmi->joint_y_mode < NON_DIRECTIONAL_MODES_COUNT)
-    assert(mbmi->joint_y_mode == mbmi->mode_idx);
-  const int context = get_intra_y_mode_context(xd);
+  assert(mbmi->joint_y_mode_delta_angle >= 0 &&
+         mbmi->joint_y_mode_delta_angle < LUMA_MODE_COUNT);
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
+  const int context = get_y_mode_idx_ctx(xd);
   int mode_set_index = mode_idx < FIRST_MODE_COUNT ? 0 : 1;
   mode_set_index += ((mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
   aom_write_symbol(w, mode_set_index, ec_ctx->y_mode_set_cdf, INTRA_MODE_SETS);
@@ -1396,10 +1398,11 @@ static AOM_INLINE void write_intra_luma_mode(MACROBLOCKD *const xd,
         mode_idx - FIRST_MODE_COUNT - (mode_set_index - 1) * SECOND_MODE_COUNT,
         ec_ctx->y_mode_idx_cdf_1[context], SECOND_MODE_COUNT);
   }
-  if (mbmi->joint_y_mode < NON_DIRECTIONAL_MODES_COUNT)
-    assert(mbmi->joint_y_mode == mbmi->mode_idx);
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
 }
 
+// write mode mode index for uv component
 static AOM_INLINE void write_intra_uv_mode(MACROBLOCKD *const xd,
                                            CFL_ALLOWED_TYPE cfl_allowed,
                                            aom_writer *w) {
@@ -1839,6 +1842,7 @@ static AOM_INLINE void write_mb_modes_kf(
     if (is_intrabc_block(mbmi)) return;
 #endif
   }
+
 #if CONFIG_AIMC
   write_intra_prediction_modes(cpi, w);
 #else

@@ -364,10 +364,15 @@ typedef struct MB_MODE_INFO {
   uint8_t mrl_index;
 #endif
 #if CONFIG_AIMC
-  uint8_t mode_idx;
+  /*! \brief mode index of y mode and y delta angle after re-ordering. */
+  uint8_t y_mode_idx;
+  /*! \brief mode index of uv mode after re-ordering. */
   uint8_t uv_mode_idx;
-  uint8_t joint_y_mode;
+  /*! \brief joint mode index of y mode and y delta angle before re-ordering. */
+  uint8_t joint_y_mode_delta_angle;
+  /*! \brief re-ordered mode list for y mode and y delta angle. */
   uint8_t y_intra_mode_list[LUMA_MODE_COUNT];
+  /*! \brief re-ordered mode list for uv mode. */
   uint8_t uv_intra_mode_list[UV_INTRA_MODES];
 #endif  // CONFIG_AIMC
   /**@}*/
@@ -537,7 +542,7 @@ static INLINE MV_REFERENCE_FRAME comp_ref1(int ref_idx) {
 }
 
 #if CONFIG_AIMC
-PREDICTION_MODE av1_get_block_joint_mode(const MB_MODE_INFO *mi);
+PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi);
 #else
 PREDICTION_MODE av1_left_block_mode(const MB_MODE_INFO *left_mi);
 

@@ -542,8 +542,8 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
   if (xd->tree_type != CHROMA_PART) {
 #endif
 #if CONFIG_AIMC
-    const int context = get_intra_y_mode_context(xd);
-    const int mode_idx = mbmi->mode_idx;
+    const int context = get_y_mode_idx_ctx(xd);
+    const int mode_idx = mbmi->y_mode_idx;
     int mode_set_index = mode_idx < FIRST_MODE_COUNT ? 0 : 1;
     mode_set_index += ((mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
     update_cdf(fc->y_mode_set_cdf, mode_set_index, INTRA_MODE_SETS);

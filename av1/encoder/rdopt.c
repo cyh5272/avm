@@ -5966,7 +5966,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     top_intra_model_rd[i] = INT64_MAX;
   }
 #if CONFIG_AIMC
-  get_luma_intra_prediction_mode_set(mbmi, xd);
+  get_y_intra_mode_set(mbmi, xd);
 #endif  // CONFIG_AIMC
 #if CONFIG_MRLS
   uint8_t enable_mrls_flag = cm->seq_params.enable_mrls;
@@ -5980,9 +5980,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
           search_state.intra_search_state.skip_intra_modes)
         break;
 #if CONFIG_AIMC
-      mbmi->mode_idx = mode_idx;
-      mbmi->joint_y_mode = mbmi->y_intra_mode_list[mode_idx];
-      set_y_mode_and_delta_angle(mbmi->joint_y_mode, mbmi);
+      mbmi->y_mode_idx = mode_idx;
+      mbmi->joint_y_mode_delta_angle = mbmi->y_intra_mode_list[mode_idx];
+      set_y_mode_and_delta_angle(mbmi->joint_y_mode_delta_angle, mbmi);
 #else
     set_y_mode_and_delta_angle(mode_idx, mbmi);
 #endif  // CONFIG_AIMC

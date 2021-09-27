@@ -50,8 +50,8 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
   mbmi->mrl_index = 0;
 #endif
 #if CONFIG_AIMC
-  mbmi->joint_y_mode = DC_PRED;
-  mbmi->mode_idx = DC_PRED;
+  mbmi->joint_y_mode_delta_angle = DC_PRED;
+  mbmi->y_mode_idx = DC_PRED;
 #endif  // CONFIG_AIMC
 
 #if CONFIG_ORIP
@@ -107,8 +107,8 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
     mbmi->filter_intra_mode_info = filter_intra_mode_info;
     av1_copy_array(ctx->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
 #if CONFIG_AIMC
-    mbmi->joint_y_mode = DC_PRED;
-    mbmi->mode_idx = DC_PRED;
+    mbmi->joint_y_mode_delta_angle = DC_PRED;
+    mbmi->y_mode_idx = DC_PRED;
 #endif  // CONFIG_AIMC
 #if CONFIG_ORIP
     mbmi->angle_delta[PLANE_TYPE_Y] = 0;
@@ -539,7 +539,7 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
   // Search through all non-palette modes.
 #if CONFIG_AIMC
-  get_uv_intra_prediction_mode_set(mbmi);
+  get_uv_intra_mode_set(mbmi);
   for (int mode_idx = 0; mode_idx < UV_INTRA_MODES; ++mode_idx) {
     mbmi->uv_mode_idx = mode_idx;
     mbmi->uv_mode = mbmi->uv_intra_mode_list[mode_idx];
@@ -926,17 +926,17 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
 #endif
 #if CONFIG_AIMC
   int mode_cost = 0;
-  const int context = get_intra_y_mode_context(xd);
-  int mode_set_index = mbmi->mode_idx < FIRST_MODE_COUNT ? 0 : 1;
-  mode_set_index += ((mbmi->mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
+  const int context = get_y_mode_idx_ctx(xd);
+  int mode_set_index = mbmi->y_mode_idx < FIRST_MODE_COUNT ? 0 : 1;
+  mode_set_index += ((mbmi->y_mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
   mode_cost += x->mode_costs.y_primary_flag_cost[mode_set_index];
-  if (mbmi->mode_idx < FIRST_MODE_COUNT) {
-    mode_cost += x->mode_costs.y_first_mode_costs[context][mbmi->mode_idx];
+  if (mbmi->y_mode_idx < FIRST_MODE_COUNT) {
+    mode_cost += x->mode_costs.y_first_mode_costs[context][mbmi->y_mode_idx];
   } else {
     mode_cost +=
         x->mode_costs
             .y_second_mode_costs[context]
-                                [mbmi->mode_idx - FIRST_MODE_COUNT -
+                                [mbmi->y_mode_idx - FIRST_MODE_COUNT -
                                  SECOND_MODE_COUNT * (mode_set_index - 1)];
   }
   mode_cost += ref_frame_cost;
@@ -983,7 +983,7 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
     }
 #if CONFIG_AIMC
     if (intra_search_state->directional_mode_skip_mask[mode] &&
-        mbmi->mode_idx >= FIRST_MODE_COUNT)
+        mbmi->y_mode_idx >= FIRST_MODE_COUNT)
       return INT64_MAX;
 #else
     if (intra_search_state->directional_mode_skip_mask[mode]) return INT64_MAX;
@@ -1177,7 +1177,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   uint8_t *best_palette_color_map =
       try_palette ? x->palette_buffer->best_palette_color_map : NULL;
 #if CONFIG_AIMC
-  const int context = get_intra_y_mode_context(xd);
+  const int context = get_y_mode_idx_ctx(xd);
   int mode_costs = 0;
 #else
   const int *bmode_costs;
@@ -1203,7 +1203,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   set_mode_eval_params(cpi, x, MODE_EVAL);
 
 #if CONFIG_AIMC
-  get_luma_intra_prediction_mode_set(mbmi, xd);
+  get_y_intra_mode_set(mbmi, xd);
 #endif  // CONFIG_AIMC
 
   MB_MODE_INFO best_mbmi = *mbmi;
@@ -1225,13 +1225,13 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     for (int mode_idx = INTRA_MODE_START; mode_idx < LUMA_MODE_COUNT;
          ++mode_idx) {
 #if CONFIG_AIMC
-      mbmi->mode_idx = mode_idx;
-      mbmi->joint_y_mode = mbmi->y_intra_mode_list[mode_idx];
-      set_y_mode_and_delta_angle(mbmi->joint_y_mode, mbmi);
+      mbmi->y_mode_idx = mode_idx;
+      mbmi->joint_y_mode_delta_angle = mbmi->y_intra_mode_list[mode_idx];
+      set_y_mode_and_delta_angle(mbmi->joint_y_mode_delta_angle, mbmi);
       mode_costs = 0;
-      int mode_set_index = mbmi->mode_idx < FIRST_MODE_COUNT ? 0 : 1;
+      int mode_set_index = mbmi->y_mode_idx < FIRST_MODE_COUNT ? 0 : 1;
       mode_set_index +=
-          ((mbmi->mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
+          ((mbmi->y_mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
       mode_costs += x->mode_costs.y_primary_flag_cost[mode_set_index];
       if (mode_idx < FIRST_MODE_COUNT) {
         mode_costs += x->mode_costs.y_first_mode_costs[context][mode_idx];
@@ -1239,7 +1239,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         mode_costs +=
             x->mode_costs
                 .y_second_mode_costs[context]
-                                    [mbmi->mode_idx - FIRST_MODE_COUNT -
+                                    [mbmi->y_mode_idx - FIRST_MODE_COUNT -
                                      SECOND_MODE_COUNT * (mode_set_index - 1)];
       }
 #else
@@ -1453,8 +1453,8 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   }
   *mbmi = best_mbmi;
 #if CONFIG_AIMC
-  if (mbmi->joint_y_mode < NON_DIRECTIONAL_MODES_COUNT)
-    assert(mbmi->joint_y_mode == mbmi->mode_idx);
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
 #endif  // CONFIG_AIMC
   av1_copy_array(xd->tx_type_map, ctx->tx_type_map, ctx->num_4x4_blk);
   return best_rd;

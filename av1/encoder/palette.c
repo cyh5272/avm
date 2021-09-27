@@ -493,8 +493,8 @@ void av1_rd_pick_palette_intra_sby(
 
     mbmi->mode = DC_PRED;
 #if CONFIG_AIMC
-    mbmi->joint_y_mode = DC_PRED;
-    mbmi->mode_idx = DC_PRED;
+    mbmi->joint_y_mode_delta_angle = DC_PRED;
+    mbmi->y_mode_idx = DC_PRED;
 #endif  // CONFIG_AIMC
     mbmi->filter_intra_mode_info.use_filter_intra = 0;
 
