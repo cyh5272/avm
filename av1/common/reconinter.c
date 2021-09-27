@@ -642,76 +642,7 @@ static INLINE int opfl_get_subblock_size(int bw, int bh, int plane) {
   return (plane || (bh <= 8 && bw <= 8)) ? OF_MIN_BSIZE : OF_BSIZE;
 }
 
-void av1_opfl_build_inter_predictor_highbd(
-    const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, const MB_MODE_INFO *mi,
-    int bw, int bh, int mi_x, int mi_y, uint8_t **mc_buf,
-    InterPredParams *inter_pred_params,
-    CalcSubpelParamsFunc calc_subpel_params_func, int ref,
-    uint16_t *pred_dst16) {
-  assert(cm->seq_params.order_hint_info.enable_order_hint);
-  uint8_t *pred_dst = CONVERT_TO_BYTEPTR(pred_dst16);
-#if CONFIG_SDP
-  const int is_intrabc = is_intrabc_block(mi, xd->tree_type);
-#else
-  const int is_intrabc = is_intrabc_block(mi);
-#endif  // CONFIG_SDP
-
-  // Do references one at a time
-  const int is_compound = 0;
-  struct macroblockd_plane *const pd = &xd->plane[plane];
-  struct buf_2d *const dst_buf = &pd->dst;
-
-  const WarpedMotionParams *const wm = &xd->global_motion[mi->ref_frame[ref]];
-  const WarpTypesAllowed warp_types = { is_global_mv_block(mi, wm->wmtype),
-                                        mi->motion_mode == WARPED_CAUSAL };
-  const struct scale_factors *const sf =
-      is_intrabc ? &cm->sf_identity : xd->block_ref_scale_factors[ref];
-
-#if CONFIG_SDP
-  const BLOCK_SIZE bsize = mi->sb_type[PLANE_TYPE_Y];
-#else
-  const BLOCK_SIZE bsize = mi->sb_type;
-#endif  // CONFIG_SDP
-  const int ss_x = pd->subsampling_x;
-  const int ss_y = pd->subsampling_y;
-  const int row_start = (block_size_high[bsize] == 4) && ss_y ? -1 : 0;
-  const int col_start = (block_size_wide[bsize] == 4) && ss_x ? -1 : 0;
-  const int pre_x = (mi_x + MI_SIZE * col_start) >> ss_x;
-  const int pre_y = (mi_y + MI_SIZE * row_start) >> ss_y;
-
-  struct buf_2d *const pre_buf = is_intrabc ? dst_buf : &pd->pre[ref];
-
-  av1_init_inter_params(inter_pred_params, bw, bh, pre_y, pre_x,
-                        pd->subsampling_x, pd->subsampling_y, xd->bd,
-#if CONFIG_SDP
-                        is_cur_buf_hbd(xd), mi->use_intrabc[0], sf, pre_buf,
-#else
-                        is_cur_buf_hbd(xd), mi->use_intrabc, sf, pre_buf,
-#endif  // CONFIG_SDP
-#if CONFIG_REMOVE_DUAL_FILTER
-                        mi->interp_fltr);
-#else
-                        mi->interp_filters);
-#endif  // CONFIG_REMOVE_DUAL_FILTER
-
-  inter_pred_params->conv_params = get_conv_params_no_round(
-      0, plane, xd->tmp_conv_dst, MAX_SB_SIZE, is_compound, xd->bd);
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  av1_dist_wtd_comp_weight_assign(
-      cm, mi, &inter_pred_params->conv_params.fwd_offset,
-      &inter_pred_params->conv_params.bck_offset, is_compound);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
-
-  av1_init_warp_params(inter_pred_params, &warp_types, ref, xd, mi);
-  if (inter_pred_params->mode == WARP_PRED) return;
-
-  assert(mi->interinter_comp.type == COMPOUND_AVERAGE);
-  av1_build_one_inter_predictor(pred_dst, bw, &mi->mv[ref].as_mv,
-                                inter_pred_params, xd, mi_x, mi_y, ref, mc_buf,
-                                calc_subpel_params_func);
-}
-
-void av1_opfl_build_inter_predictor_lowbd(
+void av1_opfl_build_inter_predictor(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, const MB_MODE_INFO *mi,
     int bw, int bh, int mi_x, int mi_y, uint8_t **mc_buf,
     InterPredParams *inter_pred_params,
@@ -1411,12 +1342,12 @@ static int get_optflow_based_mv_highbd(
 
   // Obrain P0 and P1
   InterPredParams params0, params1;
-  av1_opfl_build_inter_predictor_highbd(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
-                                        mc_buf, &params0,
-                                        calc_subpel_params_func, 0, dst0);
-  av1_opfl_build_inter_predictor_highbd(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
-                                        mc_buf, &params1,
-                                        calc_subpel_params_func, 1, dst1);
+  av1_opfl_build_inter_predictor(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
+                                 mc_buf, &params0, calc_subpel_params_func, 0,
+                                 CONVERT_TO_BYTEPTR(dst0));
+  av1_opfl_build_inter_predictor(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
+                                 mc_buf, &params1, calc_subpel_params_func, 1,
+                                 CONVERT_TO_BYTEPTR(dst1));
 
   int n_blocks = 1;
   int grad_prec_bits;
@@ -1524,12 +1455,12 @@ static int get_optflow_based_mv_lowbd(
 
   // Obrain P0 and P1
   InterPredParams params0, params1;
-  av1_opfl_build_inter_predictor_lowbd(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
-                                       mc_buf, &params0,
-                                       calc_subpel_params_func, 0, dst0);
-  av1_opfl_build_inter_predictor_lowbd(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
-                                       mc_buf, &params1,
-                                       calc_subpel_params_func, 1, dst1);
+  av1_opfl_build_inter_predictor(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
+                                 mc_buf, &params0, calc_subpel_params_func, 0,
+                                 dst0);
+  av1_opfl_build_inter_predictor(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
+                                 mc_buf, &params1, calc_subpel_params_func, 1,
+                                 dst1);
 
   int n_blocks = 1;
   int grad_prec_bits;
