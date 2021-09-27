@@ -3821,7 +3821,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
       write_frame_interp_filter(features->interp_filter, wb);
       aom_wb_write_bit(wb, features->switchable_motion_mode);
 #if CONFIG_OPTFLOW_REFINEMENT
-      if (cm->seq_params.enable_opfl_refine == 3) {
+      if (cm->seq_params.enable_opfl_refine == AOM_OPFL_REFINE_AUTO) {
         aom_wb_write_literal(wb, features->opfl_refine_type, 2);
       }
 #endif  // CONFIG_OPTFLOW_REFINEMENT

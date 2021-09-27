@@ -200,6 +200,22 @@ typedef enum {
   AOM_SUPERRES_AUTO,
 } aom_superres_mode;
 
+#if CONFIG_OPTFLOW_REFINEMENT
+/*!\brief Frame super-resolution mode. */
+typedef enum {
+  /**< MV refinement is disabled for all frames. */
+  AOM_OPFL_REFINE_NONE,
+  /**< MV refinement is switchable per block and signaled by the encoder for all
+   * frames. */
+  AOM_OPFL_REFINE_SWITCHABLE,
+  /**< MV refinement is done for all compound average blocks for all frames. */
+  AOM_OPFL_REFINE_ALL,
+  /**< One among the three above types is automatically selected by the encoder
+   * for each frame. */
+  AOM_OPFL_REFINE_AUTO,
+} aom_opfl_refine_type;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+
 /*!\brief Encoder Config Options
  *
  * This type allows to enumerate and control flags defined for encoder control
@@ -356,7 +372,7 @@ typedef struct cfg_options {
   /*!\brief enable optical flow refinement
    *
    */
-  unsigned int enable_opfl_refine;
+  aom_opfl_refine_type enable_opfl_refine;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   /*!\brief enable intra edge filter
    *

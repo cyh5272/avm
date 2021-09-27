@@ -323,7 +323,8 @@ typedef struct SequenceHeader {
   uint8_t enable_interintra_compound;  // enables/disables interintra_compound
   uint8_t enable_masked_compound;      // enables/disables masked compound
 #if CONFIG_OPTFLOW_REFINEMENT
-  uint8_t enable_opfl_refine;  // enables/disables optical flow refinement
+  aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type for
+                                            // this frame
 #endif
 #if !CONFIG_REMOVE_DUAL_FILTER
   uint8_t enable_dual_filter;    // 0 - disable dual interpolation filter

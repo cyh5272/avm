@@ -4767,7 +4767,7 @@ void av1_read_sequence_header(AV1_COMMON *cm, struct aom_read_bit_buffer *rb,
     seq_params->force_integer_mv = 2;            // SELECT_INTEGER_MV
     seq_params->order_hint_info.order_hint_bits_minus_1 = -1;
 #if CONFIG_OPTFLOW_REFINEMENT
-    seq_params->enable_opfl_refine = 0;
+    seq_params->enable_opfl_refine = AOM_OPFL_REFINE_NONE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   } else {
     seq_params->enable_interintra_compound = aom_rb_read_bit(rb);
@@ -4835,7 +4835,7 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 #if CONFIG_OPTFLOW_REFINEMENT
   seq_params->enable_opfl_refine = seq_params->order_hint_info.enable_order_hint
                                        ? aom_rb_read_literal(rb, 2)
-                                       : 0;
+                                       : AOM_OPFL_REFINE_NONE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 }
 
@@ -5481,7 +5481,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       features->interp_filter = read_frame_interp_filter(rb);
       features->switchable_motion_mode = aom_rb_read_bit(rb);
 #if CONFIG_OPTFLOW_REFINEMENT
-      if (cm->seq_params.enable_opfl_refine == 3) {
+      if (cm->seq_params.enable_opfl_refine == AOM_OPFL_REFINE_AUTO) {
         features->opfl_refine_type = aom_rb_read_literal(rb, 2);
       } else {
         features->opfl_refine_type = cm->seq_params.enable_opfl_refine;

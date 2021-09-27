@@ -374,7 +374,7 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
                                    int *vx0, int *vy0, int *vx1, int *vy1);
 static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
                                          const MB_MODE_INFO *mbmi) {
-  if (cm->seq_params.enable_opfl_refine == 0 ||
+  if (cm->seq_params.enable_opfl_refine == AOM_OPFL_REFINE_NONE ||
       cm->features.opfl_refine_type == REFINE_NONE)
     return 0;
   if (!mbmi->ref_frame[1]) return 0;

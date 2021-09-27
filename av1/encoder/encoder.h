@@ -839,7 +839,7 @@ typedef struct {
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_OPTFLOW_REFINEMENT
   // Indicates if optical flow refinement should be enabled
-  unsigned int enable_opfl_refine;
+  aom_opfl_refine_type enable_opfl_refine;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 } ToolCfg;
 

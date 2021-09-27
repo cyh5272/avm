@@ -159,7 +159,8 @@ struct av1_extracfg {
   int enable_intrabc;
   int enable_angle_delta;
 #if CONFIG_OPTFLOW_REFINEMENT
-  int enable_opfl_refine;  // enable optical flow refinement for sequence
+  aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type
+                                            // for sequence
 #endif                     // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_DENOISE
   float noise_level;
@@ -1210,8 +1211,9 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   tool_cfg->enable_refmvbank = extra_cfg->enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_OPTFLOW_REFINEMENT
-  tool_cfg->enable_opfl_refine =
-      extra_cfg->enable_order_hint ? extra_cfg->enable_opfl_refine : 0;
+  tool_cfg->enable_opfl_refine = extra_cfg->enable_order_hint
+                                     ? extra_cfg->enable_opfl_refine
+                                     : AOM_OPFL_REFINE_NONE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   // Set Quantization related configuration.
