@@ -994,12 +994,13 @@ void av1_opfl_mv_refinement_lowbd(const uint8_t *p0, int pstride0,
   sv2 += rls_alpha;
 #endif
 
-  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in D, Px, and Py
-  su2 = clamp(su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  sv2 = clamp(sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suv = clamp(suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
+  // det_y
+  su2 = (int64_t)clamp((int)su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  sv2 = (int64_t)clamp((int)sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suv = (int64_t)clamp((int)suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suw = (int64_t)clamp((int)suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  svw = (int64_t)clamp((int)svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -1010,10 +1011,8 @@ void av1_opfl_mv_refinement_lowbd(const uint8_t *p0, int pstride0,
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-  const int tx1 =
-      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 =
-      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int tx1 = (*vx0) * d1;
+  const int ty1 = (*vy0) * d1;
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }
@@ -1053,12 +1052,13 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
   sv2 += rls_alpha;
 #endif
 
-  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in D, Px, and Py
-  su2 = clamp(su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  sv2 = clamp(sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suv = clamp(suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
+  // det_y
+  su2 = (int64_t)clamp((int)su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  sv2 = (int64_t)clamp((int)sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suv = (int64_t)clamp((int)suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suw = (int64_t)clamp((int)suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  svw = (int64_t)clamp((int)svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -1069,10 +1069,8 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-  const int tx1 =
-      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 =
-      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int tx1 = (*vx0) * d1;
+  const int ty1 = (*vy0) * d1;
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }
@@ -1114,12 +1112,13 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
   sv2 += rls_alpha;
 #endif
 
-  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in D, Px, and Py
-  su2 = clamp(su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  sv2 = clamp(sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suv = clamp(suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
+  // det_y
+  su2 = (int64_t)clamp((int)su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  sv2 = (int64_t)clamp((int)sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suv = (int64_t)clamp((int)suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  suw = (int64_t)clamp((int)suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  svw = (int64_t)clamp((int)svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -1130,10 +1129,8 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-  const int tx1 =
-      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 =
-      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int tx1 = (*vx0) * d1;
+  const int ty1 = (*vy0) * d1;
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }

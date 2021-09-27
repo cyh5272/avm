@@ -350,8 +350,8 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 #define OPFL_RLS_PARAM_BITS 4
 
 // Number of bits allowed for covariance matrix elements (su2, sv2, suv, suw
-// and svw) so that D, Px, and Py does not cause overflow issue in int64_t.
-// Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
+// and svw) so that det, det_x, and det_y does not cause overflow issue in
+// int64_t. Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
 #define OPFL_COV_CLAMP_BITS 28
 #define OPFL_COV_CLAMP_VAL (1 << OPFL_COV_CLAMP_BITS)
 
