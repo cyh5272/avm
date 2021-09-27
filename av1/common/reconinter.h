@@ -390,13 +390,11 @@ static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
           OPFL_DIST_RATIO_THR * AOMMIN(abs(d0), abs(d1)));
 }
 
-#define OPTFLOW_INTEGER_MULT_DIVIDE 1
 // Integer division based on lookup table.
 // num: numerator
 // den: denominator
 // out: output result (num / den)
 static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
-#if OPTFLOW_INTEGER_MULT_DIVIDE
   if (llabs(den) == 1) return (int32_t)(den < 0 ? -num : num);
   const int optflow_prec_bits = 16;
   int16_t shift;
@@ -434,14 +432,6 @@ static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
            num, den, inverse_den, shift, out_div, out);
   }
 #endif  // NDEBUG
-#else
-  // Quick overflow check
-  const int32_t out = (llabs(num) + llabs(den) < 0)
-                          ? (int32_t)DIVIDE_AND_ROUND_SIGNED(
-                                ROUND_POWER_OF_TWO_SIGNED_64(num, 2),
-                                ROUND_POWER_OF_TWO_SIGNED_64(den, 2))
-                          : (int32_t)DIVIDE_AND_ROUND_SIGNED(num, den);
-#endif  // OPTFLOW_INTEGER_MULT_DIVIDE
   return out;
 }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
