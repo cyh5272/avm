@@ -175,10 +175,9 @@ static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
                                                  const int16_t mode_ctx) {
   assert(is_inter_compound_mode(mode));
 #if CONFIG_OPTFLOW_REFINEMENT
-  int use_optical_flow = 0;
   if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
       is_opfl_refine_allowed(cm, mbmi)) {
-    use_optical_flow = mode > NEW_NEWMV;
+    const int use_optical_flow = mode > NEW_NEWMV;
     aom_write_symbol(w, use_optical_flow,
                      xd->tile_ctx->use_optflow_cdf[mode_ctx], 2);
   }
@@ -1527,11 +1526,7 @@ static INLINE int_mv get_ref_mv(const MACROBLOCK *x, int ref_idx) {
   const MACROBLOCKD *xd = &x->e_mbd;
   const MB_MODE_INFO *mbmi = xd->mi[0];
   int ref_mv_idx = mbmi->ref_mv_idx;
-  if (mbmi->mode == NEAR_NEWMV ||
-#if CONFIG_OPTFLOW_REFINEMENT
-      mbmi->mode == NEAR_NEWMV_OPTFLOW || mbmi->mode == NEW_NEARMV_OPTFLOW ||
-#endif  // CONFIG_OPTFLOW_REFINEMENT
-      mbmi->mode == NEW_NEARMV) {
+  if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
     assert(has_second_ref(mbmi));
 #if !CONFIG_NEW_INTER_MODES
     ref_mv_idx += 1;

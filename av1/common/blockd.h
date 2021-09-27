@@ -175,6 +175,14 @@ static INLINE int have_nearmv_in_inter_mode(PREDICTION_MODE mode) {
           mode == NEW_NEARMV);
 }
 
+static INLINE int have_nearmv_newmv_in_inter_mode(PREDICTION_MODE mode) {
+  return mode == NEAR_NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+         mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+         mode == NEW_NEARMV;
+}
+
 #if CONFIG_NEW_INTER_MODES
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||

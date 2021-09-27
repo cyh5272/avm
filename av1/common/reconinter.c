@@ -1056,9 +1056,9 @@ void av1_opfl_mv_refinement_lowbd(const uint8_t *p0, int pstride0,
       svw += (v * w);
     }
   }
-  int bits = mv_prec_bits + grad_prec_bits;
+  const int bits = mv_prec_bits + grad_prec_bits;
 #if OPFL_REGULARIZED_LS
-  int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
+  const int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
   su2 += rls_alpha;
   sv2 += rls_alpha;
 #endif
@@ -1070,15 +1070,19 @@ void av1_opfl_mv_refinement_lowbd(const uint8_t *p0, int pstride0,
   suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
   svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
-  const int64_t D = su2 * sv2 - suv * suv;
-  const int64_t Px = (suv * svw - sv2 * suw) * (1 << bits);
-  const int64_t Py = (suv * suw - su2 * svw) * (1 << bits);
+  // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
+  //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
+  const int64_t det = su2 * sv2 - suv * suv;
+  if (det == 0) return;
+  const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
+  const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
 
-  if (D == 0) return;
-  *vx0 = (int)divide_and_round_signed(Px, D);
-  *vy0 = (int)divide_and_round_signed(Py, D);
-  const int tx1 = clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 = clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  *vx0 = (int)divide_and_round_signed(det_x, det);
+  *vy0 = (int)divide_and_round_signed(det_y, det);
+  const int tx1 =
+      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int ty1 =
+      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }
@@ -1111,9 +1115,9 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
       svw += (v * w);
     }
   }
-  int bits = mv_prec_bits + grad_prec_bits;
+  const int bits = mv_prec_bits + grad_prec_bits;
 #if OPFL_REGULARIZED_LS
-  int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
+  const int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
   su2 += rls_alpha;
   sv2 += rls_alpha;
 #endif
@@ -1125,15 +1129,19 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
   suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
   svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
-  const int64_t D = su2 * sv2 - suv * suv;
-  const int64_t Px = (suv * svw - sv2 * suw) * (1 << bits);
-  const int64_t Py = (suv * suw - su2 * svw) * (1 << bits);
+  // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
+  //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
+  const int64_t det = su2 * sv2 - suv * suv;
+  if (det == 0) return;
+  const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
+  const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
 
-  if (D == 0) return;
-  *vx0 = (int)divide_and_round_signed(Px, D);
-  *vy0 = (int)divide_and_round_signed(Py, D);
-  const int tx1 = clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 = clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  *vx0 = (int)divide_and_round_signed(det_x, det);
+  *vy0 = (int)divide_and_round_signed(det_y, det);
+  const int tx1 =
+      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int ty1 =
+      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }
@@ -1168,9 +1176,9 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
       svw += (v * w);
     }
   }
-  int bits = mv_prec_bits + grad_prec_bits;
+  const int bits = mv_prec_bits + grad_prec_bits;
 #if OPFL_REGULARIZED_LS
-  int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
+  const int rls_alpha = (bw * bh >> 4) << OPFL_RLS_PARAM_BITS;
   su2 += rls_alpha;
   sv2 += rls_alpha;
 #endif
@@ -1182,15 +1190,19 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
   suw = clamp(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
   svw = clamp(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
 
-  const int64_t D = su2 * sv2 - suv * suv;
-  const int64_t Px = (suv * svw - sv2 * suw) * (1 << bits);
-  const int64_t Py = (suv * suw - su2 * svw) * (1 << bits);
+  // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
+  //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
+  const int64_t det = su2 * sv2 - suv * suv;
+  if (det == 0) return;
+  const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
+  const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
 
-  if (D == 0) return;
-  *vx0 = (int)divide_and_round_signed(Px, D);
-  *vy0 = (int)divide_and_round_signed(Py, D);
-  const int tx1 = clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
-  const int ty1 = clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  *vx0 = (int)divide_and_round_signed(det_x, det);
+  *vy0 = (int)divide_and_round_signed(det_y, det);
+  const int tx1 =
+      (int)clamp((int64_t)(*vx0) * (int64_t)d1, INT32_MIN, INT32_MAX);
+  const int ty1 =
+      (int)clamp((int64_t)(*vy0) * (int64_t)d1, INT32_MIN, INT32_MAX);
   *vx1 = (int)divide_and_round_signed(tx1, d0);
   *vy1 = (int)divide_and_round_signed(ty1, d0);
 }

@@ -1338,16 +1338,15 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         av1_mode_context_analyzer(mbmi_ext->mode_context, mbmi->ref_frame);
     if (has_second_ref(mbmi)) {
 #if CONFIG_OPTFLOW_REFINEMENT
-      int use_optical_flow = 0;
       if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
           is_opfl_refine_allowed(cm, mbmi)) {
-        use_optical_flow = mode > NEW_NEWMV;
+        const int use_optical_flow = mode > NEW_NEWMV;
 #if CONFIG_ENTROPY_STATS
         ++counts->use_optflow[mode_ctx][use_optical_flow];
 #endif
         update_cdf(fc->use_optflow_cdf[mode_ctx], use_optical_flow, 2);
       }
-      int comp_mode_idx = opfl_get_comp_idx(mode);
+      const int comp_mode_idx = opfl_get_comp_idx(mode);
 #if CONFIG_ENTROPY_STATS
       ++counts->inter_compound_mode[mode_ctx][comp_mode_idx];
 #endif
@@ -1421,12 +1420,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                               allow_hp);
         }
 #if CONFIG_NEW_INTER_MODES
-      } else if (mbmi->mode == NEAR_NEWMV ||
-#if CONFIG_OPTFLOW_REFINEMENT
-                 mbmi->mode == NEAR_NEWMV_OPTFLOW ||
-                 mbmi->mode == NEW_NEARMV_OPTFLOW ||
-#endif  // CONFIG_OPTFLOW_REFINEMENT
-                 mbmi->mode == NEW_NEARMV) {
+      } else if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
         const int ref =
 #if CONFIG_OPTFLOW_REFINEMENT
             mbmi->mode == NEAR_NEWMV_OPTFLOW ||

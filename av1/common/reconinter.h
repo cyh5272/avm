@@ -398,7 +398,7 @@ static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
 static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
 #if OPTFLOW_INTEGER_MULT_DIVIDE
   if (llabs(den) == 1) return (int32_t)(den < 0 ? -num : num);
-  static const int optflow_prec_bits = 16;
+  const int optflow_prec_bits = 16;
   int16_t shift;
   const int sign_den = (den < 0 ? -1 : 1);
   uint16_t inverse_den = resolve_divisor_64(llabs(den), &shift);
@@ -444,7 +444,6 @@ static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
 #endif  // OPTFLOW_INTEGER_MULT_DIVIDE
   return out;
 }
-
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
 // TODO(jkoleszar): yet another mv clamping function :-(

@@ -924,14 +924,14 @@ static int cost_mv_ref(const ModeCosts *const mode_costs, PREDICTION_MODE mode,
                        int16_t mode_context) {
   if (is_inter_compound_mode(mode)) {
 #if CONFIG_OPTFLOW_REFINEMENT
-    int use_optical_flow = 0, use_optical_flow_cost = 0;
+    int use_optical_flow_cost = 0;
     if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
         is_opfl_refine_allowed(cm, mbmi)) {
-      use_optical_flow = mode > NEW_NEWMV;
+      const int use_optical_flow = mode > NEW_NEWMV;
       use_optical_flow_cost =
           mode_costs->use_optflow_cost[mode_context][use_optical_flow];
     }
-    int comp_mode_idx = opfl_get_comp_idx(mode);
+    const int comp_mode_idx = opfl_get_comp_idx(mode);
     return use_optical_flow_cost +
            mode_costs->inter_compound_mode_cost[mode_context][comp_mode_idx];
 #else
@@ -1266,7 +1266,7 @@ static int skip_repeated_mv(const AV1_COMMON *const cm,
   const int16_t mode_ctx =
       av1_mode_context_analyzer(mbmi_ext->mode_context, ref_frames);
 #if CONFIG_OPTFLOW_REFINEMENT
-  MB_MODE_INFO *mbmi = x->e_mbd.mi[0];
+  const MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
   const int compare_cost =
       cost_mv_ref(&x->mode_costs, compare_mode, cm, mbmi, mode_ctx);
   const int this_cost =
