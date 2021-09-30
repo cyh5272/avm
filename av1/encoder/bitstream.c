@@ -861,6 +861,7 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
   if (!av1_is_interp_needed(xd)) {
+#if CONFIG_DEBUG
 #if CONFIG_OPTFLOW_REFINEMENT
     // In switchable optical flow refinement, use the sharp filter instead
     int mb_interp_filter =
@@ -877,6 +878,7 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
     (void)filters;
 #endif  // CONFIG_REMOVE_DUAL_FILTER
     (void)mb_interp_filter;
+#endif  // CONFIG_DEBUG
     return;
   }
   if (cm->features.interp_filter == SWITCHABLE) {
