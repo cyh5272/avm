@@ -572,12 +572,12 @@ TEST_P(WienerTestHighbd, DISABLED_Speed) {
 INSTANTIATE_TEST_SUITE_P(C, WienerTestHighbd,
                          ::testing::Values(compute_stats_highbd_opt_c));
 
-#if HAVE_SSE4_1
+#if HAVE_SSE4_1 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 INSTANTIATE_TEST_SUITE_P(SSE4_1, WienerTestHighbd,
                          ::testing::Values(av1_compute_stats_highbd_sse4_1));
 #endif  // HAVE_SSE4_1
 
-#if HAVE_AVX2
+#if HAVE_AVX2 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 INSTANTIATE_TEST_SUITE_P(AVX2, WienerTestHighbd,
                          ::testing::Values(av1_compute_stats_highbd_avx2));
 #endif  // HAVE_AVX2
