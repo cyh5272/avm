@@ -458,7 +458,11 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
                          mode_costs->cfl_cost[best_joint_sign][CFL_PRED_V][v];
 #if CONFIG_DEBUG
     xd->cfl.rate =
+#if CONFIG_AIMC
+        mode_costs->intra_uv_mode_cost[CFL_ALLOWED][uv_context][UV_CFL_PRED] +
+#else
         mode_costs->intra_uv_mode_cost[CFL_ALLOWED][mbmi->mode][UV_CFL_PRED] +
+#endif
         best_rate_overhead + best_rate_uv[best_joint_sign][CFL_PRED_U] +
         best_rate_uv[best_joint_sign][CFL_PRED_V];
 #endif  // CONFIG_DEBUG

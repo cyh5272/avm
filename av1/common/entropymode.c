@@ -18,6 +18,7 @@
 #include "av1/common/seg_common.h"
 #include "av1/common/txb_common.h"
 
+#if !CONFIG_AIMC
 static const aom_cdf_prob
     default_kf_y_mode_cdf[KF_MODE_CONTEXTS][KF_MODE_CONTEXTS][CDF_SIZE(
         INTRA_MODES)] = {
@@ -72,6 +73,7 @@ static const aom_cdf_prob
         { AOM_CDF13(7618, 8288, 9859, 10509, 15386, 18657, 22903, 28776, 29180,
                     31355, 31802, 32593) } }
     };
+#endif
 
 #if CONFIG_MRLS
 static const aom_cdf_prob default_mrl_index_cdf[CDF_SIZE(MRL_LINE_NUMBER)] = {

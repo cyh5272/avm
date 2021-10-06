@@ -569,10 +569,12 @@ void set_y_mode_and_delta_angle(const int mode_idx, MB_MODE_INFO *const mbmi) {
     mbmi->mode = mode_idx;
     mbmi->angle_delta[PLANE_TYPE_Y] = 0;
   } else {
-    mbmi->mode = (mode_idx - NON_DIRECTIONAL_MODES_COUNT) / 7 +
-                 NON_DIRECTIONAL_MODES_COUNT;
+    mbmi->mode =
+        (mode_idx - NON_DIRECTIONAL_MODES_COUNT) / TOTAL_ANGLE_DELTA_COUNT +
+        NON_DIRECTIONAL_MODES_COUNT;
     mbmi->angle_delta[PLANE_TYPE_Y] =
-        (mode_idx - NON_DIRECTIONAL_MODES_COUNT) % 7 - 3;
+        (mode_idx - NON_DIRECTIONAL_MODES_COUNT) % TOTAL_ANGLE_DELTA_COUNT -
+        MAX_ANGLE_DELTA;
   }
   mbmi->mode = reordered_y_mode[mbmi->mode];
 }
@@ -1976,16 +1978,15 @@ static void build_intra_predictors_high(
 #endif
 }
 
-static void build_intra_predictors(const MACROBLOCKD *xd, const uint8_t *ref,
-                                   int ref_stride, uint8_t *dst, int dst_stride,
-                                   PREDICTION_MODE mode, int angle_delta,
-                                   FILTER_INTRA_MODE filter_intra_mode,
-                                   TX_SIZE tx_size, int disable_edge_filter,
-                                   int n_top_px, int n_topright_px,
-                                   int n_left_px, int n_bottomleft_px, int plane
+static void build_intra_predictors(
+    const MACROBLOCKD *xd, const uint8_t *ref, int ref_stride, uint8_t *dst,
+    int dst_stride, PREDICTION_MODE mode, int angle_delta,
+    FILTER_INTRA_MODE filter_intra_mode, TX_SIZE tx_size,
+    int disable_edge_filter, int n_top_px, int n_topright_px, int n_left_px,
+    int n_bottomleft_px, int plane
 #if CONFIG_MRLS
-                                   ,
-                                   int is_sb_boundary
+    ,
+    int is_sb_boundary
 #endif
 #if CONFIG_ORIP
     ,
