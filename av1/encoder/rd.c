@@ -88,7 +88,11 @@ static const int av1_ext_tx_set_idx_to_type[2][AOMMAX(EXT_TX_SETS_INTRA,
   {
       // Inter
       EXT_TX_SET_DCTONLY,
+#if CONFIG_DDT_INTER
+      EXT_TX_SET_ALL24,
+#else
       EXT_TX_SET_ALL16,
+#endif  // CONFIG_DDT_INTER
       EXT_TX_SET_DTT9_IDTX_1DDCT,
       EXT_TX_SET_DCT_IDTX,
   },
@@ -260,6 +264,16 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
       }
     }
   }
+#if CONFIG_DDT_INTER
+  for (i = TX_4X4; i < EXT_TX_SIZES; ++i) {
+    av1_cost_tokens_from_cdf(mode_costs->ddtx_type_inter_costs[i],
+                             fc->ddtx_type_inter_cdf[i], NULL);
+  }
+  for (int s = 0; s < EXT_TX_SIZES; ++s) {
+    av1_cost_tokens_from_cdf(mode_costs->use_ddtx_inter_costs[s],
+                             fc->use_ddtx_inter_cdf[s], NULL);
+  }
+#endif  // CONFIG_DDT_INTER
 #if CONFIG_SDP
   for (i = 0; i < PARTITION_STRUCTURE_NUM; ++i) {
     for (j = 0; j < DIRECTIONAL_MODES; ++j) {

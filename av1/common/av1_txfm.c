@@ -59,6 +59,49 @@ const int32_t av1_cospi_arr_data[7][64] = {
     14359, 12785, 11204, 9616,  8022,  6424,  4821,  3216,  1608 }
 };
 
+#if CONFIG_LGT
+// self-loop weight 2.0 (DST4)
+const int32_t lgt4[4 * 4] = {
+  200, 569, 851,   1004, 569,  1004, 200, -851,
+  851, 200, -1004, 569,  1004, -851, 569, -200,
+};
+
+// self-loop weight 1.5
+const int32_t lgt8[8 * 8] = {
+  130,  319,  497,  657,  792,  899,  972,  1009, 382,   832,  1012, 865,  438,
+  -130, -657, -971, 614,  1010, 545,  -386, -987, -746,  131,  897,  808,  770,
+  -459, -978, 15,   985,  432,  -790, 945,  190,  -1002, 110,  969,  -400, -850,
+  654,  993,  -497, -497, 993,  -497, -497, 993,  -497,  895,  -941, 564,  66,
+  -666, 968,  -835, 327,  566,  -786, 920,  -951, 878,   -707, 458,  -159,
+};
+
+// self-loop weight 1.0 (DST7)
+const int32_t lgt16[16 * 16] = {
+  96,    191,   284,  375,  462,  545,   623,   696,   762,  821,  873,  917,
+  953,   980,   998,  1007, 284,  545,   762,   917,   998,  998,  917,  762,
+  545,   284,   0,    -284, -545, -762,  -917,  -998,  462,  821,  998,  953,
+  696,   284,   -191, -623, -917, -1007, -873,  -545,  -96,  375,  762,  980,
+  623,   980,   917,  462,  -191, -762,  -1007, -821,  -284, 375,  873,  998,
+  696,   96,    -545, -953, 762,  998,   545,   -284,  -917, -917, -284, 545,
+  998,   762,   0,    -762, -998, -545,  284,   917,   873,  873,  0,    -873,
+  -873,  0,     873,  873,  0,    -873,  -873,  0,     873,  873,  0,    -873,
+  953,   623,   -545, -980, -96,  917,   696,   -462,  -998, -191, 873,  762,
+  -375,  -1007, -284, 821,  998,  284,   -917,  -545,  762,  762,  -545, -917,
+  284,   998,   0,    -998, -284, 917,   545,   -762,  1007, -96,  -998, 191,
+  980,   -284,  -953, 375,  917,  -462,  -873,  545,   821,  -623, -762, 696,
+  980,   -462,  -762, 821,  375,  -998,  96,    953,   -545, -696, 873,  284,
+  -1007, 191,   917,  -623, 917,  -762,  -284,  998,   -545, -545, 998,  -284,
+  -762,  917,   0,    -917, 762,  284,   -998,  545,   821,  -953, 284,  623,
+  -1007, 545,   375,  -980, 762,  96,    -873,  917,   -191, -696, 998,  -462,
+  696,   -1007, 762,  -96,  -623, 998,   -821,  191,   545,  -980, 873,  -284,
+  -462,  953,   -917, 375,  545,  -917,  998,   -762,  284,  284,  -762, 998,
+  -917,  545,   0,    -545, 917,  -998,  762,   -284,  375,  -696, 917,  -1007,
+  953,   -762,  462,  -96,  -284, 623,   -873,  998,   -980, 821,  -545, 191,
+  191,   -375,  545,  -696, 821,  -917,  980,   -1007, 998,  -953, 873,  -762,
+  623,   -462,  284,  -96,
+};
+#endif  // CONFIG_LGT
+
 #if CONFIG_DST7_16X16
 const int16_t dst7_16x16[16][16] = {
   { 12, 24, 36, 47, 57, 69, 78, 87, 94, 103, 109, 115, 118, 123, 125, 126 },
@@ -222,6 +265,25 @@ void av1_round_shift_array_c(int32_t *arr, int size, int bit) {
   }
 }
 
+#if CONFIG_DDT_INTER
+const TXFM_TYPE av1_txfm_type_ls[5][TX_TYPES_1D] = {
+  { TXFM_TYPE_DCT4, TXFM_TYPE_ADST4, TXFM_TYPE_ADST4, TXFM_TYPE_IDENTITY4,
+    TXFM_TYPE_DDT4 },
+  { TXFM_TYPE_DCT8, TXFM_TYPE_ADST8, TXFM_TYPE_ADST8, TXFM_TYPE_IDENTITY8,
+    TXFM_TYPE_DDT8 },
+  { TXFM_TYPE_DCT16, TXFM_TYPE_ADST16, TXFM_TYPE_ADST16, TXFM_TYPE_IDENTITY16,
+    TXFM_TYPE_DDT16 },
+#if CONFIG_DST_32X32
+  { TXFM_TYPE_DCT32, TXFM_TYPE_ADST32, TXFM_TYPE_ADST32, TXFM_TYPE_IDENTITY32,
+    TXFM_TYPE_ADST32 },
+#else
+  { TXFM_TYPE_DCT32, TXFM_TYPE_INVALID, TXFM_TYPE_INVALID, TXFM_TYPE_IDENTITY32,
+    TXFM_TYPE_INVALID },
+#endif
+  { TXFM_TYPE_DCT64, TXFM_TYPE_INVALID, TXFM_TYPE_INVALID, TXFM_TYPE_INVALID,
+    TXFM_TYPE_INVALID }
+};
+#else
 const TXFM_TYPE av1_txfm_type_ls[5][TX_TYPES_1D] = {
   { TXFM_TYPE_DCT4, TXFM_TYPE_ADST4, TXFM_TYPE_ADST4, TXFM_TYPE_IDENTITY4 },
   { TXFM_TYPE_DCT8, TXFM_TYPE_ADST8, TXFM_TYPE_ADST8, TXFM_TYPE_IDENTITY8 },
@@ -234,6 +296,7 @@ const TXFM_TYPE av1_txfm_type_ls[5][TX_TYPES_1D] = {
 #endif  // CONFIG_DST_32X32
   { TXFM_TYPE_DCT64, TXFM_TYPE_INVALID, TXFM_TYPE_INVALID, TXFM_TYPE_INVALID }
 };
+#endif  // CONFIG_DDT_INTER
 
 const int8_t av1_txfm_stage_num_list[TXFM_TYPES] = {
   4,   // TXFM_TYPE_DCT4
@@ -248,6 +311,11 @@ const int8_t av1_txfm_stage_num_list[TXFM_TYPES] = {
   1,   // TXFM_TYPE_IDENTITY8
   1,   // TXFM_TYPE_IDENTITY16
   1,   // TXFM_TYPE_IDENTITY32
+#if CONFIG_DDT_INTER
+  1,    // TXFM_TYPE_DDT4 (not used)
+  1,    // TXFM_TYPE_DDT8 (not used)
+  1,    // TXFM_TYPE_DDT16 (not used)
+#endif  // CONFIG_DDT_INTER
 #if CONFIG_DST_32X32
   1,  // TXFM_TYPE_ADST32
 #endif

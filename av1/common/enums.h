@@ -333,6 +333,9 @@ enum {
   ADST_1D,
   FLIPADST_1D,
   IDTX_1D,
+#if CONFIG_DDT_INTER
+  DDT1_1D,
+#endif  // CONFIG_DDT_INTER
   TX_TYPES_1D,
 } UENUM1BYTE(TX_TYPE_1D);
 
@@ -353,8 +356,22 @@ enum {
   H_ADST,             // Identity in vertical, ADST in horizontal
   V_FLIPADST,         // FLIPADST in vertical, identity in horizontal
   H_FLIPADST,         // Identity in vertical, FLIPADST in horizontal
+#if CONFIG_DDT_INTER
+  DDT_DDT,          // DDT in both horizontal and vertical
+  DDT_DCT,          // DDT in vertical, DCT in horizontal
+  DCT_DDT,          // DCT in vertical, DDT in horizontal
+  FLIPDDT_FLIPDDT,  // flipped DDT in both horizontal and vertical
+  FLIPDDT_DCT,      // flipped DDT in vertical, DCT in horizontal
+  DCT_FLIPDDT,      // DCT in vertical, flipped DDT in horizontal
+  FLIPDDT_DDT,      // flipped DDT in vertical, DDT in horizontal
+  DDT_FLIPDDT,      // DDT in vertical, flipped DDT in horizontal
+#endif              // CONFIG_DDT_INTER
   TX_TYPES,
-  DCT_ADST_TX_MASK = 0x000F,  // Either DCT or ADST in each direction
+#if CONFIG_DDT_INTER
+  TX_TYPES_TRIG = DDT_DDT,               // Trignometric transforms (16)
+  DDT_TYPES = TX_TYPES - TX_TYPES_TRIG,  // data-driven transforms (8)
+#endif                                   // CONFIG_DDT_INTER
+  DCT_ADST_TX_MASK = 0x000F,             // Either DCT or ADST in each direction
 } UENUM1BYTE(TX_TYPE);
 
 enum {
@@ -380,8 +397,14 @@ enum {
   EXT_TX_SET_DTT4_IDTX_1DDCT,
   // Discrete Trig transforms w/ flip (9) + Identity (1) + 1D Hor/Ver DCT (2)
   EXT_TX_SET_DTT9_IDTX_1DDCT,
+#if CONFIG_DDT_INTER
+  // Discrete Trig transforms w/ flip (9) + Identity (1) + 1D Hor/Ver (6)
+  //  + DCT w/ 2 DDTs (4) + 2 DDTs (4)
+  EXT_TX_SET_ALL24,
+#else
   // Discrete Trig transforms w/ flip (9) + Identity (1) + 1D Hor/Ver (6)
   EXT_TX_SET_ALL16,
+#endif  // CONFIG_DDT_INTER
   EXT_TX_SET_TYPES
 } UENUM1BYTE(TxSetType);
 

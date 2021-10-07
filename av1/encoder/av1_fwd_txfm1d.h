@@ -14,6 +14,10 @@
 
 #include "av1/common/av1_txfm.h"
 
+#if CONFIG_DDT_INTER
+#include "av1/common/ddtx_bases.h"
+#endif  // CONFIG_DDT_INTER
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +50,22 @@ void av1_fidentity16_c(const int32_t *input, int32_t *output, int8_t cos_bit,
                        const int8_t *stage_range);
 void av1_fidentity32_c(const int32_t *input, int32_t *output, int8_t cos_bit,
                        const int8_t *stage_range);
+#if CONFIG_DDT_INTER
+void av1_fklt4(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_fklt8(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_fklt16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                const int8_t *stage_range);
+#endif  // CONFIG_DDT_INTER
+#if CONFIG_LGT
+void av1_flgt4(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_flgt8(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_flgt16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                const int8_t *stage_range);
+#endif  // CONFIG_LGT
 #ifdef __cplusplus
 }
 #endif
