@@ -604,7 +604,7 @@ static void init_config(cfg_options_t *config) {
   config->enable_ist = 1;
 #endif
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  config->enable_ibp = 0;
+  config->enable_ibp = 1;
 #endif
   config->enable_flip_idtx = 1;
   config->enable_deblocking = 1;

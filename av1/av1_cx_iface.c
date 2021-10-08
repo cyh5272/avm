@@ -414,7 +414,7 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable intra secondary transform
 #endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  0,    // enable intra bi-prediction
+  1,    // enable intra bi-prediction
 #endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
   4,    // min_partition_size
   128,  // max_partition_size
@@ -4054,7 +4054,7 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
         1,
 #endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-        0,
+        1,
 #endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
         1, 1,   1,   1,
 #if CONFIG_CCSO
