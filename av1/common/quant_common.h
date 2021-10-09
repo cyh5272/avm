@@ -86,10 +86,9 @@ static INLINE int aom_get_qmlevel(int qindex, int first, int last
 ) {
 #if CONFIG_EXTQUANT
   return first + (qindex * (last + 1 - first)) /
-                     (bit_depth == AOM_BITS_8
-                          ? QINDEX_RANGE_8_BITS
-                          : bit_depth == AOM_BITS_10 ? QINDEX_RANGE_10_BITS
-                                                     : QINDEX_RANGE);
+                     (bit_depth == AOM_BITS_8    ? QINDEX_RANGE_8_BITS
+                      : bit_depth == AOM_BITS_10 ? QINDEX_RANGE_10_BITS
+                                                 : QINDEX_RANGE);
 #else
   return first + (qindex * (last + 1 - first)) / QINDEX_RANGE;
 #endif

@@ -183,10 +183,18 @@ SIMD_INLINE v64 v64_pack_s32_u16(v64 a, v64 b) {
   int32_t al = v64_low_u32(a);
   int32_t bh = v64_high_u32(b);
   int32_t bl = v64_low_u32(b);
-  return v64_from_16(ah > 65535 ? 65535 : ah < 0 ? 0 : ah,
-                     al > 65535 ? 65535 : al < 0 ? 0 : al,
-                     bh > 65535 ? 65535 : bh < 0 ? 0 : bh,
-                     bl > 65535 ? 65535 : bl < 0 ? 0 : bl);
+  return v64_from_16(ah > 65535 ? 65535
+                     : ah < 0   ? 0
+                                : ah,
+                     al > 65535 ? 65535
+                     : al < 0   ? 0
+                                : al,
+                     bh > 65535 ? 65535
+                     : bh < 0   ? 0
+                                : bh,
+                     bl > 65535 ? 65535
+                     : bl < 0   ? 0
+                                : bl);
 #endif
 }
 

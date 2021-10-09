@@ -845,10 +845,9 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_ccso = extra_cfg->enable_ccso;
 #endif
   cfg->superblock_size =
-      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)
-          ? 64
-          : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
-                                                                        : 0;
+      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)     ? 64
+      : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
+                                                                    : 0;
   cfg->enable_warped_motion = extra_cfg->enable_warped_motion;
 #if !CONFIG_REMOVE_DIST_WTD_COMP
   cfg->enable_dist_wtd_comp = extra_cfg->enable_dist_wtd_comp;
@@ -923,11 +922,10 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #if CONFIG_CCSO
   extra_cfg->enable_ccso = cfg->enable_ccso;
 #endif
-  extra_cfg->superblock_size = (cfg->superblock_size == 64)
-                                   ? AOM_SUPERBLOCK_SIZE_64X64
-                                   : (cfg->superblock_size == 128)
-                                         ? AOM_SUPERBLOCK_SIZE_128X128
-                                         : AOM_SUPERBLOCK_SIZE_DYNAMIC;
+  extra_cfg->superblock_size =
+      (cfg->superblock_size == 64)    ? AOM_SUPERBLOCK_SIZE_64X64
+      : (cfg->superblock_size == 128) ? AOM_SUPERBLOCK_SIZE_128X128
+                                      : AOM_SUPERBLOCK_SIZE_DYNAMIC;
   extra_cfg->enable_warped_motion = cfg->enable_warped_motion;
 #if !CONFIG_REMOVE_DIST_WTD_COMP
   extra_cfg->enable_dist_wtd_comp = cfg->enable_dist_wtd_comp;
@@ -1018,9 +1016,9 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth) {
     // At higher end of QP the slope of quant step-size grows exponentially,
     // captured by qp_threshold.
 #if CONFIG_EXTQUANT
-    const int max_q = (bit_depth == AOM_BITS_8)
-                          ? MAXQ_8_BITS
-                          : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS : MAXQ;
+    const int max_q = (bit_depth == AOM_BITS_8)    ? MAXQ_8_BITS
+                      : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS
+                                                   : MAXQ;
 #else
     const int max_q = MAXQ;
 #endif  // CONFIG_EXTQUANT

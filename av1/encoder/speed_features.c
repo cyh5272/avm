@@ -514,10 +514,9 @@ static void set_good_speed_features_framesize_independent(
         frame_is_intra_only(&cpi->common) ? 0 : 1;
     sf->winner_mode_sf.enable_winner_mode_for_use_tx_domain_dist = 1;
     sf->winner_mode_sf.motion_mode_for_winner_cand =
-        boosted
-            ? 0
-            : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
-                                                                         : 2;
+        boosted                                                      ? 0
+        : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
+                                                                     : 2;
 
     // TODO(any): evaluate if these lpf features can be moved to speed 2.
     // For screen content, "prune_sgr_based_on_wiener = 2" cause large quality
