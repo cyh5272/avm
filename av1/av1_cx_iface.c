@@ -1,12 +1,13 @@
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 3-Clause Clear License and the
- * Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear License was
- * not distributed with this source code in the LICENSE file, you can obtain it
- * at aomedia.org/license/software-license/bsd-3-c-c/.  If the Alliance for Open Media Patent
- * License 1.0 was not distributed with this source code in the PATENTS file, you
- * can obtain it at aomedia.org/license/patent-license/.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -124,8 +125,8 @@ struct av1_extracfg {
   int enable_orip;  // enable ORIP
 #endif              // CONFIG_ORIP
 #if CONFIG_IST
-  int enable_ist;                // enable intra secondary transform
-#endif                           // CONFIG_IST
+  int enable_ist;  // enable intra secondary transform
+#endif             // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
   int enable_ibp;                // enable intra bi-prediction
 #endif                           // CONFIG_IBP_DC or CONFIG_IBP_DIR
@@ -164,7 +165,7 @@ struct av1_extracfg {
 #if CONFIG_OPTFLOW_REFINEMENT
   aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type
                                             // for sequence
-#endif                     // CONFIG_OPTFLOW_REFINEMENT
+#endif                                      // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_DENOISE
   float noise_level;
   int noise_block_size;
