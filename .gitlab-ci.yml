@@ -26,7 +26,7 @@ Style Check:
     - |
       # Run clang-format
       for f in $(git ls-files '*.[hc]pp' '*.cc' '*.[ch]' | grep -v third_party); do
-        clang-format -i --style=file $f
+        clang-format -i --style=file $f -n -Werror
       done
     - |
       # Run cmake-format
