@@ -164,6 +164,10 @@ typedef struct macroblock_plane {
 typedef struct {
   //! Cost to skip txfm for the current txfm block.
   int txb_skip_cost[TXB_SKIP_CONTEXTS][2];
+#if CONFIG_ALL_ZERO_CONTEXT
+  //! Cost to skip txfm for the current Cr txfm block.
+  int cr_txb_skip_cost[CR_TXB_SKIP_CONTEXTS][2];
+#endif
   /*! \brief Cost for encoding the base_eob of a level.
    *
    * Decoder uses base_eob to derive the base_level as base_eob := base_eob+1.

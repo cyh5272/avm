@@ -81,6 +81,7 @@ int64_t tot_ctx_syms = { 0 };
 int64_t tot_bypass_syms = { 0 };
 int max_ctx_syms = { 0 };
 int max_bypass_syms = { 0 };
+int max_bits = { 0 };
 int64_t tot_bits = { 0 };
 int tot_frames = { 0 };
 #endif
@@ -3225,29 +3226,34 @@ static void aom_accounting_cal_total(AV1Decoder *pbi) {
     pbi->common.sym_stats.tot_bits = 0;
     pbi->common.sym_stats.peak_ctx_syms = 0;
     pbi->common.sym_stats.peak_bypass_syms = 0;
+    pbi->common.sym_stats.peak_bits = 0;
   }
   Accounting accounting = pbi->accounting;
   int frm_ctx_syms = accounting.syms.num_ctx_coded;
   int frm_bypass_syms = accounting.syms.num_bypass_coded;
+  int frm_bits = 0;
+  for (int i = 0; i < accounting.syms.num_syms; i++) {
+    AccountingSymbol sym = accounting.syms.syms[i];
+    frm_bits += sym.bits;
+  }
   int peak_ctx_syms = pbi->common.sym_stats.peak_ctx_syms;
   int peak_bypass_syms = pbi->common.sym_stats.peak_bypass_syms;
   pbi->common.sym_stats.tot_ctx_syms += frm_ctx_syms;
   pbi->common.sym_stats.tot_bypass_syms += frm_bypass_syms;
   pbi->common.sym_stats.frame_dec_order += 1;
+  pbi->common.sym_stats.tot_bits += frm_bits;
   if (frm_ctx_syms * 4 + frm_bypass_syms >
       peak_ctx_syms * 4 + peak_bypass_syms) {
     pbi->common.sym_stats.peak_ctx_syms = frm_ctx_syms;
     pbi->common.sym_stats.peak_bypass_syms = frm_bypass_syms;
-  }
-  for (int i = 0; i < accounting.syms.num_syms; i++) {
-    AccountingSymbol sym = accounting.syms.syms[i];
-    pbi->common.sym_stats.tot_bits += sym.bits;
+    pbi->common.sym_stats.peak_bits = frm_bits;
   }
   tot_ctx_syms = pbi->common.sym_stats.tot_ctx_syms;
   tot_bypass_syms = pbi->common.sym_stats.tot_bypass_syms;
   tot_bits = pbi->common.sym_stats.tot_bits;
   max_ctx_syms = pbi->common.sym_stats.peak_ctx_syms;
   max_bypass_syms = pbi->common.sym_stats.peak_bypass_syms;
+  max_bits = pbi->common.sym_stats.peak_bits;
   tot_frames = pbi->common.sym_stats.frame_dec_order;
 }
 #endif

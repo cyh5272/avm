@@ -144,10 +144,16 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   uint8_t levels_buf[TX_PAD_2D];
   uint8_t *const levels = set_levels(levels_buf, width);
 #if CONFIG_ALL_ZERO_CONTEXT
-  const int txb_skip_ctx =
-      txb_ctx->txb_skip_ctx + (plane == 2 ? (xd->eob_u_flag ? 12 : 6) : 0);
-  const int all_zero = aom_read_symbol(
-      r, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2, ACCT_STR);
+  int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+  int all_zero;
+  if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+    all_zero = aom_read_symbol(r, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx],
+                               2, ACCT_STR);
+  } else {
+    txb_skip_ctx += (xd->eob_u_flag ? 6 : 0);
+    all_zero =
+        aom_read_symbol(r, ec_ctx->cr_txb_skip_cdf[txb_skip_ctx], 2, ACCT_STR);
+  }
 #else
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);

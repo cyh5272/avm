@@ -355,10 +355,18 @@ static INLINE void get_txb_ctx(const BLOCK_SIZE plane_bsize,
   } else {
     const int ctx_base = get_entropy_context(tx_size, a, l);
 #if CONFIG_ALL_ZERO_CONTEXT
-    const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
-                            num_pels_log2_lookup[txsize_to_bsize[tx_size]])
-                               ? 10
-                               : 7;
+    int ctx_offset = 0;
+    if (plane == AOM_PLANE_U) {
+      ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                    num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                       ? 10
+                       : 7;
+    } else {
+      ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                    num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                       ? 3
+                       : 0;
+    }
     txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
 #else
     const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >

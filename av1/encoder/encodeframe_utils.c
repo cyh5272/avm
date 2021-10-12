@@ -1216,6 +1216,9 @@ static void avg_nmv(nmv_context *nmv_left, nmv_context *nmv_tr, int wt_left,
 void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                          int wt_left, int wt_tr) {
   AVERAGE_CDF(ctx_left->txb_skip_cdf, ctx_tr->txb_skip_cdf, 2);
+#if CONFIG_ALL_ZERO_CONTEXT
+  AVERAGE_CDF(ctx_left->cr_txb_skip_cdf, ctx_tr->cr_txb_skip_cdf, 2);
+#endif
   AVERAGE_CDF(ctx_left->eob_extra_cdf, ctx_tr->eob_extra_cdf, 2);
   AVERAGE_CDF(ctx_left->dc_sign_cdf, ctx_tr->dc_sign_cdf, 2);
 #if CONFIG_SIGN_PRED_CONTEXT

@@ -117,9 +117,9 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
 #if CONFIG_B065_THROUGHPUT
   printf(
       "avg_ctx_syms : %d\t avg_bypass_syms : %d\t max_ctx_syms : %d\t "
-      "max_bypass_syms : %d\t total_bits : %d\n",
+      "max_bypass_syms : %d\t max_bits : %d\t total_bits : %d\n",
       (int)(tot_ctx_syms / tot_frames), (int)(tot_bypass_syms / tot_frames),
-      max_ctx_syms, max_bypass_syms, (int)(tot_bits / 8));
+      max_ctx_syms, max_bypass_syms, max_bits, (int)(tot_bits / 8));
 #endif
 
   if (ctx->frame_worker != NULL) {

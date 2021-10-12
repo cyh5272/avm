@@ -347,8 +347,10 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   const uint16_t eob = eob_txb[block];
   const uint8_t *entropy_ctx = cb_coef_buff->entropy_ctx[plane] + txb_offset;
 #if CONFIG_ALL_ZERO_CONTEXT
-  const int txb_skip_ctx = (entropy_ctx[block] & TXB_SKIP_CTX_MASK) +
-                           (plane == 2 ? (xd->eob_u_flag ? 12 : 6) : 0);
+  int txb_skip_ctx = (entropy_ctx[block] & TXB_SKIP_CTX_MASK);
+  if (plane == AOM_PLANE_V) {
+    txb_skip_ctx += (xd->eob_u_flag ? 6 : 0);
+  }
 #else
   const int txb_skip_ctx = entropy_ctx[block] & TXB_SKIP_CTX_MASK;
 #endif
@@ -359,9 +361,15 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = eob ? 1 : 0;
   }
-#endif
-
+  if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+    aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx],
+                     2);
+  } else {
+    aom_write_symbol(w, eob == 0, ec_ctx->cr_txb_skip_cdf[txb_skip_ctx], 2);
+  }
+#else
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
+#endif
   if (eob == 0) return;
 
   const PLANE_TYPE plane_type = get_plane_type(plane);
@@ -716,8 +724,10 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
   const tran_low_t *const qcoeff = p->qcoeff + BLOCK_OFFSET(block);
 #if CONFIG_ALL_ZERO_CONTEXT
   const struct macroblock_plane *pu = &x->plane[AOM_PLANE_U];
-  const int txb_skip_ctx =
-      txb_ctx->txb_skip_ctx + (plane == 2 ? (pu->eobs[block] ? 12 : 6) : 0);
+  int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+  if (plane == AOM_PLANE_V) {
+    txb_skip_ctx += (pu->eobs[block] ? 6 : 0);
+  }
 #else
   const int txb_skip_ctx = txb_ctx->txb_skip_ctx;
 #endif
@@ -732,7 +742,16 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
   const int eob_multi_size = txsize_log2_minus4[tx_size];
   const LV_MAP_EOB_COST *const eob_costs =
       &x->coeff_costs.eob_costs[eob_multi_size][plane_type];
+#if CONFIG_ALL_ZERO_CONTEXT
+  int cost;
+  if (plane == AOM_PLANE_V) {
+    cost = coeff_costs->cr_txb_skip_cost[txb_skip_ctx][0];
+  } else {
+    cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
+  }
+#else
   int cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
+#endif
 
   av1_txb_init_levels(qcoeff, width, height, levels);
 
@@ -857,9 +876,10 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_laplacian(
     const MACROBLOCKD *const xd, const TX_TYPE tx_type, const TX_CLASS tx_class,
     int reduced_tx_set_used) {
 #if CONFIG_ALL_ZERO_CONTEXT
-  const int txb_skip_ctx =
-      txb_ctx->txb_skip_ctx +
-      (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
+  int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+  if (plane == AOM_PLANE_V) {
+    txb_skip_ctx += (x->plane[AOM_PLANE_U].eobs[block] ? 6 : 0);
+  }
 #else
   const int txb_skip_ctx = txb_ctx->txb_skip_ctx;
 #endif
@@ -867,7 +887,16 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_laplacian(
   const int eob_multi_size = txsize_log2_minus4[tx_size];
   const LV_MAP_EOB_COST *const eob_costs =
       &x->coeff_costs.eob_costs[eob_multi_size][plane_type];
+#if CONFIG_ALL_ZERO_CONTEXT
+  int cost;
+  if (plane == AOM_PLANE_V) {
+    cost = coeff_costs->cr_txb_skip_cost[txb_skip_ctx][0];
+  } else {
+    cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
+  }
+#else
   int cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
+#endif
 
   cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type, reduced_tx_set_used
 #if CONFIG_IST
@@ -937,10 +966,13 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
       &x->coeff_costs.coeff_costs[txs_ctx][plane_type];
   if (eob == 0) {
 #if CONFIG_ALL_ZERO_CONTEXT
-    const int txb_skip_ctx =
-        txb_ctx->txb_skip_ctx +
-        (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
-    return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+    int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+    if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+      return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+    } else {
+      txb_skip_ctx += (x->plane[AOM_PLANE_U].eobs[block] ? 6 : 0);
+      return coeff_costs->cr_txb_skip_cost[txb_skip_ctx][1];
+    }
 #else
     return coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif
@@ -984,10 +1016,13 @@ int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
       &x->coeff_costs.coeff_costs[txs_ctx][plane_type];
   if (eob == 0) {
 #if CONFIG_ALL_ZERO_CONTEXT
-    const int txb_skip_ctx =
-        txb_ctx->txb_skip_ctx +
-        (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
-    return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+    int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+    if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+      return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+    } else {
+      txb_skip_ctx += (x->plane[AOM_PLANE_U].eobs[block] ? 6 : 0);
+      return coeff_costs->cr_txb_skip_cost[txb_skip_ctx][1];
+    }
 #else
     return coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif
@@ -1514,11 +1549,17 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     // TODO(angirbird): check iqmatrix
 
 #if CONFIG_ALL_ZERO_CONTEXT
-  const int txb_skip_ctx =
-      txb_ctx->txb_skip_ctx +
-      (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
-  const int non_skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][0];
-  const int skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][1];
+  int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+  int non_skip_cost = 0;
+  int skip_cost = 0;
+  if (plane == AOM_PLANE_V) {
+    txb_skip_ctx += (x->plane[AOM_PLANE_U].eobs[block] ? 6 : 0);
+    non_skip_cost = txb_costs->cr_txb_skip_cost[txb_skip_ctx][0];
+    skip_cost = txb_costs->cr_txb_skip_cost[txb_skip_ctx][1];
+  } else {
+    non_skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][0];
+    skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][1];
+  }
 #else
   const int non_skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][0];
   const int skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
@@ -1806,10 +1847,13 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
 #endif  // CONFIG_ENTROPY_STATS
     if (allow_update_cdf) {
 #if CONFIG_ALL_ZERO_CONTEXT
-      const int txb_skip_ctx =
-          txb_ctx.txb_skip_ctx +
-          (plane == 2 ? (x->plane[AOM_PLANE_U].eobs[block] ? 12 : 6) : 0);
-      update_cdf(ec_ctx->txb_skip_cdf[txsize_ctx][txb_skip_ctx], eob == 0, 2);
+      int txb_skip_ctx = txb_ctx.txb_skip_ctx;
+      if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+        update_cdf(ec_ctx->txb_skip_cdf[txsize_ctx][txb_skip_ctx], eob == 0, 2);
+      } else {
+        txb_skip_ctx += (x->plane[AOM_PLANE_U].eobs[block] ? 6 : 0);
+        update_cdf(ec_ctx->cr_txb_skip_cdf[txb_skip_ctx], eob == 0, 2);
+      }
 #else
       update_cdf(ec_ctx->txb_skip_cdf[txsize_ctx][txb_ctx.txb_skip_ctx],
                  eob == 0, 2);

@@ -71,6 +71,9 @@ typedef struct {
 
 typedef struct frame_contexts {
   aom_cdf_prob txb_skip_cdf[TX_SIZES][TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
+#if CONFIG_ALL_ZERO_CONTEXT
+  aom_cdf_prob cr_txb_skip_cdf[CR_TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
+#endif
   aom_cdf_prob eob_extra_cdf[TX_SIZES][PLANE_TYPES][EOB_COEF_CONTEXTS]
                             [CDF_SIZE(2)];
   aom_cdf_prob dc_sign_cdf[PLANE_TYPES][DC_SIGN_CONTEXTS][CDF_SIZE(2)];

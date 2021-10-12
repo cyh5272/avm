@@ -807,6 +807,8 @@ struct total_sym_stats {
   int peak_ctx_syms;
   /** peak bypass coded symbols. */
   int peak_bypass_syms;
+  /** peak bits. */
+  int peak_bits;
 };
 #endif
 

@@ -734,7 +734,11 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       for (int ctx = 0; ctx < TXB_SKIP_CONTEXTS; ++ctx)
         av1_cost_tokens_from_cdf(pcost->txb_skip_cost[ctx],
                                  fc->txb_skip_cdf[tx_size][ctx], NULL);
-
+#if CONFIG_ALL_ZERO_CONTEXT
+      for (int ctx = 0; ctx < CR_TXB_SKIP_CONTEXTS; ++ctx)
+        av1_cost_tokens_from_cdf(pcost->cr_txb_skip_cost[ctx],
+                                 fc->cr_txb_skip_cdf[ctx], NULL);
+#endif
       for (int ctx = 0; ctx < SIG_COEF_CONTEXTS_EOB; ++ctx)
         av1_cost_tokens_from_cdf(pcost->base_eob_cost[ctx],
                                  fc->coeff_base_eob_cdf[tx_size][plane][ctx],

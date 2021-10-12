@@ -35,6 +35,9 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
 #endif
 
   av1_copy(cm->fc->txb_skip_cdf, av1_default_txb_skip_cdfs[index]);
+#if CONFIG_ALL_ZERO_CONTEXT
+  av1_copy(cm->fc->cr_txb_skip_cdf, av1_default_cr_txb_skip_cdfs[index]);
+#endif
   av1_copy(cm->fc->eob_extra_cdf, av1_default_eob_extra_cdfs[index]);
   av1_copy(cm->fc->dc_sign_cdf, av1_default_dc_sign_cdfs[index]);
 #if CONFIG_SIGN_PRED_CONTEXT
@@ -89,6 +92,9 @@ static AOM_INLINE void reset_nmv_counter(nmv_context *nmv) {
 
 void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->txb_skip_cdf, 2);
+#if CONFIG_ALL_ZERO_CONTEXT
+  RESET_CDF_COUNTER(fc->cr_txb_skip_cdf, 2);
+#endif
   RESET_CDF_COUNTER(fc->eob_extra_cdf, 2);
   RESET_CDF_COUNTER(fc->dc_sign_cdf, 2);
 #if CONFIG_SIGN_PRED_CONTEXT
