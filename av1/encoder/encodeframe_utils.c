@@ -1473,6 +1473,9 @@ void av1_backup_sb_state(SB_FIRST_PASS_STATS *sb_fp_stats, const AV1_COMP *cpi,
   const int alloc_mi_idx = get_alloc_mi_idx(&cm->mi_params, mi_row, mi_col);
   sb_fp_stats->current_qindex =
       cm->mi_params.mi_alloc[alloc_mi_idx].current_qindex;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  sb_fp_stats->min_partition_size = x->sb_enc.min_partition_size;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_INTERNAL_STATS
   memcpy(sb_fp_stats->mode_chosen_counts, cpi->mode_chosen_counts,
@@ -1505,6 +1508,9 @@ void av1_restore_sb_state(const SB_FIRST_PASS_STATS *sb_fp_stats, AV1_COMP *cpi,
   const int alloc_mi_idx = get_alloc_mi_idx(&cm->mi_params, mi_row, mi_col);
   cm->mi_params.mi_alloc[alloc_mi_idx].current_qindex =
       sb_fp_stats->current_qindex;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  x->sb_enc.min_partition_size = sb_fp_stats->min_partition_size;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_INTERNAL_STATS
   memcpy(cpi->mode_chosen_counts, sb_fp_stats->mode_chosen_counts,
