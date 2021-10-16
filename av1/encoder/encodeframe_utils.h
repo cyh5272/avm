@@ -56,6 +56,9 @@ typedef struct SB_FIRST_PASS_STATS {
   int thresh_freq_fact[BLOCK_SIZES_ALL][MAX_MODES];
 #endif  // CONFIG_NEW_REF_SIGNALING
   int current_qindex;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  BLOCK_SIZE min_partition_size;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   unsigned int mode_chosen_counts[MAX_MODES];
