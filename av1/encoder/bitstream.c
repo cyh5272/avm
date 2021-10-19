@@ -857,7 +857,7 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   if (!av1_is_interp_needed(xd)) {
 #if CONFIG_DEBUG
 #if CONFIG_OPTFLOW_REFINEMENT
-    // In switchable optical flow refinement, use the sharp filter instead
+    // Sharp filter is always used whenever optical flow refinement is applied.
     int mb_interp_filter =
         (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
             ? MULTITAP_SHARP
