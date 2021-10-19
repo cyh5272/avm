@@ -14,6 +14,10 @@
 
 #include "av1/common/av1_txfm.h"
 
+#if CONFIG_DDT_INTER
+#include "av1/common/ddtx_bases.h"
+#endif  // CONFIG_DDT_INTER
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,6 +62,14 @@ void av1_iidentity16_c(const int32_t *input, int32_t *output, int8_t cos_bit,
 void av1_iidentity32_c(const int32_t *input, int32_t *output, int8_t cos_bit,
                        const int8_t *stage_range);
 
+#if CONFIG_DDT_INTER
+void av1_iklt4(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_iklt8(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range);
+void av1_iklt16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                const int8_t *stage_range);
+#endif  // CONFIG_DDT_INTER
 #ifdef __cplusplus
 }
 #endif

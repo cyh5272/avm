@@ -584,9 +584,34 @@ static int get_tx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd,
     const int ext_tx_set =
         get_ext_tx_set(tx_size, is_inter, reduced_tx_set_used);
     if (is_inter) {
+#if CONFIG_DDT_INTER
+      const TxSetType tx_set_type =
+          av1_get_ext_tx_set_type(tx_size, is_inter, reduced_tx_set_used);
+      if (tx_set_type == EXT_TX_SET_ALL24) {
+#if CONFIG_IST
+        TX_TYPE ptx_type = get_primary_tx_type(tx_type);
+#else
+        TX_TYPE ptx_type = tx_type;
+#endif  // CONFIG_IST
+        int is_ddtx = has_ddtx(ptx_type);
+        int use_ddtx_cost =
+            x->mode_costs.use_ddtx_inter_costs[square_tx_size][is_ddtx];
+        int tx_type_cost =
+            is_ddtx
+                ? x->mode_costs
+                      .ddtx_type_inter_costs[square_tx_size][ptx_type - DDT_DDT]
+                : x->mode_costs.inter_tx_type_costs[ext_tx_set][square_tx_size]
+                                                   [ptx_type];
+        return use_ddtx_cost + tx_type_cost;
+      } else {
+        return x->mode_costs
+            .inter_tx_type_costs[ext_tx_set][square_tx_size][tx_type];
+      }
+#else
       if (ext_tx_set > 0)
         return x->mode_costs
             .inter_tx_type_costs[ext_tx_set][square_tx_size][tx_type];
+#endif  // CONFIG_DDT_INTER
     } else {
       if (ext_tx_set > 0) {
         PREDICTION_MODE intra_dir;
@@ -1512,13 +1537,56 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
           av1_get_ext_tx_set_type(tx_size, is_inter, reduced_tx_set_used);
       if (is_inter) {
         if (allow_update_cdf) {
-          update_cdf(fc->inter_ext_tx_cdf[eset][txsize_sqr_map[tx_size]],
-                     av1_ext_tx_ind[tx_set_type][tx_type],
-                     av1_num_ext_tx_set[tx_set_type]);
+#if CONFIG_DDT_INTER
+          if (tx_set_type == EXT_TX_SET_ALL24) {
+#if CONFIG_IST
+            TX_TYPE ptx_type = get_primary_tx_type(tx_type);
+#else
+            TX_TYPE ptx_type = tx_type;
+#endif  // CONFIG_IST
+            int is_ddtx = has_ddtx(ptx_type);
+            update_cdf(fc->use_ddtx_inter_cdf[txsize_sqr_map[tx_size]], is_ddtx,
+                       2);
+            if (is_ddtx) {
+              update_cdf(fc->ddtx_type_inter_cdf[txsize_sqr_map[tx_size]],
+                         ptx_type - DDT_DDT, DDT_TYPES);
+            } else {
+              update_cdf(fc->inter_ext_tx_cdf[eset][txsize_sqr_map[tx_size]],
+                         av1_ext_tx_ind[tx_set_type][ptx_type],
+                         av1_num_ext_tx_set[tx_set_type]);
+            }
+          } else {
+#endif  // CONFIG_DDT_INTER
+            update_cdf(fc->inter_ext_tx_cdf[eset][txsize_sqr_map[tx_size]],
+                       av1_ext_tx_ind[tx_set_type][tx_type],
+                       av1_num_ext_tx_set[tx_set_type]);
+#if CONFIG_DDT_INTER
+          }
+#endif
         }
 #if CONFIG_ENTROPY_STATS
-        ++counts->inter_ext_tx[eset][txsize_sqr_map[tx_size]]
-                              [av1_ext_tx_ind[tx_set_type][tx_type]];
+#if CONFIG_DDT_INTER
+        if (tx_set_type == EXT_TX_SET_ALL24) {
+#if CONFIG_IST
+          TX_TYPE ptx_type = get_primary_tx_type(tx_type);
+#else
+          TX_TYPE ptx_type = tx_type;
+#endif  // CONFIG_IST
+          int is_ddtx = has_ddtx(ptx_type);
+          ++counts->use_ddtx_inter[txsize_sqr_map[tx_size]][is_ddtx];
+          if (is_ddtx)
+            ++counts->ddtx_type_inter[txsize_sqr_map[tx_size]]
+                                     [ptx_type - DDT_DDT];
+          else
+            ++counts->inter_ext_tx[eset][txsize_sqr_map[tx_size]]
+                                  [av1_ext_tx_ind[tx_set_type][ptx_type]];
+        } else {
+#endif
+          ++counts->inter_ext_tx[eset][txsize_sqr_map[tx_size]]
+                                [av1_ext_tx_ind[tx_set_type][tx_type]];
+#if CONFIG_DDT_INTER
+        }
+#endif
 #endif  // CONFIG_ENTROPY_STATS
       } else {
         PREDICTION_MODE intra_dir;
