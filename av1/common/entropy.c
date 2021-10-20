@@ -170,6 +170,9 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #if CONFIG_RST_MERGECOEFFS
   RESET_CDF_COUNTER(fc->merged_param_cdf, 2);
 #endif  // CONFIG_RST_MERGECOEFFS
+#if CONFIG_PC_WIENER
+  RESET_CDF_COUNTER(fc->pc_wiener_restore_cdf, 2);
+#endif  // CONFIG_PC_WIENER
   RESET_CDF_COUNTER(fc->y_mode_cdf, INTRA_MODES);
   RESET_CDF_COUNTER_STRIDE(fc->uv_mode_cdf[0], UV_INTRA_MODES - 1,
                            CDF_SIZE(UV_INTRA_MODES));
