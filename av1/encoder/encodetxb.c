@@ -344,6 +344,10 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
+#if CONFIG_PC_WIENER
+  assert((eob == 0) ==
+         av1_get_txk_skip(cm, xd->mi_row, xd->mi_col, plane, blk_row, blk_col));
+#endif  // CONFIG_PC_WIENER
   if (eob == 0) return;
 
   const PLANE_TYPE plane_type = get_plane_type(plane);

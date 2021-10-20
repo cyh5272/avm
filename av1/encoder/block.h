@@ -827,6 +827,12 @@ typedef struct {
    */
   int wiener_nonsep_restore_cost[2];
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  /*!
+   * pc_wiener_restore_cost
+   */
+  int pc_wiener_restore_cost[2];
+#endif  // CONFIG_PC_WIENER
   /**@}*/
 } ModeCosts;
 
