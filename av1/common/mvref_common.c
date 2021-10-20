@@ -378,7 +378,7 @@ static AOM_INLINE void scan_row_mbmi(
       len = AOMMAX(len, width_8x8);
 
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
-    //Don't add weight to row_offset < -1 which is in the outer area
+    // Don't add weight to row_offset < -1 which is in the outer area
     uint16_t weight = row_offset < -1 ? 0 : 2;
     if (xd->width >= width_8x8 && xd->width <= n4_w) {
       uint16_t inc = AOMMIN(-max_row_offset + row_offset + 1,
@@ -451,7 +451,7 @@ static AOM_INLINE void scan_col_mbmi(
       len = AOMMAX(len, n8_h_8);
 
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
-    //Don't add weight to col_offset < -1 which is in the outer area
+    // Don't add weight to col_offset < -1 which is in the outer area
     uint16_t weight = col_offset < -1 ? 0 : 2;
     if (xd->height >= n8_h_8 && xd->height <= n4_h) {
       int inc = AOMMIN(-max_col_offset + col_offset + 1,
@@ -507,7 +507,7 @@ static AOM_INLINE void scan_blk_mbmi(
     const int len = mi_size_wide[BLOCK_8X8];
 
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
-    //Don't add weight to (-1,-1) which is in the outer area
+    // Don't add weight to (-1,-1) which is in the outer area
     uint16_t weight = row_offset == -1 && col_offset == -1 ? 0 : 2;
     add_ref_mv_candidate(candidate, rf, refmv_count, ref_match_count,
                          newmv_count, ref_mv_stack, ref_mv_weight,
@@ -974,7 +974,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
 
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
-  //These contexts are independent of the outer area search
+  // These contexts are independent of the outer area search
   int new_ctx = 2 * nearest_match + (newmv_count > 0);
   int ref_ctx = 2 * nearest_match + (newmv_count < 3);
   mode_context[ref_frame] |= new_ctx;
