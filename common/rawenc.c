@@ -81,6 +81,7 @@ static void raw_write_image_file_or_md5(const aom_image_t *img,
     const unsigned char *buf = img->planes[plane];
     const int stride = img->stride[plane];
     if (high_bitdepth && img->bit_depth == 8) {
+      // convert 16-bit buffer to 8-bit (input bitdepth) buffer
       uint8_t *buf8 = (uint8_t *)aom_malloc(sizeof(*buf8) * w);
       for (int y = 0; y < h; ++y) {
         uint16_t *buf16 = (uint16_t *)buf;
