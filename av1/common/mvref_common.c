@@ -380,23 +380,19 @@ static AOM_INLINE void scan_row_mbmi(
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
     // Don't add weight to row_offset < -1 which is in the outer area
     uint16_t weight = row_offset < -1 ? 0 : 2;
-    if (xd->width >= width_8x8 && xd->width <= n4_w) {
-      uint16_t inc = AOMMIN(-max_row_offset + row_offset + 1,
-                            mi_size_high[candidate_bsize]);
-      // Update processed rows.
-      *processed_rows = inc - row_offset - 1;
-    }
 #else
     uint16_t weight = 2;
+#endif
     if (xd->width >= width_8x8 && xd->width <= n4_w) {
       uint16_t inc = AOMMIN(-max_row_offset + row_offset + 1,
                             mi_size_high[candidate_bsize]);
+#if !CONFIG_COMPLEXITY_SCALABLE_MVP
       // Obtain range used in weight calculation.
       weight = AOMMAX(weight, inc);
+#endif
       // Update processed rows.
       *processed_rows = inc - row_offset - 1;
     }
-#endif
 
     add_ref_mv_candidate(candidate, rf, refmv_count, ref_match_count,
                          newmv_count, ref_mv_stack, ref_mv_weight,
@@ -453,23 +449,19 @@ static AOM_INLINE void scan_col_mbmi(
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
     // Don't add weight to col_offset < -1 which is in the outer area
     uint16_t weight = col_offset < -1 ? 0 : 2;
-    if (xd->height >= n8_h_8 && xd->height <= n4_h) {
-      int inc = AOMMIN(-max_col_offset + col_offset + 1,
-                       mi_size_wide[candidate_bsize]);
-      // Update processed cols.
-      *processed_cols = inc - col_offset - 1;
-    }
 #else
     int weight = 2;
+#endif
     if (xd->height >= n8_h_8 && xd->height <= n4_h) {
       int inc = AOMMIN(-max_col_offset + col_offset + 1,
                        mi_size_wide[candidate_bsize]);
+#if !CONFIG_COMPLEXITY_SCALABLE_MVP
       // Obtain range used in weight calculation.
       weight = AOMMAX(weight, inc);
+#endif
       // Update processed cols.
       *processed_cols = inc - col_offset - 1;
     }
-#endif
 
     add_ref_mv_candidate(candidate, rf, refmv_count, ref_match_count,
                          newmv_count, ref_mv_stack, ref_mv_weight,
@@ -509,6 +501,7 @@ static AOM_INLINE void scan_blk_mbmi(
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
     // Don't add weight to (-1,-1) which is in the outer area
     uint16_t weight = row_offset == -1 && col_offset == -1 ? 0 : 2;
+#endif
     add_ref_mv_candidate(candidate, rf, refmv_count, ref_match_count,
                          newmv_count, ref_mv_stack, ref_mv_weight,
                          gm_mv_candidates, cm->global_motion,
@@ -516,15 +509,9 @@ static AOM_INLINE void scan_blk_mbmi(
                          cm, add_more_mvs, single_mv, single_mv_count,
                          derived_mv_stack, derived_mv_weight, derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
+#if CONFIG_COMPLEXITY_SCALABLE_MVP
                          weight * len);
 #else
-    add_ref_mv_candidate(candidate, rf, refmv_count, ref_match_count,
-                         newmv_count, ref_mv_stack, ref_mv_weight,
-                         gm_mv_candidates, cm->global_motion,
-#if CONFIG_SMVP_IMPROVEMENT
-                         cm, add_more_mvs, single_mv, single_mv_count,
-                         derived_mv_stack, derived_mv_weight, derived_mv_count,
-#endif  // CONFIG_SMVP_IMPROVEMENT
                          2 * len);
 #endif
   }  // Analyze a single 8x8 block motion information.
