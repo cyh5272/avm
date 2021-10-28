@@ -2612,8 +2612,13 @@ static void report_stats(AV1_COMP *cpi, size_t frame_size, uint64_t cx_time) {
   if (!cm->show_existing_frame) {
     // Get reference frame information
     int ref_poc[INTER_REFS_PER_FRAME];
+#if CONFIG_NEW_REF_SIGNALING
+    for (int ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+      const int ref_idx = ref_frame;
+#else
     for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
       const int ref_idx = ref_frame - LAST_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
       const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
       ref_poc[ref_idx] = buf ? (int)buf->absolute_poc : -1;
       ref_poc[ref_idx] = (ref_poc[ref_idx] == (int)cm->cur_frame->absolute_poc)

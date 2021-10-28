@@ -967,8 +967,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   const BLOCK_SIZE bsize = mbmi->sb_type;
 #endif
   FRAME_CONTEXT *fc = xd->tile_ctx;
+#if CONFIG_NEW_REF_SIGNALING
+  const int seg_ref_active = 0;
+#else
   const int seg_ref_active =
       segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   if (current_frame->skip_mode_info.skip_mode_flag && !seg_ref_active &&
       is_comp_ref_allowed(bsize)) {
@@ -1116,6 +1120,24 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 
       if (has_second_ref(mbmi)) {
+#if CONFIG_NEW_REF_SIGNALING
+        const int n_refs = cm->ref_frames_info.n_total_refs;
+        int n_bits = 0;
+        assert(ref0 < ref1);
+        for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
+          const int bit = ref0 == i || ref1 == i;
+          const int bit_type = av1_get_compound_ref_bit_type(
+              n_bits, &cm->ref_frames_info, ref0, i);
+          update_cdf(av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type,
+                                                       n_refs),
+                     bit, 2);
+#if CONFIG_ENTROPY_STATS
+          counts->comp_ref[av1_get_ref_pred_context_nrs(xd, i, n_refs)]
+                          [bit_type][i - n_bits][bit]++;
+#endif  // CONFIG_ENTROPY_STATS
+          n_bits += bit;
+        }
+#else
         const COMP_REFERENCE_TYPE comp_ref_type = has_uni_comp_refs(mbmi)
                                                       ? UNIDIR_COMP_REFERENCE
                                                       : BIDIR_COMP_REFERENCE;
@@ -1185,7 +1207,21 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
           }
         }
+#endif  // CONFIG_NEW_REF_SIGNALING
       } else {
+#if CONFIG_NEW_REF_SIGNALING
+        const int n_refs = cm->ref_frames_info.n_total_refs;
+        const MV_REFERENCE_FRAME ref0_nrs = mbmi->ref_frame[0];
+        for (int i = 0; i < n_refs - 1; i++) {
+          const int bit = ref0_nrs == i;
+          update_cdf(av1_get_pred_cdf_single_ref_nrs(xd, i, n_refs), bit, 2);
+#if CONFIG_ENTROPY_STATS
+          counts->single_ref[av1_get_ref_pred_context_nrs(xd, i, n_refs)][i]
+                            [bit]++;
+#endif  // CONFIG_ENTROPY_STATS
+          if (bit) break;
+        }
+#else
         const int bit = (ref0 >= BWDREF_FRAME);
         update_cdf(av1_get_pred_cdf_single_ref_p1(xd), bit, 2);
 #if CONFIG_ENTROPY_STATS
@@ -1229,12 +1265,17 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
           }
         }
+#endif  // CONFIG_NEW_REF_SIGNALING
       }
 
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
         const int bsize_group = size_group_lookup[bsize];
+#if CONFIG_NEW_REF_SIGNALING
+        if (mbmi->ref_frame[1] == INTRA_FRAME_NRS) {
+#else
         if (mbmi->ref_frame[1] == INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_ENTROPY_STATS
           counts->interintra[bsize_group][1]++;
 #endif
@@ -1271,7 +1312,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               ? motion_mode_allowed(xd->global_motion, xd, mbmi,
                                     cm->features.allow_warped_motion)
               : SIMPLE_TRANSLATION;
+#if CONFIG_NEW_REF_SIGNALING
+      if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
+#else
       if (mbmi->ref_frame[1] != INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
         if (motion_allowed == WARPED_CAUSAL) {
 #if CONFIG_ENTROPY_STATS
           counts->motion_mode[bsize][mbmi->motion_mode]++;
@@ -1575,8 +1620,12 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       }
       set_ref_ptrs(cm, xd, mbmi->ref_frame[0], mbmi->ref_frame[1]);
     } else {
+#if CONFIG_NEW_REF_SIGNALING
+      const int seg_ref_active = 0;
+#else
       const int seg_ref_active =
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active) {
         // If the segment reference feature is enabled we have only a single
         // reference frame allowed for the segment so exclude it from
@@ -1610,8 +1659,12 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #else
       const int inter_block = is_inter_block(mbmi);
 #endif
+#if CONFIG_NEW_REF_SIGNALING
+      const int seg_ref_active = 0;
+#else
       const int seg_ref_active =
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
         const MOTION_MODE motion_allowed =
             cm->features.switchable_motion_mode
@@ -1619,7 +1672,11 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                                       cm->features.allow_warped_motion)
                 : SIMPLE_TRANSLATION;
 
+#if CONFIG_NEW_REF_SIGNALING
+        if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
+#else
         if (mbmi->ref_frame[1] != INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
           if (motion_allowed >= OBMC_CAUSAL) {
             td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
           }

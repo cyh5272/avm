@@ -996,13 +996,17 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
   const int mi_col = xd->mi_col;
   for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
     const MV_REFERENCE_FRAME frame = mbmi->ref_frame[ref];
+#if CONFIG_NEW_REF_SIGNALING
+    if (frame == INTRA_FRAME_NRS) {
+#else
     if (frame < LAST_FRAME) {
+      assert(frame == INTRA_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
       assert(is_intrabc_block(mbmi, xd->tree_type));
 #else
       assert(is_intrabc_block(mbmi));
 #endif
-      assert(frame == INTRA_FRAME);
       assert(ref == 0);
     } else {
       const RefCntBuffer *ref_buf = get_ref_frame_buf(cm, frame);
@@ -2562,7 +2566,11 @@ static AOM_INLINE void setup_frame_size_with_refs(
   int width, height;
   int found = 0;
   int has_valid_ref_frame = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     if (aom_rb_read_bit(rb)) {
       const RefCntBuffer *const ref_buf = get_ref_frame_buf(cm, i);
       // This will never be NULL in a normal stream, as streams are required to
@@ -2602,9 +2610,13 @@ static AOM_INLINE void setup_frame_size_with_refs(
     aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                        "Invalid frame size");
 
-  // Check to make sure at least one of frames that this frame references
-  // has valid dimensions.
+    // Check to make sure at least one of frames that this frame references has
+    // valid dimensions.
+#if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     const RefCntBuffer *const ref_frame = get_ref_frame_buf(cm, i);
     has_valid_ref_frame |=
         valid_ref_frame_size(ref_frame->buf.y_crop_width,
@@ -2613,7 +2625,11 @@ static AOM_INLINE void setup_frame_size_with_refs(
   if (!has_valid_ref_frame)
     aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                        "Referenced frame has invalid size");
+#if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     const RefCntBuffer *const ref_frame = get_ref_frame_buf(cm, i);
     if (!valid_ref_frame_img_fmt(
             ref_frame->buf.bit_depth, ref_frame->buf.subsampling_x,
@@ -4964,7 +4980,11 @@ static int read_global_motion_params(WarpedMotionParams *params,
 
 static AOM_INLINE void read_global_motion(AV1_COMMON *cm,
                                           struct aom_read_bit_buffer *rb) {
+#if CONFIG_NEW_REF_SIGNALING
+  for (int frame = 0; frame < cm->ref_frames_info.n_total_refs; ++frame) {
+#else
   for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; ++frame) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     const WarpedMotionParams *ref_params =
         cm->prev_frame ? &cm->prev_frame->global_motion[frame]
                        : &default_warp_params;
@@ -5001,8 +5021,13 @@ static AOM_INLINE void read_global_motion(AV1_COMMON *cm,
            cm->global_motion[frame].wmmat[3]);
            */
   }
+#if CONFIG_NEW_REF_SIGNALING
+  memcpy(cm->cur_frame->global_motion, cm->global_motion,
+         INTER_REFS_PER_FRAME * sizeof(WarpedMotionParams));
+#else
   memcpy(cm->cur_frame->global_motion, cm->global_motion,
          REF_FRAMES * sizeof(WarpedMotionParams));
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 // Release the references to the frame buffers in cm->ref_frame_map and reset
@@ -5081,7 +5106,42 @@ static INLINE int get_disp_order_hint(AV1_COMMON *const cm) {
   if (current_frame->frame_type == KEY_FRAME && cm->show_existing_frame)
     return 0;
 
+#if CONFIG_NEW_REF_SIGNALING
+  // Derive the exact display order hint from the signaled order_hint.
+  // This requires scaling up order_hints corresponding to frame
+  // numbers that exceed the number of bits available to send the order_hints.
+
+  // Find the reference frame with the largest order_hint
+  int max_disp_order_hint = 0;
+  for (int map_idx = 0; map_idx < REF_FRAMES; map_idx++) {
+    // Get reference frame buffer
+    const RefCntBuffer *const buf = cm->ref_frame_map[map_idx];
+    if (buf == NULL) continue;
+    if ((int)buf->display_order_hint > max_disp_order_hint)
+      max_disp_order_hint = buf->display_order_hint;
+  }
+
+  // If the order_hint is above the threshold distance of 32 frames from the
+  // found reference frame, we assume it was modified using:
+  // order_hint = display_order_hint % display_order_hint_factor. Here, the
+  // actual display_order_hint is recovered.
+  const int order_hint = current_frame->order_hint;
+  int cur_disp_order_hint = order_hint;
+  // Check if the display order of the max reference is greater than the
+  // threshold of 32 frames apart from the current frame.
+  if (abs(max_disp_order_hint - order_hint) > 32) {
+    assert(order_hint < max_disp_order_hint);
+    const int display_order_hint_factor =
+        (1 << (cm->seq_params.order_hint_info.order_hint_bits_minus_1 + 1));
+    const int upper_order_factor =
+        order_hint +
+        (display_order_hint_factor - (order_hint % display_order_hint_factor));
+    cur_disp_order_hint += upper_order_factor;
+  }
+  return cur_disp_order_hint;
+#else
   return current_frame->order_hint;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 // On success, returns 0. On failure, calls aom_internal_error and does not
@@ -5451,6 +5511,14 @@ static int read_uncompressed_header(AV1Decoder *pbi,
         features->allow_intrabc = aom_rb_read_bit(rb);
 
     } else if (pbi->need_resync != 1) { /* Skip if need resync */
+#if CONFIG_NEW_REF_SIGNALING
+      RefFrameMapPair ref_frame_map_pairs[REF_FRAMES];
+      // initialize without pyramid levels
+      init_ref_map_pair(cm, ref_frame_map_pairs,
+                        current_frame->frame_type == KEY_FRAME);
+      av1_get_ref_frames(cm, current_frame->display_order_hint,
+                         ref_frame_map_pairs);
+#else
       int frame_refs_short_signaling = 0;
       // Frame refs short signaling is off when error resilient mode is on.
       if (seq_params->order_hint_info.enable_order_hint)
@@ -5480,10 +5548,23 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 
         av1_set_frame_refs(cm, cm->remapped_ref_idx, lst_ref, gld_ref);
       }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_NEW_REF_SIGNALING
+      for (int i = 0; i < cm->ref_frames_info.n_total_refs; ++i) {
+        int ref = 0;
+        if (seq_params->order_hint_info.enable_order_hint) {
+          ref = cm->remapped_ref_idx[i];
+          if (cm->ref_frame_map[ref] == NULL)
+            aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
+                               "Inter frame requests nonexistent reference");
+#else
       for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
         int ref = 0;
-        if (!frame_refs_short_signaling) {
+        if (frame_refs_short_signaling) {
+          ref = cm->remapped_ref_idx[i];
+#endif  // CONFIG_NEW_REF_SIGNALING
+        } else {
           ref = aom_rb_read_literal(rb, REF_FRAMES_LOG2);
 
           // Most of the time, streams start with a keyframe. In that case,
@@ -5496,15 +5577,15 @@ static int read_uncompressed_header(AV1Decoder *pbi,
             aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                                "Inter frame requests nonexistent reference");
           cm->remapped_ref_idx[i] = ref;
-        } else {
-          ref = cm->remapped_ref_idx[i];
         }
         // Check valid for referencing
         if (pbi->valid_for_referencing[ref] == 0)
           aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                              "Reference frame not valid for referencing");
 
+#if !CONFIG_NEW_REF_SIGNALING
         cm->ref_frame_sign_bias[LAST_FRAME + i] = 0;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
         if (seq_params->frame_id_numbers_present_flag) {
           int frame_id_length = seq_params->frame_id_length;
@@ -5565,8 +5646,14 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       else
         features->allow_ref_frame_mvs = 0;
 
+#if CONFIG_NEW_REF_SIGNALING
+      for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+        const RefCntBuffer *const ref_buf = get_ref_frame_buf(cm, i);
+        if (!ref_buf) continue;
+#else
       for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
         const RefCntBuffer *const ref_buf = get_ref_frame_buf(cm, i);
+#endif  // CONFIG_NEW_REF_SIGNALING
         struct scale_factors *const ref_scale_factors =
             get_ref_scale_factors(cm, i);
         av1_setup_scale_factors_for_frame(
@@ -5638,6 +5725,9 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   CommonQuantParams *const quant_params = &cm->quant_params;
   setup_quantization(quant_params, av1_num_planes(cm), cm->seq_params.bit_depth,
                      cm->seq_params.separate_uv_delta_q, rb);
+#if CONFIG_NEW_REF_SIGNALING
+  cm->cur_frame->base_qindex = quant_params->base_qindex;
+#endif  // CONFIG_NEW_REF_SIGNALING
   xd->bd = (int)seq_params->bit_depth;
 
   CommonContexts *const above_contexts = &cm->above_contexts;
@@ -5813,7 +5903,11 @@ uint32_t av1_decode_frame_headers_and_setup(AV1Decoder *pbi,
   mismatch_move_frame_idx_r();
 #endif
 
+#if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     cm->global_motion[i] = default_warp_params;
     cm->cur_frame->global_motion[i] = default_warp_params;
   }

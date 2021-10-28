@@ -277,7 +277,11 @@ int_mv av1_find_best_ref_mv_from_stack(int allow_hp,
                                        int is_integer) {
   int_mv mv;
   bool found_ref_mv = false;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   int range = AOMMIN(mbmi_ext->ref_mv_count[ref_frame], MAX_REF_MV_STACK_SIZE);
   for (int i = 0; i < range; i++) {
     mv = av1_get_ref_mv_from_stack(0, ref_frames, i, mbmi_ext);
@@ -297,7 +301,11 @@ int_mv av1_find_first_ref_mv_from_stack(int allow_hp,
                                         int is_integer) {
   int_mv mv;
   const int ref_idx = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 0, mbmi_ext);
   lower_mv_precision(&mv.as_mv, allow_hp, is_integer);
   return mv;
@@ -309,7 +317,11 @@ void av1_find_best_ref_mvs_from_stack(int allow_hp,
                                       int_mv *nearest_mv, int_mv *near_mv,
                                       int is_integer) {
   const int ref_idx = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   *nearest_mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 0, mbmi_ext);
   lower_mv_precision(&nearest_mv->as_mv, allow_hp, is_integer);
   *near_mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 1, mbmi_ext);

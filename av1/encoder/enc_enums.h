@@ -17,6 +17,9 @@
 extern "C" {
 #endif
 
+#if CONFIG_NEW_REF_SIGNALING
+#define NUM_SINGLE_REF_MODES (INTER_REFS_PER_FRAME * SINGLE_INTER_MODE_NUM)
+#else
 // This enumerator type needs to be kept aligned with the mode order in
 // const MODE_DEFINITION av1_mode_defs[MAX_MODES] used in the rd code.
 #if CONFIG_NEW_INTER_MODES
@@ -491,6 +494,7 @@ enum {
 
   MAX_REFS
 } UENUM1BYTE(THR_MODES_SUB8X8);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 enum {
   FULL_TXFM_RD,

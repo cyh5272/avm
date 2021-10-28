@@ -308,6 +308,23 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->comp_inter_cdf[i], NULL);
     }
 
+#if CONFIG_NEW_REF_SIGNALING
+    for (i = 0; i < REF_CONTEXTS; ++i) {
+      for (j = 0; j < INTER_REFS_PER_FRAME - 1; ++j) {
+        av1_cost_tokens_from_cdf(mode_costs->single_ref_cost[i][j],
+                                 fc->single_ref_cdf[i][j], NULL);
+      }
+    }
+
+    for (i = 0; i < REF_CONTEXTS; ++i) {
+      for (j = 0; j < COMPREF_BIT_TYPES; j++) {
+        for (int k = 0; k < INTER_REFS_PER_FRAME - 2; ++k) {
+          av1_cost_tokens_from_cdf(mode_costs->comp_ref_cost[i][j][k],
+                                   fc->comp_ref_cdf[i][j][k], NULL);
+        }
+      }
+    }
+#else
     for (i = 0; i < REF_CONTEXTS; ++i) {
       for (j = 0; j < SINGLE_REFS - 1; ++j) {
         av1_cost_tokens_from_cdf(mode_costs->single_ref_cost[i][j],
@@ -340,6 +357,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                  fc->comp_bwdref_cdf[i][j], NULL);
       }
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_CONTEXT_DERIVATION
     for (j = 0; j < INTRA_INTER_SKIP_TXFM_CONTEXTS; ++j) {
@@ -698,7 +716,11 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd) {
       const int t = q * rd_thresh_block_size_factor[bsize];
       const int thresh_max = INT_MAX / t;
 
+#if CONFIG_NEW_REF_SIGNALING
+      for (i = 0; i < MB_MODE_COUNT; ++i)
+#else
       for (i = 0; i < MAX_MODES; ++i)
+#endif  // CONFIG_NEW_REF_SIGNALING
         rd->threshes[segment_id][bsize][i] = rd->thresh_mult[i] < thresh_max
                                                  ? rd->thresh_mult[i] * t / 4
                                                  : INT_MAX;
@@ -1236,7 +1258,11 @@ void av1_get_entropy_contexts(BLOCK_SIZE plane_bsize,
 
 void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint8_t *ref_y_buffer,
                  int ref_y_stride, int ref_frame, BLOCK_SIZE block_size) {
+#if CONFIG_NEW_REF_SIGNALING
+  const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   const int_mv ref_mv =
       av1_get_ref_mv_from_stack(0, ref_frames, 0, x->mbmi_ext);
   const int_mv ref_mv1 =
@@ -1276,8 +1302,14 @@ void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint8_t *ref_y_buffer,
   }
 
   // Note the index of the mv that worked best in the reference list.
+#if CONFIG_NEW_REF_SIGNALING
+  const MV_REFERENCE_FRAME rfn = COMPACT_INDEX0_NRS(ref_frame);
+  x->max_mv_context[rfn] = max_mv;
+  x->pred_mv_sad[rfn] = best_sad;
+#else
   x->max_mv_context[ref_frame] = max_mv;
   x->pred_mv_sad[ref_frame] = best_sad;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 void av1_setup_pred_block(const MACROBLOCKD *xd,
@@ -1313,8 +1345,13 @@ void av1_setup_pred_block(const MACROBLOCKD *xd,
 
 YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const AV1_COMP *cpi,
                                              MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_NEW_REF_SIGNALING
+  assert(ref_frame < cpi->common.ref_frames_info.n_total_refs);
+  RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame];
+#else
   assert(ref_frame >= LAST_FRAME && ref_frame <= ALTREF_FRAME);
   RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame - 1];
+#endif  // CONFIG_NEW_REF_SIGNALING
   const RefCntBuffer *const ref_buf =
       get_ref_frame_buf(&cpi->common, ref_frame);
   return (scaled_buf != ref_buf && scaled_buf != NULL) ? &scaled_buf->buf
@@ -1343,6 +1380,35 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   // Set baseline threshold values.
   av1_zero(rd->thresh_mult);
 
+#if CONFIG_NEW_REF_SIGNALING
+#if !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[NEARESTMV] = 300;
+  rd->thresh_mult[NEAREST_NEARESTMV] = 1000;
+  rd->thresh_mult[NEAREST_NEWMV] = 1500;
+  rd->thresh_mult[NEW_NEARESTMV] = 1500;
+#endif  // !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[NEWMV] = 1000;
+  rd->thresh_mult[NEARMV] = 1000;
+  rd->thresh_mult[GLOBALMV] = 2200;
+  rd->thresh_mult[NEAR_NEARMV] = 1500;
+  rd->thresh_mult[NEAR_NEWMV] = 1500;
+  rd->thresh_mult[NEW_NEARMV] = 1500;
+  rd->thresh_mult[NEW_NEWMV] = 1500;
+  rd->thresh_mult[GLOBAL_GLOBALMV] = 1500;
+  rd->thresh_mult[DC_PRED] = 1000;
+  rd->thresh_mult[PAETH_PRED] = 1000;
+  rd->thresh_mult[SMOOTH_PRED] = 2200;
+  rd->thresh_mult[SMOOTH_V_PRED] = 2000;
+  rd->thresh_mult[SMOOTH_H_PRED] = 2000;
+  rd->thresh_mult[H_PRED] = 2000;
+  rd->thresh_mult[V_PRED] = 1800;
+  rd->thresh_mult[D135_PRED] = 2500;
+  rd->thresh_mult[D203_PRED] = 2000;
+  rd->thresh_mult[D157_PRED] = 2500;
+  rd->thresh_mult[D67_PRED] = 2000;
+  rd->thresh_mult[D113_PRED] = 2500;
+  rd->thresh_mult[D45_PRED] = 2500;
+#else
 #if !CONFIG_NEW_INTER_MODES
   rd->thresh_mult[THR_NEARESTMV] = 300;
   rd->thresh_mult[THR_NEARESTL2] = 300;
@@ -1684,17 +1750,25 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_D67_PRED] = 2000;
   rd->thresh_mult[THR_D113_PRED] = 2500;
   rd->thresh_mult[THR_D45_PRED] = 2500;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
+#if CONFIG_NEW_REF_SIGNALING
+                               int (*factor_buf)[MB_MODE_COUNT],
+#else
                                int (*factor_buf)[MAX_MODES],
+#endif  // CONFIG_NEW_REF_SIGNALING
                                int use_adaptive_rd_thresh, BLOCK_SIZE bsize,
+#if !CONFIG_NEW_REF_SIGNALING
                                MV_REFERENCE_FRAME *ref_frames,
+#endif  // !CONFIG_NEW_REF_SIGNALING
                                PREDICTION_MODE best_mode) {
   assert(use_adaptive_rd_thresh > 0);
-  const THR_MODES top_mode = MAX_MODES;
+#if !CONFIG_NEW_REF_SIGNALING
   const int best_mode_index =
       get_prediction_mode_idx(best_mode, ref_frames[0], ref_frames[1]);
+#endif  // !CONFIG_NEW_REF_SIGNALING
   const int max_rd_thresh_factor = use_adaptive_rd_thresh * RD_THRESH_MAX_FACT;
 
   const int bsize_is_1_to_4 = bsize > cm->seq_params.sb_size;
@@ -1709,10 +1783,18 @@ void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
     max_size = AOMMIN(bsize + 2, (int)cm->seq_params.sb_size);
   }
 
-  for (THR_MODES mode = 0; mode < top_mode; ++mode) {
+#if CONFIG_NEW_REF_SIGNALING
+  for (PREDICTION_MODE mode = 0; mode < MB_MODE_COUNT; ++mode) {
+#else
+  for (THR_MODES mode = 0; mode < MAX_MODES; ++mode) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     for (BLOCK_SIZE bs = min_size; bs <= max_size; ++bs) {
       int *const fact = &factor_buf[bs][mode];
+#if CONFIG_NEW_REF_SIGNALING
+      if (mode == best_mode) {
+#else
       if (mode == best_mode_index) {
+#endif  // CONFIG_NEW_REF_SIGNALING
         *fact -= (*fact >> RD_THRESH_LOG_DEC_FACTOR);
       } else {
         *fact = AOMMIN(*fact + RD_THRESH_INC, max_rd_thresh_factor);
