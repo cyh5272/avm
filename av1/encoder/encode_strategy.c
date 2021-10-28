@@ -42,6 +42,7 @@
 
 #define TEMPORAL_FILTER_KEY_FRAME 1
 
+#if !CONFIG_NEW_REF_SIGNALING
 static INLINE void set_refresh_frame_flags(
     RefreshFrameFlagsInfo *const refresh_frame_flags, bool refresh_gf,
     bool refresh_bwdref, bool refresh_arf) {
@@ -49,6 +50,7 @@ static INLINE void set_refresh_frame_flags(
   refresh_frame_flags->bwd_ref_frame = refresh_bwdref;
   refresh_frame_flags->alt_ref_frame = refresh_arf;
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 // Get the subgop config corresponding to the current frame within the
 // gf group
@@ -62,6 +64,39 @@ const SubGOPStepCfg *get_subgop_step(const GF_GROUP *const gf_group,
   return &subgop_cfg->step[index - offset];
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+// Encoder-only version for the reference mapping
+void av1_get_ref_frames_enc(AV1_COMMON *cm, int cur_frame_disp,
+                            RefFrameMapPair *ref_frame_map_pairs) {
+  assert(cm->seq_params.explicit_ref_frame_map);
+  // With explicit_ref_frame_map on, an encoder-only ranking scheme can be
+  // implemented here. For now, av1_get_ref_frames is used as a placeholder.
+  av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
+}
+
+void av1_configure_buffer_updates(AV1_COMP *const cpi,
+                                  const FRAME_UPDATE_TYPE type) {
+  // NOTE(weitinglin): Should we define another function to take care of
+  // cpi->rc.is_$Source_Type to make this function as it is in the comment?
+
+  cpi->rc.is_src_frame_alt_ref = 0;
+
+  switch (type) {
+    case OVERLAY_UPDATE:
+    case KFFLT_OVERLAY_UPDATE:
+    case INTNL_OVERLAY_UPDATE: cpi->rc.is_src_frame_alt_ref = 1; break;
+
+    case KF_UPDATE:
+    case LF_UPDATE:
+    case GF_UPDATE:
+    case ARF_UPDATE:
+    case KFFLT_UPDATE:
+    case INTNL_ARF_UPDATE: break;
+
+    default: assert(0); break;
+  }
+}
+#else
 void av1_configure_buffer_updates(
     AV1_COMP *const cpi, RefreshFrameFlagsInfo *const refresh_frame_flags,
     const FRAME_UPDATE_TYPE type, const FRAME_TYPE frame_type,
@@ -126,6 +161,7 @@ void av1_configure_buffer_updates(
   if (force_refresh_all)
     set_refresh_frame_flags(refresh_frame_flags, true, true, true);
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 static void set_additional_frame_flags(const AV1_COMMON *const cm,
                                        unsigned int *const frame_flags) {
@@ -147,6 +183,7 @@ static INLINE void update_keyframe_counters(AV1_COMP *cpi) {
   }
 }
 
+#if !CONFIG_NEW_REF_SIGNALING
 static INLINE int is_frame_droppable(
     const ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags) {
   // Droppable frame is only used by external refresh flags. VoD setting won't
@@ -160,14 +197,19 @@ static INLINE int is_frame_droppable(
   else
     return 0;
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 static INLINE void update_frames_till_gf_update(AV1_COMP *cpi) {
   // TODO(weitinglin): Updating this counter for is_frame_droppable
   // is a work-around to handle the condition when a frame is drop.
   // We should fix the cpi->common.show_frame flag
   // instead of checking the other condition to update the counter properly.
+#if CONFIG_NEW_REF_SIGNALING
+  if (cpi->common.show_frame) {
+#else
   if (cpi->common.show_frame ||
       is_frame_droppable(&cpi->ext_flags.refresh_frame)) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     // Decrement count down till next gf
     if (cpi->rc.frames_till_gf_update_due > 0)
       cpi->rc.frames_till_gf_update_due--;
@@ -270,7 +312,11 @@ static int choose_primary_ref_frame(
   // Note(yunqing): In other cases, primary_ref_frame is chosen based on
   // cpi->gf_group.layer_depth[cpi->gf_group.index], which also controls
   // frame bit allocation.
+#if CONFIG_NEW_REF_SIGNALING
+  if (cm->tiles.large_scale) return 0;
+#else
   if (cm->tiles.large_scale) return (LAST_FRAME - LAST_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   // Find the most recent reference frame with the same reference type as the
   // current frame
@@ -278,11 +324,20 @@ static int choose_primary_ref_frame(
   int wanted_fb = cpi->fb_of_context_type[current_ref_type];
 
   int primary_ref_frame = PRIMARY_REF_NONE;
+#if CONFIG_NEW_REF_SIGNALING
+  const int n_refs = cm->ref_frames_info.n_total_refs;
+  for (int ref_frame = 0; ref_frame < n_refs; ref_frame++) {
+    if (get_ref_frame_map_idx(cm, ref_frame) == wanted_fb) {
+      primary_ref_frame = ref_frame;
+    }
+  }
+#else
   for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ref_frame++) {
     if (get_ref_frame_map_idx(cm, ref_frame) == wanted_fb) {
       primary_ref_frame = ref_frame - LAST_FRAME;
     }
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   return primary_ref_frame;
 }
@@ -303,6 +358,16 @@ static void get_gop_cfg_enabled_refs(AV1_COMP *const cpi, int *ref_frame_flags,
   // No references specified
   if (step_gop_cfg->num_references < 0) return;
 
+#if CONFIG_NEW_REF_SIGNALING
+  // Mask to indicate whether or not each ref is allowed by the GOP config
+  int ref_frame_used[INTER_REFS_PER_FRAME] = { 0 };
+  // Structures to hash each reference frame based on its pyramid level. This
+  // will allow us to match the pyramid levels specified in the cfg to the best
+  // reference frame index.
+  int n_references[MAX_ARF_LAYERS + 1] = { 0 };
+  int references[MAX_ARF_LAYERS + 1][INTER_REFS_PER_FRAME] = { { 0 } };
+  int disp_orders[MAX_ARF_LAYERS + 1][INTER_REFS_PER_FRAME] = { { 0 } };
+#else
   // Mask to indicate whether or not each ref is allowed by the GOP config
   int ref_frame_used[REF_FRAMES] = { 0 };
   // Structures to hash each reference frame based on its pyramid level. This
@@ -311,10 +376,15 @@ static void get_gop_cfg_enabled_refs(AV1_COMP *const cpi, int *ref_frame_flags,
   int n_references[MAX_ARF_LAYERS + 1] = { 0 };
   int references[MAX_ARF_LAYERS + 1][REF_FRAMES] = { { 0 } };
   int disp_orders[MAX_ARF_LAYERS + 1][REF_FRAMES] = { { 0 } };
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   int frame_level = -1;
   // Loop over each reference frame and hash it based on its pyramid level
+#if CONFIG_NEW_REF_SIGNALING
+  for (int frame = 0; frame < INTER_REFS_PER_FRAME; frame++) {
+#else
   for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; frame++) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     // Get reference frame buffer
     const RefCntBuffer *const buf = get_ref_frame_buf(&cpi->common, frame);
     if (buf == NULL) continue;
@@ -380,10 +450,14 @@ static void get_gop_cfg_enabled_refs(AV1_COMP *const cpi, int *ref_frame_flags,
   }
 
   // Avoid using references that were not specified by the cfg
-  for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; frame++) {
+#if CONFIG_NEW_REF_SIGNALING
+  for (int frame = 0; frame < INTER_REFS_PER_FRAME; frame++)
+    if (!ref_frame_used[frame]) *ref_frame_flags &= ~(1 << (frame));
+#else
+  for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; frame++)
     if (!ref_frame_used[frame])
       *ref_frame_flags &= ~(1 << (frame - LAST_FRAME));
-  }
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static void update_fb_of_context_type(
@@ -393,14 +467,24 @@ static void update_fb_of_context_type(
   const int current_frame_ref_type =
       get_current_frame_ref_type(cpi, frame_params);
 
+#if CONFIG_NEW_REF_SIGNALING
+  const int golden_frame = cm->ref_frames_info.past_refs[0];
+  const int altref_frame = get_furthest_future_ref_index(cm);
+#endif  // CONFIG_NEW_REF_SIGNALING
   if (frame_is_intra_only(cm) || cm->features.error_resilient_mode ||
       cpi->ext_flags.use_primary_ref_none) {
     for (int i = 0; i < REF_FRAMES; i++) {
       fb_of_context_type[i] = -1;
     }
+#if CONFIG_NEW_REF_SIGNALING
+    fb_of_context_type[current_frame_ref_type] =
+        cm->show_frame ? get_ref_frame_map_idx(cm, golden_frame)
+                       : get_ref_frame_map_idx(cm, altref_frame);
+#else
     fb_of_context_type[current_frame_ref_type] =
         cm->show_frame ? get_ref_frame_map_idx(cm, GOLDEN_FRAME)
                        : get_ref_frame_map_idx(cm, ALTREF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
   }
 
   if (!encode_show_existing_frame(cm)) {
@@ -570,6 +654,7 @@ static int allow_show_existing(const AV1_COMP *const cpi,
   return !(is_error_resilient || is_s_frame) || is_key_frame;
 }
 
+#if !CONFIG_NEW_REF_SIGNALING
 // Update frame_flags to tell the encoder's caller what sort of frame was
 // encoded.
 static void update_frame_flags(
@@ -608,6 +693,7 @@ static void update_frame_flags(
     *frame_flags &= ~FRAMEFLAGS_KEY;
   }
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 #define DUMP_REF_FRAME_IMAGES 0
 
@@ -771,10 +857,6 @@ int av1_get_refresh_frame_flags(
     const AV1_COMP *const cpi, const EncodeFrameParams *const frame_params,
     FRAME_UPDATE_TYPE frame_update_type, int gf_index, int cur_disp_order,
     RefFrameMapPair ref_frame_map_pairs[REF_FRAMES]) {
-  const AV1_COMMON *const cm = &cpi->common;
-  const ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags =
-      &cpi->ext_flags.refresh_frame;
-
   // Switch frames and shown key-frames overwrite all reference slots
   if ((frame_params->frame_type == KEY_FRAME && !cpi->no_show_fwd_kf) ||
       frame_params->frame_type == S_FRAME)
@@ -788,9 +870,13 @@ int av1_get_refresh_frame_flags(
     return 0;
   }
 
-  if (is_frame_droppable(ext_refresh_frame_flags)) return 0;
-
   int refresh_mask = 0;
+#if !CONFIG_NEW_REF_SIGNALING
+  const AV1_COMMON *const cm = &cpi->common;
+  const ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags =
+      &cpi->ext_flags.refresh_frame;
+
+  if (is_frame_droppable(ext_refresh_frame_flags)) return 0;
 
   if (ext_refresh_frame_flags->update_pending) {
     // Unfortunately the encoder interface reflects the old refresh_*_frame
@@ -829,6 +915,7 @@ int av1_get_refresh_frame_flags(
     }
     return refresh_mask;
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   // Search for the open slot to store the current frame.
   int free_fb_index = get_free_ref_map_index(ref_frame_map_pairs);
@@ -1176,31 +1263,50 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
        frame_params.frame_type == S_FRAME) &&
       !frame_params.show_existing_frame;
 
+#if CONFIG_NEW_REF_SIGNALING
+  (void)force_refresh_all;
+  av1_configure_buffer_updates(cpi, frame_update_type);
+#else
   av1_configure_buffer_updates(cpi, &frame_params.refresh_frame,
                                frame_update_type, frame_params.frame_type,
                                force_refresh_all);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
+  const int order_offset = gf_group->arf_src_offset[gf_group->index];
+  const int cur_frame_disp =
+      cpi->common.current_frame.frame_number + order_offset;
   RefFrameMapPair ref_frame_map_pairs[REF_FRAMES];
   init_ref_map_pair(&cpi->common, ref_frame_map_pairs,
                     gf_group->update_type[gf_group->index] == KF_UPDATE);
 
   if (!is_stat_generation_stage(cpi)) {
-    const RefCntBuffer *ref_frames[INTER_REFS_PER_FRAME];
-    const YV12_BUFFER_CONFIG *ref_frame_buf[INTER_REFS_PER_FRAME];
-
     if (!ext_flags->refresh_frame.update_pending) {
-      const int order_offset = gf_group->arf_src_offset[gf_group->index];
-      const int cur_frame_disp =
-          cpi->common.current_frame.frame_number + order_offset;
+#if !CONFIG_NEW_REF_SIGNALING
       av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
+#endif  // !CONFIG_NEW_REF_SIGNALING
     }
 
+#if CONFIG_NEW_REF_SIGNALING
+    if (cm->seq_params.explicit_ref_frame_map)
+      av1_get_ref_frames_enc(cm, cur_frame_disp, ref_frame_map_pairs);
+    else
+      av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
+#else
+    const RefCntBuffer *ref_frames[INTER_REFS_PER_FRAME];
+    const YV12_BUFFER_CONFIG *ref_frame_buf[INTER_REFS_PER_FRAME];
     // Get the reference frames
     for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
       ref_frames[i] = get_ref_frame_buf(cm, ref_frame_priority_order[i]);
       ref_frame_buf[i] = ref_frames[i] != NULL ? &ref_frames[i]->buf : NULL;
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_NEW_REF_SIGNALING
+    // In NEW_REF_SIGNALING, ref_frame_flags is defined based on
+    // the external flag max-reference-frames.
+    frame_params.ref_frame_flags =
+        (1 << cpi->common.ref_frames_info.n_total_refs) - 1;
+#else
     // Work out which reference frame slots may be used.
     if (av1_check_keyframe_overlay(gf_group->index, gf_group,
                                    cpi->rc.frames_since_key)) {
@@ -1212,6 +1318,7 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
       frame_params.ref_frame_flags =
           get_ref_frame_flags(ref_frame_buf, ext_flags->ref_frame_flags);
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
     frame_params.primary_ref_frame =
         choose_primary_ref_frame(cpi, &frame_params);
@@ -1223,9 +1330,6 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
       get_gop_cfg_enabled_refs(cpi, &frame_params.ref_frame_flags,
                                frame_params.order_offset);
     }
-
-    const int cur_frame_disp =
-        cpi->common.current_frame.frame_number + frame_params.order_offset;
 
     frame_params.refresh_frame_flags = av1_get_refresh_frame_flags(
         cpi, &frame_params, frame_update_type, cpi->gf_group.index,
@@ -1265,11 +1369,13 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
     return AOM_CODEC_ERROR;
   }
 
+#if !CONFIG_NEW_REF_SIGNALING
   if (!is_stat_generation_stage(cpi)) {
     // First pass doesn't modify reference buffer assignment or produce frame
     // flags
     update_frame_flags(&cpi->common, &cpi->refresh_frame, frame_flags);
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   if (!is_stat_generation_stage(cpi)) {
 #if TXCOEFF_COST_TIMER
@@ -1302,7 +1408,11 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
 
   // Leave a signal for a higher level caller about if this frame is droppable
   if (*size > 0) {
+#if CONFIG_NEW_REF_SIGNALING
+    cpi->droppable = 0;
+#else
     cpi->droppable = is_frame_droppable(&ext_flags->refresh_frame);
+#endif  // CONFIG_NEW_REF_SIGNALING
   }
 
   return AOM_CODEC_OK;

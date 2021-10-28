@@ -2041,7 +2041,11 @@ int av1_skip_u4x4_pred_in_obmc(BLOCK_SIZE bsize,
 }
 
 void av1_modify_neighbor_predictor_for_obmc(MB_MODE_INFO *mbmi) {
+#if CONFIG_NEW_REF_SIGNALING
+  mbmi->ref_frame[1] = INVALID_IDX;
+#else
   mbmi->ref_frame[1] = NONE_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
   mbmi->interinter_comp.type = COMPOUND_AVERAGE;
 
   return;

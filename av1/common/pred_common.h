@@ -25,6 +25,9 @@ extern "C" {
 typedef struct {
   int pyr_level;
   int disp_order;
+#if CONFIG_NEW_REF_SIGNALING
+  int base_qindex;
+#endif  // CONFIG_NEW_REF_SIGNALING
 } RefFrameMapPair;
 
 static INLINE void init_ref_map_pair(AV1_COMMON *cm,
@@ -42,6 +45,9 @@ static INLINE void init_ref_map_pair(AV1_COMMON *cm,
     if (buf == NULL) {
       ref_frame_map_pairs[map_idx].disp_order = -1;
       ref_frame_map_pairs[map_idx].pyr_level = -1;
+#if CONFIG_NEW_REF_SIGNALING
+      ref_frame_map_pairs[map_idx].base_qindex = -1;
+#endif  // CONFIG_NEW_REF_SIGNALING
       continue;
     } else if (buf->ref_count > 1) {
       // Once the keyframe is coded, the slots in ref_frame_map will all
@@ -54,16 +60,122 @@ static INLINE void init_ref_map_pair(AV1_COMMON *cm,
         if (buf2 == buf) {
           ref_frame_map_pairs[idx2].disp_order = -1;
           ref_frame_map_pairs[idx2].pyr_level = -1;
+#if CONFIG_NEW_REF_SIGNALING
+          ref_frame_map_pairs[idx2].base_qindex = -1;
+#endif  // CONFIG_NEW_REF_SIGNALING
         }
       }
     }
     ref_frame_map_pairs[map_idx].disp_order = (int)buf->display_order_hint;
     ref_frame_map_pairs[map_idx].pyr_level = buf->pyramid_level;
+#if CONFIG_NEW_REF_SIGNALING
+    ref_frame_map_pairs[map_idx].base_qindex = buf->base_qindex;
+#endif  // CONFIG_NEW_REF_SIGNALING
   }
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+/*!\cond */
+typedef struct {
+  int score;
+  int index;
+  int distance;
+  int disp_order;
+  int base_qindex;
+} RefScoreData;
+/*!\endcond */
+
+void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores);
+void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
+                        RefFrameMapPair *ref_frame_map_pairs);
+
+// Find the reference that is furthest in the future
+static INLINE int get_furthest_future_ref_index(const AV1_COMMON *const cm) {
+  int index = INVALID_IDX;
+  int ref_disp_order = -1;
+  for (int i = 0; i < cm->ref_frames_info.n_future_refs; i++) {
+    const int ref = cm->ref_frames_info.future_refs[i];
+    const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref);
+    if (buf == NULL) continue;
+    if ((int)buf->display_order_hint > ref_disp_order) {
+      index = ref;
+      ref_disp_order = (int)buf->display_order_hint;
+    }
+  }
+  return index;
+}
+
+static INLINE int get_closest_ref_index(const AV1_COMMON *const cm) {
+  int index = INVALID_IDX;
+  int best_dist = INT_MAX;
+  for (int ref = 0; ref < cm->ref_frames_info.n_total_refs; ref++) {
+    const int dist = abs(cm->ref_frames_info.ref_frame_distance[ref]);
+    if (dist < best_dist) {
+      index = ref;
+      best_dist = dist;
+    }
+  }
+  return index;
+}
+
+static INLINE int get_closest_past_ref_index(const AV1_COMMON *const cm) {
+  int index = INVALID_IDX;
+  int best_dist = INT_MAX;
+  for (int i = 0; i < cm->ref_frames_info.n_past_refs; i++) {
+    const int ref = cm->ref_frames_info.past_refs[i];
+    const int dist = cm->ref_frames_info.ref_frame_distance[ref];
+    if (dist < best_dist) {
+      index = ref;
+      best_dist = dist;
+    }
+  }
+  return index;
+}
+
+static INLINE int get_closest_pastcur_ref_index(const AV1_COMMON *const cm) {
+  if (cm->ref_frames_info.n_cur_refs > 0)
+    return cm->ref_frames_info.cur_refs[0];
+  return get_closest_past_ref_index(cm);
+}
+
+static INLINE int get_best_past_ref_index(const AV1_COMMON *const cm) {
+  return cm->ref_frames_info.past_refs[0];
+}
+
+// Gets directional i.e. past/future ref rank from overall rank
+// in dir_refrank[0]/[1] respectively. Returns 0 if found in past
+// list, 1 if found in future list, -1 if not found in either (error).
+// Note dir_refrank can be NULL, in which case only the direction
+// is returned, the ranks are not output.
+static INLINE int get_dir_rank(const AV1_COMMON *const cm, int refrank,
+                               int *dir_refrank) {
+  if (!is_inter_ref_frame(refrank)) return -1;
+  assert(refrank < cm->ref_frames_info.n_total_refs);
+  if (dir_refrank) {
+    dir_refrank[0] = -1;
+    dir_refrank[1] = -1;
+  }
+  for (int i = 0; i < cm->ref_frames_info.n_past_refs; ++i) {
+    if (cm->ref_frames_info.past_refs[i] == refrank) {
+      if (dir_refrank) dir_refrank[0] = i;
+      return 0;
+    }
+  }
+  for (int i = 0; i < cm->ref_frames_info.n_future_refs; ++i) {
+    if (cm->ref_frames_info.future_refs[i] == refrank) {
+      if (dir_refrank) dir_refrank[1] = i;
+      return 1;
+    }
+  }
+  // If refrank has the same distance as a reference return 0 (past)
+  // but the dir_refrank[0] is -1
+  if (cm->ref_frames_info.cur_refs[0] == refrank) return 0;
+  return -1;
+}
+#else
 void av1_get_ref_frames(AV1_COMMON *const cm, int cur_frame_disp,
                         RefFrameMapPair *ref_frame_map_pairs);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 static INLINE int get_segment_id(const CommonModeInfoParams *const mi_params,
                                  const uint8_t *segment_ids, BLOCK_SIZE bsize,
@@ -144,6 +256,9 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
                                              const MACROBLOCKD *xd) {
   (void)cm;
   MB_MODE_INFO *mbmi = xd->mi[0];
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME altref_frame = get_furthest_future_ref_index(cm);
+#endif  // CONFIG_NEW_REF_SIGNALING
   const RefCntBuffer *const bck_buf = get_ref_frame_buf(cm, mbmi->ref_frame[0]);
   const RefCntBuffer *const fwd_buf = get_ref_frame_buf(cm, mbmi->ref_frame[1]);
   int bck_frame_index = 0, fwd_frame_index = 0;
@@ -163,15 +278,21 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
   int above_ctx = 0, left_ctx = 0;
 
   if (above_mi) {
-    if (has_second_ref(above_mi))
-      above_ctx = above_mi->comp_group_idx;
+    if (has_second_ref(above_mi)) above_ctx = above_mi->comp_group_idx;
+#if CONFIG_NEW_REF_SIGNALING
+    else if (above_mi->ref_frame[0] == altref_frame)
+#else
     else if (above_mi->ref_frame[0] == ALTREF_FRAME)
+#endif  // CONFIG_NEW_REF_SIGNALING
       above_ctx = 2;
   }
   if (left_mi) {
-    if (has_second_ref(left_mi))
-      left_ctx = left_mi->comp_group_idx;
+    if (has_second_ref(left_mi)) left_ctx = left_mi->comp_group_idx;
+#if CONFIG_NEW_REF_SIGNALING
+    else if (left_mi->ref_frame[0] == altref_frame)
+#else
     else if (left_mi->ref_frame[0] == ALTREF_FRAME)
+#endif  // CONFIG_NEW_REF_SIGNALING
       left_ctx = 2;
   }
   const int ctxmap[3 * 3] = { 0, 1, 2, 1, 3, 4, 2, 4, 5 };
@@ -238,6 +359,39 @@ static INLINE aom_cdf_prob *av1_get_skip_txfm_cdf(const MACROBLOCKD *xd) {
   return xd->tile_ctx->skip_txfm_cdfs[av1_get_skip_txfm_context(xd)];
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+// == Single contexts ==
+int av1_get_ref_pred_context_nrs(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
+                                 int n_total_refs);
+
+static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref_nrs(
+    const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref, int n_total_refs) {
+  assert((ref + 1) < n_total_refs);
+  return xd->tile_ctx->single_ref_cdf[av1_get_ref_pred_context_nrs(
+      xd, ref, n_total_refs)][ref];
+}
+
+// == Compound contexts ==
+static INLINE int av1_get_compound_ref_bit_type(
+    int n_bits, const RefFramesInfo *const ref_frames_info, int i, int j) {
+  const int bit_type =
+      (n_bits == 0 ? 0
+                   : 1 + ((ref_frames_info->ref_frame_distance[i] >= 0) ^
+                          (ref_frames_info->ref_frame_distance[j] >= 0)));
+  return bit_type;
+}
+
+static INLINE aom_cdf_prob *av1_get_pred_cdf_compound_ref_nrs(
+    const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref, int n_bits, int bit_type,
+    int n_total_refs) {
+  assert((ref + 1) < n_total_refs);
+  assert(n_bits < 2);
+  assert(ref - n_bits < n_total_refs - 2);
+  assert(bit_type < COMPREF_BIT_TYPES);
+  return xd->tile_ctx->comp_ref_cdf[av1_get_ref_pred_context_nrs(
+      xd, ref, n_total_refs)][bit_type][ref - n_bits];
+}
+#else
 int av1_get_comp_reference_type_context(const MACROBLOCKD *xd);
 
 // == Uni-directional contexts ==
@@ -357,6 +511,7 @@ static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref_p6(
   return xd->tile_ctx
       ->single_ref_cdf[av1_get_pred_context_single_ref_p6(xd)][5];
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 // Returns a context number for the given MB prediction signal
 // The mode info data structure has a one element border above and to the

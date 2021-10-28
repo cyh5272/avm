@@ -19,6 +19,7 @@
 #include "aom_ports/mem.h"
 #include "aom_scale/yv12config.h"
 
+#include "av1/common/alloccommon.h"
 #include "av1/common/common_data.h"
 #include "av1/common/quant_common.h"
 #include "av1/common/entropy.h"
@@ -542,18 +543,29 @@ static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
 }
 
 static INLINE int is_inter_ref_frame(MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_NEW_REF_SIGNALING
+  return ref_frame != INTRA_FRAME_NRS && ref_frame != INTRA_FRAME_INDEX_NRS &&
+         ref_frame != INVALID_IDX;
+#else
   return ref_frame > INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi, int tree_type) {
+#if CONFIG_NEW_REF_SIGNALING
+  return is_intrabc_block(mbmi, tree_type) ||
+         mbmi->ref_frame[0] != INTRA_FRAME_NRS;
+#else
   return is_intrabc_block(mbmi, tree_type) ||
          is_inter_ref_frame(mbmi->ref_frame[0]);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int has_second_ref(const MB_MODE_INFO *mbmi) {
   return is_inter_ref_frame(mbmi->ref_frame[1]);
 }
 
+#if !CONFIG_NEW_REF_SIGNALING
 static INLINE int has_uni_comp_refs(const MB_MODE_INFO *mbmi) {
   return has_second_ref(mbmi) && (!((mbmi->ref_frame[0] >= BWDREF_FRAME) ^
                                     (mbmi->ref_frame[1] >= BWDREF_FRAME)));
@@ -590,6 +602,7 @@ static INLINE MV_REFERENCE_FRAME comp_ref1(int ref_idx) {
   assert(NELEMENTS(lut) == TOTAL_UNIDIR_COMP_REFS);
   return lut[ref_idx];
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_AIMC
 PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi);
@@ -1040,7 +1053,11 @@ typedef struct macroblockd {
    * Counts of each reference frame in the above and left neighboring blocks.
    * NOTE: Take into account both single and comp references.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  uint8_t neighbors_ref_counts[INTER_REFS_PER_FRAME];
+#else
   uint8_t neighbors_ref_counts[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   /*!
    * Current CDFs of all the symbols for the current tile.
@@ -1767,8 +1784,13 @@ void av1_set_entropy_contexts(const MACROBLOCKD *xd,
 
 #define MAX_INTERINTRA_SB_SQUARE 32 * 32
 static INLINE int is_interintra_mode(const MB_MODE_INFO *mbmi) {
+#if CONFIG_NEW_REF_SIGNALING
+  return (is_inter_ref_frame(mbmi->ref_frame[0]) &&
+          mbmi->ref_frame[1] == INTRA_FRAME_NRS);
+#else
   return (is_inter_ref_frame(mbmi->ref_frame[0]) &&
           mbmi->ref_frame[1] == INTRA_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int is_interintra_allowed_bsize(const BLOCK_SIZE bsize) {
@@ -1801,8 +1823,13 @@ static INLINE int is_interintra_allowed_bsize_group(int group) {
 }
 
 static INLINE int is_interintra_pred(const MB_MODE_INFO *mbmi) {
+#if CONFIG_NEW_REF_SIGNALING
+  return is_inter_ref_frame(mbmi->ref_frame[0]) &&
+         mbmi->ref_frame[1] == INTRA_FRAME_NRS && is_interintra_allowed(mbmi);
+#else
   return is_inter_ref_frame(mbmi->ref_frame[0]) &&
          mbmi->ref_frame[1] == INTRA_FRAME && is_interintra_allowed(mbmi);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int get_vartx_max_txsize(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
@@ -1839,7 +1866,11 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
     if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
   }
   if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
+#if CONFIG_NEW_REF_SIGNALING
+      is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME_NRS &&
+#else
       is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
+#endif  // CONFIG_NEW_REF_SIGNALING
       is_motion_variation_allowed_compound(mbmi)) {
     if (!check_num_overlappable_neighbors(mbmi)) return SIMPLE_TRANSLATION;
     assert(!has_second_ref(mbmi));

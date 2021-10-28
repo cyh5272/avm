@@ -278,7 +278,11 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
   xd->mi[0]->motion_mode = SIMPLE_TRANSLATION;
 
   // Intra prediction search
+#if CONFIG_NEW_REF_SIGNALING
+  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
+#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   // Pre-load the bottom left line.
   if (xd->left_available &&
@@ -315,7 +319,11 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
   }
 
   // Motion compensated prediction
+#if CONFIG_NEW_REF_SIGNALING
+  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
+#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   int best_rf_idx = -1;
   int_mv best_mv;
@@ -443,7 +451,11 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
       best_mv.as_int = best_rfidx_mv.as_int;
       if (best_inter_cost < best_intra_cost) {
         best_mode = NEWMV;
+#if CONFIG_NEW_REF_SIGNALING
+        xd->mi[0]->ref_frame[0] = best_rf_idx;
+#else
         xd->mi[0]->ref_frame[0] = best_rf_idx + LAST_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
         xd->mi[0]->mv[0].as_int = best_mv.as_int;
       }
     }
@@ -746,14 +758,11 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
   TplParams *const tpl_data = &cpi->tpl_data;
   TplDepFrame *tpl_frame = &tpl_data->tpl_frame[frame_idx];
   const YV12_BUFFER_CONFIG *this_frame = tpl_frame->gf_picture;
-  const YV12_BUFFER_CONFIG *ref_frames_ordered[INTER_REFS_PER_FRAME];
-  uint32_t ref_frame_display_indices[INTER_REFS_PER_FRAME];
   GF_GROUP *gf_group = &cpi->gf_group;
   int ref_pruning_enabled = is_frame_eligible_for_ref_pruning(
       gf_group, cpi->sf.inter_sf.selective_ref_frame,
       cpi->sf.tpl_sf.prune_ref_frames_in_tpl, frame_idx);
   int gop_length = get_gop_length(gf_group);
-  int ref_frame_flags;
   AV1_COMMON *cm = &cpi->common;
   int rdmult, idx;
   ThreadData *td = &cpi->td;
@@ -770,14 +779,25 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
 
   xd->cur_buf = this_frame;
 
+#if !CONFIG_NEW_REF_SIGNALING
+  uint32_t ref_frame_display_indices[INTER_REFS_PER_FRAME];
+#endif  // !CONFIG_NEW_REF_SIGNALING
   for (idx = 0; idx < INTER_REFS_PER_FRAME; ++idx) {
     TplDepFrame *tpl_ref_frame =
         &tpl_data->tpl_frame[tpl_frame->ref_map_index[idx]];
     tpl_data->ref_frame[idx] = tpl_ref_frame->rec_picture;
     tpl_data->src_ref_frame[idx] = tpl_ref_frame->gf_picture;
+#if !CONFIG_NEW_REF_SIGNALING
     ref_frame_display_indices[idx] = tpl_ref_frame->frame_display_index;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   }
 
+  // TODO(debargha,kslu) Apply ref_frame_flags and prune references here.
+  // See example of how this is done in init_mc_flow_dispenser().
+  // aomedia:3159
+#if !CONFIG_NEW_REF_SIGNALING
+  int ref_frame_flags;
+  const YV12_BUFFER_CONFIG *ref_frames_ordered[INTER_REFS_PER_FRAME];
   // Store the reference frames based on priority order
   for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
     ref_frames_ordered[i] =
@@ -796,6 +816,7 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
       tpl_data->ref_frame[idx] = NULL;
     }
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   // Skip motion estimation w.r.t. reference frames which are not
   // considered in RD search, using "selective_ref_frame" speed feature.
@@ -803,10 +824,16 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
   // length, as there are fewer reference frames and the reference frames
   // differ from the frames considered during RD search.
   if (ref_pruning_enabled && (frame_idx < gop_length)) {
+#if CONFIG_NEW_REF_SIGNALING
+    for (idx = 0; idx < cm->ref_frames_info.n_total_refs; ++idx) {
+      const MV_REFERENCE_FRAME refs[2] = { idx, INVALID_IDX };
+      if (prune_ref_by_selective_ref_frame_nrs(cpi, NULL, refs)) {
+#else
     for (idx = 0; idx < INTER_REFS_PER_FRAME; ++idx) {
       const MV_REFERENCE_FRAME refs[2] = { idx + 1, NONE_FRAME };
       if (prune_ref_by_selective_ref_frame(cpi, NULL, refs,
                                            ref_frame_display_indices)) {
+#endif  // CONFIG_NEW_REF_SIGNALING
         tpl_data->ref_frame[idx] = NULL;
       }
     }
@@ -1010,7 +1037,12 @@ static AOM_INLINE void init_gop_frames_for_tpl(
     const int true_disp =
         (int)(tpl_frame->frame_display_index) -
         (gf_group->subgop_cfg != NULL && frame_params.show_frame);
-    av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
+#if CONFIG_NEW_REF_SIGNALING
+    if (cm->seq_params.explicit_ref_frame_map)
+      av1_get_ref_frames_enc(cm, true_disp, ref_frame_map_pairs);
+    else
+#endif  // CONFIG_NEW_REF_SIGNALING
+      av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
     int refresh_mask =
         av1_get_refresh_frame_flags(cpi, &frame_params, frame_update_type,
                                     gf_index, true_disp, ref_frame_map_pairs);
@@ -1025,16 +1057,41 @@ static AOM_INLINE void init_gop_frames_for_tpl(
                              cpi->gf_group.max_layer_depth);
     }
 
+#if CONFIG_NEW_REF_SIGNALING
+    for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+      if (cm->remapped_ref_idx[i] != -1) {
+        tpl_frame->ref_map_index[i] = ref_picture_map[cm->remapped_ref_idx[i]];
+      } else {
+        tpl_frame->ref_map_index[i] = ref_picture_map[0];
+      }
+    }
+#else
     for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i)
       tpl_frame->ref_map_index[i - LAST_FRAME] =
           ref_picture_map[cm->remapped_ref_idx[i - LAST_FRAME]];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
     if (refresh_mask) ref_picture_map[refresh_frame_map_index] = gf_index;
 
     ++*tpl_group_frames;
   }
 
-  if (cpi->rc.frames_since_key == 0) return;
+  if (cpi->rc.frames_since_key == 0) {
+#if CONFIG_NEW_REF_SIGNALING
+    TplDepFrame *tpl_frame = &tpl_data->tpl_frame[cur_frame_idx];
+    const int true_disp =
+        (int)(tpl_frame->frame_display_index) -
+        (gf_group->subgop_cfg != NULL && init_frame_params->show_frame);
+    init_ref_map_pair(
+        cm, ref_frame_map_pairs,
+        cpi->gf_group.update_type[cpi->gf_group.index] == KEY_FRAME);
+    if (cm->seq_params.explicit_ref_frame_map)
+      av1_get_ref_frames_enc(cm, true_disp, ref_frame_map_pairs);
+    else
+      av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
+#endif  // CONFIG_NEW_REF_SIGNALING
+    return;
+  }
 
   int extend_frame_count = 0;
   int extend_frame_length = AOMMIN(
@@ -1082,8 +1139,13 @@ static AOM_INLINE void init_gop_frames_for_tpl(
     const int true_disp =
         (int)(tpl_frame->frame_display_index) -
         (gf_group->subgop_cfg != NULL && frame_params.show_frame);
-    av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
-    // TODO(sarahparker) av1_get_refresh_frame_flags()
+#if CONFIG_NEW_REF_SIGNALING
+    if (cm->seq_params.explicit_ref_frame_map)
+      av1_get_ref_frames_enc(cm, true_disp, ref_frame_map_pairs);
+    else
+#endif  // CONFIG_NEW_REF_SIGNALING
+      av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
+    // TODO(kslu) av1_get_refresh_frame_flags()
     // will execute default behavior even when
     // subgop cfg is enabled. This should be addressed if we ever remove the
     // frame_update_type.
@@ -1099,6 +1161,15 @@ static AOM_INLINE void init_gop_frames_for_tpl(
                              cpi->gf_group.max_layer_depth);
     }
 
+#if CONFIG_NEW_REF_SIGNALING
+    for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+      if (cm->remapped_ref_idx[i] != -1) {
+        tpl_frame->ref_map_index[i] = ref_picture_map[cm->remapped_ref_idx[i]];
+      } else {
+        tpl_frame->ref_map_index[i] = ref_picture_map[0];
+      }
+    }
+#else
     for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i)
       tpl_frame->ref_map_index[i - LAST_FRAME] =
           ref_picture_map[cm->remapped_ref_idx[i - LAST_FRAME]];
@@ -1107,6 +1178,7 @@ static AOM_INLINE void init_gop_frames_for_tpl(
     tpl_frame->ref_map_index[LAST3_FRAME - LAST_FRAME] = -1;
     tpl_frame->ref_map_index[BWDREF_FRAME - LAST_FRAME] = -1;
     tpl_frame->ref_map_index[ALTREF2_FRAME - LAST_FRAME] = -1;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
     if (refresh_mask) ref_picture_map[refresh_frame_map_index] = gf_index;
 
@@ -1122,7 +1194,12 @@ static AOM_INLINE void init_gop_frames_for_tpl(
   init_ref_map_pair(
       cm, ref_frame_map_pairs,
       cpi->gf_group.update_type[cpi->gf_group.index] == KF_UPDATE);
-  av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
+#if CONFIG_NEW_REF_SIGNALING
+  if (cm->seq_params.explicit_ref_frame_map)
+    av1_get_ref_frames_enc(cm, true_disp, ref_frame_map_pairs);
+  else
+#endif  // CONFIG_NEW_REF_SIGNALING
+    av1_get_ref_frames(cm, true_disp, ref_frame_map_pairs);
 }
 
 void av1_init_tpl_stats(TplParams *const tpl_data) {
@@ -1155,12 +1232,17 @@ void av1_tpl_setup_stats(AV1_COMP *cpi, int gop_eval,
   cm->current_frame.frame_type = frame_params->frame_type;
   for (int gf_index = gf_group->index; gf_index < (gf_group->size - 1);
        ++gf_index) {
+#if CONFIG_NEW_REF_SIGNALING
+    (void)this_frame_params;
+    av1_configure_buffer_updates(cpi, gf_group->update_type[gf_index]);
+#else
     av1_configure_buffer_updates(cpi, &this_frame_params.refresh_frame,
                                  gf_group->update_type[gf_index],
                                  cm->current_frame.frame_type, 0);
 
     memcpy(&cpi->refresh_frame, &this_frame_params.refresh_frame,
            sizeof(cpi->refresh_frame));
+#endif  // CONFIG_NEW_REF_SIGNALING
 
     cm->show_frame = gf_group->update_type[gf_index] != ARF_UPDATE &&
                      gf_group->update_type[gf_index] != KFFLT_UPDATE &&
@@ -1222,9 +1304,13 @@ void av1_tpl_setup_stats(AV1_COMP *cpi, int gop_eval,
     mc_flow_synthesizer(cpi, frame_idx);
   }
 
+#if CONFIG_NEW_REF_SIGNALING
+  av1_configure_buffer_updates(cpi, gf_group->update_type[gf_group->index]);
+#else
   av1_configure_buffer_updates(cpi, &this_frame_params.refresh_frame,
                                gf_group->update_type[gf_group->index],
                                frame_params->frame_type, 0);
+#endif  // CONFIG_NEW_REF_SIGNALING
   cm->current_frame.frame_type = frame_params->frame_type;
   cm->show_frame = frame_params->show_frame;
 }

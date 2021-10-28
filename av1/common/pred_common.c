@@ -16,6 +16,161 @@
 #include "av1/common/reconintra.h"
 #include "av1/common/seg_common.h"
 
+#if CONFIG_NEW_REF_SIGNALING
+// Comparison function to sort reference frames in ascending score order
+static int compare_score_data_asc(const void *a, const void *b) {
+  if (((RefScoreData *)a)->score == ((RefScoreData *)b)->score) {
+    return 0;
+  } else if (((const RefScoreData *)a)->score >
+             ((const RefScoreData *)b)->score) {
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+static void bubble_sort_ref_scores(RefScoreData *scores, int n_ranked) {
+  for (int i = n_ranked - 1; i > 0; --i) {
+    for (int j = 0; j < i; j++) {
+      if (compare_score_data_asc(&scores[j], &scores[j + 1]) > 0) {
+        RefScoreData score_temp = scores[j];
+        scores[j] = scores[j + 1];
+        scores[j + 1] = score_temp;
+      }
+    }
+  }
+}
+
+// Checks to see if a particular reference frame is already in the reference
+// frame map
+static int is_in_ref_score(RefScoreData *map, int disp_order, int score,
+                           int n_frames) {
+  for (int i = 0; i < n_frames; i++) {
+    if (disp_order == map[i].disp_order && score == map[i].score) return 1;
+  }
+  return 0;
+}
+
+static int get_unmapped_ref(RefScoreData *scores, int n_bufs) {
+  if (n_bufs < INTER_REFS_PER_FRAME) return INVALID_IDX;
+
+  int min_q = INT_MAX;
+  int max_q = INT_MIN;
+  for (int i = n_bufs - 1; i >= 0; i--) {
+    min_q = AOMMIN(min_q, scores[i].base_qindex);
+    max_q = AOMMAX(max_q, scores[i].base_qindex);
+  }
+  const int q_thresh = (max_q + min_q + 1) / 2;
+
+  int unmapped_past_idx = INVALID_IDX;
+  int unmapped_future_idx = INVALID_IDX;
+  int max_past_score = 0;
+  int max_future_score = 0;
+  int n_past = 0;
+  int n_future = 0;
+  for (int i = 0; i < n_bufs; i++) {
+    if (scores[i].base_qindex >= q_thresh) {
+      int dist = scores[i].distance;
+      if (dist > 0) {
+        if (dist > max_past_score) {
+          max_past_score = dist;
+          unmapped_past_idx = i;
+        }
+        n_past++;
+      } else if (dist < 0) {
+        if (-dist > max_future_score) {
+          max_future_score = -dist;
+          unmapped_future_idx = i;
+        }
+        n_future++;
+      }
+    }
+  }
+  if (n_past > n_future) return unmapped_past_idx;
+  if (n_past < n_future) return unmapped_future_idx;
+  if (n_past == n_future && n_past > 0)
+    return max_past_score >= max_future_score ? unmapped_past_idx
+                                              : unmapped_future_idx;
+
+  return INVALID_IDX;
+}
+
+void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores) {
+  int n_future = 0;
+  int n_past = 0;
+  int n_cur = 0;
+  for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+    if (scores[i].distance < 0) {
+      cm->ref_frames_info.future_refs[n_future] = i;
+      n_future++;
+    } else if (scores[i].distance > 0) {
+      cm->ref_frames_info.past_refs[n_past] = i;
+      n_past++;
+    } else {
+      cm->ref_frames_info.cur_refs[n_cur] = i;
+      n_cur++;
+    }
+  }
+  cm->ref_frames_info.n_past_refs = n_past;
+  cm->ref_frames_info.n_future_refs = n_future;
+  cm->ref_frames_info.n_cur_refs = n_cur;
+}
+
+#define DIST_WEIGHT_BITS 6
+void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
+                        RefFrameMapPair *ref_frame_map_pairs) {
+  RefScoreData scores[REF_FRAMES];
+  memset(scores, 0, REF_FRAMES * sizeof(*scores));
+  for (int i = 0; i < REF_FRAMES; i++) {
+    scores[i].score = INT_MAX;
+    cm->remapped_ref_idx[i] = INVALID_IDX;
+  }
+  int n_ranked = 0;
+  // Compute a score for each reference buffer
+  for (int i = 0; i < REF_FRAMES; i++) {
+    // Get reference frame buffer
+    RefFrameMapPair cur_ref = ref_frame_map_pairs[i];
+    if (cur_ref.disp_order == -1) continue;
+    const int ref_disp = cur_ref.disp_order;
+    const int ref_base_qindex = cur_ref.base_qindex;
+    const int disp_diff = cur_frame_disp - ref_disp;
+    const int score = (abs(disp_diff) << DIST_WEIGHT_BITS) + ref_base_qindex;
+    if (is_in_ref_score(scores, ref_disp, score, n_ranked)) continue;
+
+    scores[n_ranked].index = i;
+    scores[n_ranked].score = score;
+    scores[n_ranked].distance = disp_diff;
+    scores[n_ranked].disp_order = ref_disp;
+    scores[n_ranked].base_qindex = ref_base_qindex;
+    n_ranked++;
+  }
+  if (n_ranked > INTER_REFS_PER_FRAME) {
+    const int unmapped_idx = get_unmapped_ref(scores, n_ranked);
+    if (unmapped_idx != INVALID_IDX) scores[unmapped_idx].score = INT_MAX;
+  }
+
+  // Sort the references according to their score
+  bubble_sort_ref_scores(scores, n_ranked);
+
+  cm->ref_frames_info.n_total_refs =
+      AOMMIN(n_ranked, cm->seq_params.max_reference_frames);
+  for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+    cm->remapped_ref_idx[i] = scores[i].index;
+    cm->ref_frames_info.ref_frame_distance[i] = scores[i].distance;
+  }
+
+  // Fill in RefFramesInfo struct according to computed mapping
+  av1_get_past_future_cur_ref_lists(cm, scores);
+
+  if (n_ranked > INTER_REFS_PER_FRAME)
+    cm->remapped_ref_idx[n_ranked - 1] = scores[n_ranked - 1].index;
+
+  // Fill any slots that are empty (should only happen for the first 7 frames)
+  for (int i = 0; i < REF_FRAMES; i++) {
+    if (cm->remapped_ref_idx[i] == INVALID_IDX) cm->remapped_ref_idx[i] = 0;
+  }
+}
+#else
 /*!\cond */
 // Struct to keep track of relevant reference frame data
 typedef struct {
@@ -251,6 +406,7 @@ void av1_get_ref_frames(AV1_COMMON *const cm, int cur_frame_disp,
   for (int i = 0; i < REF_FRAMES; ++i)
     if (remapped_ref_idx[i] == INVALID_IDX) remapped_ref_idx[i] = 0;
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 // Returns a context number for the given MB prediction signal
 static InterpFilter get_ref_filter_type(const MB_MODE_INFO *ref_mbmi,
@@ -387,9 +543,14 @@ int av1_get_intra_inter_context(const MACROBLOCKD *xd) {
   }
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+#define IS_BACKWARD_REF_FRAME(ref_frame) \
+  (get_dir_rank(cm, ref_frame, NULL) == 1)
+#else
 #define CHECK_BACKWARD_REFS(ref_frame) \
   (((ref_frame) >= BWDREF_FRAME) && ((ref_frame) <= ALTREF_FRAME))
 #define IS_BACKWARD_REF_FRAME(ref_frame) CHECK_BACKWARD_REFS(ref_frame)
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 int av1_get_reference_mode_context(const AV1_COMMON *cm,
                                    const MACROBLOCKD *xd) {
@@ -435,6 +596,26 @@ int av1_get_reference_mode_context(const AV1_COMMON *cm,
   return ctx;
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+int av1_get_ref_pred_context_nrs(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
+                                 int n_total_refs) {
+  assert((ref + 1) < n_total_refs);
+  const uint8_t *const ref_counts = &xd->neighbors_ref_counts[0];
+  const int this_ref_count = ref_counts[ref];
+  int next_refs_count = 0;
+
+  for (int i = ref + 1; i < n_total_refs; i++) {
+    next_refs_count += ref_counts[i];
+  }
+
+  const int pred_context = (this_ref_count == next_refs_count)
+                               ? 1
+                               : ((this_ref_count < next_refs_count) ? 0 : 2);
+
+  assert(pred_context >= 0 && pred_context < REF_CONTEXTS);
+  return pred_context;
+}
+#else
 int av1_get_comp_reference_type_context(const MACROBLOCKD *xd) {
   int pred_context;
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
@@ -749,3 +930,4 @@ int av1_get_pred_context_single_ref_p5(const MACROBLOCKD *xd) {
 int av1_get_pred_context_single_ref_p6(const MACROBLOCKD *xd) {
   return get_pred_context_brf_or_arf2(xd);
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
