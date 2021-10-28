@@ -85,11 +85,13 @@ static void raw_write_image_file_or_md5(const aom_image_t *img,
       uint8_t *buf8 = (uint8_t *)malloc(sizeof(*buf8) * w);
       for (int y = 0; y < h; ++y) {
         uint16_t *buf16 = (uint16_t *)buf;
-        for (int x = 0; x < w; ++x) buf8[x] = buf16[x] & 0xff;
-
+        for (int x = 0; x < w; ++x) {
+          buf8[x] = buf16[x] & 0xff;
+        }
         writer_func(file_or_md5, buf8, 1, w);
         buf += stride;
       }
+      free(buf8);
     } else {
       for (int y = 0; y < h; ++y) {
         writer_func(file_or_md5, buf, bytes_per_sample, w);
