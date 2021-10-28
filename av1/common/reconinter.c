@@ -1673,7 +1673,7 @@ void av1_build_one_inter_predictor(
   calc_subpel_params_func(src_mv, inter_pred_params, xd, mi_x, mi_y, ref,
 #if CONFIG_OPTFLOW_REFINEMENT
                           0, /* use_optflow_refinement */
-#endif  // CONFIG_OPTFLOW_REFINEMENT
+#endif                       // CONFIG_OPTFLOW_REFINEMENT
                           mc_buf, &src, &subpel_params, &src_stride);
 
   if (inter_pred_params->comp_mode == UNIFORM_SINGLE ||
