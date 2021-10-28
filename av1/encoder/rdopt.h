@@ -177,6 +177,91 @@ static INLINE void av1_copy_usable_ref_mv_stack_and_weight(
          USABLE_REF_MV_STACK_SIZE * sizeof(xd->ref_mv_stack[0][0]));
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+static INLINE int prune_ref_by_selective_ref_frame_nrs(
+    const AV1_COMP *const cpi, const MACROBLOCK *const x,
+    const MV_REFERENCE_FRAME *const ref_frame) {
+  (void)x;
+  const AV1_COMMON *const cm = &cpi->common;
+  const SPEED_FEATURES *const sf = &cpi->sf;
+
+  if (!sf->inter_sf.selective_ref_frame) return 0;
+  assert(ref_frame[0] != INVALID_IDX);
+  if (ref_frame[0] == INTRA_FRAME_NRS) return 0;
+
+  const int comp_pred = is_inter_ref_frame(ref_frame[1]);
+
+  if (x != NULL) {
+    const int n_refs = cm->ref_frames_info.n_total_refs;
+    if (sf->inter_sf.selective_ref_frame >= 2 ||
+        (sf->inter_sf.selective_ref_frame == 1 && comp_pred)) {
+      if ((n_refs - 1) >= 0 && x->tpl_keep_ref_frame[n_refs - 1] &&
+          (ref_frame[0] == (n_refs - 1) || ref_frame[1] == (n_refs - 1)))
+        return 0;
+      if ((n_refs - 2) >= 0 && x->tpl_keep_ref_frame[n_refs - 2] &&
+          (ref_frame[0] == (n_refs - 2) || ref_frame[1] == (n_refs - 2)))
+        return 0;
+    }
+    if (sf->inter_sf.selective_ref_frame >= 3) {
+      if ((n_refs - 3) >= 0 && x->tpl_keep_ref_frame[n_refs - 3] &&
+          (ref_frame[0] == (n_refs - 3) || ref_frame[1] == (n_refs - 3)))
+        return 0;
+      if ((n_refs - 4) >= 0 && x->tpl_keep_ref_frame[n_refs - 4] &&
+          (ref_frame[0] == (n_refs - 4) || ref_frame[1] == (n_refs - 4)))
+        return 0;
+    }
+  }
+
+  int dir_refrank[2][2] = { { -1, -1 }, { -1, -1 } };
+  int d0 = get_dir_rank(cm, ref_frame[0], dir_refrank[0]);
+  assert(d0 != -1);
+  int d1 = -1;
+  if (comp_pred) {
+    d1 = get_dir_rank(cm, ref_frame[1], dir_refrank[1]);
+    assert(d1 != -1);
+  }
+  const int one_sided_comp = (d0 == d1);
+
+  switch (sf->inter_sf.selective_ref_frame) {
+    case 0: return 0;
+    case 1:
+      if (comp_pred) {
+        if (one_sided_comp) {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 1) return 1;
+        } else {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 2) return 1;
+        }
+      } else {
+        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 2) return 1;
+      }
+      break;
+    case 2:
+      if (comp_pred) {
+        if (one_sided_comp) {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+        } else {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 1) return 1;
+        }
+      } else {
+        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 3) return 1;
+      }
+      break;
+    case 3:
+    default:
+      if (comp_pred) {
+        if (one_sided_comp) {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+        } else {
+          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+        }
+      } else {
+        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 4) return 1;
+      }
+      break;
+  }
+  return 0;
+}
+#else
 // This function prunes the mode if either of the reference frame falls in the
 // pruning list
 static INLINE int prune_ref(const MV_REFERENCE_FRAME *const ref_frame,
@@ -237,6 +322,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
 
   return 0;
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 // This function will copy the best reference mode information from
 // MB_MODE_INFO_EXT to MB_MODE_INFO_EXT_FRAME.

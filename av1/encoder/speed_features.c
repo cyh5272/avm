@@ -307,7 +307,11 @@ static void set_good_speed_features_framesize_independent(
 
   // Speed 0 for all speed features that give neutral coding performance change.
   sf->gm_sf.gm_disable_recode = 1;
+#if CONFIG_NEW_REF_SIGNALING
+  sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_LEV2;
+#else
   sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_L2_L3;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   sf->part_sf.less_rectangular_check_level = 1;
   sf->part_sf.ml_prune_4_partition = 1;
@@ -357,7 +361,11 @@ static void set_good_speed_features_framesize_independent(
   sf->hl_sf.superres_auto_search_type = SUPERRES_AUTO_DUAL;
 
   if (speed >= 1) {
+#if CONFIG_NEW_REF_SIGNALING
+    sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_LEV3;
+#else
     sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_L2_L3_ARF2;
+#endif  // CONFIG_NEW_REF_SIGNALING
     sf->gm_sf.prune_ref_frame_for_gm_search = boosted ? 0 : 1;
 
     sf->part_sf.intra_cnn_split = 1;
@@ -529,7 +537,9 @@ static void set_good_speed_features_framesize_independent(
     sf->part_sf.prune_ab_partition_using_split_info = 1;
     sf->part_sf.early_term_after_none_split = 1;
 
+#if !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.alt_ref_search_fp = 1;
+#endif  // !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.txfm_rd_gate_level = boosted ? 0 : 4;
 
     sf->inter_sf.prune_inter_modes_based_on_tpl = boosted ? 0 : 3;
@@ -724,7 +734,9 @@ static AOM_INLINE void init_inter_sf(INTER_MODE_SPEED_FEATURES *inter_sf) {
   inter_sf->adaptive_rd_thresh = 0;
   inter_sf->model_based_post_interp_filter_breakout = 0;
   inter_sf->reduce_inter_modes = 0;
+#if !CONFIG_NEW_REF_SIGNALING
   inter_sf->alt_ref_search_fp = 0;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   inter_sf->selective_ref_frame = 0;
   inter_sf->prune_ref_frame_for_rect_partitions = 0;
   inter_sf->disable_wedge_search_var_thresh = 0;

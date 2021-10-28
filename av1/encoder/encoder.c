@@ -661,7 +661,9 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   MACROBLOCK *const x = &cpi->td.mb;
   AV1LevelParams *const level_params = &cpi->level_params;
   InitialDimensions *const initial_dimensions = &cpi->initial_dimensions;
+#if !CONFIG_NEW_REF_SIGNALING
   RefreshFrameFlagsInfo *const refresh_frame_flags = &cpi->refresh_frame;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   const FrameDimensionCfg *const frm_dim_cfg = &cpi->oxcf.frm_dim_cfg;
   const DecoderModelCfg *const dec_model_cfg = &oxcf->dec_model_cfg;
   const ColorCfg *const color_cfg = &oxcf->color_cfg;
@@ -753,8 +755,10 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
 
   rc->baseline_gf_interval = (MIN_GF_INTERVAL + MAX_GF_INTERVAL) / 2;
 
+#if !CONFIG_NEW_REF_SIGNALING
   refresh_frame_flags->golden_frame = false;
   refresh_frame_flags->bwd_ref_frame = false;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   cm->features.refresh_frame_context =
       (oxcf->tool_cfg.frame_parallel_decoding_mode)
@@ -1031,7 +1035,9 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
   cpi->last_show_frame_buf = NULL;
   realloc_segmentation_maps(cpi);
 
+#if !CONFIG_NEW_REF_SIGNALING
   cpi->refresh_frame.alt_ref_frame = false;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   cpi->b_calculate_psnr = CONFIG_INTERNAL_STATS;
 #if CONFIG_INTERNAL_STATS
@@ -2064,7 +2070,11 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   if (!is_stat_generation_stage(cpi)) alloc_util_frame_buffers(cpi);
   init_motion_estimation(cpi);
 
+#if CONFIG_NEW_REF_SIGNALING
+  for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+#else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
     if (buf != NULL) {
       struct scale_factors *sf = get_ref_scale_factors(cm, ref_frame);
@@ -2078,7 +2088,11 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   av1_setup_scale_factors_for_frame(&cm->sf_identity, cm->width, cm->height,
                                     cm->width, cm->height);
 
+#if CONFIG_NEW_REF_SIGNALING
+  set_ref_ptrs(cm, xd, 0, 0);
+#else
   set_ref_ptrs(cm, xd, LAST_FRAME, LAST_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 /*!\brief Select and apply cdef filters and switchable restoration filters
@@ -2395,6 +2409,22 @@ static int encode_without_recode(AV1_COMP *cpi) {
   if (svc->number_spatial_layers == 1)
 #endif  // CONFIG_SVC_ENCODER
   {
+#if CONFIG_NEW_REF_SIGNALING
+    const MV_REFERENCE_FRAME golden_frame = get_best_past_ref_index(cm);
+    const MV_REFERENCE_FRAME altref_frame = get_furthest_future_ref_index(cm);
+    if (cm->ref_frame_flags & (1 << golden_frame)) {
+      const YV12_BUFFER_CONFIG *const ref =
+          get_ref_frame_yv12_buf(cm, golden_frame);
+      if (ref->y_crop_width != cm->width || ref->y_crop_height != cm->height)
+        cm->ref_frame_flags ^= (1 << golden_frame);
+    }
+    if (cm->ref_frame_flags & (1 << altref_frame)) {
+      const YV12_BUFFER_CONFIG *const ref =
+          get_ref_frame_yv12_buf(cm, altref_frame);
+      if (ref->y_crop_width != cm->width || ref->y_crop_height != cm->height)
+        cm->ref_frame_flags ^= (1 << altref_frame);
+    }
+#else
     if (cm->ref_frame_flags & av1_ref_frame_flag_list[GOLDEN_FRAME]) {
       const YV12_BUFFER_CONFIG *const ref =
           get_ref_frame_yv12_buf(cm, GOLDEN_FRAME);
@@ -2407,6 +2437,7 @@ static int encode_without_recode(AV1_COMP *cpi) {
       if (ref->y_crop_width != cm->width || ref->y_crop_height != cm->height)
         cm->ref_frame_flags ^= AOM_ALT_FLAG;
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
   }
 
   // For SVC the inter-layer/spatial prediction is not done for newmv
@@ -3163,10 +3194,10 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
 
   aom_clear_system_state();
 
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   memset(cpi->mode_chosen_counts, 0,
          MAX_MODES * sizeof(*cpi->mode_chosen_counts));
-#endif
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
 
   if (seq_params->frame_id_numbers_present_flag) {
     /* Non-normative definition of current_frame_id ("frame counter" with
@@ -3360,8 +3391,10 @@ int av1_encode(AV1_COMP *const cpi, uint8_t *const dest,
   memcpy(cm->remapped_ref_idx, frame_params->remapped_ref_idx,
          REF_FRAMES * sizeof(*cm->remapped_ref_idx));
 
+#if !CONFIG_NEW_REF_SIGNALING
   memcpy(&cpi->refresh_frame, &frame_params->refresh_frame,
          sizeof(cpi->refresh_frame));
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   if (current_frame->frame_type == KEY_FRAME && !cpi->no_show_fwd_kf) {
     current_frame->key_frame_number += current_frame->frame_number;
@@ -3811,11 +3844,13 @@ int av1_convert_sect5obus_to_annexb(uint8_t *buffer, size_t *frame_size) {
 static void svc_set_updates_external_ref_frame_config(
     ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags, SVC *const svc) {
   ext_refresh_frame_flags->update_pending = 1;
+#if !CONFIG_NEW_REF_SIGNALING
   ext_refresh_frame_flags->last_frame = svc->refresh[svc->ref_idx[0]];
   ext_refresh_frame_flags->golden_frame = svc->refresh[svc->ref_idx[3]];
   ext_refresh_frame_flags->bwd_ref_frame = svc->refresh[svc->ref_idx[4]];
   ext_refresh_frame_flags->alt2_ref_frame = svc->refresh[svc->ref_idx[5]];
   ext_refresh_frame_flags->alt_ref_frame = svc->refresh[svc->ref_idx[6]];
+#endif  // !CONFIG_NEW_REF_SIGNALING
   svc->non_reference_frame = 1;
   for (int i = 0; i < REF_FRAMES; i++) {
     if (svc->refresh[i] == 1) {
@@ -3847,6 +3882,20 @@ void av1_apply_encoding_flags(AV1_COMP *cpi, aom_enc_frame_flags_t flags) {
   ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags =
       &ext_flags->refresh_frame;
   ext_flags->ref_frame_flags = AOM_REFFRAME_ALL;
+#if CONFIG_NEW_REF_SIGNALING
+#if CONFIG_SVC_ENCODER
+  if (cpi->svc.external_ref_frame_config) {
+    int ref = svc_set_references_external_ref_frame_config(cpi);
+    av1_use_as_reference(&ext_flags->ref_frame_flags, ref);
+    svc_set_updates_external_ref_frame_config(ext_refresh_frame_flags,
+                                              &cpi->svc);
+  } else {
+    ext_refresh_frame_flags->update_pending = 0;
+  }
+#else
+  ext_refresh_frame_flags->update_pending = 0;
+#endif
+#else
   if (flags &
       (AOM_EFLAG_NO_REF_LAST | AOM_EFLAG_NO_REF_LAST2 | AOM_EFLAG_NO_REF_LAST3 |
        AOM_EFLAG_NO_REF_GF | AOM_EFLAG_NO_REF_ARF | AOM_EFLAG_NO_REF_BWD |
@@ -3908,6 +3957,7 @@ void av1_apply_encoding_flags(AV1_COMP *cpi, aom_enc_frame_flags_t flags) {
 #endif  // CONFIG_SVC_ENCODER
       ext_refresh_frame_flags->update_pending = 0;
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   ext_flags->use_ref_frame_mvs = cpi->oxcf.tool_cfg.enable_ref_frame_mvs &
                                  ((flags & AOM_EFLAG_NO_REF_FRAME_MVS) == 0);

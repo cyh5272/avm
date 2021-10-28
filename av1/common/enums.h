@@ -398,6 +398,7 @@ enum {
 #define EXT_TX_SETS_INTER 4  // Sets of transform selections for INTER
 #define EXT_TX_SETS_INTRA 3  // Sets of transform selections for INTRA
 
+#if !CONFIG_NEW_REF_SIGNALING
 enum {
   AOM_LAST_FLAG = 1 << 0,
   AOM_LAST2_FLAG = 1 << 1,
@@ -408,6 +409,7 @@ enum {
   AOM_ALT_FLAG = 1 << 6,
   AOM_REFFRAME_ALL = (1 << 7) - 1
 } UENUM1BYTE(AOM_REFFRAME);
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 enum {
   UNIDIR_COMP_REFERENCE,
@@ -735,6 +737,17 @@ enum {
 #endif  // CONFIG_NEW_TX_PARTITION
 typedef uint8_t TXFM_CONTEXT;
 
+#if CONFIG_NEW_REF_SIGNALING
+#define INTER_REFS_PER_FRAME 7
+#define REF_FRAMES (INTER_REFS_PER_FRAME + 1)
+#define MODE_CTX_REF_FRAMES \
+  (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 1)
+#define INTRA_FRAME_NRS (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2)
+// Used for indexing into arrays that contain reference data for
+// inter and intra.
+#define INTRA_FRAME_INDEX_NRS INTER_REFS_PER_FRAME
+#define AOM_REFFRAME_ALL ((1 << INTER_REFS_PER_FRAME) - 1)
+#else
 // An enum for single reference types (and some derived values).
 enum {
   NONE_FRAME = -1,
@@ -765,6 +778,12 @@ enum {
   SINGLE_REFS = FWD_REFS + BWD_REFS,
 };
 
+// NOTE: A limited number of unidirectional reference pairs can be signalled for
+//       compound prediction. The use of skip mode, on the other hand, makes it
+//       possible to have a reference pair not listed for explicit signaling.
+#define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
+#endif  // CONFIG_NEW_REF_SIGNALING
+
 #define REF_FRAMES_LOG2 3
 
 // REF_FRAMES for the cm->ref_frame_map array, 1 scratch frame for the new
@@ -775,6 +794,7 @@ enum {
 #define FWD_RF_OFFSET(ref) (ref - LAST_FRAME)
 #define BWD_RF_OFFSET(ref) (ref - BWDREF_FRAME)
 
+#if !CONFIG_NEW_REF_SIGNALING
 enum {
   LAST_LAST2_FRAMES,      // { LAST_FRAME, LAST2_FRAME }
   LAST_LAST3_FRAMES,      // { LAST_FRAME, LAST3_FRAME }
@@ -790,15 +810,11 @@ enum {
   //       that are explicitly signaled.
   UNIDIR_COMP_REFS = BWDREF_ALTREF_FRAMES + 1,
 } UENUM1BYTE(UNIDIR_COMP_REF);
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 #define TOTAL_COMP_REFS (FWD_REFS * BWD_REFS + TOTAL_UNIDIR_COMP_REFS)
 
 #define COMP_REFS (FWD_REFS * BWD_REFS + UNIDIR_COMP_REFS)
-
-// NOTE: A limited number of unidirectional reference pairs can be signalled for
-//       compound prediction. The use of skip mode, on the other hand, makes it
-//       possible to have a reference pair not listed for explicit signaling.
-#define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
 
 // Note: It includes single and compound references. So, it can take values from
 // NONE_FRAME to (MODE_CTX_REF_FRAMES - 1). Hence, it is not defined as an enum.
