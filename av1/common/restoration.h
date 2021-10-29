@@ -263,11 +263,27 @@ typedef struct {
    */
   int luma_stride;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
   /*!
    * Plane for filtering.
    */
   int plane;
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER
+  /*!
+   * Pointer to tskip frame.
+   */
+  const uint8_t *tskip;
+  /*!
+   * Stride for tskip frame.
+   */
+  int tskip_stride;
+  /*!
+   * Quantizer index.
+   */
+  int base_qindex;
+#endif  // CONFIG_PC_WIENER
 } RestorationUnitInfo;
 
 /*!\cond */
@@ -485,13 +501,18 @@ typedef struct FilterFrameCtxt {
   uint8_t *data8, *dst8;
   int data_stride, dst_stride;
   AV1PixelRect tile_rect;
-#if CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
   int plane;
+#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint8_t *luma;
   int luma_stride;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  const uint8_t *tskip;
+  int tskip_stride;
+  int base_qindex;
+#endif  // CONFIG_PC_WIENER
 } FilterFrameCtxt;
 
 typedef struct AV1LrStruct {
