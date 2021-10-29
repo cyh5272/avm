@@ -1136,8 +1136,8 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                          x->mode_costs.merged_param_cost[0] +
                          (count_sgrproj_bits(&rusi->sgrproj, &rsc->sgrproj)
                           << AV1_PROB_COST_SHIFT);
-  double cost_nomerge =
-      RDCOST_DBL(x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_SGRPROJ]);
+  double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
   const double dual_sgr_penalty_sf_mult =
       1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level;
   if (rusi->sgrproj.ep < DUAL_SGR_EP_PENALTY_THRESHOLD)
@@ -1184,8 +1184,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   // Iterate through vector to get current cost and the sum of A and b so far.
   VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
     RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
-    cost_nomerge += RDCOST_DBL(x->rdmult, old_unit->current_bits >> 4,
-                               old_unit->current_sse);
+    cost_nomerge +=
+        RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
+                                       old_unit->current_ssei, bit_depth);
     // Merge SSE and bits must be recalculated every time we create a new
     // merge filter.
     old_unit->merge_sse = 0;
@@ -1219,8 +1220,8 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       old_unit->merge_bits = x->mode_costs.sgrproj_restore_cost[1] +
                              x->mode_costs.merged_param_cost[1];
     }
-    cost_merge +=
-        RDCOST_DBL(x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse);
+    cost_merge += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+        x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse, bit_depth);
   }
   if (rui_temp.sgrproj_info.ep < DUAL_SGR_EP_PENALTY_THRESHOLD) {
     cost_merge *= dual_sgr_penalty_sf_mult;
@@ -2030,8 +2031,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       x->mode_costs.merged_param_cost[0] +
       (count_wiener_bits(wiener_win, &rusi->wiener, &rsc->wiener)
        << AV1_PROB_COST_SHIFT);
-  double cost_nomerge =
-      RDCOST_DBL(x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_WIENER]);
+  double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_WIENER],
+      rsc->cm->seq_params.bit_depth);
   RestorationType rtype =
       (cost_none <= cost_nomerge) ? RESTORE_NONE : RESTORE_WIENER;
   if (cost_none <= cost_nomerge) {
@@ -2078,8 +2080,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
   // Iterate through vector to get current cost and the sum of M and H so far.
   VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
     RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
-    cost_nomerge += RDCOST_DBL(x->rdmult, old_unit->current_bits >> 4,
-                               old_unit->current_sse);
+    cost_nomerge += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+        x->rdmult, old_unit->current_bits >> 4, old_unit->current_sse,
+        rsc->cm->seq_params.bit_depth);
     for (int index = 0; index < WIENER_WIN2; ++index) {
       M_AVG[index] += old_unit->M[index];
     }
@@ -2132,8 +2135,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       old_unit->merge_bits = x->mode_costs.wiener_restore_cost[1] +
                              x->mode_costs.merged_param_cost[1];
     }
-    cost_merge +=
-        RDCOST_DBL(x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse);
+    cost_merge += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+        x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse,
+        rsc->cm->seq_params.bit_depth);
   }
   if (cost_merge < cost_nomerge) {
     // Update data within the stack.
@@ -2419,8 +2423,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wiener_nonsep_restore_cost[0];
-  double cost_none =
-      RDCOST_DBL(x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE]);
+  const int bit_depth = rsc->cm->seq_params.bit_depth;
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
   RestorationUnitInfo rui;
   memset(&rui, 0, sizeof(rui));
   rui.restoration_type = RESTORE_WIENER_NONSEP;
@@ -2453,8 +2458,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
         (count_wienerns_bits(rsc->plane, &rusi->wiener_nonsep,
                              &rsc->wiener_nonsep)
          << AV1_PROB_COST_SHIFT);
-    double cost_nomerge = RDCOST_DBL(x->rdmult, bits_nomerge >> 4,
-                                     rusi->sse[RESTORE_WIENER_NONSEP]);
+    double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+        x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+        bit_depth);
     RestorationType rtype =
         (cost_none <= cost_nomerge) ? RESTORE_NONE : RESTORE_WIENER_NONSEP;
     if (cost_none <= cost_nomerge) {
@@ -2504,8 +2510,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     // Iterate through vector to get current cost and the sum of A and b so far.
     VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
       RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
-      cost_nomerge += RDCOST_DBL(x->rdmult, old_unit->current_bits >> 4,
-                                 old_unit->current_sse);
+      cost_nomerge +=
+          RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
+                                         old_unit->current_sse, bit_depth);
       for (int index = 0; index < WIENERNS_MAX * WIENERNS_MAX; ++index) {
         A_AVG[index] += old_unit->A[index];
       }
@@ -2579,8 +2586,8 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
         old_unit->merge_bits = x->mode_costs.wiener_nonsep_restore_cost[1] +
                                x->mode_costs.merged_param_cost[1];
       }
-      cost_merge +=
-          RDCOST_DBL(x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse);
+      cost_merge += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, old_unit->merge_bits >> 4, old_unit->merge_sse, bit_depth);
     }
     if (cost_merge < cost_nomerge) {
       // Update data within the stack.
@@ -2618,8 +2625,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
         (count_wienerns_bits(rui.plane, &rusi->wiener_nonsep,
                              &rsc->wiener_nonsep)
          << AV1_PROB_COST_SHIFT);
-    double cost_wienerns = RDCOST_DBL(x->rdmult, bits_wienerns >> 4,
-                                      rusi->sse[RESTORE_WIENER_NONSEP]);
+    double cost_wienerns = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+        x->rdmult, bits_wienerns >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+        bit_depth);
     RestorationType rtype =
         (cost_wienerns < cost_none) ? RESTORE_WIENER_NONSEP : RESTORE_NONE;
     rusi->best_rtype[RESTORE_WIENER_NONSEP - 1] = rtype;
@@ -2798,7 +2806,9 @@ double switchable_edge_cost(const void *info, Vector *path, int node_idx,
                              ? rusi->sse[RESTORE_NONE]
                              : rusi->sse[rusi->best_rtype[end_rtype - 1]];
   int64_t end_unit_bits = count_switchable_bits(end_rtype, &path_rsc, rusi);
-  double edge_cost = RDCOST_DBL(x->rdmult, end_unit_bits >> 4, end_unit_sse);
+  double edge_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, end_unit_bits >> 4, end_unit_sse,
+      rsc->cm->seq_params.bit_depth);
   if (end_rtype == RESTORE_SGRPROJ &&
       rusi->sgrproj.ep < DUAL_SGR_EP_PENALTY_THRESHOLD)
     edge_cost *= dual_sgr_penalty_sf_mult;
@@ -3021,7 +3031,9 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
   // Limiting number of units for graph search to prevent hanging.
   if (rtype == RESTORE_SWITCHABLE && nunits < MAX_UNITS_FOR_GRAPH_SWITCHABLE) {
     search_switchable(NULL, NULL, 0, rsc, NULL, NULL);
-    return RDCOST_DBL(rsc->x->rdmult, rsc->bits >> 4, rsc->sse);
+    return RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, rsc->bits >> 4,
+                                          rsc->sse,
+                                          rsc->cm->seq_params.bit_depth);
   }
 #endif  // CONFIG_RST_MERGECOEFFS
 
