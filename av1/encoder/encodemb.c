@@ -535,7 +535,12 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #endif
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
-
+#if CONFIG_PC_WIENER
+  if (p->eobs[block] == 0 && dry_run == OUTPUT_ENABLED) {
+    av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, blk_row,
+                              blk_col, tx_size, cm->mi_params.fEncTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_MISMATCH_DEBUG
   if (dry_run == OUTPUT_ENABLED) {
     int pixel_c, pixel_r;
@@ -738,6 +743,18 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
 #else
   mbmi->skip_txfm = 1;
 #endif
+  const AV1_COMMON *const cm = &cpi->common;
+#if CONFIG_PC_WIENER
+  if (x->txfm_search_info.skip_txfm && dry_run == OUTPUT_ENABLED) {
+#if CONFIG_SDP
+    int sb_type = mbmi->sb_type[xd->tree_type == CHROMA_PART];
+#else
+    int sb_type = mbmi->sb_type;
+#endif
+    av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, sb_type, 1,
+                            cm->mi_params.fEncTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
   if (x->txfm_search_info.skip_txfm) return;
 
   struct optimize_ctx ctx;
@@ -758,7 +775,6 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     dry_run,
     cpi->optimize_seg_arr[mbmi->segment_id]
   };
-  const AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   for (int plane = 0; plane < num_planes; ++plane) {
     const struct macroblockd_plane *const pd = &xd->plane[plane];
@@ -945,6 +961,13 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 #endif
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
+
+#if CONFIG_PC_WIENER
+  if (*eob == 0 && args->dry_run == OUTPUT_ENABLED) {
+    av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, blk_row,
+                              blk_col, tx_size, cm->mi_params.fEncTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
 
   // For intra mode, skipped blocks are so rare that transmitting skip=1 is
   // very expensive.
