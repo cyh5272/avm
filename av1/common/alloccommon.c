@@ -237,6 +237,9 @@ static int alloc_mi(CommonModeInfoParams *mi_params) {
         mi_grid_size, sizeof(*mi_params->mi_grid_base));
     if (!mi_params->mi_grid_base) return 1;
     mi_params->mi_grid_size = mi_grid_size;
+#if CONFIG_PC_WIENER
+    av1_alloc_txk_skip_array(mi_params);
+#endif  // CONFIG_PC_WIENER
 
     mi_params->tx_type_map =
         aom_calloc(mi_grid_size, sizeof(*mi_params->tx_type_map));

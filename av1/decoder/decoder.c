@@ -112,6 +112,9 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
   mi_params->mi_alloc_size = 0;
   aom_free(mi_params->tx_type_map);
   mi_params->tx_type_map = NULL;
+#if CONFIG_PC_WIENER
+  av1_dealloc_txk_skip_array(mi_params);
+#endif  // CONFIG_PC_WIENER
 }
 
 AV1Decoder *av1_decoder_create(BufferPool *const pool) {
@@ -175,7 +178,9 @@ AV1Decoder *av1_decoder_create(BufferPool *const pool) {
 #if DEBUG_EXTQUANT
   cm->fDecCoeffLog = fopen("DecCoeffLog.txt", "wt");
 #endif
-
+#if CONFIG_PC_WIENER
+  cm->mi_params.fDecTxSkipLog = NULL;
+#endif  // CONFIG_PC_WIENER
   return pbi;
 }
 
@@ -259,7 +264,11 @@ void av1_decoder_remove(AV1Decoder *pbi) {
     fclose(pbi->common.fDecCoeffLog);
   }
 #endif
-
+#if CONFIG_PC_WIENER
+  if (pbi->common.mi_params.fDecTxSkipLog != NULL) {
+    fclose(pbi->common.mi_params.fDecTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
   aom_free(pbi);
 }
 

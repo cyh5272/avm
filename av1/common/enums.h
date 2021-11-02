@@ -849,6 +849,9 @@ typedef enum {
   RESTORE_NONE,    /**< No restoration */
   RESTORE_WIENER,  /**< Separable Wiener restoration */
   RESTORE_SGRPROJ, /**< Selfguided restoration */
+#if CONFIG_PC_WIENER
+  RESTORE_PC_WIENER, /**< Pixel-classified Wiener restoration */
+#endif               // CONFIG_PC_WIENER
 #if CONFIG_WIENER_NONSEP
   RESTORE_WIENER_NONSEP, /**< Nonseparable Wiener restoration */
 #endif                   // CONFIG_WIENER_NONSEP
