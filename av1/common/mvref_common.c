@@ -22,6 +22,8 @@ typedef struct single_mv_candidate {
 } SINGLE_MV_CANDIDATE;
 #endif  // CONFIG_SMVP_IMPROVEMENT
 
+#define MFMV_STACK_SIZE 3
+
 // Although we assign 32 bit integers, all the values are strictly under 14
 // bits.
 static int div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730, 2340,
@@ -1357,21 +1359,8 @@ static int get_block_position(AV1_COMMON *cm, int *mi_r, int *mi_c, int blk_row,
   return 1;
 }
 
-// Note: motion_filed_projection finds motion vectors of current frame's
-// reference frame, and projects them to current frame. To make it clear,
-// let's call current frame's reference frame as start frame.
-// Call Start frame's reference frames as reference frames.
-// Call ref_offset as frame distances between start frame and its reference
-// frames.
-#if CONFIG_TMVP_IMPROVEMENT
-static int motion_field_projection_bwd(AV1_COMMON *cm,
-                                       MV_REFERENCE_FRAME start_frame,
-                                       int dir) {
-  TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
-  int ref_offset[REF_FRAMES] = { 0 };
-
-  const RefCntBuffer *const start_frame_buf =
-      get_ref_frame_buf(cm, start_frame);
+static INLINE int is_ref_motion_field_eligible(
+    const AV1_COMMON *const cm, const RefCntBuffer *const start_frame_buf) {
   if (start_frame_buf == NULL) return 0;
 
   if (start_frame_buf->frame_type == KEY_FRAME ||
@@ -1381,6 +1370,25 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
   if (start_frame_buf->mi_rows != cm->mi_params.mi_rows ||
       start_frame_buf->mi_cols != cm->mi_params.mi_cols)
     return 0;
+  return 1;
+}
+
+// Note: motion_filed_projection finds motion vectors of current frame's
+// reference frame, and projects them to current frame. To make it clear,
+// let's call current frame's reference frame as start frame.
+// Call Start frame's reference frames as reference frames.
+// Call ref_offset as frame distances between start frame and its reference
+// frames.
+#if CONFIG_TMVP_IMPROVEMENT
+static int motion_field_projection_bwd(AV1_COMMON *cm,
+                                       MV_REFERENCE_FRAME start_frame,
+                                       int dir, int overwrite_mv) {
+  TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
+  int ref_offset[REF_FRAMES] = { 0 };
+
+  const RefCntBuffer *const start_frame_buf =
+      get_ref_frame_buf(cm, start_frame);
+  if (!is_ref_motion_field_eligible(cm, start_frame_buf)) return 0;
 
   const int start_frame_order_hint = start_frame_buf->order_hint;
   const unsigned int *const ref_order_hints =
@@ -1429,7 +1437,8 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
           fwd_mv.col = -fwd_mv.col;
 
           const int mi_offset = mi_r * (cm->mi_params.mi_stride >> 1) + mi_c;
-          if (tpl_mvs_base[mi_offset].mfmv0.as_int == INVALID_MV) {
+          if (overwrite_mv ||
+              tpl_mvs_base[mi_offset].mfmv0.as_int == INVALID_MV) {
             tpl_mvs_base[mi_offset].mfmv0.as_mv.row = fwd_mv.row;
             tpl_mvs_base[mi_offset].mfmv0.as_mv.col = fwd_mv.col;
             tpl_mvs_base[mi_offset].ref_frame_offset = ref_frame_offset;
@@ -1444,21 +1453,14 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
 #endif  // CONFIG_TMVP_IMPROVEMENT
 
 static int motion_field_projection(AV1_COMMON *cm,
-                                   MV_REFERENCE_FRAME start_frame, int dir) {
+                                   MV_REFERENCE_FRAME start_frame, int dir,
+                                   int overwrite_mv) {
   TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
   int ref_offset[REF_FRAMES] = { 0 };
 
   const RefCntBuffer *const start_frame_buf =
       get_ref_frame_buf(cm, start_frame);
-  if (start_frame_buf == NULL) return 0;
-
-  if (start_frame_buf->frame_type == KEY_FRAME ||
-      start_frame_buf->frame_type == INTRA_ONLY_FRAME)
-    return 0;
-
-  if (start_frame_buf->mi_rows != cm->mi_params.mi_rows ||
-      start_frame_buf->mi_cols != cm->mi_params.mi_cols)
-    return 0;
+  if (!is_ref_motion_field_eligible(cm, start_frame_buf)) return 0;
 
   const int start_frame_order_hint = start_frame_buf->order_hint;
   const unsigned int *const ref_order_hints =
@@ -1503,15 +1505,12 @@ static int motion_field_projection(AV1_COMMON *cm,
 
         if (pos_valid) {
           const int mi_offset = mi_r * (cm->mi_params.mi_stride >> 1) + mi_c;
-#if CONFIG_TMVP_IMPROVEMENT
-          if (tpl_mvs_base[mi_offset].mfmv0.as_int == INVALID_MV) {
-#endif  // CONFIG_TMVP_IMPROVEMENT
+          if (overwrite_mv ||
+              tpl_mvs_base[mi_offset].mfmv0.as_int == INVALID_MV) {
             tpl_mvs_base[mi_offset].mfmv0.as_mv.row = fwd_mv.row;
             tpl_mvs_base[mi_offset].mfmv0.as_mv.col = fwd_mv.col;
             tpl_mvs_base[mi_offset].ref_frame_offset = ref_frame_offset;
-#if CONFIG_TMVP_IMPROVEMENT
           }
-#endif  // CONFIG_TMVP_IMPROVEMENT
         }
       }
     }
@@ -1574,6 +1573,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
   int ref_stamp = MFMV_STACK_SIZE - 1;
 
 #if CONFIG_TMVP_IMPROVEMENT
+  int overwrite_mv = 0;
   if (has_bwd_ref) {
     if (ref_buf[LAST_FRAME - LAST_FRAME] != NULL) {
       const int alt_of_lst_order_hint =
@@ -1582,10 +1582,12 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
 
       const int is_lst_overlay =
           (alt_of_lst_order_hint == ref_order_hint[GOLDEN_FRAME - LAST_FRAME]);
-      if (!is_lst_overlay) motion_field_projection_bwd(cm, LAST_FRAME, 2);
+      if (!is_lst_overlay)
+        motion_field_projection_bwd(cm, LAST_FRAME, 2, overwrite_mv);
     }
   }
 #else
+  int overwrite_mv = 1;
   if (ref_buf[LAST_FRAME - LAST_FRAME] != NULL) {
     const int alt_of_lst_order_hint =
         ref_buf[LAST_FRAME - LAST_FRAME]
@@ -1593,7 +1595,8 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
 
     const int is_lst_overlay =
         (alt_of_lst_order_hint == ref_order_hint[GOLDEN_FRAME - LAST_FRAME]);
-    if (!is_lst_overlay) motion_field_projection(cm, LAST_FRAME, 2);
+    if (!is_lst_overlay)
+      motion_field_projection(cm, LAST_FRAME, 2, overwrite_mv);
     --ref_stamp;
   }
 #endif  // CONFIG_TMVP_IMPROVEMENT
@@ -1601,13 +1604,14 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
   if (get_relative_dist(order_hint_info,
                         ref_order_hint[BWDREF_FRAME - LAST_FRAME],
                         cur_order_hint) > 0) {
-    if (motion_field_projection(cm, BWDREF_FRAME, 0)) --ref_stamp;
+    if (motion_field_projection(cm, BWDREF_FRAME, 0, overwrite_mv)) --ref_stamp;
   }
 
   if (get_relative_dist(order_hint_info,
                         ref_order_hint[ALTREF2_FRAME - LAST_FRAME],
                         cur_order_hint) > 0) {
-    if (motion_field_projection(cm, ALTREF2_FRAME, 0)) --ref_stamp;
+    if (motion_field_projection(cm, ALTREF2_FRAME, 0, overwrite_mv))
+      --ref_stamp;
   }
 
 #if CONFIG_TMVP_IMPROVEMENT
@@ -1618,7 +1622,8 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
 
     const int is_lst_overlay =
         (alt_of_lst_order_hint == ref_order_hint[GOLDEN_FRAME - LAST_FRAME]);
-    if (!is_lst_overlay) motion_field_projection(cm, LAST_FRAME, 2);
+    if (!is_lst_overlay)
+      motion_field_projection(cm, LAST_FRAME, 2, overwrite_mv);
     --ref_stamp;
   }
 #endif  // CONFIG_TMVP_IMPROVEMENT
@@ -1627,14 +1632,14 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
                         ref_order_hint[ALTREF_FRAME - LAST_FRAME],
                         cur_order_hint) > 0 &&
       ref_stamp >= 0)
-    if (motion_field_projection(cm, ALTREF_FRAME, 0)) --ref_stamp;
+    if (motion_field_projection(cm, ALTREF_FRAME, 0, overwrite_mv)) --ref_stamp;
 
 #if CONFIG_TMVP_IMPROVEMENT
   if (has_bwd_ref && ref_stamp >= 0) {
-    motion_field_projection_bwd(cm, LAST2_FRAME, 2);
+    motion_field_projection_bwd(cm, LAST2_FRAME, 2, overwrite_mv);
   }
 #endif  // CONFIG_TMVP_IMPROVEMENT
-  if (ref_stamp >= 0) motion_field_projection(cm, LAST2_FRAME, 2);
+  if (ref_stamp >= 0) motion_field_projection(cm, LAST2_FRAME, 2, overwrite_mv);
 }
 
 #if CONFIG_SMVP_IMPROVEMENT
