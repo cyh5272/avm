@@ -980,6 +980,10 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
     return 0;
   }
 
+#if CONFIG_PC_WIENER
+  cm->mi_params.fEncTxSkipLog = NULL;
+#endif  // CONFIG_PC_WIENER
+
 #if DEBUG_EXTQUANT
   cm->fEncCoeffLog = fopen("EncCoeffLog.txt", "wt");
 #endif
@@ -1659,6 +1663,11 @@ void av1_remove_compressor(AV1_COMP *cpi) {
 
   aom_free(cpi->subgop_config_str);
   aom_free(cpi->subgop_config_path);
+#if CONFIG_PC_WIENER
+  if (cpi->common.mi_params.fEncTxSkipLog != NULL) {
+    fclose(cpi->common.mi_params.fEncTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
   aom_free(cpi);
 
 #ifdef OUTPUT_YUV_REC
