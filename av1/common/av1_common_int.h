@@ -766,6 +766,14 @@ struct CommonModeInfoParams {
    */
   TX_TYPE *tx_type_map;
 
+#if CONFIG_PC_WIENER
+  FILE *fEncTxSkipLog;
+  FILE *fDecTxSkipLog;
+  // indicate if a transform block has any non-zero coefficients or not.
+  // the buffer is allocated for each 4x4 block
+  uint8_t *tx_skip[MAX_MB_PLANE];
+  uint32_t tx_skip_buf_size[MAX_MB_PLANE];
+#endif  // CONFIG_PC_WIENER
   /**
    * \name Function pointers to allow separate logic for encoder and decoder.
    */
@@ -1503,6 +1511,20 @@ typedef struct AV1Common {
   int use_cnn[MAX_MB_PLANE];
 #endif  // CONFIG_CNN_RESTORATION
 } AV1_COMMON;
+
+#if CONFIG_PC_WIENER
+void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params);
+void av1_dealloc_txk_skip_array(CommonModeInfoParams *mi_params);
+void av1_reset_txk_skip_array(AV1_COMMON *cm);
+void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
+                             int mi_row, int mi_col, BLOCK_SIZE bsize,
+                             uint8_t value, FILE *fLog);
+void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
+                               int plane, int blk_row, int blk_col,
+                               TX_SIZE tx_size, FILE *fLog);
+uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
+                         int plane, int blk_row, int blk_col);
+#endif  // CONFIG_PC_WIENER
 
 /*!\cond */
 
