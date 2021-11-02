@@ -26,6 +26,10 @@
 
 #include "aom_ports/mem.h"
 
+#if CONFIG_PC_WIENER
+#include "av1/common/pc_wiener_filters.h"
+#endif  // CONFIG_PC_WIENER
+
 #if CONFIG_WIENER_NONSEP
 #define WIENERNS_PREC_BITS_Y_MINUS7 (WIENERNS_PREC_BITS_Y - 7)
 #define AOM_WIENERNS_COEFF_Y(b, m, k)               \
@@ -1029,6 +1033,342 @@ static void sgrproj_filter_stripe(const RestorationUnitInfo *rui,
   }
 }
 
+#if CONFIG_PC_WIENER
+
+static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
+  int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+
+  int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+  return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+}
+
+// TODO: This should remain in sync with av1_convert_qindex_to_q.
+static int get_qstep(int base_qindex, int bit_depth, int *shift) {
+#if CONFIG_EXTQUANT
+  int base_shift = QUANT_TABLE_BITS;
+#else
+  int base_shift = 0;
+#endif  // CONFIG_EXTQUANT
+  switch (bit_depth) {
+    case AOM_BITS_8:
+      *shift = 2 + base_shift;
+      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+    case AOM_BITS_10:
+      *shift = 4 + base_shift;
+      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+    case AOM_BITS_12:
+      *shift = 6 + base_shift;
+      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+    default:
+      assert(0 && "bit_depth should be AOM_BITS_8, AOM_BITS_10 or AOM_BITS_12");
+      return -1;
+  }
+}
+
+static int get_pcwiener_index(int base_qindex, int bit_depth,
+                              int32_t *feature_vector,
+                              int32_t *debug_feature_vector,
+                              int32_t *multiplier) {
+  int qstep_shift = 0;
+  const int qstep = get_qstep(base_qindex, bit_depth, &qstep_shift);
+  qstep_shift += 8;  // normalization in tf
+
+  // actual * 256
+  const int tskip_index = NUM_PC_WIENER_FEATURES;
+  const int tskip = feature_vector[tskip_index];
+  const int tskip_shift = 8;
+  const int diff_shift = qstep_shift - tskip_shift;
+  assert(diff_shift >= 0);
+
+  const int tskip_shifted = tskip * (1 << diff_shift);
+  const int tskip_qstep_prod =
+      ROUND_POWER_OF_TWO_SIGNED(tskip * qstep, tskip_shift);
+  const int total_shift = qstep_shift;
+
+  // Arithmetic ideas: tskip can be divided by 2, qstep can be scaled down.
+  // TODO: tskip needs boundary extension.
+  int lut_input = 0;
+  for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i) {
+    int32_t qval = (mode_weights[i][0] * tskip_shifted) +
+                   (mode_weights[i][1] * qstep) +
+                   (mode_weights[i][2] * tskip_qstep_prod);
+
+    qval = ROUND_POWER_OF_TWO_SIGNED(qval, total_shift);
+    qval += mode_offsets[i];  // actual * (1 << PC_WIENER_PREC_BITS_F)
+
+    qval = ROUND_POWER_OF_TWO_SIGNED(abs(feature_vector[i]) + 255 * qval,
+                                     PC_WIENER_PREC_BITS_F);
+
+    // qval range is [0, 1] -> [0, 255]
+    qval = clip_pixel(qval) >> pc_wiener_threshold_shift;
+    lut_input += qval * pc_wiener_thresholds[i];
+    debug_feature_vector[i] = qval;
+  }
+
+  if (use_multiplier) {
+    int32_t mult = (multiplier_weights[0] * tskip_shifted) +
+                   (multiplier_weights[1] * qstep) +
+                   (multiplier_weights[2] * tskip_qstep_prod);
+    mult = ROUND_POWER_OF_TWO_SIGNED(mult, total_shift) + multiplier_offset;
+    mult = mult < 0 ? 0 : (mult > pcwiener_max_mult ? pcwiener_max_mult : mult);
+    *multiplier = mult;
+  }
+
+  return pc_wiener_lut_to_filter_index[lut_input];
+}
+
+static void calculate_features(int row, int col, int height, int width,
+                               const uint8_t *dgd, int dgd_stride,
+                               const uint8_t *tskip, int tskip_stride,
+                               const NonsepFilterConfig *pcwiener_y,
+                               int32_t *feature_vector) {
+  for (int f = 0; f < NUM_PC_WIENER_FEATURES + 1; ++f) {
+    feature_vector[f] = 0;
+  }
+
+  const bool use_strict_bounds = pcwiener_y->strict_bounds;
+  const bool use_tskip_strict_bounds = true;
+  for (int k = 0; k < pcwiener_y->num_pixels; ++k) {
+    const int pos = pcwiener_y->config[k][NONSEP_BUF_POS];
+    const int r = pcwiener_y->config[k][NONSEP_ROW_ID];
+    const int c = pcwiener_y->config[k][NONSEP_COL_ID];
+    const int ir =
+        use_strict_bounds ? AOMMAX(AOMMIN(row + r, height - 1), 0) : row + r;
+    const int jc =
+        use_strict_bounds ? AOMMAX(AOMMIN(col + c, width - 1), 0) : col + c;
+
+    // Calculate image features.
+    const int32_t value = dgd[(ir)*dgd_stride + (jc)];
+    for (int f = 0; f < NUM_PC_WIENER_FEATURES; ++f) {
+      // Should swap the dimensions in feature_filters defn to make this faster.
+      feature_vector[f] += feature_filters[f][pos] * value;
+    }
+
+    // Calculate tskip feature.
+    const int16_t filter_tap = (int)(256 / NUM_PC_WIENER_TAPS);
+    const int tskip_index = NUM_PC_WIENER_FEATURES;
+    const int ts_ir =
+        use_tskip_strict_bounds ? AOMMAX(AOMMIN(ir, height - 1), 0) : ir;
+    const int ts_jc =
+        use_tskip_strict_bounds ? AOMMAX(AOMMIN(jc, width - 1), 0) : jc;
+    feature_vector[tskip_index] +=
+        filter_tap *
+        tskip[(ts_ir >> MI_SIZE_LOG2) * tskip_stride + (ts_jc >> MI_SIZE_LOG2)];
+  }
+}
+
+static void calculate_features_highbd(int row, int col, int height, int width,
+                                      const uint16_t *dgd, int dgd_stride,
+                                      const uint8_t *tskip, int tskip_stride,
+                                      const NonsepFilterConfig *pcwiener_y,
+                                      int32_t *feature_vector) {
+  for (int f = 0; f < NUM_PC_WIENER_FEATURES + 1; ++f) {
+    feature_vector[f] = 0;
+  }
+
+  const bool use_strict_bounds = pcwiener_y->strict_bounds;
+  const bool use_tskip_strict_bounds = true;
+  for (int k = 0; k < pcwiener_y->num_pixels; ++k) {
+    const int pos = pcwiener_y->config[k][NONSEP_BUF_POS];
+    const int r = pcwiener_y->config[k][NONSEP_ROW_ID];
+    const int c = pcwiener_y->config[k][NONSEP_COL_ID];
+    const int ir =
+        use_strict_bounds ? AOMMAX(AOMMIN(row + r, height - 1), 0) : row + r;
+    const int jc =
+        use_strict_bounds ? AOMMAX(AOMMIN(col + c, width - 1), 0) : col + c;
+
+    // Calculate image features.
+    const int32_t value = dgd[(ir)*dgd_stride + (jc)];
+    for (int f = 0; f < NUM_PC_WIENER_FEATURES; ++f) {
+      // Should swap the dimensions in feature_filters defn to make this faster.
+      feature_vector[f] += feature_filters[f][pos] * value;
+    }
+
+    // Calculate tskip feature.
+    const int16_t filter_tap = (int)(256 / NUM_PC_WIENER_TAPS);
+    const int tskip_index = NUM_PC_WIENER_FEATURES;
+    const int ts_ir =
+        use_tskip_strict_bounds ? AOMMAX(AOMMIN(ir, height - 1), 0) : ir;
+    const int ts_jc =
+        use_tskip_strict_bounds ? AOMMAX(AOMMIN(jc, width - 1), 0) : jc;
+    feature_vector[tskip_index] +=
+        filter_tap *
+        tskip[(ts_ir >> MI_SIZE_LOG2) * tskip_stride + (ts_jc >> MI_SIZE_LOG2)];
+  }
+}
+
+void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
+                     uint8_t *dst, int dst_stride, const uint8_t *tskip,
+                     int tskip_stride, int base_qindex, bool is_uv,
+                     int bit_depth) {
+  const int pcwiener_y_pixel =
+      sizeof(pcwiener_config_y) / sizeof(pcwiener_config_y[0]);
+  const NonsepFilterConfig pcwiener_y = {
+    PC_WIENER_PREC_BITS_Y, pcwiener_y_pixel, 0, pcwiener_config_y, NULL, 0,
+  };
+
+  if (is_uv) {
+    // Not filtering uv for now.
+    for (int i = 0; i < height; ++i) {
+      for (int j = 0; j < width; ++j) {
+        dst[i * dst_stride + j] = dgd[i * stride + j];
+      }
+    }
+    return;
+  }
+
+  int32_t feature_vector[NUM_PC_WIENER_FEATURES + 1];        // 255 x actual
+  int32_t debug_feature_vector[NUM_PC_WIENER_FEATURES + 1];  // 255 x actual
+  int32_t multiplier;
+
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+      calculate_features(i, j, height, width, dgd, stride, tskip, tskip_stride,
+                         &pcwiener_y, feature_vector);
+      const int filter_index =
+          get_pcwiener_index(base_qindex, bit_depth, feature_vector,
+                             debug_feature_vector, &multiplier);
+      const int32_t *filter = pc_wiener_filters[filter_index];
+
+      int dgd_id = i * stride + j;
+      int32_t tmp = 0;
+      const bool use_strict_bounds = pcwiener_y.strict_bounds;
+      for (int k = 0; k < pcwiener_y.num_pixels; ++k) {
+        const int pos = pcwiener_y.config[k][NONSEP_BUF_POS];
+        const int r = pcwiener_y.config[k][NONSEP_ROW_ID];
+        const int c = pcwiener_y.config[k][NONSEP_COL_ID];
+        const int ir =
+            use_strict_bounds ? AOMMAX(AOMMIN(i + r, height - 1), 0) : i + r;
+        const int jc =
+            use_strict_bounds ? AOMMAX(AOMMIN(j + c, width - 1), 0) : j + c;
+        tmp += filter[pos] * dgd[(ir)*stride + (jc)];
+      }
+
+      if (use_multiplier) {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, pcwiener_y.prec_bits - PC_WIENER_MULT_ROOM);
+        tmp *= multiplier;
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM);
+      } else {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, pcwiener_y.prec_bits);
+      }
+      tmp += (int32_t)dgd[dgd_id];
+
+      int dst_id = i * dst_stride + j;
+      dst[dst_id] = (uint8_t)clip_pixel(tmp);
+    }
+  }
+}
+
+void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
+                            int stride, uint8_t *dst8, int dst_stride,
+                            const uint8_t *tskip, int tskip_stride,
+                            int base_qindex, bool is_uv, int bit_depth) {
+  const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
+  uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
+
+  const int pcwiener_y_pixel =
+      sizeof(pcwiener_config_y) / sizeof(pcwiener_config_y[0]);
+  const NonsepFilterConfig pcwiener_y = {
+    PC_WIENER_PREC_BITS_Y, pcwiener_y_pixel, 0, pcwiener_config_y, NULL, 0,
+  };
+
+  if (is_uv) {
+    // Not filtering uv for now.
+    for (int i = 0; i < height; ++i) {
+      for (int j = 0; j < width; ++j) {
+        dst[i * dst_stride + j] = dgd[i * stride + j];
+      }
+    }
+    return;
+  }
+
+  int32_t feature_vector[NUM_PC_WIENER_FEATURES + 1];        // 255 x actual
+  int32_t debug_feature_vector[NUM_PC_WIENER_FEATURES + 1];  // 255 x actual
+  int32_t multiplier;
+
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+      calculate_features_highbd(i, j, height, width, dgd, stride, tskip,
+                                tskip_stride, &pcwiener_y, feature_vector);
+      const int filter_index =
+          get_pcwiener_index(base_qindex, bit_depth, feature_vector,
+                             debug_feature_vector, &multiplier);
+      const int32_t *filter = pc_wiener_filters[filter_index];
+
+      int dgd_id = i * stride + j;
+      int32_t tmp = 0;
+      const bool use_strict_bounds = pcwiener_y.strict_bounds;
+      for (int k = 0; k < pcwiener_y.num_pixels; ++k) {
+        const int pos = pcwiener_y.config[k][NONSEP_BUF_POS];
+        const int r = pcwiener_y.config[k][NONSEP_ROW_ID];
+        const int c = pcwiener_y.config[k][NONSEP_COL_ID];
+        const int ir =
+            use_strict_bounds ? AOMMAX(AOMMIN(i + r, height - 1), 0) : i + r;
+        const int jc =
+            use_strict_bounds ? AOMMAX(AOMMIN(j + c, width - 1), 0) : j + c;
+        tmp += filter[pos] * dgd[(ir)*stride + (jc)];
+      }
+
+      if (use_multiplier) {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, pcwiener_y.prec_bits - PC_WIENER_MULT_ROOM);
+        tmp *= multiplier;
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM);
+      } else {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, pcwiener_y.prec_bits);
+      }
+      tmp += (int32_t)dgd[dgd_id];
+
+      int dst_id = i * dst_stride + j;
+      dst[dst_id] = (uint8_t)clip_pixel(tmp);
+    }
+  }
+}
+
+static void pc_wiener_stripe(const RestorationUnitInfo *rui, int stripe_width,
+                             int stripe_height, int procunit_width,
+                             const uint8_t *src, int src_stride, uint8_t *dst,
+                             int dst_stride, int32_t *tmpbuf, int bit_depth) {
+  (void)tmpbuf;
+  (void)bit_depth;
+  assert(rui->tskip);
+  bool is_uv = (rui->plane != AOM_PLANE_Y);
+
+  for (int j = 0; j < stripe_width; j += procunit_width) {
+    int w = AOMMIN(procunit_width, stripe_width - j);
+
+    apply_pc_wiener(src + j, w, stripe_height, src_stride, dst + j, dst_stride,
+                    rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+                    rui->base_qindex, is_uv, bit_depth);
+  }
+}
+
+static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
+                                    int stripe_width, int stripe_height,
+                                    int procunit_width, const uint8_t *src,
+                                    int src_stride, uint8_t *dst,
+                                    int dst_stride, int32_t *tmpbuf,
+                                    int bit_depth) {
+  (void)tmpbuf;
+  (void)bit_depth;
+  assert(rui->tskip);
+  bool is_uv = (rui->plane != AOM_PLANE_Y);
+
+  for (int j = 0; j < stripe_width; j += procunit_width) {
+    int w = AOMMIN(procunit_width, stripe_width - j);
+
+    apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
+                           dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
+                           rui->tskip_stride, rui->base_qindex, is_uv,
+                           bit_depth);
+  }
+}
+#endif  // CONFIG_PC_WIENER
+
 #if CONFIG_WIENER_NONSEP
 void apply_wiener_nonsep(const uint8_t *dgd, int width, int height, int stride,
                          const int16_t *filter, uint8_t *dst, int dst_stride,
@@ -1272,13 +1612,37 @@ typedef void (*stripe_filter_fun)(const RestorationUnitInfo *rui,
                                   int src_stride, uint8_t *dst, int dst_stride,
                                   int32_t *tmpbuf, int bit_depth);
 
-#if CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#define NUM_STRIPE_FILTERS 8
+
+static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
+  wiener_filter_stripe,
+  sgrproj_filter_stripe,
+  pc_wiener_stripe,
+  wiener_nsfilter_stripe,
+  wiener_filter_stripe_highbd,
+  sgrproj_filter_stripe_highbd,
+  pc_wiener_stripe_highbd,
+  wiener_nsfilter_stripe_highbd
+};
+#elif CONFIG_WIENER_NONSEP
 #define NUM_STRIPE_FILTERS 6
 
 static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
   wiener_filter_stripe,         sgrproj_filter_stripe,
   wiener_nsfilter_stripe,       wiener_filter_stripe_highbd,
   sgrproj_filter_stripe_highbd, wiener_nsfilter_stripe_highbd
+};
+#elif CONFIG_PC_WIENER
+#define NUM_STRIPE_FILTERS 6
+
+static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
+  wiener_filter_stripe,
+  sgrproj_filter_stripe,
+  pc_wiener_stripe,
+  wiener_filter_stripe_highbd,
+  sgrproj_filter_stripe_highbd,
+  pc_wiener_stripe_highbd,
 };
 #else
 #define NUM_STRIPE_FILTERS 4
@@ -1314,7 +1678,7 @@ void av1_loop_restoration_filter_unit(
 
   const int procunit_width = RESTORATION_PROC_UNIT_SIZE >> ss_x;
 
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
+#if CONFIG_WIENER_NONSEP_CROSS_FILT || CONFIG_PC_WIENER
   // rui is a pointer to a const but we modify its contents when calling
   // stripe_filter(). Use a temporary for now and refactor the datastructure
   // later.
@@ -1322,13 +1686,19 @@ void av1_loop_restoration_filter_unit(
   RestorationUnitInfo *tmp_rui = &rui_contents;
 #else
   const RestorationUnitInfo *tmp_rui = rui;
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT || CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint8_t *luma_in_plane = rui->luma;
   const uint8_t *luma_in_ru =
       luma_in_plane + limits->v_start * rui->luma_stride + limits->h_start;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+
+#if CONFIG_PC_WIENER
+  const uint8_t *tskip_in_ru =
+      rui->tskip + (limits->v_start >> MI_SIZE_LOG2) * rui->tskip_stride +
+      (limits->h_start >> MI_SIZE_LOG2);
+#endif  // CONFIG_PC_WIENER
 
   // Convolve the whole tile one stripe at a time
   RestorationTileLimits remaining_stripes = *limits;
@@ -1366,6 +1736,9 @@ void av1_loop_restoration_filter_unit(
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
     tmp_rui->luma = luma_in_ru + i * rui->luma_stride;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+#if CONFIG_PC_WIENER
+    tmp_rui->tskip = tskip_in_ru + (i >> MI_SIZE_LOG2) * rui->tskip_stride;
+#endif  // CONFIG_PC_WIENER
 
     stripe_filter(tmp_rui, unit_w, h, procunit_width, data8_tl + i * stride,
                   stride, dst8_tl + i * dst_stride, dst_stride, tmpbuf,
@@ -1394,6 +1767,12 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
   rsi->unit_info[rest_unit_idx].luma_stride = is_uv ? ctxt->luma_stride : -1;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  rsi->unit_info[rest_unit_idx].tskip = ctxt->tskip;
+  rsi->unit_info[rest_unit_idx].tskip_stride = ctxt->tskip_stride;
+  rsi->unit_info[rest_unit_idx].base_qindex = ctxt->base_qindex;
+  rsi->unit_info[rest_unit_idx].plane = ctxt->plane;
+#endif  // CONFIG_PC_WIENER
 
   av1_loop_restoration_filter_unit(
       limits, &rsi->unit_info[rest_unit_idx], &rsi->boundaries, rlbs, tile_rect,
@@ -1509,6 +1888,12 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     ctxt[plane].luma_stride = is_uv ? luma_stride : -1;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+    ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
+    ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
+    ctxt[plane].base_qindex = cm->quant_params.base_qindex;
+    ctxt[plane].plane = plane;
+#endif  // CONFIG_PC_WIENER
 
     av1_foreach_rest_unit_in_plane(cm, plane, lr_ctxt->on_rest_unit,
                                    &ctxt[plane], &ctxt[plane].tile_rect,
