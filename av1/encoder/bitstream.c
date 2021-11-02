@@ -2210,6 +2210,12 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     write_tokens_b(cpi, w, tok, tok_end);
   }
+#if CONFIG_PC_WIENER
+  else {
+    assert(1 == av1_get_txk_skip(cm, xd->mi_row, xd->mi_col, 0, 0, 0));
+  }
+#endif  // CONFIG_PC_WIENER
+
 #if CONFIG_IBC_SR_EXT
   av1_mark_block_as_coded(xd, mi_row, mi_col, bsize, cm->seq_params.sb_size);
 #endif  // CONFIG_IBC_SR_EXT
@@ -2450,9 +2456,9 @@ static AOM_INLINE void encode_restoration_mode(
     }
     switch (rsi->frame_restoration_type) {
       case RESTORE_NONE: aom_wb_write_bit(wb, 0); aom_wb_write_bit(wb, 0);
-#if CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
         aom_wb_write_bit(wb, 0);
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
         break;
       case RESTORE_WIENER:
         aom_wb_write_bit(wb, 1);
@@ -2467,8 +2473,21 @@ static AOM_INLINE void encode_restoration_mode(
         aom_wb_write_bit(wb, 0);
         aom_wb_write_bit(wb, 0);
         aom_wb_write_bit(wb, 1);
+#if CONFIG_PC_WIENER
+        aom_wb_write_bit(wb, 0);
+#endif  // CONFIG_PC_WIENER
         break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+      case RESTORE_PC_WIENER:
+        aom_wb_write_bit(wb, 0);
+        aom_wb_write_bit(wb, 0);
+        aom_wb_write_bit(wb, 1);
+#if CONFIG_WIENER_NONSEP
+        aom_wb_write_bit(wb, 1);
+#endif  // CONFIG_WIENER_NONSEP
+        break;
+#endif  // CONFIG_PC_WIENER
       case RESTORE_SWITCHABLE:
         aom_wb_write_bit(wb, 0);
         aom_wb_write_bit(wb, 1);
@@ -2685,6 +2704,11 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
                               ref_wiener_nonsep_info, w);
         break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+      case RESTORE_PC_WIENER:
+        // No side-information for now.
+        break;
+#endif  // CONFIG_PC_WIENER
       default: assert(unit_rtype == RESTORE_NONE); break;
     }
   } else if (frame_rtype == RESTORE_WIENER) {
@@ -2718,6 +2742,17 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
                             ref_wiener_nonsep_info, w);
     }
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  } else if (frame_rtype == RESTORE_PC_WIENER) {
+    aom_write_symbol(w, unit_rtype != RESTORE_NONE,
+                     xd->tile_ctx->pc_wiener_restore_cdf, 2);
+#if CONFIG_ENTROPY_STATS
+    ++counts->pc_wiener_restore[unit_rtype != RESTORE_NONE];
+#endif  // CONFIG_ENTROPY_STATS
+    if (unit_rtype != RESTORE_NONE) {
+      // No side-information for now.
+    }
+#endif  // CONFIG_PC_WIENER
   }
 }
 #if !CONFIG_NEW_DF
