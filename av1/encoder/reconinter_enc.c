@@ -48,10 +48,10 @@ static void enc_calc_subpel_params(const MV *const src_mv,
 
   const struct scale_factors *sf = inter_pred_params->scale_factors;
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
-#if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_OPTFLOW_REFINEMENT || CONFIG_EXT_RECUR_PARTITIONS
   const int is_scaled = av1_is_scaled(sf);
   if (is_scaled || !xd) {
-#endif  // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_OPTFLOW_REFINEMENT || CONFIG_EXT_RECUR_PARTITIONS
     int ssx = inter_pred_params->subsampling_x;
     int ssy = inter_pred_params->subsampling_y;
     int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
@@ -89,10 +89,11 @@ static void enc_calc_subpel_params(const MV *const src_mv,
     subpel_params->ys = sf->y_step_q4;
     *pre = pre_buf->buf0 + (pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
            (pos_x >> SCALE_SUBPEL_BITS);
-#if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_OPTFLOW_REFINEMENT || CONFIG_EXT_RECUR_PARTITIONS
   } else {
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
     int pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+#if CONFIG_OPTFLOW_REFINEMENT
     const int bw = use_optflow_refinement ? inter_pred_params->orig_block_width
                                           : inter_pred_params->block_width;
     const int bh = use_optflow_refinement ? inter_pred_params->orig_block_height
@@ -100,6 +101,13 @@ static void enc_calc_subpel_params(const MV *const src_mv,
     const MV mv_q4 = clamp_mv_to_umv_border_sb(
         xd, src_mv, bw, bh, use_optflow_refinement,
         inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+#else
+    const int bw = inter_pred_params->block_width;
+    const int bh = inter_pred_params->block_height;
+    const MV mv_q4 = clamp_mv_to_umv_border_sb(
+        xd, src_mv, bw, bh, inter_pred_params->subsampling_x,
+        inter_pred_params->subsampling_y);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     subpel_params->xs = subpel_params->ys = SCALE_SUBPEL_SHIFTS;
     subpel_params->subpel_x = (mv_q4.col & SUBPEL_MASK) << SCALE_EXTRA_BITS;
     subpel_params->subpel_y = (mv_q4.row & SUBPEL_MASK) << SCALE_EXTRA_BITS;
@@ -108,7 +116,7 @@ static void enc_calc_subpel_params(const MV *const src_mv,
     *pre = pre_buf->buf0 + (pos_y >> SUBPEL_BITS) * pre_buf->stride +
            (pos_x >> SUBPEL_BITS);
   }
-#endif  // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_OPTFLOW_REFINEMENT || CONFIG_EXT_RECUR_PARTITIONS
   *src_stride = pre_buf->stride;
 }
 
@@ -187,21 +195,15 @@ static void setup_address_for_obmc(MACROBLOCKD *xd, int mi_row_offset,
                                    int mi_col_offset, MB_MODE_INFO *ref_mbmi,
                                    struct build_prediction_ctxt *ctxt,
                                    const int num_planes) {
-#if CONFIG_SDP
-  const BLOCK_SIZE ref_bsize =
-      AOMMAX(BLOCK_8X8, ref_mbmi->sb_type[PLANE_TYPE_Y]);
-#else
-  const BLOCK_SIZE ref_bsize = AOMMAX(BLOCK_8X8, ref_mbmi->sb_type);
-#endif
   const int ref_mi_row = xd->mi_row + mi_row_offset;
   const int ref_mi_col = xd->mi_col + mi_col_offset;
 
   for (int plane = 0; plane < num_planes; ++plane) {
     struct macroblockd_plane *const pd = &xd->plane[plane];
-    setup_pred_plane(&pd->dst, ref_bsize, ctxt->tmp_buf[plane],
-                     ctxt->tmp_width[plane], ctxt->tmp_height[plane],
-                     ctxt->tmp_stride[plane], mi_row_offset, mi_col_offset,
-                     NULL, pd->subsampling_x, pd->subsampling_y);
+    setup_pred_plane(&pd->dst, ctxt->tmp_buf[plane], ctxt->tmp_width[plane],
+                     ctxt->tmp_height[plane], ctxt->tmp_stride[plane],
+                     mi_row_offset, mi_col_offset, NULL, pd->subsampling_x,
+                     pd->subsampling_y, NULL);
   }
 
   const MV_REFERENCE_FRAME frame = ref_mbmi->ref_frame[0];
@@ -216,7 +218,7 @@ static void setup_address_for_obmc(MACROBLOCKD *xd, int mi_row_offset,
                        "Reference frame has invalid dimensions");
 
   av1_setup_pre_planes(xd, 0, &ref_buf->buf, ref_mi_row, ref_mi_col, sf,
-                       num_planes);
+                       num_planes, NULL);
 }
 
 static INLINE void build_obmc_prediction(MACROBLOCKD *xd, int rel_mi_row,
@@ -331,13 +333,8 @@ void av1_build_obmc_inter_predictors_sb(const AV1_COMMON *cm, MACROBLOCKD *xd) {
                                       dst_stride1);
   av1_build_prediction_by_left_preds(cm, xd, dst_buf2, dst_width2, dst_height2,
                                      dst_stride2);
-#if CONFIG_SDP
-  av1_setup_dst_planes(xd->plane, xd->mi[0]->sb_type[PLANE_TYPE_Y],
-                       &cm->cur_frame->buf, mi_row, mi_col, 0, num_planes);
-#else
-  av1_setup_dst_planes(xd->plane, xd->mi[0]->sb_type, &cm->cur_frame->buf,
-                       mi_row, mi_col, 0, num_planes);
-#endif
+  av1_setup_dst_planes(xd->plane, &cm->cur_frame->buf, mi_row, mi_col, 0,
+                       num_planes, &xd->mi[0]->chroma_ref_info);
   av1_build_obmc_inter_prediction(cm, xd, dst_buf1, dst_stride1, dst_buf2,
                                   dst_stride2);
 }
@@ -345,7 +342,6 @@ void av1_build_obmc_inter_predictors_sb(const AV1_COMMON *cm, MACROBLOCKD *xd) {
 void av1_build_inter_predictors_for_planes_single_buf(
     MACROBLOCKD *xd, BLOCK_SIZE bsize, int plane_from, int plane_to, int ref,
     uint8_t *ext_dst[3], int ext_dst_stride[3]) {
-  assert(bsize < BLOCK_SIZES_ALL);
   const MB_MODE_INFO *mi = xd->mi[0];
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -358,8 +354,18 @@ void av1_build_inter_predictors_for_planes_single_buf(
 
   for (int plane = plane_from; plane <= plane_to; ++plane) {
     const struct macroblockd_plane *pd = &xd->plane[plane];
+#if CONFIG_EXT_RECUR_PARTITIONS || CONFIG_SDP
+    const BLOCK_SIZE plane_bsize = get_mb_plane_block_size(
+        xd, mi, plane, pd->subsampling_x, pd->subsampling_y);
+#if CONFIG_SDP
+    assert(plane_bsize ==
+           get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y));
+#endif  // CONFIG_SDP
+    (void)bsize;
+#else
     const BLOCK_SIZE plane_bsize =
         get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS || CONFIG_SDP
     const int bw = block_size_wide[plane_bsize];
     const int bh = block_size_high[plane_bsize];
 
@@ -483,10 +489,21 @@ void av1_build_wedge_inter_predictor_from_buf(MACROBLOCKD *xd, BLOCK_SIZE bsize,
                                               uint8_t *ext_dst1[3],
                                               int ext_dst_stride1[3]) {
   int plane;
-  assert(bsize < BLOCK_SIZES_ALL);
   for (plane = plane_from; plane <= plane_to; ++plane) {
+#if CONFIG_EXT_RECUR_PARTITIONS || CONFIG_SDP
+    const BLOCK_SIZE plane_bsize = get_mb_plane_block_size(
+        xd, xd->mi[0], plane, xd->plane[plane].subsampling_x,
+        xd->plane[plane].subsampling_y);
+#if CONFIG_SDP
+    assert(plane_bsize == get_plane_block_size(bsize,
+                                               xd->plane[plane].subsampling_x,
+                                               xd->plane[plane].subsampling_y));
+#endif  // CONFIG_SDP
+    (void)bsize;
+#else
     const BLOCK_SIZE plane_bsize = get_plane_block_size(
         bsize, xd->plane[plane].subsampling_x, xd->plane[plane].subsampling_y);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS || CONFIG_SDP
     const int bw = block_size_wide[plane_bsize];
     const int bh = block_size_high[plane_bsize];
     build_wedge_inter_predictor_from_buf(
