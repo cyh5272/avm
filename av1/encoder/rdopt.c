@@ -4434,7 +4434,7 @@ static AOM_INLINE void init_mode_skip_mask(mode_skip_mask_t *mask,
     min_pred_mv_sad = AOMMIN(min_pred_mv_sad, x->pred_mv_sad[ref_frame]);
 
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
-    if (!(cpi->ref_frame_flags & av1_ref_frame_flag_list[ref_frame])) {
+    if (!(cm->ref_frame_flags & av1_ref_frame_flag_list[ref_frame])) {
       // Skip checking missing reference in both single and compound reference
       // modes.
       disable_reference(ref_frame, mask->ref_combo);
@@ -4480,7 +4480,7 @@ static AOM_INLINE void init_mode_skip_mask(mode_skip_mask_t *mask,
 
   if (cpi->rc.is_src_frame_alt_ref) {
     if (sf->inter_sf.alt_ref_search_fp) {
-      assert(cpi->ref_frame_flags & av1_ref_frame_flag_list[ALTREF_FRAME]);
+      assert(cm->ref_frame_flags & av1_ref_frame_flag_list[ALTREF_FRAME]);
       mask->pred_modes[ALTREF_FRAME] = 0;
       disable_inter_references_except_altref(mask->ref_combo);
       disable_reference(INTRA_FRAME, mask->ref_combo);
@@ -4576,7 +4576,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
     x->pred_mv_sad[ref_frame] = INT_MAX;
     x->mbmi_ext->mode_context[ref_frame] = 0;
     mbmi_ext->ref_mv_count[ref_frame] = UINT8_MAX;
-    if (cpi->ref_frame_flags & av1_ref_frame_flag_list[ref_frame]) {
+    if (cm->ref_frame_flags & av1_ref_frame_flag_list[ref_frame]) {
       if (mbmi->partition != PARTITION_NONE &&
           mbmi->partition != PARTITION_SPLIT) {
         if (skip_ref_frame_mask & (1 << ref_frame)) {
@@ -4609,8 +4609,8 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
       x->mbmi_ext->mode_context[ref_frame] = 0;
       mbmi_ext->ref_mv_count[ref_frame] = UINT8_MAX;
       const MV_REFERENCE_FRAME *rf = ref_frame_map[ref_frame - REF_FRAMES];
-      if (!((cpi->ref_frame_flags & av1_ref_frame_flag_list[rf[0]]) &&
-            (cpi->ref_frame_flags & av1_ref_frame_flag_list[rf[1]]))) {
+      if (!((cm->ref_frame_flags & av1_ref_frame_flag_list[rf[0]]) &&
+            (cm->ref_frame_flags & av1_ref_frame_flag_list[rf[1]]))) {
         continue;
       }
 
@@ -4787,7 +4787,8 @@ static int inter_mode_compatible_skip(const AV1_COMP *cpi, const MACROBLOCK *x,
   const int comp_pred = ref_frames[1] > INTRA_FRAME;
   if (comp_pred) {
     if (!is_comp_ref_allowed(bsize)) return 1;
-    if (!(cpi->ref_frame_flags & av1_ref_frame_flag_list[ref_frames[1]])) {
+    if (!(cpi->common.ref_frame_flags &
+          av1_ref_frame_flag_list[ref_frames[1]])) {
       return 1;
     }
 
