@@ -299,6 +299,10 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
                            fc->wiener_nonsep_restore_cdf, NULL);
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
+                           fc->pc_wiener_restore_cdf, NULL);
+#endif  // CONFIG_PC_WIENER
   av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
 #if CONFIG_BVP_IMPROVEMENT
   av1_cost_tokens_from_cdf(mode_costs->intrabc_mode_cost, fc->intrabc_mode_cdf,

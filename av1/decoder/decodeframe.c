@@ -194,6 +194,13 @@ static AOM_INLINE void read_coeffs_tx_intra_block(
     ++cm->txb_count;
 #endif
   }
+#if CONFIG_PC_WIENER
+  else {
+    // all tx blocks are skipped.
+    av1_update_txk_skip_array(cm, dcb->xd.mi_row, dcb->xd.mi_col, plane, row,
+                              col, tx_size, cm->mi_params.fDecTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER
 }
 
 static AOM_INLINE void decode_block_void(const AV1_COMMON *const cm,
@@ -1160,6 +1167,11 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   DecoderCodingBlock *const dcb = &td->dcb;
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *mbmi = xd->mi[0];
+#if CONFIG_PC_WIENER
+  av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
+                          cm->mi_params.fDecTxSkipLog);
+#endif  // CONFIG_PC_WIENER
+
   xd->mi[0]->partition = partition;
   const int plane_start = get_partition_plane_start(xd->tree_type);
   const int plane_end =
@@ -1260,6 +1272,12 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
         }
       }
     }
+#if CONFIG_PC_WIENER
+    else {
+      av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 1,
+                              cm->mi_params.fDecTxSkipLog);
+    }
+#endif  // CONFIG_PC_WIENER
     td->cfl_store_inter_block_visit(cm, xd);
   }
 
@@ -2071,12 +2089,26 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       if (aom_rb_read_bit(rb)) {
         rsi->frame_restoration_type = RESTORE_SWITCHABLE;
       } else {
+#if CONFIG_PC_WIENER
+        if (aom_rb_read_bit(rb)) {
 #if CONFIG_WIENER_NONSEP
+          if (aom_rb_read_bit(rb)) {
+            rsi->frame_restoration_type = RESTORE_PC_WIENER;
+          } else {
+            rsi->frame_restoration_type = RESTORE_WIENER_NONSEP;
+          }
+#else
+          rsi->frame_restoration_type = RESTORE_PC_WIENER;
+#endif  // CONFIG_WIENER_NONSEP
+        } else {
+          rsi->frame_restoration_type = RESTORE_NONE;
+        }
+#elif CONFIG_WIENER_NONSEP
         rsi->frame_restoration_type =
             aom_rb_read_bit(rb) ? RESTORE_WIENER_NONSEP : RESTORE_NONE;
 #else
         rsi->frame_restoration_type = RESTORE_NONE;
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_PC_WIENER
       }
     }
     if (rsi->frame_restoration_type != RESTORE_NONE) {
@@ -2308,6 +2340,11 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
                              wiener_nonsep_info, r);
         break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+      case RESTORE_PC_WIENER:
+        // No side-information for now.
+        break;
+#endif  // CONFIG_PC_WIENER
       default: assert(rui->restoration_type == RESTORE_NONE); break;
     }
   } else if (rsi->frame_restoration_type == RESTORE_WIENER) {
@@ -2335,6 +2372,15 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
       rui->restoration_type = RESTORE_NONE;
     }
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  } else if (rsi->frame_restoration_type == RESTORE_PC_WIENER) {
+    if (aom_read_symbol(r, xd->tile_ctx->pc_wiener_restore_cdf, 2, ACCT_STR)) {
+      rui->restoration_type = RESTORE_PC_WIENER;
+      // No side-information for now.
+    } else {
+      rui->restoration_type = RESTORE_NONE;
+    }
+#endif  // CONFIG_PC_WIENER
   }
 }
 #if CONFIG_NEW_DF
