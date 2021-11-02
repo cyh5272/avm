@@ -1649,6 +1649,75 @@ static AOM_INLINE void finalize_sym_filter(int wiener_win, int32_t *f,
   fi[3] = -2 * (fi[0] + fi[1] + fi[2]);
 }
 
+#if CONFIG_PC_WIENER
+
+static int count_pc_wiener_bits() {
+  // No side-information for now.
+  return 0;
+}
+
+static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
+  int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+
+  int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+  return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+}
+
+static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
+                                        const AV1PixelRect *tile_rect,
+                                        int rest_unit_idx, void *priv,
+                                        int32_t *tmpbuf,
+                                        RestorationLineBuffers *rlbs) {
+  (void)tmpbuf;
+  (void)rlbs;
+
+  RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
+  RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
+
+  const int bit_depth = rsc->cm->seq_params.bit_depth;
+  const MACROBLOCK *const x = rsc->x;
+  const int64_t bits_none = x->mode_costs.pc_wiener_restore_cost[0];
+  const int plane = rsc->plane;
+
+  if (plane != AOM_PLANE_Y) {
+    rsc->bits += bits_none;
+    rsc->sse += rusi->sse[RESTORE_NONE];
+    rusi->best_rtype[RESTORE_PC_WIENER - 1] = RESTORE_NONE;
+    rusi->sse[RESTORE_PC_WIENER] = INT64_MAX;
+    return;
+  }
+
+  RestorationUnitInfo rui;
+  rui.plane = plane;
+  rui.restoration_type = RESTORE_PC_WIENER;
+  rui.tskip = rsc->cm->mi_params.tx_skip[plane];
+  rui.tskip_stride = get_tskip_stride(rsc->cm, plane);
+  rui.base_qindex = rsc->cm->quant_params.base_qindex;
+
+  rusi->sse[RESTORE_PC_WIENER] =
+      try_restoration_unit(rsc, limits, tile_rect, &rui);
+
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+
+  const int64_t bits_pc_wiener =
+      x->mode_costs.pc_wiener_restore_cost[1] +
+      (count_pc_wiener_bits() << AV1_PROB_COST_SHIFT);
+  double cost_pc_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      x->rdmult, bits_pc_wiener >> 4, rusi->sse[RESTORE_PC_WIENER], bit_depth);
+
+  RestorationType rtype =
+      (cost_pc_wiener < cost_none) ? RESTORE_PC_WIENER : RESTORE_NONE;
+  rusi->best_rtype[RESTORE_PC_WIENER - 1] = rtype;
+
+  rsc->sse += rusi->sse[rtype];
+  rsc->bits += (cost_pc_wiener < cost_none) ? bits_pc_wiener : bits_none;
+
+  // No side-information for now to copy to info.
+}
+#endif  // CONFIG_PC_WIENER
+
 static int count_wiener_bits(int wiener_win, WienerInfo *wiener_info,
                              WienerInfo *ref_wiener_info) {
   int bits = 0;
@@ -2591,6 +2660,12 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
                                         &rsc->wiener_nonsep);
       break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+    case RESTORE_PC_WIENER:
+      // No side-information for now.
+      coeff_pcost = 0;
+      break;
+#endif  // CONFIG_PC_WIENER
     default: assert(0); break;
   }
   const int64_t coeff_bits = coeff_pcost << AV1_PROB_COST_SHIFT;
@@ -2613,6 +2688,12 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
         merged = 1;
     } break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+    case RESTORE_PC_WIENER:
+      // No side-information for now.
+      merged = 1;
+      break;
+#endif  // CONFIG_PC_WIENER
     default: break;
   }
   if (rest_type != RESTORE_NONE) {
@@ -2673,6 +2754,11 @@ RestSearchCtxt switchable_update_refs(Vector *path, const RestSearchCtxt *rsc,
         rsc_dup.wiener_nonsep = visited_rusi->wiener_nonsep;
         break;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+      case RESTORE_PC_WIENER:
+        // No side-information for now.
+        break;
+#endif  // CONFIG_PC_WIENER
       default: assert(0); break;
     }
   }
@@ -2885,6 +2971,11 @@ static void search_switchable(const RestorationTileLimits *limits,
     if (best_rtype == RESTORE_WIENER_NONSEP)
       rsc->wiener_nonsep = rusi->wiener_nonsep;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+    if (best_rtype == RESTORE_PC_WIENER) {
+      // No side-information for now.
+    }
+#endif  // CONFIG_PC_WIENER
   }
 }
 
@@ -2898,6 +2989,11 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   else if (rui->restoration_type == RESTORE_WIENER_NONSEP)
     rui->wiener_nonsep_info = rusi->wiener_nonsep;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  else if (rui->restoration_type == RESTORE_PC_WIENER) {
+    // No side-information for now.
+  }
+#endif  // CONFIG_PC_WIENER
   else
     rui->sgrproj_info = rusi->sgrproj;
 }
@@ -2907,6 +3003,9 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
     search_norestore,
     search_wiener,
     search_sgrproj,
+#if CONFIG_PC_WIENER
+    search_pc_wiener,
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_WIENER_NONSEP
     search_wiener_nonsep,
 #endif  // CONFIG_WIENER_NONSEP
