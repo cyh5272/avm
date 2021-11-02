@@ -110,6 +110,7 @@ specialize qw/aom_dc_left_predictor_8x4 sse2/;
 specialize qw/aom_dc_left_predictor_8x8 neon msa sse2/;
 specialize qw/aom_dc_left_predictor_8x16 sse2/;
 specialize qw/aom_dc_left_predictor_8x32 sse2/;
+
 specialize qw/aom_dc_left_predictor_16x4 sse2/;
 specialize qw/aom_dc_left_predictor_16x8 sse2/;
 specialize qw/aom_dc_left_predictor_16x16 neon msa sse2/;
@@ -198,9 +199,6 @@ specialize qw/aom_paeth_predictor_32x64 ssse3 avx2/;
 specialize qw/aom_paeth_predictor_64x32 ssse3 avx2/;
 specialize qw/aom_paeth_predictor_64x64 ssse3 avx2/;
 specialize qw/aom_paeth_predictor_64x16 ssse3 avx2/;
-specialize qw/aom_paeth_predictor_16x8 ssse3/;
-specialize qw/aom_paeth_predictor_16x16 ssse3/;
-specialize qw/aom_paeth_predictor_16x32 ssse3/;
 specialize qw/aom_paeth_predictor_32x16 ssse3/;
 specialize qw/aom_paeth_predictor_32x32 ssse3/;
 specialize qw/aom_smooth_predictor_4x4 neon ssse3/;
@@ -325,13 +323,13 @@ specialize qw/aom_highbd_dc_128_predictor_4x4 sse2/;
 specialize qw/aom_highbd_dc_left_predictor_4x8 sse2/;
 specialize qw/aom_highbd_dc_top_predictor_4x8 sse2/;
 specialize qw/aom_highbd_dc_128_predictor_4x8 sse2/;
-specialize qw/aom_highbd_dc_left_predictor_8x4 sse2/;
 specialize qw/aom_highbd_dc_top_predictor_8x4 sse2/;
 specialize qw/aom_highbd_dc_128_predictor_8x4 sse2/;
+specialize qw/aom_highbd_dc_left_predictor_8x4 sse2/;
 specialize qw/aom_highbd_dc_left_predictor_8x8 sse2/;
+specialize qw/aom_highbd_dc_left_predictor_8x16 sse2/;
 specialize qw/aom_highbd_dc_top_predictor_8x8 sse2/;
 specialize qw/aom_highbd_dc_128_predictor_8x8 sse2/;
-specialize qw/aom_highbd_dc_left_predictor_8x16 sse2/;
 specialize qw/aom_highbd_dc_top_predictor_8x16 sse2/;
 specialize qw/aom_highbd_dc_128_predictor_8x16 sse2/;
 specialize qw/aom_highbd_dc_left_predictor_16x8 sse2/;
@@ -636,6 +634,7 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad16x32                msa sse2/;
   specialize qw/aom_sad16x16           neon msa sse2/;
   specialize qw/aom_sad16x8            neon msa sse2/;
+  specialize qw/aom_sad16x4                     sse2/;
   specialize qw/aom_sad8x16            neon msa sse2/;
   specialize qw/aom_sad8x8             neon msa sse2/;
   specialize qw/aom_sad8x4                  msa sse2/;
@@ -643,7 +642,6 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad4x4             neon msa sse2/;
 
   specialize qw/aom_sad4x16                     sse2/;
-  specialize qw/aom_sad16x4                     sse2/;
   specialize qw/aom_sad8x32                     sse2/;
   specialize qw/aom_sad32x8                     sse2/;
   specialize qw/aom_sad16x64                    sse2/;
@@ -681,6 +679,7 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad16x32_avg        msa sse2/;
   specialize qw/aom_sad16x16_avg        msa sse2/;
   specialize qw/aom_sad16x8_avg         msa sse2/;
+  specialize qw/aom_sad16x4_avg             sse2/;
   specialize qw/aom_sad8x16_avg         msa sse2/;
   specialize qw/aom_sad8x8_avg          msa sse2/;
   specialize qw/aom_sad8x4_avg          msa sse2/;
@@ -688,7 +687,6 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad4x4_avg          msa sse2/;
 
   specialize qw/aom_sad4x16_avg             sse2/;
-  specialize qw/aom_sad16x4_avg             sse2/;
   specialize qw/aom_sad8x32_avg             sse2/;
   specialize qw/aom_sad32x8_avg             sse2/;
   specialize qw/aom_sad16x64_avg            sse2/;
@@ -864,9 +862,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad32x16x4d   avx2      msa sse2/;
   specialize qw/aom_sad32x8x4d    avx2          sse2/;
   specialize qw/aom_sad16x64x4d                 sse2/;
-  specialize qw/aom_sad16x32x4d             msa sse2/;
-  specialize qw/aom_sad16x16x4d         neon msa sse2/;
-  specialize qw/aom_sad16x8x4d               msa sse2/;
+  specialize qw/aom_sad16x32x4d           msa sse2/;
+  specialize qw/aom_sad16x8x4d            msa sse2/;
+  specialize qw/aom_sad16x16x4d      neon msa sse2/;
 
   specialize qw/aom_sad8x16x4d              msa sse2/;
   specialize qw/aom_sad8x8x4d               msa sse2/;

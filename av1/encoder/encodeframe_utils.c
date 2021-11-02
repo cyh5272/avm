@@ -663,9 +663,10 @@ static BLOCK_SIZE len_to_bsize(int length) {
 }
 #endif  // CONFIG_IBC_SR_EXT
 
-void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
-                         int mi_row, int mi_col, BLOCK_SIZE bsize,
-                         const int num_planes) {
+void av1_restore_context(const AV1_COMMON *cm, MACROBLOCK *x,
+                         const RD_SEARCH_MACROBLOCK_CONTEXT *ctx, int mi_row,
+                         int mi_col, BLOCK_SIZE bsize, const int num_planes) {
+  (void)cm;
   MACROBLOCKD *xd = &x->e_mbd;
   int p;
   const int num_4x4_blocks_wide = mi_size_wide[bsize];
@@ -696,10 +697,8 @@ void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
          sizeof(*xd->above_txfm_context) * mi_width);
   memcpy(xd->left_txfm_context, ctx->tl,
          sizeof(*xd->left_txfm_context) * mi_height);
-#if CONFIG_IBC_SR_EXT
   av1_mark_block_as_not_coded(xd, mi_row, mi_col, bsize,
-                              len_to_bsize(x->e_mbd.is_mi_coded_stride * 4));
-#endif  // CONFIG_IBC_SR_EXT
+                              cm->seq_params.sb_size);
 }
 
 void av1_save_context(const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
@@ -1086,13 +1085,16 @@ void av1_reset_simple_motion_tree_partition(SIMPLE_MOTION_DATA_TREE *sms_tree,
 void av1_update_picked_ref_frames_mask(MACROBLOCK *const x, int ref_type,
                                        BLOCK_SIZE bsize, int mib_size,
                                        int mi_row, int mi_col) {
+#if !CONFIG_EXT_RECUR_PARTITIONS
   assert(mi_size_wide[bsize] == mi_size_high[bsize]);
+#endif  // !CONFIG_EXT_RECUR_PARTITIONS
   const int sb_size_mask = mib_size - 1;
   const int mi_row_in_sb = mi_row & sb_size_mask;
   const int mi_col_in_sb = mi_col & sb_size_mask;
-  const int mi_size = mi_size_wide[bsize];
-  for (int i = mi_row_in_sb; i < mi_row_in_sb + mi_size; ++i) {
-    for (int j = mi_col_in_sb; j < mi_col_in_sb + mi_size; ++j) {
+  const int mi_size_h = mi_size_high[bsize];
+  const int mi_size_w = mi_size_wide[bsize];
+  for (int i = mi_row_in_sb; i < mi_row_in_sb + mi_size_h; ++i) {
+    for (int j = mi_col_in_sb; j < mi_col_in_sb + mi_size_w; ++j) {
       x->picked_ref_frames_mask[i * 32 + j] |= 1 << ref_type;
     }
   }
@@ -1324,7 +1326,12 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
       }
     }
   }
-
+#if CONFIG_EXT_RECUR_PARTITIONS
+  for (int i = 0; i < PARTITION_CONTEXTS_REC; ++i) {
+    AVERAGE_CDF(ctx_left->partition_rec_cdf[i], ctx_tr->partition_rec_cdf[i],
+                4);
+  }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   AVERAGE_CDF(ctx_left->switchable_interp_cdf, ctx_tr->switchable_interp_cdf,
               SWITCHABLE_FILTERS);
 #if !CONFIG_AIMC
@@ -1458,7 +1465,7 @@ void av1_restore_sb_state(const SB_FIRST_PASS_STATS *sb_fp_stats, AV1_COMP *cpi,
   const int num_planes = av1_num_planes(cm);
   const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
 
-  av1_restore_context(x, &sb_fp_stats->x_ctx, mi_row, mi_col, sb_size,
+  av1_restore_context(cm, x, &sb_fp_stats->x_ctx, mi_row, mi_col, sb_size,
                       num_planes);
 
   cpi->td.rd_counts = sb_fp_stats->rd_count;
