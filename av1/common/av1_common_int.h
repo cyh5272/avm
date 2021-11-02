@@ -857,6 +857,11 @@ typedef struct AV1Common {
   struct total_sym_stats sym_stats;
 #endif  // CONFIG_THROUGHPUT_ANALYSIS
   /*!
+   * Bitmask indicating which reference buffers may be referenced by this frame.
+   */
+  int ref_frame_flags;
+
+  /*!
    * Information about the current frame that is being coded.
    */
   CurrentFrame current_frame;
