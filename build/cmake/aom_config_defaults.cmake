@@ -137,6 +137,8 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
+set_aom_config_var(CONFIG_EXT_RECUR_PARTITIONS 0 NUMBER
+                   "AV2 Fully recursive partitions experiment flag")
 set_aom_config_var(CONFIG_FORWARDSKIP 1
                    "AV2 enable forward skip residual coding.")
 set_aom_config_var(CONFIG_SDP 1 NUMBER "AV2 Semi-Decoupled Partitioning.")
