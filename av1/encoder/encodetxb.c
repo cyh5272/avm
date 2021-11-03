@@ -1790,8 +1790,14 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
         else
           intra_dir = mbmi->mode;
 #if CONFIG_ENTROPY_STATS
+#if CONFIG_IST
+        ++counts->intra_ext_tx[eset][txsize_sqr_map[tx_size]][intra_dir]
+                              [av1_ext_tx_ind[tx_set_type]
+                                             [get_primary_tx_type(tx_type)]];
+#else
         ++counts->intra_ext_tx[eset][txsize_sqr_map[tx_size]][intra_dir]
                               [av1_ext_tx_ind[tx_set_type][tx_type]];
+#endif  // CONFIG_IST
 #endif  // CONFIG_ENTROPY_STATS
         if (allow_update_cdf) {
           update_cdf(
