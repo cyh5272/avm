@@ -4914,10 +4914,11 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
 #endif  // CONFIG_IBC_SR_EXT
 }
 
-static AOM_INLINE void collect_single_states(const FeatureFlags *const features,
+static AOM_INLINE void collect_single_states(const AV1_COMMON *const cm,
                                              MACROBLOCK *x,
                                              InterModeSearchState *search_state,
                                              const MB_MODE_INFO *const mbmi) {
+  const FeatureFlags *const features = &cm->features;
   (void)features;
   int i, j;
   const MV_REFERENCE_FRAME ref_frame = mbmi->ref_frame[0];
@@ -5707,7 +5708,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   int i;
   const ModeCosts *mode_costs = &x->mode_costs;
   const int *comp_inter_cost =
-      mode_costs->comp_inter_cost[av1_get_reference_mode_context(xd)];
+      mode_costs->comp_inter_cost[av1_get_reference_mode_context(cm, xd)];
 #if CONFIG_IBC_SR_EXT
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #endif  // CONFIG_IBC_SR_EXT
@@ -5993,7 +5994,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 
     if (sf->inter_sf.prune_comp_search_by_single_result > 0 &&
         is_inter_singleref_mode(this_mode)) {
-      collect_single_states(&cm->features, x, &search_state, mbmi);
+      collect_single_states(cm, x, &search_state, mbmi);
     }
 
     if (sf->inter_sf.prune_comp_using_best_single_mode_ref > 0 &&
@@ -6394,7 +6395,7 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
   unsigned int ref_costs_comp[REF_FRAMES][REF_FRAMES];
   const ModeCosts *mode_costs = &x->mode_costs;
   const int *comp_inter_cost =
-      mode_costs->comp_inter_cost[av1_get_reference_mode_context(xd)];
+      mode_costs->comp_inter_cost[av1_get_reference_mode_context(cm, xd)];
   InterpFilter best_filter = SWITCHABLE;
   int64_t this_rd = INT64_MAX;
   int rate2 = 0;
