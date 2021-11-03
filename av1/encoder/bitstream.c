@@ -743,7 +743,7 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
 #else
       if (is_comp_ref_allowed(mbmi->sb_type))
 #endif
-        aom_write_symbol(w, is_compound, av1_get_reference_mode_cdf(xd), 2);
+        aom_write_symbol(w, is_compound, av1_get_reference_mode_cdf(cm, xd), 2);
     } else {
       assert((!is_compound) ==
              (cm->current_frame.reference_mode == SINGLE_REFERENCE));
