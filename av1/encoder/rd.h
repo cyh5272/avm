@@ -250,7 +250,7 @@ int av1_get_switchable_rate(const MACROBLOCK *x, const MACROBLOCKD *xd,
                             InterpFilter interp_filter);
 
 YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const struct AV1_COMP *cpi,
-                                             int ref_frame);
+                                             MV_REFERENCE_FRAME ref_frame);
 
 void av1_init_me_luts(void);
 

@@ -1385,8 +1385,9 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const int is_comp_pred = has_second_ref(mbmi);
   const PREDICTION_MODE this_mode = mbmi->mode;
-  const int refs[2] = { mbmi->ref_frame[0],
-                        mbmi->ref_frame[1] < 0 ? 0 : mbmi->ref_frame[1] };
+  const MV_REFERENCE_FRAME refs[2] = {
+    mbmi->ref_frame[0], mbmi->ref_frame[1] < 0 ? 0 : mbmi->ref_frame[1]
+  };
   const int ref_mv_idx = mbmi->ref_mv_idx;
 
   if (is_comp_pred) {
@@ -2759,8 +2760,8 @@ static AOM_INLINE void get_block_level_tpl_stats(
 
 static AOM_INLINE int prune_modes_based_on_tpl_stats(
     const FeatureFlags *const features,
-    PruneInfoFromTpl *inter_cost_info_from_tpl, const int *refs, int ref_mv_idx,
-    const PREDICTION_MODE this_mode, int prune_mode_level) {
+    PruneInfoFromTpl *inter_cost_info_from_tpl, const MV_REFERENCE_FRAME *refs,
+    int ref_mv_idx, const PREDICTION_MODE this_mode, int prune_mode_level) {
   (void)features;
   const int have_newmv = have_newmv_in_inter_mode(this_mode);
   if ((prune_mode_level < 3) && have_newmv) return 0;
@@ -2828,8 +2829,9 @@ static int skip_repeated_newmv(
     MB_MODE_INFO *best_mbmi, motion_mode_candidate *motion_mode_cand,
     int64_t *ref_best_rd, RD_STATS *best_rd_stats, RD_STATS *best_rd_stats_y,
     RD_STATS *best_rd_stats_uv, inter_mode_info *mode_info,
-    HandleInterModeArgs *args, int drl_cost, const int *refs, int_mv *cur_mv,
-    int64_t *best_rd, const BUFFER_SET orig_dst, int ref_mv_idx) {
+    HandleInterModeArgs *args, int drl_cost, const MV_REFERENCE_FRAME *refs,
+    int_mv *cur_mv, int64_t *best_rd, const BUFFER_SET orig_dst,
+    int ref_mv_idx) {
   // This feature only works for NEWMV when a previous mv has been searched
   if (this_mode != NEWMV || ref_mv_idx == 0) return 0;
   MACROBLOCKD *xd = &x->e_mbd;
@@ -3146,8 +3148,9 @@ static int64_t handle_inter_mode(
       tpl_idx < MAX_TPL_FRAME_IDX && tpl_frame->is_valid;
   int i;
   // Reference frames for this mode
-  const int refs[2] = { mbmi->ref_frame[0],
-                        (mbmi->ref_frame[1] < 0 ? 0 : mbmi->ref_frame[1]) };
+  const MV_REFERENCE_FRAME refs[2] = {
+    mbmi->ref_frame[0], (mbmi->ref_frame[1] < 0 ? 0 : mbmi->ref_frame[1])
+  };
   int rate_mv = 0;
   int64_t rd = INT64_MAX;
   // Do first prediction into the destination buffer. Do the next
@@ -5229,7 +5232,7 @@ static AOM_INLINE void evaluate_motion_mode_for_winner_candidates(
 
     if (ret_value != INT64_MAX) {
       rd_stats.rdcost = RDCOST(x->rdmult, rd_stats.rate, rd_stats.dist);
-      int refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
+      MV_REFERENCE_FRAME refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
       // Collect mode stats for multiwinner mode processing
       store_winner_mode_stats(
           &cpi->common, x, mbmi, &rd_stats, &rd_stats_y, &rd_stats_uv, refs,
@@ -5407,7 +5410,7 @@ static void tx_search_best_inter_candidates(
   search_state->best_mbmode.mode = MODE_INVALID;
   // Initialize best mode stats for winner mode processing
   x->winner_mode_count = 0;
-  const int init_refs[2] = { -1, -1 };
+  const MV_REFERENCE_FRAME init_refs[2] = { -1, -1 };
   store_winner_mode_stats(&cpi->common, x, mbmi, NULL, NULL, NULL, init_refs,
                           MODE_INVALID, NULL, bsize, best_rd_so_far,
                           cpi->sf.winner_mode_sf.multi_winner_mode_type, 0);
@@ -5480,7 +5483,8 @@ static void tx_search_best_inter_candidates(
     }
     rd_stats.rdcost = RDCOST(x->rdmult, rd_stats.rate, rd_stats.dist);
 
-    const int refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
+    const MV_REFERENCE_FRAME refs[2] = { mbmi->ref_frame[0],
+                                         mbmi->ref_frame[1] };
 
     // Collect mode stats for multiwinner mode processing
     const int txfm_search_done = 1;
@@ -5726,7 +5730,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   // Initialize best mode stats for winner mode processing
   av1_zero(x->winner_mode_stats);
   x->winner_mode_count = 0;
-  const int init_refs[2] = { -1, -1 };
+  const MV_REFERENCE_FRAME init_refs[2] = { -1, -1 };
   store_winner_mode_stats(&cpi->common, x, mbmi, NULL, NULL, NULL, init_refs,
                           MODE_INVALID, NULL, bsize, best_rd_so_far,
                           cpi->sf.winner_mode_sf.multi_winner_mode_type, 0);
@@ -6008,8 +6012,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       }
 #endif
       const PREDICTION_MODE this_mode = mbmi->mode;
-      int refs[2] = { av1_mode_defs[mode_enum].ref_frame[0],
-                      av1_mode_defs[mode_enum].ref_frame[1] };
+      MV_REFERENCE_FRAME refs[2] = { av1_mode_defs[mode_enum].ref_frame[0],
+                                     av1_mode_defs[mode_enum].ref_frame[1] };
 
       assert(av1_mode_defs[mode_enum].ref_frame[0] == INTRA_FRAME);
       assert(av1_mode_defs[mode_enum].ref_frame[1] == NONE_FRAME);

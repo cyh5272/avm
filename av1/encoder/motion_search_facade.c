@@ -334,7 +334,7 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   // This function should only ever be called for compound modes
   assert(has_second_ref(mbmi));
   const int_mv init_mv[2] = { cur_mv[0], cur_mv[1] };
-  const int refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
+  const MV_REFERENCE_FRAME refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
   const MvCosts *mv_costs = &x->mv_costs;
   int_mv ref_mv[2];
   int ite, ref;
