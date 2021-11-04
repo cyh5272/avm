@@ -1186,7 +1186,7 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
     RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
     cost_nomerge +=
         RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
-                                       old_unit->current_ssei, bit_depth);
+                                       old_unit->current_sse, bit_depth);
     // Merge SSE and bits must be recalculated every time we create a new
     // merge filter.
     old_unit->merge_sse = 0;
