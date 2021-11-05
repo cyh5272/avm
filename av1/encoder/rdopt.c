@@ -5416,8 +5416,6 @@ typedef struct {
   int skip_ref_frame_mask;
   int reach_first_comp_mode;
   int mode_thresh_mul_fact;
-  int *intra_mode_idx_ls;
-  int *intra_mode_num;
   int *num_single_modes_processed;
   int prune_cpd_using_sr_stats_ready;
 } InterModeSFArgs;
@@ -5794,13 +5792,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   InterModesInfo *inter_modes_info = x->inter_modes_info;
   inter_modes_info->num = 0;
 
-  int intra_mode_num = 0;
   int num_single_modes_processed = 0;
-  int intra_mode_idx_ls[INTRA_MODES];
-
-  for (i = 0; i < INTRA_MODES; ++i) {
-    intra_mode_idx_ls[i] = i + THR_DC;
-  }
 
   // Temporary buffers used by handle_inter_mode().
   uint8_t *const tmp_buf = get_buf_by_bd(xd, x->tmp_pred_bufs[0]);
@@ -5895,8 +5887,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
                               skip_ref_frame_mask,
                               0,
                               mode_thresh_mul_fact,
-                              intra_mode_idx_ls,
-                              &intra_mode_num,
                               &num_single_modes_processed,
                               0 };
 
@@ -6139,13 +6129,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #else
       set_y_mode_and_delta_angle(mode_idx, mbmi);
 #endif  // CONFIG_AIMC
-        THR_MODES mode_enum = 0;
-        for (i = 0; i < INTRA_MODE_END; i++) {
-          if (mbmi->mode == av1_mode_defs[intra_mode_idx_ls[i]].mode) {
-            mode_enum = intra_mode_idx_ls[i];
-            break;
-          }
-        }
+        THR_MODES mode_enum = mbmi->mode + THR_DC;
         if ((!cpi->oxcf.intra_mode_cfg.enable_smooth_intra ||
              cpi->sf.intra_sf.disable_smooth_intra) &&
             (mbmi->mode == SMOOTH_PRED || mbmi->mode == SMOOTH_H_PRED ||
