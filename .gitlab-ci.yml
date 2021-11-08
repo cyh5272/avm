@@ -22,6 +22,8 @@ Style Check:
   stage: check
   interruptible: true
   image: registry.gitlab.com/aomediacodec/aom-testing/alpine3:20210901124702
+  variables:
+    DIFF_REF: $CI_MERGE_REQUEST_DIFF_BASE_SHA
   script:
     - 'echo "Diff ref is: $DIFF_REF"'
     - git fetch --unshallow
