@@ -35,9 +35,10 @@ Style Check:
       done
     - |
       # Run cmake-format check.
-      git diff --diff-filter=ACMR --name-only $DIFF_REF '*.cmake' 'CMakeLists.txt' \
-        | grep -v third_party \
-        | xargs cmake-format --check
+      for f in $(git diff --diff-filter=ACMR --name-only $DIFF_REF '*.cmake' 'CMakeLists.txt' \
+        | grep -v third_party); do
+        cmake-format --check
+      done
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
