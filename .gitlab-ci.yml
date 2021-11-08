@@ -23,6 +23,8 @@ Style Check:
   interruptible: true
   image: registry.gitlab.com/aomediacodec/aom-testing/alpine3:20210901124702
   script:
+    - 'echo "Diff ref is: $DIFF_REF"'
+    - git fetch --unshallow
     - |
       # Run clang-format check.
       for f in $(git diff --diff-filter=ACMR --name-only $DIFF_REF \
