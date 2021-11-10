@@ -5076,6 +5076,14 @@ static INLINE void reset_frame_buffers(AV1_COMMON *cm) {
   unlock_buffer_pool(cm->buffer_pool);
 }
 
+static INLINE int get_disp_order_hint(AV1_COMMON *const cm) {
+  CurrentFrame *const current_frame = &cm->current_frame;
+  if (current_frame->frame_type == KEY_FRAME && cm->show_existing_frame)
+    return 0;
+
+  return current_frame->order_hint;
+}
+
 // On success, returns 0. On failure, calls aom_internal_error and does not
 // return.
 static int read_uncompressed_header(AV1Decoder *pbi,
@@ -5299,6 +5307,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 
     current_frame->order_hint = aom_rb_read_literal(
         rb, seq_params->order_hint_info.order_hint_bits_minus_1 + 1);
+    current_frame->display_order_hint = get_disp_order_hint(cm);
     current_frame->frame_number = current_frame->order_hint;
 
     if (!features->error_resilient_mode && !frame_is_intra_only(cm)) {
@@ -5424,6 +5433,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   }
 
   if (current_frame->frame_type == KEY_FRAME) {
+    cm->current_frame.pyramid_level = 1;
     setup_frame_size(cm, frame_size_override_flag, rb);
 
     if (features->allow_screen_content_tools && !av1_superres_scaled(cm))
