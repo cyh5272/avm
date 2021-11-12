@@ -298,7 +298,7 @@ static bool export_context_export_frame(const void *frame, int stride,
                                         bool high_bd) {
   assert(export_context.initialized == true);
 
-  // Inefficient but convenient. OK since we only export data inferquently.
+  // Inefficient but convenient. OK since we only export data infrequently.
   uint8_t *frame_8bit = (uint8_t *)frame;
   uint16_t *frame_16bit = (uint16_t *)frame;
 
