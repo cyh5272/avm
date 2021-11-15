@@ -700,6 +700,7 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
   av1_zero_left_context(xd);
 
   // Reset delta for quantizer and loof filters at the beginning of every tile
+  xd->base_qindex = cm->quant_params.base_qindex;
   if (mi_row == tile_info->mi_row_start || row_mt_enabled) {
     if (cm->delta_q_info.delta_q_present_flag)
       xd->current_base_qindex = cm->quant_params.base_qindex;
