@@ -1493,6 +1493,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
         (bsize != cm->seq_params.sb_size ||
          !mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) &&
         super_block_upper_left) {
+      xd->base_qindex = cm->quant_params.base_qindex;
       xd->current_base_qindex = mbmi->current_qindex;
       if (delta_q_info->delta_lf_present_flag) {
         if (delta_q_info->delta_lf_multi) {
