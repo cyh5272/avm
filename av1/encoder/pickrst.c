@@ -272,13 +272,15 @@ static bool export_context_is_initialized() {
   return export_context.initialized;
 }
 
-static bool export_context_initialize(int num_rows_luma, int num_cols_luma) {
+static bool export_context_initialize(int num_rows_luma, int num_cols_luma,
+                                      float rdmult) {
   assert(export_context.initialized == false);
 
   FILE *export_file = fopen(export_context.filename, "wb");
   if (export_file == NULL) return false;
   fwrite(&num_rows_luma, sizeof(num_rows_luma), 1, export_file);
   fwrite(&num_cols_luma, sizeof(num_cols_luma), 1, export_file);
+  fwrite(&rdmult, sizeof(rdmult), 1, export_file);
   fclose(export_file);
 
   // Just in case.
@@ -293,15 +295,21 @@ static bool export_context_initialize(int num_rows_luma, int num_cols_luma) {
 
 // Saves the frame data as floating point values. frame should have
 // export_context.num_rows_luma and export_context.num_cols_luma dimensions.
-static bool export_context_export_frame(const uint8_t *frame, int stride) {
+static bool export_context_export_frame(const void *frame, int stride,
+                                        bool high_bd) {
   assert(export_context.initialized == true);
+
+  // Inefficient but convenient. OK since we only export data infrequently.
+  uint8_t *frame_8bit = (uint8_t *)frame;
+  uint16_t *frame_16bit = (uint16_t *)frame;
 
   // Append to export.
   FILE *export_file = fopen(export_context.filename, "ab");
   if (export_file == NULL) return false;
   for (int r = 0; r < export_context.num_rows_luma; ++r) {
     for (int c = 0; c < export_context.num_cols_luma; ++c) {
-      const float pixel_value = (float)frame[r * stride + c];
+      const float pixel_value = (float)(high_bd ? frame_16bit[r * stride + c]
+                                                : frame_8bit[r * stride + c]);
       fwrite(&pixel_value, sizeof(pixel_value), 1, export_file);
     }
   }
@@ -3150,12 +3158,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   }
 
 #if CONFIG_SAVE_IN_LOOP_DATA
-  // TODO(oguleryuz): Add the high-bit-depth path and save normalized output.
-  assert(!cm->seq_params.use_highbitdepth);
-
   // File format for the exported data:
-  // Two integers: num_rows_luma, num_cols_luma
-  // In float: original_frame0, pre_lr_frame0, qstep_frame0, post_lr_frame0,
+  // Two integers then a float: num_rows_luma, num_cols_luma, rdmult.
+  // In float:
+  // original_frame0, pre_lr_frame0, tskip_frame0, qstep_frame0, post_lr_frame0,
   // ...
   const int absolute_poc = cm->cur_frame->absolute_poc;
   const bool exporting_this_frame = !(export_context_is_skipped(absolute_poc) ||
@@ -3166,22 +3172,36 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     if (!export_context_is_initialized()) {
       const int num_rows_luma = pre_lr_decoded->crop_heights[0];
       const int num_cols_luma = pre_lr_decoded->crop_widths[0];
+      const int rdmult_scale =
+          (1 << AV1_PROB_COST_SHIFT) * (1 << 4) * (1 << RDDIV_BITS);
+      const float rdmult_for_rate_in_bits = x->rdmult * 1.0 / rdmult_scale;
 
       // Keep default filename.
       export_context_set_filename(NULL);
-      success = export_context_initialize(num_rows_luma, num_cols_luma);
+      success = export_context_initialize(num_rows_luma, num_cols_luma,
+                                          rdmult_for_rate_in_bits);
       assert(success);
     }
     export_context_register_as_exported(absolute_poc);
 
     // Export original.
     success =
-        export_context_export_frame(src->buffers[AOM_PLANE_Y], src->strides[0]);
+        export_context_export_frame(src->buffers[AOM_PLANE_Y], src->strides[0],
+                                    cm->seq_params.use_highbitdepth);
 
     // Export decoded frame before loop reconstruction.
     success = success &&
               export_context_export_frame(pre_lr_decoded->buffers[AOM_PLANE_Y],
-                                          pre_lr_decoded->strides[0]);
+                                          pre_lr_decoded->strides[0],
+                                          cm->seq_params.use_highbitdepth);
+
+    // Export tskip.
+    success = success && export_context_export_frame(
+                             cm->mi_params.tx_skip[AOM_PLANE_Y],
+                             get_tskip_stride(cm, AOM_PLANE_Y), false);
+    assert(success);
+
+    // Export qstep.
     success = success && export_context_export_qstep(cpi);
     assert(success);
 
@@ -3205,7 +3225,8 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
 
     // (iii) Export.
     success = export_context_export_frame(tmp_buffer->buffers[AOM_PLANE_Y],
-                                          tmp_buffer_stride);
+                                          tmp_buffer_stride,
+                                          cm->seq_params.use_highbitdepth);
     assert(success);
   }
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
