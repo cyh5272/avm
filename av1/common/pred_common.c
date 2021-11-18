@@ -273,7 +273,7 @@ static InterpFilter get_ref_filter_type(const MB_MODE_INFO *ref_mbmi,
 int av1_get_pred_context_switchable_interp(const MACROBLOCKD *xd, int dir) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   const int ctx_offset =
-      (mbmi->ref_frame[1] > INTRA_FRAME) * INTER_FILTER_COMP_OFFSET;
+      is_inter_ref_frame(mbmi->ref_frame[1]) * INTER_FILTER_COMP_OFFSET;
   assert(dir == 0 || dir == 1);
   const MV_REFERENCE_FRAME ref_frame = mbmi->ref_frame[0];
   // Note:

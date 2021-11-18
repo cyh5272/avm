@@ -1242,7 +1242,7 @@ static int skip_repeated_mv(const AV1_COMMON *const cm,
                             PREDICTION_MODE this_mode,
                             const MV_REFERENCE_FRAME ref_frames[2],
                             InterModeSearchState *search_state) {
-  const int is_comp_pred = ref_frames[1] > INTRA_FRAME;
+  const int is_comp_pred = is_inter_ref_frame(ref_frames[1]);
   if (is_comp_pred) {
     return 0;
   }
@@ -1301,7 +1301,7 @@ static int skip_repeated_mv(const AV1_COMMON *const cm,
                             PREDICTION_MODE this_mode,
                             const MV_REFERENCE_FRAME ref_frames[2],
                             InterModeSearchState *search_state) {
-  const int is_comp_pred = ref_frames[1] > INTRA_FRAME;
+  const int is_comp_pred = is_inter_ref_frame(ref_frames[1]);
   const uint8_t ref_frame_type = av1_ref_frame_type(ref_frames);
   const MB_MODE_INFO_EXT *const mbmi_ext = x->mbmi_ext;
   const int ref_mv_count = mbmi_ext->ref_mv_count[ref_frame_type];
@@ -2793,7 +2793,7 @@ static AOM_INLINE int prune_modes_based_on_tpl_stats(
 #endif  // CONFIG_NEW_INTER_MODES
   };
 
-  const int is_comp_pred = (refs[1] > INTRA_FRAME);
+  const int is_comp_pred = is_inter_ref_frame(refs[1]);
   if (!is_comp_pred) {
     cur_inter_cost = inter_cost_info_from_tpl->ref_inter_cost[refs[0] - 1];
   } else {
@@ -4617,7 +4617,7 @@ static int inter_mode_compatible_skip(const AV1_COMP *cpi, const MACROBLOCK *x,
                                       BLOCK_SIZE bsize,
                                       PREDICTION_MODE curr_mode,
                                       const MV_REFERENCE_FRAME *ref_frames) {
-  const int comp_pred = ref_frames[1] > INTRA_FRAME;
+  const int comp_pred = is_inter_ref_frame(ref_frames[1]);
   if (comp_pred) {
     if (!is_comp_ref_allowed(bsize)) return 1;
     if (!(cpi->common.ref_frame_flags &
@@ -4638,7 +4638,7 @@ static int inter_mode_compatible_skip(const AV1_COMP *cpi, const MACROBLOCK *x,
     if (segfeature_active(seg, segment_id, SEG_LVL_REF_FRAME)) return 1;
   }
 
-  if (ref_frames[0] > INTRA_FRAME && ref_frames[1] == INTRA_FRAME) {
+  if (is_inter_ref_frame(ref_frames[0]) && ref_frames[1] == INTRA_FRAME) {
     // Mode must be compatible
     if (!is_interintra_allowed_bsize(bsize)) return 1;
     if (!is_interintra_allowed_mode(curr_mode)) return 1;
@@ -5217,7 +5217,7 @@ static AOM_INLINE void evaluate_motion_mode_for_winner_candidates(
     // Initialize motion mode to simple translation
     // Calculation of switchable rate depends on it.
     mbmi->motion_mode = 0;
-    const int is_comp_pred = mbmi->ref_frame[1] > INTRA_FRAME;
+    const int is_comp_pred = is_inter_ref_frame(mbmi->ref_frame[1]);
     for (int i = 0; i < num_planes; i++) {
       xd->plane[i].pre[0] = yv12_mb[mbmi->ref_frame[0]][i];
       if (is_comp_pred) xd->plane[i].pre[1] = yv12_mb[mbmi->ref_frame[1]][i];
@@ -5273,7 +5273,7 @@ static int skip_inter_mode(AV1_COMP *cpi, MACROBLOCK *x, const BLOCK_SIZE bsize,
   const MV_REFERENCE_FRAME *ref_frames = mode_def->ref_frame;
   const MV_REFERENCE_FRAME ref_frame = ref_frames[0];
   const MV_REFERENCE_FRAME second_ref_frame = ref_frames[1];
-  const int comp_pred = second_ref_frame > INTRA_FRAME;
+  const int comp_pred = is_inter_ref_frame(second_ref_frame);
 
   // Check if this mode should be skipped because it is incompatible with the
   // current frame
@@ -5428,7 +5428,7 @@ static void tx_search_best_inter_candidates(
     set_ref_ptrs(cm, xd, mbmi->ref_frame[0], mbmi->ref_frame[1]);
 
     // Select prediction reference frames.
-    const int is_comp_pred = mbmi->ref_frame[1] > INTRA_FRAME;
+    const int is_comp_pred = is_inter_ref_frame(mbmi->ref_frame[1]);
     for (int i = 0; i < num_planes; i++) {
       xd->plane[i].pre[0] = yv12_mb[mbmi->ref_frame[0]][i];
       if (is_comp_pred) xd->plane[i].pre[1] = yv12_mb[mbmi->ref_frame[1]][i];
@@ -5760,8 +5760,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     const MV_REFERENCE_FRAME ref_frame = ref_frames[0];
     const MV_REFERENCE_FRAME second_ref_frame = ref_frames[1];
     const int is_single_pred =
-        ref_frame > INTRA_FRAME && second_ref_frame == NONE_FRAME;
-    const int comp_pred = second_ref_frame > INTRA_FRAME;
+        is_inter_ref_frame(ref_frame) && second_ref_frame == NONE_FRAME;
+    const int comp_pred = is_inter_ref_frame(second_ref_frame);
 
     init_mbmi(mbmi, this_mode, ref_frames, cm);
 
