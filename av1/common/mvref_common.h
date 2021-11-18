@@ -104,7 +104,7 @@ static INLINE void lower_mv_precision(MV *mv, int allow_hp, int is_integer) {
 
 static INLINE int8_t get_uni_comp_ref_idx(const MV_REFERENCE_FRAME *const rf) {
   // Single ref pred
-  if (rf[1] <= INTRA_FRAME) return -1;
+  if (!is_inter_ref_frame(rf[1])) return -1;
 
   // Bi-directional comp ref pred
   if ((rf[0] < BWDREF_FRAME) && (rf[1] >= BWDREF_FRAME)) return -1;
@@ -117,7 +117,7 @@ static INLINE int8_t get_uni_comp_ref_idx(const MV_REFERENCE_FRAME *const rf) {
 }
 
 static INLINE int8_t av1_ref_frame_type(const MV_REFERENCE_FRAME *const rf) {
-  if (rf[1] > INTRA_FRAME) {
+  if (is_inter_ref_frame(rf[1])) {
     const int8_t uni_comp_ref_idx = get_uni_comp_ref_idx(rf);
     if (uni_comp_ref_idx >= 0) {
       assert((REF_FRAMES + FWD_REFS * BWD_REFS + uni_comp_ref_idx) <
@@ -183,7 +183,7 @@ static INLINE int16_t av1_mode_context_analyzer(
     const int16_t *const mode_context, const MV_REFERENCE_FRAME *const rf) {
   const int8_t ref_frame = av1_ref_frame_type(rf);
 
-  if (rf[1] <= INTRA_FRAME) return mode_context[ref_frame];
+  if (!is_inter_ref_frame(rf[1])) return mode_context[ref_frame];
 
   const int16_t newmv_ctx = mode_context[ref_frame] & NEWMV_CTX_MASK;
   const int16_t refmv_ctx =
