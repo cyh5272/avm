@@ -100,7 +100,7 @@ uint8_t av1_get_filter_level(const AV1_COMMON *cm,
     if (cm->lf.mode_ref_delta_enabled) {
       const int scale = 1 << (lvl_seg >> 5);
       lvl_seg += cm->lf.ref_deltas[mbmi->ref_frame[0]] * scale;
-      if (mbmi->ref_frame[0] > INTRA_FRAME)
+      if (is_inter_ref_frame(mbmi->ref_frame[0]))
         lvl_seg += cm->lf.mode_deltas[mode_lf_lut[mbmi->mode]] * scale;
       lvl_seg = clamp(lvl_seg, 0, MAX_LOOP_FILTER);
     }

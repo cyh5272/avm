@@ -484,18 +484,23 @@ static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
   return uv2y[mode];
 }
 
+static INLINE int is_inter_ref_frame(MV_REFERENCE_FRAME ref_frame) {
+  return ref_frame > INTRA_FRAME;
+}
+
 #if CONFIG_SDP
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi, int tree_type) {
-  return is_intrabc_block(mbmi, tree_type) || mbmi->ref_frame[0] > INTRA_FRAME;
+  return is_intrabc_block(mbmi, tree_type) ||
+         is_inter_ref_frame(mbmi->ref_frame[0]);
 }
 #else
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi) {
-  return is_intrabc_block(mbmi) || mbmi->ref_frame[0] > INTRA_FRAME;
+  return is_intrabc_block(mbmi) || is_inter_ref_frame(mbmi->ref_frame[0]);
 }
 #endif
 
 static INLINE int has_second_ref(const MB_MODE_INFO *mbmi) {
-  return mbmi->ref_frame[1] > INTRA_FRAME;
+  return is_inter_ref_frame(mbmi->ref_frame[1]);
 }
 
 static INLINE int has_uni_comp_refs(const MB_MODE_INFO *mbmi) {
@@ -1743,7 +1748,7 @@ void av1_set_entropy_contexts(const MACROBLOCKD *xd,
 
 #define MAX_INTERINTRA_SB_SQUARE 32 * 32
 static INLINE int is_interintra_mode(const MB_MODE_INFO *mbmi) {
-  return (mbmi->ref_frame[0] > INTRA_FRAME &&
+  return (is_inter_ref_frame(mbmi->ref_frame[0]) &&
           mbmi->ref_frame[1] == INTRA_FRAME);
 }
 
@@ -1756,7 +1761,7 @@ static INLINE int is_interintra_allowed_mode(const PREDICTION_MODE mode) {
 }
 
 static INLINE int is_interintra_allowed_ref(const MV_REFERENCE_FRAME rf[2]) {
-  return (rf[0] > INTRA_FRAME) && (rf[1] <= INTRA_FRAME);
+  return is_inter_ref_frame(rf[0]) && !is_inter_ref_frame(rf[1]);
 }
 
 static INLINE int is_interintra_allowed(const MB_MODE_INFO *mbmi) {
@@ -1783,7 +1788,7 @@ static INLINE int is_interintra_allowed_bsize_group(int group) {
 }
 
 static INLINE int is_interintra_pred(const MB_MODE_INFO *mbmi) {
-  return mbmi->ref_frame[0] > INTRA_FRAME &&
+  return is_inter_ref_frame(mbmi->ref_frame[0]) &&
          mbmi->ref_frame[1] == INTRA_FRAME && is_interintra_allowed(mbmi);
 }
 

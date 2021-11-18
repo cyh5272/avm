@@ -64,7 +64,8 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
       mv->mv.as_int = 0;
 
 #if CONFIG_TMVP_IMPROVEMENT
-      if (mi->ref_frame[0] > INTRA_FRAME && mi->ref_frame[1] == NONE_FRAME) {
+      if (is_inter_ref_frame(mi->ref_frame[0]) &&
+          mi->ref_frame[1] == NONE_FRAME) {
         if ((abs(mi->mv[0].as_mv.row) <= REFMVS_LIMIT) &&
             (abs(mi->mv[0].as_mv.col) <= REFMVS_LIMIT)) {
           mv->ref_frame = mi->ref_frame[0];
@@ -74,7 +75,7 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
 #endif  // CONFIG_TMVP_IMPROVEMENT
         for (int idx = 0; idx < 2; ++idx) {
           MV_REFERENCE_FRAME ref_frame = mi->ref_frame[idx];
-          if (ref_frame > INTRA_FRAME) {
+          if (is_inter_ref_frame(ref_frame)) {
             int8_t ref_idx = cm->ref_frame_side[ref_frame];
             if (ref_idx) continue;
             if ((abs(mi->mv[idx].as_mv.row) > REFMVS_LIMIT) ||
@@ -188,7 +189,7 @@ static AOM_INLINE void add_ref_mv_candidate(
         ++*ref_match_count;
       }
 #if CONFIG_SMVP_IMPROVEMENT
-      else if (add_more_mvs && candidate->ref_frame[ref] > INTRA_FRAME &&
+      else if (add_more_mvs && is_inter_ref_frame(candidate->ref_frame[ref]) &&
                cm->seq_params.order_hint_info.enable_order_hint) {
         const int cur_blk_ref_side = cm->ref_frame_side[rf[0]];
         const int cand_blk_ref_side =
@@ -689,7 +690,7 @@ static AOM_INLINE void process_compound_ref_mv_candidate(
       if (can_rf == rf[cmp_idx] && ref_id_count[cmp_idx] < 2) {
         ref_id[cmp_idx][ref_id_count[cmp_idx]] = candidate->mv[rf_idx];
         ++ref_id_count[cmp_idx];
-      } else if (can_rf > INTRA_FRAME && ref_diff_count[cmp_idx] < 2) {
+      } else if (is_inter_ref_frame(can_rf) && ref_diff_count[cmp_idx] < 2) {
         int_mv this_mv = candidate->mv[rf_idx];
         if (cm->ref_frame_sign_bias[can_rf] !=
             cm->ref_frame_sign_bias[rf[cmp_idx]]) {
@@ -709,7 +710,7 @@ static AOM_INLINE void process_single_ref_mv_candidate(
     CANDIDATE_MV ref_mv_stack[MAX_REF_MV_STACK_SIZE],
     uint16_t ref_mv_weight[MAX_REF_MV_STACK_SIZE]) {
   for (int rf_idx = 0; rf_idx < 2; ++rf_idx) {
-    if (candidate->ref_frame[rf_idx] > INTRA_FRAME) {
+    if (is_inter_ref_frame(candidate->ref_frame[rf_idx])) {
       int_mv this_mv = candidate->mv[rf_idx];
       if (cm->ref_frame_sign_bias[candidate->ref_frame[rf_idx]] !=
           cm->ref_frame_sign_bias[ref_frame]) {
@@ -1205,7 +1206,7 @@ static AOM_INLINE void setup_ref_mv_list(
     const CANDIDATE_MV *queue = ref_mv_bank->rmb_buffer[ref_frame];
     const int count = ref_mv_bank->rmb_count[ref_frame];
     const int start_idx = ref_mv_bank->rmb_start_idx[ref_frame];
-    const int is_comp = rf[1] > INTRA_FRAME;
+    const int is_comp = is_inter_ref_frame(rf[1]);
     const int block_width = xd->width * MI_SIZE;
     const int block_height = xd->height * MI_SIZE;
 
@@ -1414,7 +1415,7 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
       MV_REF *mv_ref = &mv_ref_base[blk_row * mvs_cols + blk_col];
       MV fwd_mv = mv_ref->mv.as_mv;
 
-      if (mv_ref->ref_frame > INTRA_FRAME) {
+      if (is_inter_ref_frame(mv_ref->ref_frame)) {
         int_mv this_mv;
         int mi_r, mi_c;
         int ref_frame_offset = ref_offset[mv_ref->ref_frame];
@@ -1486,7 +1487,7 @@ static int motion_field_projection(AV1_COMMON *cm,
       MV_REF *mv_ref = &mv_ref_base[blk_row * mvs_cols + blk_col];
       MV fwd_mv = mv_ref->mv.as_mv;
 
-      if (mv_ref->ref_frame > INTRA_FRAME) {
+      if (is_inter_ref_frame(mv_ref->ref_frame)) {
         int_mv this_mv;
         int mi_r, mi_c;
         const int ref_frame_offset = ref_offset[mv_ref->ref_frame];

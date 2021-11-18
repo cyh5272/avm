@@ -1513,7 +1513,7 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 
 static INLINE int16_t mode_context_analyzer(
     const int16_t mode_context, const MV_REFERENCE_FRAME *const rf) {
-  if (rf[1] <= INTRA_FRAME) return mode_context;
+  if (!is_inter_ref_frame(rf[1])) return mode_context;
 
   const int16_t newmv_ctx = mode_context & NEWMV_CTX_MASK;
   const int16_t refmv_ctx = (mode_context >> REFMV_OFFSET) & REFMV_CTX_MASK;
@@ -1529,7 +1529,7 @@ static INLINE int_mv get_ref_mv_from_stack(
   const int8_t ref_frame_type = av1_ref_frame_type(ref_frame);
   const CANDIDATE_MV *curr_ref_mv_stack = mbmi_ext_frame->ref_mv_stack;
 
-  if (ref_frame[1] > INTRA_FRAME) {
+  if (is_inter_ref_frame(ref_frame[1])) {
     assert(ref_idx == 0 || ref_idx == 1);
     return ref_idx ? curr_ref_mv_stack[ref_mv_idx].comp_mv
                    : curr_ref_mv_stack[ref_mv_idx].this_mv;
