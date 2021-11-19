@@ -191,6 +191,8 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
 
   const int comp_pred = is_inter_ref_frame(ref_frame[1]);
 
+  if (comp_pred && ref_frame[0] >= RANKED_REF0_TO_PRUNE) return 1;
+
   if (x != NULL) {
     const int n_refs = cm->ref_frames_info.n_total_refs;
     if (sf->inter_sf.selective_ref_frame >= 2 ||

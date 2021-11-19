@@ -585,12 +585,19 @@ int main(int argc, const char **argv) {
   /* ext_refs experiment */
 #if CONFIG_NEW_REF_SIGNALING
   cts_each_dim[0] = REF_CONTEXTS;
+  cts_each_dim[1] = INTER_REFS_PER_FRAME - 2;
+  cts_each_dim[2] = 2;
+  optimize_cdf_table(&fc.comp_ref0[0][0][0], probsfile, 3, cts_each_dim,
+                     "static const aom_cdf_prob\n"
+                     "default_comp_ref0_cdf[REF_CONTEXTS]"
+                     "[INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)]");
+  cts_each_dim[0] = REF_CONTEXTS;
   cts_each_dim[1] = COMPREF_BIT_TYPES;
   cts_each_dim[2] = INTER_REFS_PER_FRAME - 2;
   cts_each_dim[3] = 2;
-  optimize_cdf_table(&fc.comp_ref[0][0][0][0], probsfile, 4, cts_each_dim,
+  optimize_cdf_table(&fc.comp_ref1[0][0][0][0], probsfile, 4, cts_each_dim,
                      "static const aom_cdf_prob\n"
-                     "default_comp_ref_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]"
+                     "default_comp_ref1_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]"
                      "[INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)]");
 #else
   cts_each_dim[0] = REF_CONTEXTS;

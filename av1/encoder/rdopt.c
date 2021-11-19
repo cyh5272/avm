@@ -1108,11 +1108,9 @@ static AOM_INLINE void estimate_ref_frame_costs(
             if (n_refs == 2) continue;  // No bits need to be sent in this case
             // Keep track of the cost to encode the first reference
             aom_cdf_prob ctx = av1_get_ref_pred_context_nrs(xd, j, n_refs);
-            const int bit_type =
-                av1_get_compound_ref_bit_type(0, &cm->ref_frames_info, i, j);
             const int bit = i == j;
-            if (j < n_refs - 2)
-              prev_cost += mode_costs->comp_ref_cost[ctx][bit_type][j][bit];
+            if (j < n_refs - 2 && j < RANKED_REF0_TO_PRUNE - 1)
+              prev_cost += mode_costs->comp_ref0_cost[ctx][j][bit];
           } else {
             // Assign the cost of signaling both references
             ref_costs_comp[i][j] = prev_cost;
@@ -1120,14 +1118,14 @@ static AOM_INLINE void estimate_ref_frame_costs(
             if (j < n_refs - 1) {
               aom_cdf_prob ctx = av1_get_ref_pred_context_nrs(xd, j, n_refs);
               const int bit_type =
-                  av1_get_compound_ref_bit_type(1, &cm->ref_frames_info, i, j);
+                  av1_get_compound_ref_bit_type(&cm->ref_frames_info, i, j);
               ref_costs_comp[i][j] +=
-                  mode_costs->comp_ref_cost[ctx][bit_type][j - 1][1];
+                  mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][1];
               ref_costs_comp[j][i] +=
-                  mode_costs->comp_ref_cost[ctx][bit_type][j - 1][1];
+                  mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][1];
               // Maintain the cost of sending a 0 bit for the 2nd reference to
               // be used in the next iteration.
-              prev_cost += mode_costs->comp_ref_cost[ctx][bit_type][j - 1][0];
+              prev_cost += mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][0];
             }
           }
         }

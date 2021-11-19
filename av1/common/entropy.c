@@ -149,8 +149,11 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->palette_uv_mode_cdf, 2);
   RESET_CDF_COUNTER(fc->comp_inter_cdf, 2);
   RESET_CDF_COUNTER(fc->single_ref_cdf, 2);
+#if CONFIG_NEW_REF_SIGNALING
+  RESET_CDF_COUNTER(fc->comp_ref0_cdf, 2);
+  RESET_CDF_COUNTER(fc->comp_ref1_cdf, 2);
+#else
   RESET_CDF_COUNTER(fc->comp_ref_cdf, 2);
-#if !CONFIG_NEW_REF_SIGNALING
   RESET_CDF_COUNTER(fc->comp_ref_type_cdf, 2);
   RESET_CDF_COUNTER(fc->uni_comp_ref_cdf, 2);
   RESET_CDF_COUNTER(fc->comp_bwdref_cdf, 2);

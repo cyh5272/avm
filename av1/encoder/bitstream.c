@@ -750,11 +750,17 @@ static AOM_INLINE void write_compound_ref_nrs(
   int n_bits = 0;
   for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
     const int bit = ref0 == i || ref1 == i;
+    // bit_type: -1 for ref0, 0 for opposite sided ref1, 1 for same sided ref1
     const int bit_type =
-        av1_get_compound_ref_bit_type(n_bits, ref_frames_info, ref0, i);
-    aom_write_symbol(
-        w, bit,
-        av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type, n_refs), 2);
+        n_bits == 0 ? -1
+                    : av1_get_compound_ref_bit_type(ref_frames_info, ref0, i);
+    // Implicitly signal a 1 when ref0 = RANK_REF0_TO_PRUNE - 1
+    if (n_bits > 0 || i < RANKED_REF0_TO_PRUNE - 1) {
+      aom_write_symbol(
+          w, bit,
+          av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type, n_refs),
+          2);
+    }
     n_bits += bit;
   }
   assert(IMPLIES(n_bits < 2, AOMMAX(ref0, ref1) == n_refs - 1));

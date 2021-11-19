@@ -728,9 +728,11 @@ typedef struct {
 #if CONFIG_NEW_REF_SIGNALING
   //! single_ref_cost
   int single_ref_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1][2];
-  //! comp_ref_cost
-  int comp_ref_cost[REF_CONTEXTS][COMPREF_BIT_TYPES][INTER_REFS_PER_FRAME - 2]
-                   [2];
+  //! comp_ref0_cost
+  int comp_ref0_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME - 2][2];
+  //! comp_ref1_cost
+  int comp_ref1_cost[REF_CONTEXTS][COMPREF_BIT_TYPES][INTER_REFS_PER_FRAME - 2]
+                    [2];
 #else
   //! single_ref_cost
   int single_ref_cost[REF_CONTEXTS][SINGLE_REFS - 1][2];
