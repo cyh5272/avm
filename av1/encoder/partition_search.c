@@ -998,14 +998,22 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         assert(ref0 < ref1);
         for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
           const int bit = ref0 == i || ref1 == i;
-          const int bit_type = av1_get_compound_ref_bit_type(
-              n_bits, &cm->ref_frames_info, ref0, i);
-          update_cdf(av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type,
-                                                       n_refs),
-                     bit, 2);
+          const int bit_type = n_bits == 0 ? -1
+                                           : av1_get_compound_ref_bit_type(
+                                                 &cm->ref_frames_info, ref0, i);
+          if (n_bits > 0 || i < RANKED_REF0_TO_PRUNE - 1)
+            update_cdf(av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits,
+                                                         bit_type, n_refs),
+                       bit, 2);
 #if CONFIG_ENTROPY_STATS
-          counts->comp_ref[av1_get_ref_pred_context_nrs(xd, i, n_refs)]
-                          [bit_type][i - n_bits][bit]++;
+          if (n_bits == 0) {
+            if (i < RANKED_REF0_TO_PRUNE - 1)
+              counts->comp_ref0[av1_get_ref_pred_context_nrs(xd, i, n_refs)][i]
+                               [bit]++;
+          } else {
+            counts->comp_ref1[av1_get_ref_pred_context_nrs(xd, i, n_refs)]
+                             [bit_type][i - 1][bit]++;
+          }
 #endif  // CONFIG_ENTROPY_STATS
           n_bits += bit;
         }

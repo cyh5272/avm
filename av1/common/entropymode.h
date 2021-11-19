@@ -78,7 +78,8 @@ extern "C" {
 #endif  // CONFIG_FORWARDSKIP
         //
 #if CONFIG_NEW_REF_SIGNALING
-#define COMPREF_BIT_TYPES 3
+#define COMPREF_BIT_TYPES 2
+#define RANKED_REF0_TO_PRUNE 3
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 struct AV1Common;
@@ -170,8 +171,10 @@ typedef struct frame_contexts {
 #if CONFIG_NEW_REF_SIGNALING
   aom_cdf_prob single_ref_cdf[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1]
                              [CDF_SIZE(2)];
-  aom_cdf_prob comp_ref_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]
-                           [INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)];
+  aom_cdf_prob comp_ref0_cdf[REF_CONTEXTS][INTER_REFS_PER_FRAME - 2]
+                            [CDF_SIZE(2)];
+  aom_cdf_prob comp_ref1_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]
+                            [INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)];
 #else
   aom_cdf_prob single_ref_cdf[REF_CONTEXTS][SINGLE_REFS - 1][CDF_SIZE(2)];
   aom_cdf_prob comp_ref_type_cdf[COMP_REF_TYPE_CONTEXTS][CDF_SIZE(2)];
