@@ -2979,7 +2979,12 @@ static int process_compound_inter_mode(
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
   // Find matching interp filter or set to default interp filter
+#if CONFIG_OPTFLOW_REFINEMENT
+  const int need_search = av1_is_interp_needed(xd) && mbmi->mode <= NEW_NEWMV &&
+                          !use_opfl_refine_all(cm, mbmi);
+#else
   const int need_search = av1_is_interp_needed(xd);
+#endif
   const InterpFilter assign_filter = cm->features.interp_filter;
   int is_luma_interp_done = 0;
   av1_find_interp_filter_match(mbmi, cpi, assign_filter, need_search,
