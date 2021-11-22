@@ -4881,6 +4881,13 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 #if CONFIG_REF_MV_BANK
   seq_params->enable_refmvbank = aom_rb_read_bit(rb);
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_NEW_REF_SIGNALING
+  if (aom_rb_read_bit(rb)) {
+    seq_params->max_reference_frames = 3 + aom_rb_read_literal(rb, 2);
+  } else {
+    seq_params->max_reference_frames = 7;
+  }
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
   seq_params->enable_sdp = aom_rb_read_bit(rb);
 #endif

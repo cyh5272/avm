@@ -3225,33 +3225,7 @@ static INLINE BLOCK_SIZE find_partition_size(BLOCK_SIZE bsize, int rows_left,
   return (BLOCK_SIZE)int_size;
 }
 
-#if CONFIG_NEW_REF_SIGNALING
-// Enforce the number of references for each arbitrary frame based on user
-// options and speed.
-static AOM_INLINE void enforce_max_ref_frames(AV1_COMP *cpi,
-                                              int *ref_frame_flags) {
-  (void)cpi;
-  MV_REFERENCE_FRAME ref_frame;
-  int total_valid_refs = 0;
-
-  for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
-    if (*ref_frame_flags & (1 << ref_frame)) {
-      total_valid_refs++;
-    }
-  }
-
-  for (int i = 0; i < 4 && total_valid_refs > INTER_REFS_PER_FRAME; ++i) {
-    const MV_REFERENCE_FRAME ref_frame_to_disable =
-        INTER_REFS_PER_FRAME - i - 1;
-
-    if (!(*ref_frame_flags & (1 << ref_frame_to_disable))) {
-      continue;
-    }
-    *ref_frame_flags &= ~(1 << ref_frame_to_disable);
-    --total_valid_refs;
-  }
-}
-#else
+#if !CONFIG_NEW_REF_SIGNALING
 static const uint8_t av1_ref_frame_flag_list[REF_FRAMES] = { 0,
                                                              AOM_LAST_FLAG,
                                                              AOM_LAST2_FLAG,
@@ -3269,14 +3243,6 @@ static const MV_REFERENCE_FRAME disable_order[] = {
   ALTREF2_FRAME,
   GOLDEN_FRAME,
 };
-
-static INLINE int get_max_allowed_ref_frames(
-    int selective_ref_frame, unsigned int max_reference_frames) {
-  const unsigned int max_allowed_refs_for_given_speed =
-      (selective_ref_frame >= 3) ? INTER_REFS_PER_FRAME - 1
-                                 : INTER_REFS_PER_FRAME;
-  return AOMMIN(max_allowed_refs_for_given_speed, max_reference_frames);
-}
 
 static const MV_REFERENCE_FRAME
     ref_frame_priority_order[INTER_REFS_PER_FRAME] = {
@@ -3305,6 +3271,15 @@ static INLINE int get_ref_frame_flags(const YV12_BUFFER_CONFIG **ref_frames,
   }
   return flags;
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
+
+static INLINE int get_max_allowed_ref_frames(
+    int selective_ref_frame, unsigned int max_reference_frames) {
+  const unsigned int max_allowed_refs_for_given_speed =
+      (selective_ref_frame >= 3) ? INTER_REFS_PER_FRAME - 1
+                                 : INTER_REFS_PER_FRAME;
+  return AOMMIN(max_allowed_refs_for_given_speed, max_reference_frames);
+}
 
 // Enforce the number of references for each arbitrary frame based on user
 // options and speed.
@@ -3313,23 +3288,34 @@ static AOM_INLINE void enforce_max_ref_frames(AV1_COMP *cpi,
   MV_REFERENCE_FRAME ref_frame;
   int total_valid_refs = 0;
 
+#if CONFIG_NEW_REF_SIGNALING
+  for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+    if (*ref_frame_flags & (1 << ref_frame)) {
+      total_valid_refs++;
+    }
+  }
+#else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
     if (*ref_frame_flags & av1_ref_frame_flag_list[ref_frame]) {
       total_valid_refs++;
     }
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   const int max_allowed_refs =
       get_max_allowed_ref_frames(cpi->sf.inter_sf.selective_ref_frame,
                                  cpi->oxcf.ref_frm_cfg.max_reference_frames);
 
   for (int i = 0; i < 4 && total_valid_refs > max_allowed_refs; ++i) {
-    const MV_REFERENCE_FRAME ref_frame_to_disable = disable_order[i];
+    const MV_REFERENCE_FRAME ref_frame_to_disable =
+        INTER_REFS_PER_FRAME - i - 1;
 
-    if (!(*ref_frame_flags & av1_ref_frame_flag_list[ref_frame_to_disable])) {
+    if (!(*ref_frame_flags & (1 << ref_frame_to_disable))) {
       continue;
     }
-
+#if CONFIG_NEW_REF_SIGNALING
+    *ref_frame_flags &= ~(1 << ref_frame_to_disable);
+#else
     switch (ref_frame_to_disable) {
       case LAST3_FRAME: *ref_frame_flags &= ~AOM_LAST3_FLAG; break;
       case LAST2_FRAME: *ref_frame_flags &= ~AOM_LAST2_FLAG; break;
@@ -3337,11 +3323,10 @@ static AOM_INLINE void enforce_max_ref_frames(AV1_COMP *cpi,
       case GOLDEN_FRAME: *ref_frame_flags &= ~AOM_GOLD_FLAG; break;
       default: assert(0);
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
     --total_valid_refs;
   }
-  assert(total_valid_refs <= max_allowed_refs);
 }
-#endif  // CONFIG_NEW_REF_SIGNALING
 
 // Returns a Sequence Header OBU stored in an aom_fixed_buf_t, or NULL upon
 // failure. When a non-NULL aom_fixed_buf_t pointer is returned by this
