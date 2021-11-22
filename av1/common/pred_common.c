@@ -131,7 +131,8 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
   qsort(scores, n_ranked, sizeof(scores[0]), compare_score_data_asc);
 
   // Fill in RefFramesInfo struct according to computed mapping
-  cm->ref_frames_info.n_total_refs = AOMMIN(n_ranked, INTER_REFS_PER_FRAME);
+  cm->ref_frames_info.n_total_refs =
+      AOMMIN(n_ranked, cm->seq_params.max_reference_frames);
   int n_future = 0;
   int n_past = 0;
   int n_cur = 0;

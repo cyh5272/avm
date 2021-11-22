@@ -3532,6 +3532,11 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #if CONFIG_REF_MV_BANK
   aom_wb_write_bit(wb, seq_params->enable_refmvbank);
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_NEW_REF_SIGNALING
+  aom_wb_write_bit(wb, seq_params->max_reference_frames < 7);
+  if (seq_params->max_reference_frames < 7)
+    aom_wb_write_literal(wb, seq_params->max_reference_frames - 3, 2);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
   aom_wb_write_bit(wb, seq_params->enable_sdp);
 #endif

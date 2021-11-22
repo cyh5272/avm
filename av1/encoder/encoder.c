@@ -424,6 +424,9 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
       seq->order_hint_info.enable_order_hint
           ? DEFAULT_EXPLICIT_ORDER_HINT_BITS - 1
           : -1;
+#if CONFIG_NEW_REF_SIGNALING
+  seq->max_reference_frames = oxcf->ref_frm_cfg.max_reference_frames;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   seq->max_frame_width = frm_dim_cfg->forced_max_frame_width
                              ? frm_dim_cfg->forced_max_frame_width

@@ -313,6 +313,9 @@ typedef struct SequenceHeader {
   BLOCK_SIZE sb_size;  // Size of the superblock used for this frame
   int mib_size;        // Size of the superblock in units of MI blocks
   int mib_size_log2;   // Log 2 of above.
+#if CONFIG_NEW_REF_SIGNALING
+  int max_reference_frames;  // Number of reference frames allowed
+#endif
 
   OrderHintInfo order_hint_info;
 
