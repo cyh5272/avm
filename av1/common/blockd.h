@@ -938,6 +938,10 @@ typedef struct macroblockd {
   int bd;
 
   /*!
+   * base_qindex: copied from cm->seq_params.base_qindex for convenience.
+   */
+  int base_qindex;
+  /*!
    * Quantizer index for each segment (base qindex + delta for each segment).
    */
   int qindex[MAX_SEGMENTS];
