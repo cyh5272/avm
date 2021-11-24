@@ -1235,9 +1235,17 @@ static void avg_cdf_symbol(aom_cdf_prob *cdf_ptr_left, aom_cdf_prob *cdf_ptr_tr,
 static void avg_nmv(nmv_context *nmv_left, nmv_context *nmv_tr, int wt_left,
                     int wt_tr) {
   AVERAGE_CDF(nmv_left->joints_cdf, nmv_tr->joints_cdf, 4);
+#if CONFIG_ADAPTIVE_MVD
+  AVERAGE_CDF(nmv_left->restrained_joints_cdf, nmv_tr->restrained_joints_cdf,
+              MV_JOINTS);
+#endif
   for (int i = 0; i < 2; i++) {
     AVERAGE_CDF(nmv_left->comps[i].classes_cdf, nmv_tr->comps[i].classes_cdf,
                 MV_CLASSES);
+#if CONFIG_ADAPTIVE_MVD
+    AVERAGE_CDF(nmv_left->comps[i].res_classes_cdf,
+                nmv_tr->comps[i].res_classes_cdf, MV_CLASSES);
+#endif
     AVERAGE_CDF(nmv_left->comps[i].class0_fp_cdf,
                 nmv_tr->comps[i].class0_fp_cdf, MV_FP_SIZE);
     AVERAGE_CDF(nmv_left->comps[i].fp_cdf, nmv_tr->comps[i].fp_cdf, MV_FP_SIZE);

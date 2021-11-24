@@ -27,6 +27,9 @@
 #include "av1/encoder/partition_search.h"
 #include "av1/encoder/reconinter_enc.h"
 #include "av1/encoder/tokenize.h"
+#if CONFIG_ADAPTIVE_MVD
+#include "av1/common/reconinter.h"
+#endif
 
 #include "aom_util/debug_util.h"
 
@@ -1380,6 +1383,13 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                        mbmi->mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                        mbmi->mode == NEW_NEWMV;
+    const int new_mv = mbmi->mode == NEWMV || mbmi->mode == NEW_NEWMV;
+#if CONFIG_JOINT_MVD
+    const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
+#endif
+#if CONFIG_ADAPTIVE_MVD
+    const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
+#endif
 #if CONFIG_NEW_INTER_MODES
     if (have_drl_index(mbmi->mode)) {
       const int16_t mode_ctx_pristine =
@@ -1429,17 +1439,34 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
           const int_mv ref_mv = av1_get_ref_mv(x, ref);
           av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
+#if CONFIG_ADAPTIVE_MVD
+                              is_adaptive_mvd,
+#endif
                               allow_hp);
         }
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_JOINT_MVD
+      } else if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV ||
+                 mbmi->mode == JOINT_NEWMV) {
+#else
+      } else if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
+#endif
+#if CONFIG_JOINT_MVD
+        const int ref = (mbmi->mode == NEAR_NEWMV || jmvd_base_ref_list);
+#else
+        const int ref = mbmi->mode == NEAR_NEWMV;
       } else if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
         const int ref =
 #if CONFIG_OPTFLOW_REFINEMENT
             mbmi->mode == NEAR_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
             mbmi->mode == NEAR_NEWMV;
+#endif
         const int_mv ref_mv = av1_get_ref_mv(x, ref);
         av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
+#if CONFIG_ADAPTIVE_MVD
+                            is_adaptive_mvd,
+#endif
                             allow_hp);
 #else
       } else if (mbmi->mode == NEAREST_NEWMV || mbmi->mode == NEAR_NEWMV) {

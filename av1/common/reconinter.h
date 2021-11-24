@@ -203,6 +203,33 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
                            const struct buf_2d *ref_buf,
                            InterpFilter interp_filter);
 
+#if CONFIG_ADAPTIVE_MVD
+static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
+                                                 const PREDICTION_MODE mode) {
+  return (mode == NEAR_NEWMV || mode == NEW_NEARMV) &&
+         cm->seq_params.enable_adaptive_mvd;
+}
+#endif
+#if CONFIG_JOINT_MVD
+static INLINE int get_joint_mvd_base_ref_list(const AV1_COMMON *const cm,
+                                              const MB_MODE_INFO *mbmi) {
+  int base_ref_list = 0;
+  int first_ref_dist = 0;
+  int sec_ref_dist = 0;
+  if (has_second_ref(mbmi)) {
+    first_ref_dist = cm->ref_frame_relative_dist[mbmi->ref_frame[0]];
+    sec_ref_dist = cm->ref_frame_relative_dist[mbmi->ref_frame[1]];
+
+    if (first_ref_dist >= sec_ref_dist) {
+      base_ref_list = 0;
+    } else {
+      base_ref_list = 1;
+    }
+  }
+  return base_ref_list;
+}
+#endif
+
 void av1_init_comp_mode(InterPredParams *inter_pred_params);
 
 void av1_init_warp_params(InterPredParams *inter_pred_params,

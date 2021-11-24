@@ -21,7 +21,7 @@ typedef struct single_mv_candidate {
   MV_REFERENCE_FRAME ref_frame;
 } SINGLE_MV_CANDIDATE;
 #endif  // CONFIG_SMVP_IMPROVEMENT
-
+#if !CONFIG_JOINT_MVD
 // Although we assign 32 bit integers, all the values are strictly under 14
 // bits.
 static int div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730, 2340,
@@ -31,6 +31,7 @@ static int div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730, 2340,
 
 // TODO(jingning): Consider the use of lookup table for (num / den)
 // altogether.
+
 static AOM_INLINE void get_mv_projection(MV *output, MV ref, int num, int den) {
   den = AOMMIN(den, MAX_FRAME_DISTANCE);
   num = num > 0 ? AOMMIN(num, MAX_FRAME_DISTANCE)
@@ -44,7 +45,7 @@ static AOM_INLINE void get_mv_projection(MV *output, MV ref, int num, int den) {
   output->row = (int16_t)clamp(mv_row, clamp_min, clamp_max);
   output->col = (int16_t)clamp(mv_col, clamp_min, clamp_max);
 }
-
+#endif
 void av1_copy_frame_mvs(const AV1_COMMON *const cm,
                         const MB_MODE_INFO *const mi, int mi_row, int mi_col,
                         int x_mis, int y_mis) {

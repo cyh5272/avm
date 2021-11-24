@@ -110,6 +110,9 @@ static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
     NEWMV,      // NEW_NEARMV
     GLOBALMV,   // GLOBAL_GLOBALMV
     NEWMV,      // NEW_NEWMV
+#if CONFIG_JOINT_MVD
+    NEWMV,  // JOINT_NEWMV
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT
     NEARMV,  // NEAR_NEARMV_OPTFLOW
     NEARMV,  // NEAR_NEWMV_OPTFLOW
@@ -155,6 +158,9 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
     NEARMV,     // NEW_NEARMV
     GLOBALMV,   // GLOBAL_GLOBALMV
     NEWMV,      // NEW_NEWMV
+#if CONFIG_JOINT_MVD
+    NEARMV,  // JOINT_NEWMV
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT
     NEARMV,  // NEAR_NEARMV_OPTFLOW
     NEWMV,   // NEAR_NEWMV_OPTFLOW
@@ -187,6 +193,9 @@ static INLINE int have_nearmv_newmv_in_inter_mode(PREDICTION_MODE mode) {
 #if CONFIG_NEW_INTER_MODES
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
+#if CONFIG_JOINT_MVD
+          mode == JOINT_NEWMV ||
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT
           mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
           mode == NEW_NEWMV_OPTFLOW ||

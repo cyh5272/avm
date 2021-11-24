@@ -22,6 +22,9 @@
 #include "aom_ports/bitops.h"
 
 static void update_mv_component_stats(int comp, nmv_component *mvcomp,
+#if CONFIG_ADAPTIVE_MVD
+                                      int is_adaptive_mvd,
+#endif
                                       MvSubpelPrecision precision) {
   assert(comp != 0);
   int offset;
@@ -36,16 +39,33 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
   update_cdf(mvcomp->sign_cdf, sign, 2);
 
   // Class
+#if CONFIG_ADAPTIVE_MVD
+  update_cdf(is_adaptive_mvd ? mvcomp->res_classes_cdf : mvcomp->classes_cdf,
+             mv_class, MV_CLASSES);
+#else
   update_cdf(mvcomp->classes_cdf, mv_class, MV_CLASSES);
+#endif
 
-  // Integer bits
-  if (mv_class == MV_CLASS_0) {
-    update_cdf(mvcomp->class0_cdf, d, CLASS0_SIZE);
-  } else {
-    const int n = mv_class + CLASS0_BITS - 1;  // number of bits
-    for (int i = 0; i < n; ++i)
-      update_cdf(mvcomp->bits_cdf[i], (d >> i) & 1, 2);
+#if CONFIG_ADAPTIVE_MVD
+  int use_integer_mv = 1;
+  if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || d > 0)) {
+    assert(fr == 3 && hp == 1);
+    precision = MV_SUBPEL_NONE;
   }
+  if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_integer_mv = 0;
+  if (use_integer_mv) {
+#endif
+    // Integer bits
+    if (mv_class == MV_CLASS_0) {
+      update_cdf(mvcomp->class0_cdf, d, CLASS0_SIZE);
+    } else {
+      const int n = mv_class + CLASS0_BITS - 1;  // number of bits
+      for (int i = 0; i < n; ++i)
+        update_cdf(mvcomp->bits_cdf[i], (d >> i) & 1, 2);
+    }
+#if CONFIG_ADAPTIVE_MVD
+  }
+#endif
   // Fractional bits
   if (precision > MV_SUBPEL_NONE) {
     aom_cdf_prob *fp_cdf =
@@ -62,20 +82,42 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
 }
 
 void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
+#if CONFIG_ADAPTIVE_MVD
+                         int is_adaptive_mvd,
+#endif
                          MvSubpelPrecision precision) {
   const MV diff = { mv->row - ref->row, mv->col - ref->col };
   const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
 
-  update_cdf(mvctx->joints_cdf, j, MV_JOINTS);
+#if CONFIG_ADAPTIVE_MVD
+  if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
+  if (is_adaptive_mvd)
+    update_cdf(mvctx->restrained_joints_cdf, j, MV_JOINTS);
+  else
+#endif
+    update_cdf(mvctx->joints_cdf, j, MV_JOINTS);
 
   if (mv_joint_vertical(j))
+#if CONFIG_ADAPTIVE_MVD
+    update_mv_component_stats(diff.row, &mvctx->comps[0], is_adaptive_mvd,
+                              precision);
+#else
     update_mv_component_stats(diff.row, &mvctx->comps[0], precision);
+#endif
 
   if (mv_joint_horizontal(j))
+#if CONFIG_ADAPTIVE_MVD
+    update_mv_component_stats(diff.col, &mvctx->comps[1], is_adaptive_mvd,
+                              precision);
+#else
     update_mv_component_stats(diff.col, &mvctx->comps[1], precision);
+#endif
 }
 
 static void encode_mv_component(aom_writer *w, int comp, nmv_component *mvcomp,
+#if CONFIG_ADAPTIVE_MVD
+                                int is_adaptive_mvd,
+#endif
                                 MvSubpelPrecision precision) {
   assert(comp != 0);
   int offset;
@@ -90,17 +132,37 @@ static void encode_mv_component(aom_writer *w, int comp, nmv_component *mvcomp,
   aom_write_symbol(w, sign, mvcomp->sign_cdf, 2);
 
   // Class
+#if CONFIG_ADAPTIVE_MVD
+  aom_write_symbol(
+      w, mv_class,
+      is_adaptive_mvd ? mvcomp->res_classes_cdf : mvcomp->classes_cdf,
+      MV_CLASSES);
+#else
   aom_write_symbol(w, mv_class, mvcomp->classes_cdf, MV_CLASSES);
+#endif
 
-  // Integer bits
-  if (mv_class == MV_CLASS_0) {
-    aom_write_symbol(w, d, mvcomp->class0_cdf, CLASS0_SIZE);
-  } else {
-    int i;
-    const int n = mv_class + CLASS0_BITS - 1;  // number of bits
-    for (i = 0; i < n; ++i)
-      aom_write_symbol(w, (d >> i) & 1, mvcomp->bits_cdf[i], 2);
+#if CONFIG_ADAPTIVE_MVD
+  int use_integer_mv = 1;
+  if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || d > 0)) {
+    assert(fr == 3 && hp == 1);
+    precision = MV_SUBPEL_NONE;
   }
+  if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_integer_mv = 0;
+  if (use_integer_mv) {
+#endif
+
+    // Integer bits
+    if (mv_class == MV_CLASS_0) {
+      aom_write_symbol(w, d, mvcomp->class0_cdf, CLASS0_SIZE);
+    } else {
+      int i;
+      const int n = mv_class + CLASS0_BITS - 1;  // number of bits
+      for (i = 0; i < n; ++i)
+        aom_write_symbol(w, (d >> i) & 1, mvcomp->bits_cdf[i], 2);
+    }
+#if CONFIG_ADAPTIVE_MVD
+  }
+#endif
   // Fractional bits
   if (precision > MV_SUBPEL_NONE) {
     aom_write_symbol(
@@ -117,16 +179,25 @@ static void encode_mv_component(aom_writer *w, int comp, nmv_component *mvcomp,
 }
 
 static void build_nmv_component_cost_table(int *mvcost,
+#if CONFIG_ADAPTIVE_MVD
+                                           int *res_mvcost,
+#endif
                                            const nmv_component *const mvcomp,
                                            MvSubpelPrecision precision) {
   int i, v;
   int sign_cost[2], class_cost[MV_CLASSES], class0_cost[CLASS0_SIZE];
+#if CONFIG_ADAPTIVE_MVD
+  int res_class_cost[MV_CLASSES];
+#endif
   int bits_cost[MV_OFFSET_BITS][2];
   int class0_fp_cost[CLASS0_SIZE][MV_FP_SIZE], fp_cost[MV_FP_SIZE];
   int class0_hp_cost[2], hp_cost[2];
 
   av1_cost_tokens_from_cdf(sign_cost, mvcomp->sign_cdf, NULL);
   av1_cost_tokens_from_cdf(class_cost, mvcomp->classes_cdf, NULL);
+#if CONFIG_ADAPTIVE_MVD
+  av1_cost_tokens_from_cdf(res_class_cost, mvcomp->res_classes_cdf, NULL);
+#endif
   av1_cost_tokens_from_cdf(class0_cost, mvcomp->class0_cdf, NULL);
   for (i = 0; i < MV_OFFSET_BITS; ++i) {
     av1_cost_tokens_from_cdf(bits_cost[i], mvcomp->bits_cdf[i], NULL);
@@ -143,18 +214,39 @@ static void build_nmv_component_cost_table(int *mvcost,
   mvcost[0] = 0;
   for (v = 1; v <= MV_MAX; ++v) {
     int z, c, o, d, e, f, cost = 0;
+#if CONFIG_ADAPTIVE_MVD
+    int res_cost = 0;
+#endif
     z = v - 1;
     c = av1_get_mv_class(z, &o);
     cost += class_cost[c];
+#if CONFIG_ADAPTIVE_MVD
+    res_cost += res_class_cost[c];
+#endif
     d = (o >> 3);     /* int mv data */
     f = (o >> 1) & 3; /* fractional pel mv data */
     e = (o & 1);      /* high precision mv data */
     if (c == MV_CLASS_0) {
       cost += class0_cost[d];
+#if CONFIG_ADAPTIVE_MVD
+      res_cost += class0_cost[d];
+#endif
     } else {
       const int b = c + CLASS0_BITS - 1; /* number of bits */
       for (i = 0; i < b; ++i) cost += bits_cost[i][((d >> i) & 1)];
     }
+#if CONFIG_ADAPTIVE_MVD
+    if (precision > MV_SUBPEL_NONE) {
+      if (c == MV_CLASS_0 && d == 0) {
+        res_cost += class0_fp_cost[d][f];
+      }
+      if (precision > MV_SUBPEL_LOW_PRECISION) {
+        if (c == MV_CLASS_0 && d == 0) {
+          res_cost += class0_hp_cost[e];
+        }
+      }
+    }
+#endif
     if (precision > MV_SUBPEL_NONE) {
       if (c == MV_CLASS_0) {
         cost += class0_fp_cost[d][f];
@@ -169,6 +261,10 @@ static void build_nmv_component_cost_table(int *mvcost,
         }
       }
     }
+#if CONFIG_ADAPTIVE_MVD
+    res_mvcost[v] = res_cost + sign_cost[0];
+    res_mvcost[-v] = res_cost + sign_cost[1];
+#endif
     mvcost[v] = cost + sign_cost[0];
     mvcost[-v] = cost + sign_cost[1];
   }
@@ -177,18 +273,39 @@ static void build_nmv_component_cost_table(int *mvcost,
 void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
                    nmv_context *mvctx, int usehp) {
   const MV diff = { mv->row - ref->row, mv->col - ref->col };
+#if CONFIG_ADAPTIVE_MVD
+  const AV1_COMMON *cm = &cpi->common;
+  const MACROBLOCK *const x = &cpi->td.mb;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
+#endif
   const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
   // If the mv_diff is zero, then we should have used near or nearest instead.
   assert(j != MV_JOINT_ZERO);
   if (cpi->common.features.cur_frame_force_integer_mv) {
     usehp = MV_SUBPEL_NONE;
   }
-  aom_write_symbol(w, j, mvctx->joints_cdf, MV_JOINTS);
+#if CONFIG_ADAPTIVE_MVD
+  if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
+  if (is_adaptive_mvd)
+    aom_write_symbol(w, j, mvctx->restrained_joints_cdf, MV_JOINTS);
+  else
+#endif
+    aom_write_symbol(w, j, mvctx->joints_cdf, MV_JOINTS);
   if (mv_joint_vertical(j))
+#if CONFIG_ADAPTIVE_MVD
+    encode_mv_component(w, diff.row, &mvctx->comps[0], is_adaptive_mvd, usehp);
+#else
     encode_mv_component(w, diff.row, &mvctx->comps[0], usehp);
+#endif
 
   if (mv_joint_horizontal(j))
+#if CONFIG_ADAPTIVE_MVD
+    encode_mv_component(w, diff.col, &mvctx->comps[1], is_adaptive_mvd, usehp);
+#else
     encode_mv_component(w, diff.col, &mvctx->comps[1], usehp);
+#endif
 
   // If auto_mv_step_size is enabled then keep track of the largest
   // motion vector component used.
@@ -211,18 +328,37 @@ void av1_encode_dv(aom_writer *w, const MV *mv, const MV *ref,
 
   aom_write_symbol(w, j, mvctx->joints_cdf, MV_JOINTS);
   if (mv_joint_vertical(j))
+#if CONFIG_ADAPTIVE_MVD
+    encode_mv_component(w, diff.row, &mvctx->comps[0], 0, MV_SUBPEL_NONE);
+#else
     encode_mv_component(w, diff.row, &mvctx->comps[0], MV_SUBPEL_NONE);
+#endif
 
   if (mv_joint_horizontal(j))
+#if CONFIG_ADAPTIVE_MVD
+    encode_mv_component(w, diff.col, &mvctx->comps[1], 0, MV_SUBPEL_NONE);
+#else
     encode_mv_component(w, diff.col, &mvctx->comps[1], MV_SUBPEL_NONE);
+#endif
 }
 
-void av1_build_nmv_cost_table(int *mvjoint, int *mvcost[2],
-                              const nmv_context *ctx,
+void av1_build_nmv_cost_table(int *mvjoint,
+#if CONFIG_ADAPTIVE_MVD
+                              int *res_mvjoint, int *res_mvcost[2],
+#endif
+                              int *mvcost[2], const nmv_context *ctx,
                               MvSubpelPrecision precision) {
   av1_cost_tokens_from_cdf(mvjoint, ctx->joints_cdf, NULL);
+#if CONFIG_ADAPTIVE_MVD
+  av1_cost_tokens_from_cdf(res_mvjoint, ctx->restrained_joints_cdf, NULL);
+  build_nmv_component_cost_table(mvcost[0], res_mvcost[0], &ctx->comps[0],
+                                 precision);
+  build_nmv_component_cost_table(mvcost[1], res_mvcost[1], &ctx->comps[1],
+                                 precision);
+#else
   build_nmv_component_cost_table(mvcost[0], &ctx->comps[0], precision);
   build_nmv_component_cost_table(mvcost[1], &ctx->comps[1], precision);
+#endif
 }
 
 int_mv av1_get_ref_mv_from_stack(int ref_idx,

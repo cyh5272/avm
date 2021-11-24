@@ -1674,6 +1674,10 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     mode_ctx =
         mode_context_analyzer(mbmi_ext_frame->mode_context, mbmi->ref_frame);
 
+#if CONFIG_JOINT_MVD
+    const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
+#endif
+
     // If segment skip is not enabled code the mode.
     if (!segfeature_active(seg, segment_id, SEG_LVL_SKIP)) {
       if (is_inter_compound_mode(mode))
@@ -1707,10 +1711,15 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                       allow_hp);
       }
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_JOINT_MVD
+    } else if (mode == NEAR_NEWMV ||
+               (mode == JOINT_NEWMV && jmvd_base_ref_list == 1)) {
+#else
 #if CONFIG_OPTFLOW_REFINEMENT
     } else if (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW) {
 #else
     } else if (mode == NEAR_NEWMV) {
+#endif
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
@@ -1718,8 +1727,13 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #if CONFIG_OPTFLOW_REFINEMENT
     } else if (mode == NEW_NEARMV || mode == NEW_NEARMV_OPTFLOW) {
 #else
+#if CONFIG_JOINT_MVD
+    } else if (mode == NEW_NEARMV ||
+               (mode == JOINT_NEWMV && jmvd_base_ref_list == 0)) {
+#else
     } else if (mode == NEW_NEARMV) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#endif
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
       av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
@@ -3515,6 +3529,9 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
   aom_wb_write_bit(wb, seq_params->enable_ibp);
+#endif
+#if CONFIG_ADAPTIVE_MVD
+  aom_wb_write_bit(wb, seq_params->enable_adaptive_mvd);
 #endif
 }
 

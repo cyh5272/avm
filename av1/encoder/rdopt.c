@@ -149,6 +149,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLA,
   THR_COMP_NEAR_NEWLA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLA,
+#endif
   THR_COMP_NEW_NEWLA,
   THR_COMP_GLOBAL_GLOBALLA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -160,6 +163,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL2A,
   THR_COMP_NEAR_NEWL2A,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL2A,
+#endif
   THR_COMP_NEW_NEWL2A,
   THR_COMP_GLOBAL_GLOBALL2A,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -171,6 +177,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL3A,
   THR_COMP_NEAR_NEWL3A,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL3A,
+#endif
   THR_COMP_NEW_NEWL3A,
   THR_COMP_GLOBAL_GLOBALL3A,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -182,6 +191,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARGA,
   THR_COMP_NEAR_NEWGA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWGA,
+#endif
   THR_COMP_NEW_NEWGA,
   THR_COMP_GLOBAL_GLOBALGA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -193,6 +205,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLB,
   THR_COMP_NEAR_NEWLB,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLB,
+#endif
   THR_COMP_NEW_NEWLB,
   THR_COMP_GLOBAL_GLOBALLB,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -204,6 +219,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL2B,
   THR_COMP_NEAR_NEWL2B,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL2B,
+#endif
   THR_COMP_NEW_NEWL2B,
   THR_COMP_GLOBAL_GLOBALL2B,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -215,6 +233,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL3B,
   THR_COMP_NEAR_NEWL3B,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL3B,
+#endif
   THR_COMP_NEW_NEWL3B,
   THR_COMP_GLOBAL_GLOBALL3B,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -226,6 +247,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARGB,
   THR_COMP_NEAR_NEWGB,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWGB,
+#endif
   THR_COMP_NEW_NEWGB,
   THR_COMP_GLOBAL_GLOBALGB,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -237,6 +261,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLA2,
   THR_COMP_NEAR_NEWLA2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLA2,
+#endif
   THR_COMP_NEW_NEWLA2,
   THR_COMP_GLOBAL_GLOBALLA2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -248,6 +275,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL2A2,
   THR_COMP_NEAR_NEWL2A2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL2A2,
+#endif
   THR_COMP_NEW_NEWL2A2,
   THR_COMP_GLOBAL_GLOBALL2A2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -259,6 +289,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARL3A2,
   THR_COMP_NEAR_NEWL3A2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWL3A2,
+#endif
   THR_COMP_NEW_NEWL3A2,
   THR_COMP_GLOBAL_GLOBALL3A2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -270,6 +303,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARGA2,
   THR_COMP_NEAR_NEWGA2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWGA2,
+#endif
   THR_COMP_NEW_NEWGA2,
   THR_COMP_GLOBAL_GLOBALGA2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -281,6 +317,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLL2,
   THR_COMP_NEAR_NEWLL2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLL2,
+#endif
   THR_COMP_NEW_NEWLL2,
   THR_COMP_GLOBAL_GLOBALLL2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -292,6 +331,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLL3,
   THR_COMP_NEAR_NEWLL3,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLL3,
+#endif
   THR_COMP_NEW_NEWLL3,
   THR_COMP_GLOBAL_GLOBALLL3,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -303,6 +345,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARLG,
   THR_COMP_NEAR_NEWLG,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWLG,
+#endif
   THR_COMP_NEW_NEWLG,
   THR_COMP_GLOBAL_GLOBALLG,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -314,6 +359,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
 
   THR_COMP_NEW_NEARBA,
   THR_COMP_NEAR_NEWBA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEWBA,
+#endif
   THR_COMP_NEW_NEWBA,
   THR_COMP_GLOBAL_GLOBALBA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1444,9 +1492,47 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       } else {
         const int_mv ref_mv = av1_get_ref_mv(x, 1);
         *rate_mv = av1_mv_bit_cost(&cur_mv[1].as_mv, &ref_mv.as_mv,
+#if CONFIG_ADAPTIVE_MVD
+                                   x->mv_costs.res_nmv_joint_cost,
+                                   x->mv_costs.res_mv_cost_stack,
+#else
                                    x->mv_costs.nmv_joint_cost,
+                                   x->mv_costs.mv_cost_stack,
+#endif
+                                   MV_COST_WEIGHT);
+      }
+#if CONFIG_JOINT_MVD
+    } else if (this_mode == JOINT_NEWMV) {
+      const AV1_COMMON *const cm = &cpi->common;
+      if (!cm->seq_params.enable_joint_mvd) return INT64_MAX;
+      const int cur_ref_side = cm->ref_frame_side[mbmi->ref_frame[0]];
+      const int other_ref_side = cm->ref_frame_side[mbmi->ref_frame[1]];
+
+      const int same_side = (cur_ref_side > 0 && other_ref_side > 0) ||
+                            (cur_ref_side == 0 && other_ref_side == 0);
+      // skip JOINT_NEWMV mode when two reference frames are from same side
+      if (same_side) return INT64_MAX;
+
+      const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
+      const int valid_mv_base = (!jmvd_base_ref_list && valid_mv0) ||
+                                (jmvd_base_ref_list && valid_mv1);
+      if (valid_mv_base) {
+        cur_mv[jmvd_base_ref_list].as_int =
+            args->single_newmv[ref_mv_idx][refs[jmvd_base_ref_list]].as_int;
+        clamp_mv_in_range(x, &cur_mv[jmvd_base_ref_list], jmvd_base_ref_list);
+      }
+      // aomenc3
+      if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
+          !valid_mv_base) {
+        av1_compound_single_motion_search_interinter(
+            cpi, x, bsize, cur_mv, NULL, 0, rate_mv, jmvd_base_ref_list);
+      } else {
+        const int_mv ref_mv = av1_get_ref_mv(x, jmvd_base_ref_list);
+        *rate_mv = av1_mv_bit_cost(&cur_mv[jmvd_base_ref_list].as_mv,
+                                   &ref_mv.as_mv, x->mv_costs.nmv_joint_cost,
                                    x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
       }
+#endif
     } else {
 #if CONFIG_NEW_INTER_MODES
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1470,8 +1556,14 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       } else {
         const int_mv ref_mv = av1_get_ref_mv(x, 0);
         *rate_mv = av1_mv_bit_cost(&cur_mv[0].as_mv, &ref_mv.as_mv,
+#if CONFIG_ADAPTIVE_MVD
+                                   x->mv_costs.res_nmv_joint_cost,
+                                   x->mv_costs.res_mv_cost_stack,
+#else
                                    x->mv_costs.nmv_joint_cost,
-                                   x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
+                                   x->mv_costs.mv_cost_stack,
+#endif
+                                   MV_COST_WEIGHT);
       }
     }
   } else {
@@ -6223,6 +6315,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   if (search_state.best_mbmode.ref_mv_idx != 0 &&
       !(search_state.best_mbmode.mode == NEWMV ||
         search_state.best_mbmode.mode == NEW_NEWMV ||
+#if CONFIG_JOINT_MVD
+        search_state.best_mbmode.mode == JOINT_NEWMV ||
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT
         search_state.best_mbmode.mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
