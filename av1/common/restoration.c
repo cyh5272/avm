@@ -31,19 +31,29 @@
 #endif  // CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP
-#define WIENERNS_PREC_BITS_Y_MINUS7 (WIENERNS_PREC_BITS_Y - 7)
-#define AOM_WIENERNS_COEFF_Y(b, m, k)               \
-  {                                                 \
-    (b) + WIENERNS_PREC_BITS_Y_MINUS7,              \
-        (m) * (1 << WIENERNS_PREC_BITS_Y_MINUS7), k \
-  }
-#define WIENERNS_PREC_BITS_UV_MINUS7 (WIENERNS_PREC_BITS_UV - 7)
-#define AOM_WIENERNS_COEFF_UV(b, m, k)               \
-  {                                                  \
-    (b) + WIENERNS_PREC_BITS_UV_MINUS7,              \
-        (m) * (1 << WIENERNS_PREC_BITS_UV_MINUS7), k \
+#define AOM_WIENERNS_COEFF(p, b, m, k) \
+  { (b) + (p)-6, (m) * (1 << ((p)-6)), k }
+
+#define AOM_MAKE_WIENERNS_CONFIG(prec, config, coeff)                     \
+  {                                                                       \
+    { (prec), sizeof(config) / sizeof(config[0]), 0, (config), NULL, 0 }, \
+        sizeof(coeff) / sizeof(coeff[0]), (coeff)                         \
   }
 
+#define AOM_MAKE_WIENERNS_CONFIG2(prec, config, config2, coeff) \
+  {                                                             \
+    { (prec),                                                   \
+      sizeof(config) / sizeof(config[0]),                       \
+      sizeof(config2) / sizeof(config2[0]),                     \
+      (config),                                                 \
+      (config2),                                                \
+      0 },                                                      \
+        sizeof(coeff) / sizeof(coeff[0]), (coeff)               \
+  }
+
+///////////////////////////////////////////////////////////////////////////
+// First filter configuration
+///////////////////////////////////////////////////////////////////////////
 const int wienerns_config_y[][3] = {
   { 1, 0, 0 },  { -1, 0, 0 },   { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
   { -2, 0, 2 }, { 0, 2, 3 },    { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
@@ -57,46 +67,125 @@ const int wienerns_config_uv_from_uv[][3] = {
   { 2, 0, 2 }, { -2, 0, 2 },  { 0, 2, 3 },  { 0, -2, 3 },
   { 1, 1, 4 }, { -1, -1, 4 }, { -1, 1, 5 }, { 1, -1, 5 },
 };
-const int wienerns_uv_from_uv_pixel =
-    sizeof(wienerns_config_uv_from_uv) / sizeof(wienerns_config_uv_from_uv[0]);
 
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
 const int wienerns_config_uv_from_y[][3] = {
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
   { 1, 0, 6 },  { -1, 0, 6 },  { 0, 1, 7 },  { 0, -1, 7 },
   { 1, 1, 8 },  { -1, -1, 8 }, { -1, 1, 9 }, { 1, -1, 9 },
   { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
-};
-const int wienerns_uv_from_y_pixel =
-    sizeof(wienerns_config_uv_from_y) / sizeof(wienerns_config_uv_from_y[0]);
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+};
 
+const int wienerns_prec_bits_y = 7;
 const int wienerns_coeff_y[][3] = {
-  AOM_WIENERNS_COEFF_Y(6, -24, 3), AOM_WIENERNS_COEFF_Y(6, -24, 3),
-  AOM_WIENERNS_COEFF_Y(5, -16, 3), AOM_WIENERNS_COEFF_Y(5, -16, 3),
-  AOM_WIENERNS_COEFF_Y(5, -24, 3), AOM_WIENERNS_COEFF_Y(5, -24, 3),
-  AOM_WIENERNS_COEFF_Y(4, -6, 3),  AOM_WIENERNS_COEFF_Y(4, -6, 3),
-  AOM_WIENERNS_COEFF_Y(4, -7, 3),  AOM_WIENERNS_COEFF_Y(4, -7, 3),
-  AOM_WIENERNS_COEFF_Y(3, -4, 3),  AOM_WIENERNS_COEFF_Y(3, -4, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 5, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 5, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 4, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 4, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 3, -3, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 3, -3, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 3, -4, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 3, -4, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 2, -2, 1),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y, 2, -2, 1),
 };
+
+const int wienerns_prec_bits_uv = 7;
 const int wienerns_coeff_uv[][3] = {
-  AOM_WIENERNS_COEFF_UV(6, -14, 3), AOM_WIENERNS_COEFF_UV(6, -14, 3),
-  AOM_WIENERNS_COEFF_UV(5, -20, 3), AOM_WIENERNS_COEFF_UV(5, -20, 3),
-  AOM_WIENERNS_COEFF_UV(6, -32, 3), AOM_WIENERNS_COEFF_UV(6, -32, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -7, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -7, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -10, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -10, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -16, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -16, 3),
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-  AOM_WIENERNS_COEFF_UV(5, -16, 3), AOM_WIENERNS_COEFF_UV(5, -16, 3),
-  AOM_WIENERNS_COEFF_UV(5, -16, 3), AOM_WIENERNS_COEFF_UV(5, -16, 3),
-  AOM_WIENERNS_COEFF_UV(5, -16, 3), AOM_WIENERNS_COEFF_UV(5, -16, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 };
 
-const int wienerns_prec_bits_y = WIENERNS_PREC_BITS_Y;
-const int wienerns_prec_bits_uv = WIENERNS_PREC_BITS_UV;
+const WienernsFilterConfigType wienerns_filter_y = AOM_MAKE_WIENERNS_CONFIG(
+    wienerns_prec_bits_y, wienerns_config_y, wienerns_coeff_y);
+const WienernsFilterConfigType wienerns_filter_uv =
+    AOM_MAKE_WIENERNS_CONFIG2(wienerns_prec_bits_uv, wienerns_config_uv_from_uv,
+                              wienerns_config_uv_from_y, wienerns_coeff_uv);
 
-const int wienerns_y_pixel =
-    sizeof(wienerns_config_y) / sizeof(wienerns_config_y[0]);
-const int wienerns_y = sizeof(wienerns_coeff_y) / sizeof(wienerns_coeff_y[0]);
-const int wienerns_uv =
-    sizeof(wienerns_coeff_uv) / sizeof(wienerns_coeff_uv[0]);
+const WienernsFilterConfigPairType wienerns_filters_lowqp = {
+  &wienerns_filter_y, &wienerns_filter_uv
+};
+
+///////////////////////////////////////////////////////////////////////////
+// Second filter configuration
+///////////////////////////////////////////////////////////////////////////
+const int wienerns_config_y2[][3] = {
+  { 1, 0, 0 },  { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 },  { 2, 0, 2 },
+  { -2, 0, 2 }, { 0, 2, 3 },  { 0, -2, 3 }, { 1, 1, 4 },   { -1, -1, 4 },
+  { -1, 1, 5 }, { 1, -1, 5 }, { 2, 2, 6 },  { -2, -2, 6 }, { -2, 2, 7 },
+  { 2, -2, 7 }, { 3, 0, 8 },  { -3, 0, 8 }, { 0, 3, 9 },   { 0, -3, 9 },
+};
+
+const int wienerns_config_uv_from_uv2[][3] = {
+  { 1, 0, 0 }, { -1, 0, 0 },  { 0, 1, 1 },  { 0, -1, 1 },
+  { 2, 0, 2 }, { -2, 0, 2 },  { 0, 2, 3 },  { 0, -2, 3 },
+  { 1, 1, 4 }, { -1, -1, 4 }, { -1, 1, 5 }, { 1, -1, 5 },
+};
+
+const int wienerns_config_uv_from_y2[][3] = {
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  { 1, 0, 6 },  { -1, 0, 6 },  { 0, 1, 7 },  { 0, -1, 7 },
+  { 1, 1, 8 },  { -1, -1, 8 }, { -1, 1, 9 }, { 1, -1, 9 },
+  { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+};
+
+const int wienerns_prec_bits_y2 = 7;
+const int wienerns_coeff_y2[][3] = {
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 5, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 5, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 4, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 4, -12, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 3, -3, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 3, -3, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 3, -4, 2),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_y2, 3, -4, 2),
+};
+
+const int wienerns_prec_bits_uv2 = 7;
+const int wienerns_coeff_uv2[][3] = {
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -7, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -7, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -10, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -10, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -16, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -16, 3),
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FIL2T
+};
+
+const WienernsFilterConfigType wienerns_filter_y2 = AOM_MAKE_WIENERNS_CONFIG(
+    wienerns_prec_bits_y2, wienerns_config_y2, wienerns_coeff_y2);
+const WienernsFilterConfigType wienerns_filter_uv2 = AOM_MAKE_WIENERNS_CONFIG2(
+    wienerns_prec_bits_uv2, wienerns_config_uv_from_uv2,
+    wienerns_config_uv_from_y2, wienerns_coeff_uv2);
+
+const WienernsFilterConfigPairType wienerns_filters_highqp = {
+  &wienerns_filter_y2, &wienerns_filter_uv2
+};
+
 #endif  // CONFIG_WIENER_NONSEP
 
 // The 's' values are calculated based on original 'r' and 'e' values in the
@@ -1371,35 +1460,18 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
 
 #if CONFIG_WIENER_NONSEP
 void apply_wiener_nonsep(const uint8_t *dgd, int width, int height, int stride,
-                         const int16_t *filter, uint8_t *dst, int dst_stride,
-                         int plane, const uint8_t *luma, int luma_stride) {
+                         int base_qindex, const int16_t *filter, uint8_t *dst,
+                         int dst_stride, int plane, const uint8_t *luma,
+                         int luma_stride) {
   (void)luma;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
-
-  const NonsepFilterConfig nsfilter_y = {
-    wienerns_prec_bits_y, wienerns_y_pixel, 0, wienerns_config_y, NULL, 0,
-  };
-  const NonsepFilterConfig nsfilter_uv = {
-    wienerns_prec_bits_uv,
-    wienerns_uv_from_uv_pixel,
+  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
+  const NonsepFilterConfig *nsfilter =
+      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+  const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_uv_from_y_pixel,
-#else
-    0,
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_config_uv_from_uv,
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_config_uv_from_y,
-#else
-    NULL,
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-    0,
-  };
-  const NonsepFilterConfig *nsfilter = is_uv ? &nsfilter_uv : &nsfilter_y;
-  const int16_t *filter_ = is_uv ? filter + wienerns_y : filter;
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (!is_uv || wienerns_uv_from_y_pixel == 0) {
+  if (!is_uv || nsfilter->num_pixels2 == 0) {
     av1_convolve_nonsep(dgd, width, height, stride, nsfilter, filter_, dst,
                         dst_stride);
   } else {
@@ -1424,7 +1496,7 @@ static void wiener_nsfilter_stripe(const RestorationUnitInfo *rui,
 
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
-    apply_wiener_nonsep(src + j, w, stripe_height, src_stride,
+    apply_wiener_nonsep(src + j, w, stripe_height, src_stride, rui->base_qindex,
                         rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride,
                         rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -1436,37 +1508,19 @@ static void wiener_nsfilter_stripe(const RestorationUnitInfo *rui,
 }
 
 void apply_wiener_nonsep_highbd(const uint8_t *dgd8, int width, int height,
-                                int stride, const int16_t *filter,
-                                uint8_t *dst8, int dst_stride, int plane,
-                                const uint8_t *luma8, int luma_stride,
-                                int bit_depth) {
+                                int stride, int base_qindex,
+                                const int16_t *filter, uint8_t *dst8,
+                                int dst_stride, int plane, const uint8_t *luma8,
+                                int luma_stride, int bit_depth) {
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
-
-  const NonsepFilterConfig nsfilter_y = {
-    wienerns_prec_bits_y, wienerns_y_pixel, 0, wienerns_config_y, NULL, 0,
-  };
-  const NonsepFilterConfig nsfilter_uv = {
-    wienerns_prec_bits_uv,
-    wienerns_uv_from_uv_pixel,
+  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
+  const NonsepFilterConfig *nsfilter =
+      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+  const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_uv_from_y_pixel,
-#else
-    0,
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_config_uv_from_uv,
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-    wienerns_config_uv_from_y,
-#else
-    NULL,
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-    0,
-  };
-  const NonsepFilterConfig *nsfilter = is_uv ? &nsfilter_uv : &nsfilter_y;
-  const int16_t *filter_ = is_uv ? filter + wienerns_y : filter;
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (!is_uv || wienerns_uv_from_y_pixel == 0) {
+  if (!is_uv || nsfilter->num_pixels2 == 0) {
     av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter, filter_,
                                dst8, dst_stride, bit_depth);
   } else {
@@ -1492,15 +1546,15 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
 
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
-    apply_wiener_nonsep_highbd(src + j, w, stripe_height, src_stride,
-                               rui->wiener_nonsep_info.nsfilter, dst + j,
-                               dst_stride, rui->plane,
+    apply_wiener_nonsep_highbd(
+        src + j, w, stripe_height, src_stride, rui->base_qindex,
+        rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-                               rui->luma + j, rui->luma_stride,
+        rui->luma + j, rui->luma_stride,
 #else
-                               NULL, -1,
+        NULL, -1,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-                               bit_depth);
+        bit_depth);
   }
 }
 
@@ -1761,6 +1815,7 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
 
 #if CONFIG_WIENER_NONSEP
   rsi->unit_info[rest_unit_idx].plane = ctxt->plane;
+  rsi->unit_info[rest_unit_idx].base_qindex = ctxt->base_qindex;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const int is_uv = (ctxt->plane != AOM_PLANE_Y);
   rsi->unit_info[rest_unit_idx].luma = is_uv ? ctxt->luma : NULL;
@@ -1882,6 +1937,7 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
 
 #if CONFIG_WIENER_NONSEP
     ctxt[plane].plane = plane;
+    ctxt[plane].base_qindex = cm->quant_params.base_qindex;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
     const int is_uv = (plane != AOM_PLANE_Y);
     ctxt[plane].luma = is_uv ? luma : NULL;

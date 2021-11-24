@@ -1354,6 +1354,7 @@ static AOM_INLINE void write_delta_q_params(AV1_COMP *cpi, int skip,
           (mbmi->current_qindex - xd->current_base_qindex) /
           delta_q_info->delta_q_res;
       write_delta_qindex(xd, reduced_delta_qindex, w);
+      xd->base_qindex = cm->quant_params.base_qindex;
       xd->current_base_qindex = mbmi->current_qindex;
       if (delta_q_info->delta_lf_present_flag) {
         if (delta_q_info->delta_lf_multi) {
@@ -2380,6 +2381,7 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
   av1_zero_above_context(cm, xd, mi_col_start, mi_col_end, tile->tile_row);
   av1_init_above_context(&cm->above_contexts, num_planes, tile->tile_row, xd);
 
+  xd->base_qindex = cpi->common.quant_params.base_qindex;
   if (cpi->common.delta_q_info.delta_q_present_flag) {
     xd->current_base_qindex = cpi->common.quant_params.base_qindex;
     if (cpi->common.delta_q_info.delta_lf_present_flag) {
@@ -2622,8 +2624,11 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
                                   const WienerNonsepInfo *wienerns_info,
                                   WienerNonsepInfo *ref_wienerns_info,
                                   aom_writer *wb) {
+  const WienernsFilterConfigPairType *wnsf =
+      get_wienerns_filters(xd->base_qindex);
 #if CONFIG_RST_MERGECOEFFS
-  const int equal = check_wienerns_eq(is_uv, wienerns_info, ref_wienerns_info);
+  const int equal =
+      check_wienerns_eq(is_uv, wienerns_info, ref_wienerns_info, wnsf);
   aom_write_symbol(wb, equal, xd->tile_ctx->merged_param_cdf, 2);
   if (equal) {
     memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
@@ -2632,9 +2637,10 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
 #else
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
-  int beg_feat = is_uv ? wienerns_y : 0;
-  int end_feat = is_uv ? wienerns_y + wienerns_uv : wienerns_y;
-  const int(*wienerns_coeffs)[3] = is_uv ? wienerns_coeff_uv : wienerns_coeff_y;
+  int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
+  int end_feat =
+      is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
+  const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
   for (int i = beg_feat; i < end_feat; ++i) {
     aom_write_primitive_refsubexpfin(
@@ -4238,6 +4244,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
     aom_wb_write_bit(wb, delta_q_info->delta_q_present_flag);
     if (delta_q_info->delta_q_present_flag) {
       aom_wb_write_literal(wb, get_msb(delta_q_info->delta_q_res), 2);
+      xd->base_qindex = quant_params->base_qindex;
       xd->current_base_qindex = quant_params->base_qindex;
       if (is_global_intrabc_allowed(cm))
         assert(delta_q_info->delta_lf_present_flag == 0);
