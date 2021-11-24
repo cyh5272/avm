@@ -54,6 +54,13 @@ macro(fix_experiment_configs)
                            CONFIG_WIENER_NONSEP_CROSS_FILT)
   endif()
 
+  if(CONFIG_COMBINE_PC_NS_WIENER)
+    change_config_and_warn(CONFIG_WIENER_NONSEP 1 CONFIG_COMBINE_PC_NS_WIENER)
+  endif()
+  if(CONFIG_COMBINE_PC_NS_WIENER)
+    change_config_and_warn(CONFIG_PC_WIENER 1 CONFIG_COMBINE_PC_NS_WIENER)
+  endif()
+
   if(CONFIG_CNN_RESTORATION)
     change_config_and_warn(CONFIG_TENSORFLOW_LITE 1 CONFIG_CNN_RESTORATION)
   endif()
