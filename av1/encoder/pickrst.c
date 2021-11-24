@@ -296,13 +296,13 @@ static bool export_context_initialize(int num_rows_luma, int num_cols_luma,
 
 // Saves the frame data as floating point values. frame should have
 // export_context.num_rows_luma and export_context.num_cols_luma dimensions.
-static bool export_context_export_frame(const void *frame, int stride,
+static bool export_context_export_frame(const uint8_t *frame, int stride,
                                         bool high_bd) {
   assert(export_context.initialized == true);
 
   // Inefficient but convenient. OK since we only export data infrequently.
-  uint8_t *frame_8bit = (uint8_t *)frame;
-  uint16_t *frame_16bit = (uint16_t *)frame;
+  const uint8_t *frame_8bit = (uint8_t *)frame;
+  const uint16_t *frame_16bit = CONVERT_TO_SHORTPTR(frame);
 
   // Append to export.
   FILE *export_file = fopen(export_context.filename, "ab");
