@@ -2110,11 +2110,14 @@ static void read_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
 #else
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
-  int beg_feat = is_uv ? wienerns_y : 0;
-  int end_feat = is_uv ? wienerns_y + wienerns_uv : wienerns_y;
-  const int(*wienerns_coeffs)[3] = is_uv ? wienerns_coeff_uv : wienerns_coeff_y;
+  const WienernsFilterConfigPairType *wnsf =
+      get_wienerns_filters(xd->base_qindex);
+  int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
+  int end_feat =
+      is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
+  const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  set_default_wiener_nonsep(wienerns_info);
+  set_default_wiener_nonsep(wienerns_info, xd->base_qindex);
   for (int i = beg_feat; i < end_feat; ++i) {
     wienerns_info->nsfilter[i] += aom_read_primitive_refsubexpfin(
         rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
@@ -3430,6 +3433,7 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
       td->bit_reader = &tile_data->bit_reader;
       av1_zero(td->cb_buffer_base.dqcoeff);
       av1_tile_init(&td->dcb.xd.tile, cm, row, col);
+      td->dcb.xd.base_qindex = cm->quant_params.base_qindex;
       td->dcb.xd.current_base_qindex = cm->quant_params.base_qindex;
       setup_bool_decoder(tile_bs_buf->data, data_end, tile_bs_buf->size,
                          &cm->error, td->bit_reader, allow_update_cdf);
@@ -3507,6 +3511,7 @@ static AOM_INLINE void tile_worker_hook_init(
 
   MACROBLOCKD *const xd = &td->dcb.xd;
   av1_tile_init(&xd->tile, cm, tile_row, tile_col);
+  xd->base_qindex = cm->quant_params.base_qindex;
   xd->current_base_qindex = cm->quant_params.base_qindex;
   setup_bool_decoder(tile_buffer->data, thread_data->data_end,
                      tile_buffer->size, &thread_data->error_info,
@@ -5661,6 +5666,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   CommonQuantParams *const quant_params = &cm->quant_params;
   setup_quantization(quant_params, av1_num_planes(cm), cm->seq_params.bit_depth,
                      cm->seq_params.separate_uv_delta_q, rb);
+  xd->base_qindex = quant_params->base_qindex;
   xd->bd = (int)seq_params->bit_depth;
 
   CommonContexts *const above_contexts = &cm->above_contexts;
@@ -5688,6 +5694,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   cm->delta_q_info.delta_lf_multi = 0;
   cm->delta_q_info.delta_q_present_flag =
       quant_params->base_qindex > 0 ? aom_rb_read_bit(rb) : 0;
+  xd->base_qindex = quant_params->base_qindex;
   if (cm->delta_q_info.delta_q_present_flag) {
     xd->current_base_qindex = quant_params->base_qindex;
     cm->delta_q_info.delta_q_res = 1 << aom_rb_read_literal(rb, 2);
