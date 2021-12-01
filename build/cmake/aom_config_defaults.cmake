@@ -150,6 +150,8 @@ set_aom_config_var(
   "AV2 in-loop restoration merging coefficients experiment flag")
 set_aom_config_var(CONFIG_PC_WIENER 0 NUMBER
                    "AV2 pixel-classified Wiener filter experiment flag")
+set_aom_config_var(CONFIG_COMBINE_PC_NS_WIENER 0 NUMBER
+                   "AV2 pixel-classified & nonsep Wiener filt. experiment flag")
 set_aom_config_var(CONFIG_SAVE_IN_LOOP_DATA 0 NUMBER
                    "AV2 in-loop data save experiment flag")
 set_aom_config_var(CONFIG_EXT_SUPERRES 0 NUMBER

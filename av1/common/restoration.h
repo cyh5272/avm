@@ -294,6 +294,12 @@ typedef struct {
    */
   int tskip_stride;
 #endif  // CONFIG_PC_WIENER
+#if CONFIG_COMBINE_PC_NS_WIENER
+  /*!
+   * Whether pc_wiener should be added before wiener_ns.
+   */
+  bool combine_with_pc_wiener;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 } RestorationUnitInfo;
 
 /*!\cond */
