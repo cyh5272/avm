@@ -289,6 +289,9 @@ static AOM_INLINE void dealloc_compressor_data(AV1_COMP *cpi) {
   aom_free_frame_buffer(&cpi->cnn_buffer);
 #endif  // CONFIG_CNN_RESTORATION
 
+#if CONFIG_COMBINE_PC_NS_WIENER
+  aom_free_frame_buffer(&cpi->pc_wiener_buf);
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
   av1_free_restoration_buffers(cm);
   aom_free_frame_buffer(&cpi->trial_frame_rst);
   aom_free_frame_buffer(&cpi->scaled_source);
@@ -382,6 +385,16 @@ static AOM_INLINE void alloc_util_frame_buffers(AV1_COMP *cpi) {
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate CNN frame buffer");
 #endif  // CONFIG_CNN_RESTORATION
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+  if (aom_realloc_frame_buffer(
+          &cpi->pc_wiener_buf, cm->superres_upscaled_width,
+          cm->superres_upscaled_height, seq_params->subsampling_x,
+          seq_params->subsampling_y, seq_params->use_highbitdepth,
+          AOM_RESTORATION_FRAME_BORDER, byte_alignment, NULL, NULL, NULL))
+    aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                       "Failed to allocate pc-wiener frame buffer");
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   if (aom_realloc_frame_buffer(
           &cpi->trial_frame_rst, cm->superres_upscaled_width,
