@@ -1288,13 +1288,21 @@ static void calculate_features_highbd(int row, int col, int height, int width,
 
 void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
                      uint8_t *dst, int dst_stride, const uint8_t *tskip,
-                     int tskip_stride, int base_qindex, bool is_uv,
-                     int bit_depth) {
+                     int tskip_stride,
+#if CONFIG_COMBINE_PC_NS_WIENER
+                     const int16_t *nsfilter,
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+                     int base_qindex, bool is_uv, int bit_depth) {
   const int pcwiener_y_pixel =
       sizeof(pcwiener_config_y) / sizeof(pcwiener_config_y[0]);
   const NonsepFilterConfig pcwiener_y = {
     PC_WIENER_PREC_BITS_Y, pcwiener_y_pixel, 0, pcwiener_config_y, NULL, 0,
   };
+#if CONFIG_COMBINE_PC_NS_WIENER
+  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
+  const NonsepFilterConfig *nsfilter_config =
+      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   if (is_uv) {
     // Not filtering uv for now.
@@ -1333,17 +1341,49 @@ void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
         tmp += filter[pos] * dgd[(ir)*stride + (jc)];
       }
 
+      int total_shift = 0;
       if (use_multiplier) {
         tmp = ROUND_POWER_OF_TWO_SIGNED(
             tmp, pcwiener_y.prec_bits - PC_WIENER_MULT_ROOM);
         tmp *= multiplier;
-        tmp = ROUND_POWER_OF_TWO_SIGNED(
-            tmp, PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM);
+        total_shift = PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM;
       } else {
-        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, pcwiener_y.prec_bits);
+        total_shift = pcwiener_y.prec_bits;
       }
-      tmp += (int32_t)dgd[dgd_id];
 
+#if CONFIG_COMBINE_PC_NS_WIENER
+      // TODO: This is temporary and very inefficient: Convert to block
+      // adaptive, add filters, then filter dgd.
+      if (nsfilter != NULL) {
+        int32_t ns_tmp =
+            (int32_t)dgd[dgd_id] * (1 << nsfilter_config->prec_bits);
+        for (int k = 0; k < nsfilter_config->num_pixels; ++k) {
+          const int pos = nsfilter_config->config[k][NONSEP_BUF_POS];
+          const int r = nsfilter_config->config[k][NONSEP_ROW_ID];
+          const int c = nsfilter_config->config[k][NONSEP_COL_ID];
+          const int ir = nsfilter_config->strict_bounds
+                             ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                             : i + r;
+          const int jc = nsfilter_config->strict_bounds
+                             ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                             : j + c;
+          int16_t diff = clip_base(
+              (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+          ns_tmp += nsfilter[pos] * diff;
+        }
+
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, total_shift - nsfilter_config->prec_bits);
+        tmp =
+            ROUND_POWER_OF_TWO_SIGNED(tmp + ns_tmp, nsfilter_config->prec_bits);
+      } else {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, total_shift);
+        tmp += (int32_t)dgd[dgd_id];
+      }
+#else   // CONFIG_COMBINE_PC_NS_WIENER
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, total_shift);
+      tmp += (int32_t)dgd[dgd_id];
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
       int dst_id = i * dst_stride + j;
       dst[dst_id] = (uint8_t)clip_pixel(tmp);
     }
@@ -1353,6 +1393,9 @@ void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
 void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                             int stride, uint8_t *dst8, int dst_stride,
                             const uint8_t *tskip, int tskip_stride,
+#if CONFIG_COMBINE_PC_NS_WIENER
+                            const int16_t *nsfilter,
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
                             int base_qindex, bool is_uv, int bit_depth) {
   const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
@@ -1362,7 +1405,11 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   const NonsepFilterConfig pcwiener_y = {
     PC_WIENER_PREC_BITS_Y, pcwiener_y_pixel, 0, pcwiener_config_y, NULL, 0,
   };
-
+#if CONFIG_COMBINE_PC_NS_WIENER
+  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
+  const NonsepFilterConfig *nsfilter_config =
+      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
   if (is_uv) {
     // Not filtering uv for now.
     for (int i = 0; i < height; ++i) {
@@ -1400,19 +1447,52 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
         tmp += filter[pos] * dgd[(ir)*stride + (jc)];
       }
 
+      int total_shift = 0;
       if (use_multiplier) {
         tmp = ROUND_POWER_OF_TWO_SIGNED(
             tmp, pcwiener_y.prec_bits - PC_WIENER_MULT_ROOM);
         tmp *= multiplier;
-        tmp = ROUND_POWER_OF_TWO_SIGNED(
-            tmp, PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM);
+        total_shift = PC_WIENER_PREC_BITS_F + PC_WIENER_MULT_ROOM;
       } else {
-        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, pcwiener_y.prec_bits);
+        total_shift = pcwiener_y.prec_bits;
       }
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+      // TODO: This is temporary and very inefficient: Convert to block
+      // adaptive, add filters, then filter dgd.
+      if (nsfilter != NULL) {
+        int32_t ns_tmp =
+            (int32_t)dgd[dgd_id] * (1 << nsfilter_config->prec_bits);
+        for (int k = 0; k < nsfilter_config->num_pixels; ++k) {
+          const int pos = nsfilter_config->config[k][NONSEP_BUF_POS];
+          const int r = nsfilter_config->config[k][NONSEP_ROW_ID];
+          const int c = nsfilter_config->config[k][NONSEP_COL_ID];
+          const int ir = nsfilter_config->strict_bounds
+                             ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                             : i + r;
+          const int jc = nsfilter_config->strict_bounds
+                             ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                             : j + c;
+          int16_t diff = clip_base(
+              (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+          ns_tmp += nsfilter[pos] * diff;
+        }
+
+        tmp = ROUND_POWER_OF_TWO_SIGNED(
+            tmp, total_shift - nsfilter_config->prec_bits);
+        tmp =
+            ROUND_POWER_OF_TWO_SIGNED(tmp + ns_tmp, nsfilter_config->prec_bits);
+      } else {
+        tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, total_shift);
+        tmp += (int32_t)dgd[dgd_id];
+      }
+#else   // CONFIG_COMBINE_PC_NS_WIENER
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, total_shift);
       tmp += (int32_t)dgd[dgd_id];
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
       int dst_id = i * dst_stride + j;
-      dst[dst_id] = (uint8_t)clip_pixel(tmp);
+      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
     }
   }
 }
@@ -1431,6 +1511,9 @@ static void pc_wiener_stripe(const RestorationUnitInfo *rui, int stripe_width,
 
     apply_pc_wiener(src + j, w, stripe_height, src_stride, dst + j, dst_stride,
                     rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+#if CONFIG_COMBINE_PC_NS_WIENER
+                    NULL,
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
                     rui->base_qindex, is_uv, bit_depth);
   }
 }
@@ -1451,8 +1534,11 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
 
     apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
                            dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
-                           rui->tskip_stride, rui->base_qindex, is_uv,
-                           bit_depth);
+                           rui->tskip_stride,
+#if CONFIG_COMBINE_PC_NS_WIENER
+                           NULL,
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+                           rui->base_qindex, is_uv, bit_depth);
   }
 }
 #endif  // CONFIG_PC_WIENER
@@ -1543,17 +1629,33 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   (void)tmpbuf;
   (void)bit_depth;
 
+  bool ignore_pc_wiener = true;
+#if CONFIG_COMBINE_PC_NS_WIENER
+  ignore_pc_wiener = !rui->combine_with_pc_wiener;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
-    apply_wiener_nonsep_highbd(
-        src + j, w, stripe_height, src_stride, rui->base_qindex,
-        rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
+    if (ignore_pc_wiener) {
+      apply_wiener_nonsep_highbd(
+          src + j, w, stripe_height, src_stride, rui->base_qindex,
+          rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-        rui->luma + j, rui->luma_stride,
+          rui->luma + j, rui->luma_stride,
 #else
-        NULL, -1,
+          NULL, -1,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-        bit_depth);
+          bit_depth);
+    }
+#if CONFIG_COMBINE_PC_NS_WIENER
+    if (!ignore_pc_wiener) {
+      bool is_uv = (rui->plane != AOM_PLANE_Y);
+      apply_pc_wiener_highbd(
+          src + j, w, stripe_height, src_stride, dst + j, dst_stride,
+          rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+          rui->wiener_nonsep_info.nsfilter, rui->base_qindex, is_uv, bit_depth);
+    }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
 }
 
@@ -1827,6 +1929,10 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
   rsi->unit_info[rest_unit_idx].base_qindex = ctxt->base_qindex;
   rsi->unit_info[rest_unit_idx].plane = ctxt->plane;
 #endif  // CONFIG_PC_WIENER
+#if CONFIG_COMBINE_PC_NS_WIENER
+  rsi->unit_info[rest_unit_idx].combine_with_pc_wiener =
+      ctxt->plane == AOM_PLANE_Y;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   av1_loop_restoration_filter_unit(
       limits, &rsi->unit_info[rest_unit_idx], &rsi->boundaries, rlbs, tile_rect,
