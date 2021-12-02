@@ -199,19 +199,22 @@ typedef struct {
 } WienernsFilterConfigPairType;
 
 extern const WienernsFilterConfigPairType wienerns_filters_lowqp;
+extern const WienernsFilterConfigPairType wienerns_filters_midqp;
 extern const WienernsFilterConfigPairType wienerns_filters_highqp;
 
-#define USE_QBASED_WIENER_NONSEP 0
+#define USE_QBASED_WIENER_NONSEP 1
 static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
     int qindex) {
 #if USE_QBASED_WIENER_NONSEP
-  if (qindex <= 200)
+  if (qindex <= 128)
     return &wienerns_filters_lowqp;
+  else if (qindex <= 224)
+    return &wienerns_filters_midqp;
   else
     return &wienerns_filters_highqp;
 #else
   (void)qindex;
-  return &wienerns_filters_lowqp;
+  return &wienerns_filters_midqp;
 #endif  // USE_QBASED_WIENER_NONSEP
 }
 #endif  // CONFIG_WIENER_NONSEP
