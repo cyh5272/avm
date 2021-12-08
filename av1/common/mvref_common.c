@@ -1440,29 +1440,43 @@ static INLINE int is_ref_motion_field_eligible(
 // Call Start frame's reference frames as reference frames.
 // Call ref_offset as frame distances between start frame and its reference
 // frames.
-#if CONFIG_TMVP_IMPROVEMENT && !CONFIG_NEW_REF_SIGNALING
+#if CONFIG_TMVP_IMPROVEMENT
 static int motion_field_projection_bwd(AV1_COMMON *cm,
                                        MV_REFERENCE_FRAME start_frame, int dir,
                                        int overwrite_mv) {
   TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
+#if CONFIG_NEW_REF_SIGNALING
+  int ref_offset[INTER_REFS_PER_FRAME] = { 0 };
+#else
   int ref_offset[REF_FRAMES] = { 0 };
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   const RefCntBuffer *const start_frame_buf =
       get_ref_frame_buf(cm, start_frame);
   if (!is_ref_motion_field_eligible(cm, start_frame_buf)) return 0;
 
   const int start_frame_order_hint = start_frame_buf->order_hint;
-  const unsigned int *const ref_order_hints =
-      &start_frame_buf->ref_order_hints[0];
   const int cur_order_hint = cm->cur_frame->order_hint;
   int start_to_current_frame_offset = get_relative_dist(
       &cm->seq_params.order_hint_info, start_frame_order_hint, cur_order_hint);
 
+#if CONFIG_NEW_REF_SIGNALING
+  const int *const ref_order_hints = &start_frame_buf->ref_order_hints[0];
+  for (MV_REFERENCE_FRAME rf = 0; rf < INTER_REFS_PER_FRAME; ++rf) {
+    if (ref_order_hints[rf] != -1)
+      ref_offset[rf] =
+          get_relative_dist(&cm->seq_params.order_hint_info,
+                            start_frame_order_hint, ref_order_hints[rf]);
+  }
+#else
+  const unsigned int *const ref_order_hints =
+      &start_frame_buf->ref_order_hints[0];
   for (MV_REFERENCE_FRAME rf = LAST_FRAME; rf <= INTER_REFS_PER_FRAME; ++rf) {
     ref_offset[rf] = get_relative_dist(&cm->seq_params.order_hint_info,
                                        start_frame_order_hint,
                                        ref_order_hints[rf - LAST_FRAME]);
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   if (dir == 2) start_to_current_frame_offset = -start_to_current_frame_offset;
 
@@ -1511,7 +1525,7 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
 
   return 1;
 }
-#endif  // CONFIG_TMVP_IMPROVEMENT && !CONFIG_NEW_REF_SIGNALING
+#endif  // CONFIG_TMVP_IMPROVEMENT
 
 static int motion_field_projection(AV1_COMMON *cm,
                                    MV_REFERENCE_FRAME start_frame, int dir,
@@ -1711,6 +1725,36 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
       closest_ref[dir][1] = ref_frame;
     }
   }
+#if CONFIG_TMVP_IMPROVEMENT
+  // Do projection on closest past (backward MV), closest future, second
+  // closest future, second closest past (backward MV), closest path (forward
+  // MV), and then second closest past (forward MVs), without overwriting
+  // the MVs.
+  if (closest_ref[0][0] != -1) {
+    const int ret = motion_field_projection_bwd(cm, closest_ref[0][0], 2, 0);
+    n_refs_used += ret;
+  }
+  if (closest_ref[1][0] != -1) {
+    const int ret = motion_field_projection(cm, closest_ref[1][0], 0, 0);
+    n_refs_used += ret;
+  }
+  if (closest_ref[1][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
+    const int ret = motion_field_projection(cm, closest_ref[1][1], 0, 0);
+    n_refs_used += ret;
+  }
+  if (closest_ref[0][0] != -1 && n_refs_used < MFMV_STACK_SIZE) {
+    const int ret = motion_field_projection(cm, closest_ref[0][0], 2, 0);
+    n_refs_used += ret;
+  }
+  if (closest_ref[0][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
+    const int ret = motion_field_projection_bwd(cm, closest_ref[0][1], 2, 0);
+    n_refs_used += ret;
+  }
+  if (closest_ref[0][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
+    const int ret = motion_field_projection(cm, closest_ref[0][1], 2, 0);
+    n_refs_used += ret;
+  }
+#else
   // Do projection on closest past and future refs if they exist
   if (closest_ref[0][0] != -1) {
     const int ret = motion_field_projection(cm, closest_ref[0][0], 2, 1);
@@ -1730,6 +1774,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
     const int ret = motion_field_projection(cm, closest_ref[0][1], 2, 0);
     n_refs_used += ret;
   }
+#endif
 #else
   int ref_stamp = MFMV_STACK_SIZE - 1;
 
