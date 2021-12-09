@@ -654,6 +654,9 @@ typedef struct {
   bool enable_reduced_reference_set;
   // Indicates if one-sided compound should be enabled.
   bool enable_onesided_comp;
+#if CONFIG_NEW_REF_SIGNALING
+  bool explicit_ref_frame_map;
+#endif  // CONFIG_NEW_REF_SIGNALING
 } RefFrameCfg;
 
 typedef struct {

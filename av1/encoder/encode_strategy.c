@@ -65,6 +65,15 @@ const SubGOPStepCfg *get_subgop_step(const GF_GROUP *const gf_group,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
+// Encoder-only version for the reference mapping
+void av1_get_ref_frames_enc(AV1_COMMON *cm, int cur_frame_disp,
+                            RefFrameMapPair *ref_frame_map_pairs) {
+  assert(cm->seq_params.explicit_ref_frame_map);
+  // With explicit_ref_frame_map on, an encoder-only ranking scheme can be
+  // implemented here. For now, av1_get_ref_frames is used as a placeholder.
+  av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
+}
+
 void av1_configure_buffer_updates(AV1_COMP *const cpi,
                                   const FRAME_UPDATE_TYPE type) {
   // NOTE(weitinglin): Should we define another function to take care of
@@ -1332,7 +1341,10 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
     }
 
 #if CONFIG_NEW_REF_SIGNALING
-    av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
+    if (cm->seq_params.explicit_ref_frame_map)
+      av1_get_ref_frames_enc(cm, cur_frame_disp, ref_frame_map_pairs);
+    else
+      av1_get_ref_frames(cm, cur_frame_disp, ref_frame_map_pairs);
 #else
     const RefCntBuffer *ref_frames[INTER_REFS_PER_FRAME];
     const YV12_BUFFER_CONFIG *ref_frame_buf[INTER_REFS_PER_FRAME];

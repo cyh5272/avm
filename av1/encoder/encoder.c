@@ -425,6 +425,7 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
           ? DEFAULT_EXPLICIT_ORDER_HINT_BITS - 1
           : -1;
 #if CONFIG_NEW_REF_SIGNALING
+  seq->explicit_ref_frame_map = oxcf->ref_frm_cfg.explicit_ref_frame_map;
   seq->max_reference_frames = oxcf->ref_frm_cfg.max_reference_frames;
 #endif  // CONFIG_NEW_REF_SIGNALING
 

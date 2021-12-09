@@ -17,16 +17,6 @@
 #include "av1/common/seg_common.h"
 
 #if CONFIG_NEW_REF_SIGNALING
-/*!\cond */
-typedef struct {
-  int score;
-  int index;
-  int distance;
-  int disp_order;
-  int base_qindex;
-} RefScoreData;
-/*!\endcond */
-
 // Comparison function to sort reference frames in ascending score order
 static int compare_score_data_asc(const void *a, const void *b) {
   if (((RefScoreData *)a)->score == ((RefScoreData *)b)->score) {
@@ -93,6 +83,27 @@ static int get_unmapped_ref(RefScoreData *scores, int n_bufs) {
   return INVALID_IDX;
 }
 
+void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores) {
+  int n_future = 0;
+  int n_past = 0;
+  int n_cur = 0;
+  for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+    if (scores[i].distance < 0) {
+      cm->ref_frames_info.future_refs[n_future] = i;
+      n_future++;
+    } else if (scores[i].distance > 0) {
+      cm->ref_frames_info.past_refs[n_past] = i;
+      n_past++;
+    } else {
+      cm->ref_frames_info.cur_refs[n_cur] = i;
+      n_cur++;
+    }
+  }
+  cm->ref_frames_info.n_past_refs = n_past;
+  cm->ref_frames_info.n_future_refs = n_future;
+  cm->ref_frames_info.n_cur_refs = n_cur;
+}
+
 #define JOINT_DIST_QINDEX_ORDERING 1
 #define DIST_WEIGHT_BITS 6
 void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
@@ -130,32 +141,18 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
   // Sort the references according to their score
   qsort(scores, n_ranked, sizeof(scores[0]), compare_score_data_asc);
 
-  // Fill in RefFramesInfo struct according to computed mapping
   cm->ref_frames_info.n_total_refs =
       AOMMIN(n_ranked, cm->seq_params.max_reference_frames);
-  int n_future = 0;
-  int n_past = 0;
-  int n_cur = 0;
   for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
     cm->remapped_ref_idx[i] = scores[i].index;
     cm->ref_frames_info.ref_frame_distance[i] = scores[i].distance;
-    if (scores[i].distance < 0) {
-      cm->ref_frames_info.future_refs[n_future] = i;
-      n_future++;
-    } else if (scores[i].distance > 0) {
-      cm->ref_frames_info.past_refs[n_past] = i;
-      n_past++;
-    } else {
-      cm->ref_frames_info.cur_refs[n_cur] = i;
-      n_cur++;
-    }
   }
+
+  // Fill in RefFramesInfo struct according to computed mapping
+  av1_get_past_future_cur_ref_lists(cm, scores);
+
   if (n_ranked > INTER_REFS_PER_FRAME)
     cm->remapped_ref_idx[n_ranked - 1] = scores[n_ranked - 1].index;
-
-  cm->ref_frames_info.n_past_refs = n_past;
-  cm->ref_frames_info.n_future_refs = n_future;
-  cm->ref_frames_info.n_cur_refs = n_cur;
 
   // Fill any slots that are empty (should only happen for the first 7 frames)
   for (int i = 0; i < REF_FRAMES; i++) {
