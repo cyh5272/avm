@@ -251,6 +251,7 @@ int parse_sequence_header_beyond_av1(struct aom_read_bit_buffer *reader) {
   if (reduced_ref_frame_set) {
     AV1C_READ_BITS_OR_RETURN_ERROR(max_reference_frames, 2);
   }
+  AV1C_READ_BIT_OR_RETURN_ERROR(explicit_ref_frame_map);
 #endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
   AV1C_READ_BIT_OR_RETURN_ERROR(enable_sdp);

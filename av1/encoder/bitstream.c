@@ -3533,6 +3533,7 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
   aom_wb_write_bit(wb, seq_params->enable_refmvbank);
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_NEW_REF_SIGNALING
+  aom_wb_write_bit(wb, seq_params->explicit_ref_frame_map);
   aom_wb_write_bit(wb, seq_params->max_reference_frames < 7);
   if (seq_params->max_reference_frames < 7)
     aom_wb_write_literal(wb, seq_params->max_reference_frames - 3, 2);
@@ -3927,9 +3928,11 @@ static AOM_INLINE void write_uncompressed_header_obu(
       for (ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
            ++ref_frame) {
         assert(get_ref_frame_map_idx(cm, ref_frame) != INVALID_IDX);
-        // No need to signal ref mapping indices in NRS because decoder can
-        // derive them unless order_hint is not available.
-        if (!seq_params->order_hint_info.enable_order_hint)
+        // By default, no need to signal ref mapping indices in NRS because
+        // decoder can derive them unless order_hint is not available. Explicit
+        // signaling is enabled only when explicit_ref_frame_map is on.
+        if (seq_params->explicit_ref_frame_map ||
+            !seq_params->order_hint_info.enable_order_hint)
           aom_wb_write_literal(wb, get_ref_frame_map_idx(cm, ref_frame),
                                REF_FRAMES_LOG2);
 #else

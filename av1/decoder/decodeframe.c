@@ -4889,6 +4889,7 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
   seq_params->enable_refmvbank = aom_rb_read_bit(rb);
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_NEW_REF_SIGNALING
+  seq_params->explicit_ref_frame_map = aom_rb_read_bit(rb);
   if (aom_rb_read_bit(rb)) {
     seq_params->max_reference_frames = 3 + aom_rb_read_literal(rb, 2);
   } else {
@@ -5526,8 +5527,8 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 
     } else if (pbi->need_resync != 1) { /* Skip if need resync */
 #if CONFIG_NEW_REF_SIGNALING
+      // Implicitly derive the reference mapping
       RefFrameMapPair ref_frame_map_pairs[REF_FRAMES];
-      // initialize without pyramid levels
       init_ref_map_pair(cm, ref_frame_map_pairs,
                         current_frame->frame_type == KEY_FRAME);
       av1_get_ref_frames(cm, current_frame->display_order_hint,
@@ -5567,7 +5568,11 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #if CONFIG_NEW_REF_SIGNALING
       for (int i = 0; i < cm->ref_frames_info.n_total_refs; ++i) {
         int ref = 0;
-        if (seq_params->order_hint_info.enable_order_hint) {
+        // Reference rankings have been implicitly derived in
+        // av1_get_ref_frames. However, if explicti_ref_frame_map is on, ref
+        // idx will be overwritten by what is signaled here.
+        if (!seq_params->explicit_ref_frame_map &&
+            seq_params->order_hint_info.enable_order_hint) {
           ref = cm->remapped_ref_idx[i];
           if (cm->ref_frame_map[ref] == NULL)
             aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
@@ -5616,6 +5621,21 @@ static int read_uncompressed_header(AV1Decoder *pbi,
                                "Reference buffer frame ID mismatch");
         }
       }
+#if CONFIG_NEW_REF_SIGNALING
+      // With explicit_ref_frame_map, cm->remapped_ref_idx has been
+      // overwritten. The reference lists also needs to be reset.
+      if (seq_params->explicit_ref_frame_map) {
+        RefScoreData scores[REF_FRAMES];
+        for (int i = 0; i < REF_FRAMES; i++) scores[i].score = INT_MAX;
+        for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+          scores[i].score = i;
+          int ref = cm->remapped_ref_idx[i];
+          scores[i].distance = current_frame->display_order_hint -
+                               ref_frame_map_pairs[ref].disp_order;
+        }
+        av1_get_past_future_cur_ref_lists(cm, scores);
+      }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
       if (!features->error_resilient_mode && frame_size_override_flag) {
         setup_frame_size_with_refs(cm, rb);
