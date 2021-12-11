@@ -3205,6 +3205,18 @@ static void rectangular_partition_search(
     if (!is_rect_part_allowed(cpi, part_search_state, active_edge_type, i,
                               mi_pos_rect[i][0][i]))
       continue;
+#if CONFIG_EXT_RECUR_PARTITIONS
+    const BLOCK_SIZE bsize = blk_params.bsize;
+    if (block_size_wide[bsize] == 2 * block_size_high[bsize]) {
+      if (pc_tree->parent->horizontal3[1] == pc_tree && i == HORZ) {
+        continue;
+      }
+    } else if (2 * block_size_wide[bsize] == block_size_high[bsize]) {
+      if (pc_tree->parent->vertical3[1] == pc_tree && i == VERT) {
+        continue;
+      }
+    }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
     // Sub-partition idx.
     const PARTITION_TYPE partition_type = rect_partition_type[i];
