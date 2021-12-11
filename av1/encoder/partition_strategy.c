@@ -1432,17 +1432,20 @@ void av1_prune_partitions_by_max_min_bsize(
   assert(is_bsize_square(bsize));
 #endif  // !CONFIG_EXT_RECUR_PARTITIONS
   const int max_partition_size_1d = block_size_wide[sb_enc->max_partition_size];
-  const int min_partition_size_1d = block_size_wide[sb_enc->min_partition_size];
-  const int bsize_1d = block_size_wide[bsize];
-  assert(min_partition_size_1d <= max_partition_size_1d);
-  const int is_le_min_sq_part = bsize_1d <= min_partition_size_1d;
+
 #if CONFIG_EXT_RECUR_PARTITIONS
+  assert(is_bsize_geq(sb_enc->max_partition_size, sb_enc->min_partition_size));
   const int block_height = block_size_high[bsize];
   const int block_width = block_size_wide[bsize];
+  const int is_le_min_sq_part = is_bsize_geq(sb_enc->min_partition_size, bsize);
   const int is_gt_max_sq_part = (block_height > max_partition_size_1d) ||
                                 (block_width > max_partition_size_1d);
 #else   // CONFIG_EXT_RECUR_PARTITIONS
+  const int min_partition_size_1d = block_size_wide[sb_enc->min_partition_size];
+  const int bsize_1d = block_size_wide[bsize];
+  const int is_le_min_sq_part = bsize_1d <= min_partition_size_1d;
   const int is_gt_max_sq_part = bsize_1d > max_partition_size_1d;
+  assert(min_partition_size_1d <= max_partition_size_1d);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -1729,6 +1732,19 @@ static INLINE SimpleMotionData *get_sms_arr(SimpleMotionDataBufs *sms_bufs,
 }
 #undef MAKE_SMS_ARR_SWITCH_CASE
 
+void av1_reset_prev_partition(SimpleMotionDataBufs *sms_bufs) {
+  for (BLOCK_SIZE bsize = BLOCK_4X4; bsize < BLOCK_SIZES_ALL; bsize++) {
+    SimpleMotionData *sms_arr = get_sms_arr(sms_bufs, bsize);
+    const int mi_wide = mi_size_wide[bsize];
+    const int mi_high = mi_size_high[bsize];
+    const int sms_wide = get_sms_count_from_length(mi_wide);
+    const int sms_high = get_sms_count_from_length(mi_high);
+    const int sms_count = sms_wide * sms_high;
+    for (int idx = 0; idx < sms_count; idx++) {
+      sms_arr[idx].has_prev_partition = false;
+    }
+  }
+}
 // Retrieves the SimpleMotionData from SimpleMotionDataBufs
 SimpleMotionData *av1_get_sms_data_entry(SimpleMotionDataBufs *sms_bufs,
                                          int mi_row, int mi_col,

@@ -37,8 +37,10 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
                            RD_STATS best_rdc, PC_TREE *pc_tree,
 #if CONFIG_SDP && CONFIG_EXT_RECUR_PARTITIONS
                            const PARTITION_TREE *ptree_luma,
-                           const PARTITION_TREE *template_tree,
 #endif  // CONFIG_SDP && CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_EXT_RECUR_PARTITIONS
+                           const PARTITION_TREE *template_tree,
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
                            SIMPLE_MOTION_DATA_TREE *sms_tree, int64_t *none_rd,
                            SB_MULTI_PASS_MODE multi_pass_mode,
                            RD_RECT_PART_WIN_INFO *rect_part_win_info);
