@@ -937,9 +937,6 @@ Linux All Unit Test:
         # sse4_2 was added *after* avx2 so the mask is a little weird
         sse4_2) export AOM_SIMD_CAPS_MASK=0x13f ;;
         avx2) export AOM_SIMD_CAPS_MASK=0x1ff ;;
-
-        # libaom does not have any AVX512 and this is the wrong mask for it.
-        avx512) export AOM_SIMD_CAPS_MASK=0x1ff ;;
       esac
 
       test_filter="-C*:MMX*:SSE*:SSSE*:AVX*"
