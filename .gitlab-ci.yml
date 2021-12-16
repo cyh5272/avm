@@ -943,9 +943,7 @@ Linux All Unit Test:
         avx512) export AOM_SIMD_CAPS_MASK=0x1ff ;;
       esac
 
-      # libvpx does not skip Large but these are taking a crazy long
-      # time for libaom
-      test_filter="-C*:MMX*:SSE*:SSSE*:AVX*" # :*Large*"
+      test_filter="-C*:MMX*:SSE*:SSSE*:AVX*"
 
     - ./test_libaom --gtest_filter=${test_filter}
   needs:
