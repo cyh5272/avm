@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2019, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 /*!\file
@@ -61,10 +62,17 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
 // Set individual buffer update flags based on frame reference type.
 // force_refresh_all is used when we have a KEY_FRAME or S_FRAME.  It forces all
 // refresh_*_frame flags to be set, because we refresh all buffers in this case.
+#if CONFIG_NEW_REF_SIGNALING
+void av1_get_ref_frames_enc(AV1_COMMON *cm, int cur_frame_disp,
+                            RefFrameMapPair *ref_frame_map_paris);
+void av1_configure_buffer_updates(AV1_COMP *const cpi,
+                                  const FRAME_UPDATE_TYPE type);
+#else
 void av1_configure_buffer_updates(
     AV1_COMP *const cpi, RefreshFrameFlagsInfo *const refresh_frame_flags,
     const FRAME_UPDATE_TYPE type, const FRAME_TYPE frame_type,
     int force_refresh_all);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 int av1_get_refresh_frame_flags(
     const AV1_COMP *const cpi, const EncodeFrameParams *const frame_params,
@@ -72,9 +80,6 @@ int av1_get_refresh_frame_flags(
     RefFrameMapPair ref_frame_map_pairs[REF_FRAMES]);
 
 int av1_get_refresh_ref_frame_map(int refresh_frame_flags);
-
-void av1_get_ref_frames(AV1_COMP *const cpi, int cur_frame_disp,
-                        RefFrameMapPair ref_frame_map_pairs[REF_FRAMES]);
 
 int get_forced_keyframe_position(struct lookahead_ctx *lookahead,
                                  const int up_to_index,

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <assert.h>
@@ -40,6 +41,7 @@
 #include "av1/encoder/mcomp.h"
 #include "av1/encoder/ratectrl.h"
 #include "av1/encoder/rd.h"
+#include "av1/encoder/rdopt_utils.h"
 #include "av1/encoder/tokenize.h"
 
 #define RD_THRESH_POW 1.25
@@ -126,20 +128,35 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                              fc->skip_txfm_cdfs[i], NULL);
   }
 
+#if CONFIG_MRLS
+  av1_cost_tokens_from_cdf(mode_costs->mrl_index_cost, fc->mrl_index_cdf, NULL);
+#endif
+#if CONFIG_AIMC
+  av1_cost_tokens_from_cdf(mode_costs->y_primary_flag_cost, fc->y_mode_set_cdf,
+                           NULL);
+  for (i = 0; i < Y_MODE_CONTEXTS; ++i) {
+    // y mode costs
+    av1_cost_tokens_from_cdf(mode_costs->y_first_mode_costs[i],
+                             fc->y_mode_idx_cdf_0[i], NULL);
+    av1_cost_tokens_from_cdf(mode_costs->y_second_mode_costs[i],
+                             fc->y_mode_idx_cdf_1[i], NULL);
+  }
+#else
   for (i = 0; i < KF_MODE_CONTEXTS; ++i)
     for (j = 0; j < KF_MODE_CONTEXTS; ++j)
       av1_cost_tokens_from_cdf(mode_costs->y_mode_costs[i][j],
                                fc->kf_y_cdf[i][j], NULL);
-
-#if CONFIG_MRLS
-  av1_cost_tokens_from_cdf(mode_costs->mrl_index_cost, fc->mrl_index_cdf, NULL);
-#endif
-
   for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
     av1_cost_tokens_from_cdf(mode_costs->mbmode_cost[i], fc->y_mode_cdf[i],
                              NULL);
+#endif  // CONFIG_AIMC
+
   for (i = 0; i < CFL_ALLOWED_TYPES; ++i)
+#if CONFIG_AIMC
+    for (j = 0; j < UV_MODE_CONTEXTS; ++j)
+#else
     for (j = 0; j < INTRA_MODES; ++j)
+#endif
       av1_cost_tokens_from_cdf(mode_costs->intra_uv_mode_cost[i][j],
                                fc->uv_mode_cdf[i][j], NULL);
 
@@ -260,6 +277,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
       }
     }
   }
+#if !CONFIG_AIMC
 #if CONFIG_SDP
   for (i = 0; i < PARTITION_STRUCTURE_NUM; ++i) {
     for (j = 0; j < DIRECTIONAL_MODES; ++j) {
@@ -268,28 +286,13 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
     }
   }
 
-#if CONFIG_ORIP
-  for (i = 0; i < PARTITION_STRUCTURE_NUM; ++i) {
-    for (j = 0; j < TOTAL_NUM_ORIP_ANGLE_DELTA; ++j) {
-      av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost_hv[i][j],
-                               fc->angle_delta_cdf_hv[i][j], NULL);
-    }
-  }
-#endif
-
 #else
   for (i = 0; i < DIRECTIONAL_MODES; ++i) {
     av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost[i],
                              fc->angle_delta_cdf[i], NULL);
   }
-#if CONFIG_ORIP
-  for (i = 0; i < TOTAL_NUM_ORIP_ANGLE_DELTA; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost_hv[i],
-                             fc->angle_delta_cdf_hv[i], NULL);
-  }
-#endif
 #endif  // CONFIG_SDP
-
+#endif  // !CONFIG_AIMC
   av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
 
 #if CONFIG_IST
@@ -305,6 +308,23 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->comp_inter_cdf[i], NULL);
     }
 
+#if CONFIG_NEW_REF_SIGNALING
+    for (i = 0; i < REF_CONTEXTS; ++i) {
+      for (j = 0; j < INTER_REFS_PER_FRAME - 1; ++j) {
+        av1_cost_tokens_from_cdf(mode_costs->single_ref_cost[i][j],
+                                 fc->single_ref_cdf[i][j], NULL);
+      }
+    }
+
+    for (i = 0; i < REF_CONTEXTS; ++i) {
+      for (j = 0; j < COMPREF_BIT_TYPES; j++) {
+        for (int k = 0; k < INTER_REFS_PER_FRAME - 2; ++k) {
+          av1_cost_tokens_from_cdf(mode_costs->comp_ref_cost[i][j][k],
+                                   fc->comp_ref_cdf[i][j][k], NULL);
+        }
+      }
+    }
+#else
     for (i = 0; i < REF_CONTEXTS; ++i) {
       for (j = 0; j < SINGLE_REFS - 1; ++j) {
         av1_cost_tokens_from_cdf(mode_costs->single_ref_cost[i][j],
@@ -337,11 +357,21 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                  fc->comp_bwdref_cdf[i][j], NULL);
       }
     }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_CONTEXT_DERIVATION
+    for (j = 0; j < INTRA_INTER_SKIP_TXFM_CONTEXTS; ++j) {
+      for (i = 0; i < INTRA_INTER_CONTEXTS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->intra_inter_cost[j][i],
+                                 fc->intra_inter_cdf[j][i], NULL);
+      }
+    }
+#else
     for (i = 0; i < INTRA_INTER_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->intra_inter_cost[i],
                                fc->intra_inter_cdf[i], NULL);
     }
+#endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_NEW_INTER_MODES
     for (i = 0; i < INTER_SINGLE_MODE_CONTEXTS; ++i) {
@@ -378,6 +408,12 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                NULL);
     }
 #endif  // CONFIG_NEW_INTER_MODES
+
+#if CONFIG_OPTFLOW_REFINEMENT
+    for (i = 0; i < INTER_COMPOUND_MODE_CONTEXTS; ++i)
+      av1_cost_tokens_from_cdf(mode_costs->use_optflow_cost[i],
+                               fc->use_optflow_cdf[i], NULL);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     for (i = 0; i < INTER_COMPOUND_MODE_CONTEXTS; ++i)
       av1_cost_tokens_from_cdf(mode_costs->inter_compound_mode_cost[i],
                                fc->inter_compound_mode_cdf[i], NULL);
@@ -408,12 +444,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
       av1_cost_tokens_from_cdf(mode_costs->motion_mode_cost1[i],
                                fc->obmc_cdf[i], NULL);
     }
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-    for (i = 0; i < COMP_INDEX_CONTEXTS; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->comp_idx_cost[i],
-                               fc->compound_index_cdf[i], NULL);
-    }
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
     for (i = 0; i < COMP_GROUP_IDX_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_group_idx_cost[i],
                                fc->comp_group_idx_cdf[i], NULL);
@@ -531,11 +561,10 @@ int av1_get_deltaq_offset(const AV1_COMP *cpi, int qindex, double beta) {
                            cpi->common.seq_params.bit_depth);
 #if CONFIG_EXTQUANT
     } while (newq > q &&
-             (qindex < (cpi->common.seq_params.bit_depth == AOM_BITS_8
-                            ? MAXQ_8_BITS
-                            : cpi->common.seq_params.bit_depth == AOM_BITS_10
-                                  ? MAXQ_10_BITS
-                                  : MAXQ)));
+             (qindex <
+              (cpi->common.seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+               : cpi->common.seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                                 : MAXQ)));
 #else
     } while (newq > q && qindex < MAXQ);
 #endif
@@ -660,14 +689,14 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd) {
 
   for (segment_id = 0; segment_id < MAX_SEGMENTS; ++segment_id) {
 #if CONFIG_EXTQUANT
-    const int qindex = clamp(
-        av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
-                       cm->seq_params.bit_depth) +
-            cm->quant_params.y_dc_delta_q,
-        0,
-        cm->seq_params.bit_depth == AOM_BITS_8
-            ? MAXQ_8_BITS
-            : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ);
+    const int qindex =
+        clamp(av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
+                             cm->seq_params.bit_depth) +
+                  cm->quant_params.y_dc_delta_q,
+              0,
+              cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+              : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                        : MAXQ);
 #else
     const int qindex = clamp(
         av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex) +
@@ -687,7 +716,11 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd) {
       const int t = q * rd_thresh_block_size_factor[bsize];
       const int thresh_max = INT_MAX / t;
 
+#if CONFIG_NEW_REF_SIGNALING
+      for (i = 0; i < MB_MODE_COUNT; ++i)
+#else
       for (i = 0; i < MAX_MODES; ++i)
+#endif  // CONFIG_NEW_REF_SIGNALING
         rd->threshes[segment_id][bsize][i] = rd->thresh_mult[i] < thresh_max
                                                  ? rd->thresh_mult[i] * t / 4
                                                  : INT_MAX;
@@ -725,7 +758,11 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       for (int ctx = 0; ctx < TXB_SKIP_CONTEXTS; ++ctx)
         av1_cost_tokens_from_cdf(pcost->txb_skip_cost[ctx],
                                  fc->txb_skip_cdf[tx_size][ctx], NULL);
-
+#if CONFIG_CONTEXT_DERIVATION
+      for (int ctx = 0; ctx < V_TXB_SKIP_CONTEXTS; ++ctx)
+        av1_cost_tokens_from_cdf(pcost->v_txb_skip_cost[ctx],
+                                 fc->v_txb_skip_cdf[ctx], NULL);
+#endif  // CONFIG_CONTEXT_DERIVATION
       for (int ctx = 0; ctx < SIG_COEF_CONTEXTS_EOB; ++ctx)
         av1_cost_tokens_from_cdf(pcost->base_eob_cost[ctx],
                                  fc->coeff_base_eob_cdf[tx_size][plane][ctx],
@@ -752,6 +789,17 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
         av1_cost_tokens_from_cdf(pcost->dc_sign_cost[ctx],
                                  fc->dc_sign_cdf[plane][ctx], NULL);
+#if CONFIG_CONTEXT_DERIVATION
+      if (plane == PLANE_TYPE_UV) {
+        for (int i = 0; i < CROSS_COMPONENT_CONTEXTS; ++i)
+          for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
+            av1_cost_tokens_from_cdf(pcost->v_dc_sign_cost[i][ctx],
+                                     fc->v_dc_sign_cdf[i][ctx], NULL);
+        for (int i = 0; i < CROSS_COMPONENT_CONTEXTS; ++i)
+          av1_cost_tokens_from_cdf(pcost->v_ac_sign_cost[i],
+                                   fc->v_ac_sign_cdf[i], NULL);
+      }
+#endif  // CONFIG_CONTEXT_DERIVATION
 
       for (int ctx = 0; ctx < LEVEL_CONTEXTS; ++ctx) {
         int br_rate[BR_CDF_SIZE];
@@ -1210,7 +1258,11 @@ void av1_get_entropy_contexts(BLOCK_SIZE plane_bsize,
 
 void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint8_t *ref_y_buffer,
                  int ref_y_stride, int ref_frame, BLOCK_SIZE block_size) {
+#if CONFIG_NEW_REF_SIGNALING
+  const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   const int_mv ref_mv =
       av1_get_ref_mv_from_stack(0, ref_frames, 0, x->mbmi_ext);
   const int_mv ref_mv1 =
@@ -1250,8 +1302,14 @@ void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint8_t *ref_y_buffer,
   }
 
   // Note the index of the mv that worked best in the reference list.
+#if CONFIG_NEW_REF_SIGNALING
+  const MV_REFERENCE_FRAME rfn = COMPACT_INDEX0_NRS(ref_frame);
+  x->max_mv_context[rfn] = max_mv;
+  x->pred_mv_sad[rfn] = best_sad;
+#else
   x->max_mv_context[ref_frame] = max_mv;
   x->pred_mv_sad[ref_frame] = best_sad;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 void av1_setup_pred_block(const MACROBLOCKD *xd,
@@ -1286,9 +1344,14 @@ void av1_setup_pred_block(const MACROBLOCKD *xd,
 }
 
 YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const AV1_COMP *cpi,
-                                             int ref_frame) {
+                                             MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_NEW_REF_SIGNALING
+  assert(ref_frame < cpi->common.ref_frames_info.n_total_refs);
+  RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame];
+#else
   assert(ref_frame >= LAST_FRAME && ref_frame <= ALTREF_FRAME);
   RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame - 1];
+#endif  // CONFIG_NEW_REF_SIGNALING
   const RefCntBuffer *const ref_buf =
       get_ref_frame_buf(&cpi->common, ref_frame);
   return (scaled_buf != ref_buf && scaled_buf != NULL) ? &scaled_buf->buf
@@ -1302,6 +1365,9 @@ int av1_get_switchable_rate(const MACROBLOCK *x, const MACROBLOCKD *xd,
                             InterpFilter interp_filter) {
   if (interp_filter == SWITCHABLE) {
     const MB_MODE_INFO *const mbmi = xd->mi[0];
+#if CONFIG_OPTFLOW_REFINEMENT
+    if (mbmi->mode > NEW_NEWMV) return 0;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_REMOVE_DUAL_FILTER
     const int ctx = av1_get_pred_context_switchable_interp(xd, 0);
     const int inter_filter_cost =
@@ -1328,6 +1394,35 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   // Set baseline threshold values.
   av1_zero(rd->thresh_mult);
 
+#if CONFIG_NEW_REF_SIGNALING
+#if !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[NEARESTMV] = 300;
+  rd->thresh_mult[NEAREST_NEARESTMV] = 1000;
+  rd->thresh_mult[NEAREST_NEWMV] = 1500;
+  rd->thresh_mult[NEW_NEARESTMV] = 1500;
+#endif  // !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[NEWMV] = 1000;
+  rd->thresh_mult[NEARMV] = 1000;
+  rd->thresh_mult[GLOBALMV] = 2200;
+  rd->thresh_mult[NEAR_NEARMV] = 1500;
+  rd->thresh_mult[NEAR_NEWMV] = 1500;
+  rd->thresh_mult[NEW_NEARMV] = 1500;
+  rd->thresh_mult[NEW_NEWMV] = 1500;
+  rd->thresh_mult[GLOBAL_GLOBALMV] = 1500;
+  rd->thresh_mult[DC_PRED] = 1000;
+  rd->thresh_mult[PAETH_PRED] = 1000;
+  rd->thresh_mult[SMOOTH_PRED] = 2200;
+  rd->thresh_mult[SMOOTH_V_PRED] = 2000;
+  rd->thresh_mult[SMOOTH_H_PRED] = 2000;
+  rd->thresh_mult[H_PRED] = 2000;
+  rd->thresh_mult[V_PRED] = 1800;
+  rd->thresh_mult[D135_PRED] = 2500;
+  rd->thresh_mult[D203_PRED] = 2000;
+  rd->thresh_mult[D157_PRED] = 2500;
+  rd->thresh_mult[D67_PRED] = 2000;
+  rd->thresh_mult[D113_PRED] = 2500;
+  rd->thresh_mult[D45_PRED] = 2500;
+#else
 #if !CONFIG_NEW_INTER_MODES
   rd->thresh_mult[THR_NEARESTMV] = 300;
   rd->thresh_mult[THR_NEARESTL2] = 300;
@@ -1409,6 +1504,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLA] = 1870;
   rd->thresh_mult[THR_COMP_NEW_NEWLA] = 2400;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLA] = 2750;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLA] = 1530;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLA] = 1530;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLA] = 1530;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLA] = 1530;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL2A] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1419,6 +1520,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL2A] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL2A] = 1800;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL2A] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL2A] = 1870;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL2A] = 1870;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL2A] = 1870;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL2A] = 1870;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL3A] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1429,6 +1536,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL3A] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL3A] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL3A] = 3000;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL3A] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL3A] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL3A] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL3A] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARGA] = 1320;
 #if !CONFIG_NEW_INTER_MODES
@@ -1439,6 +1552,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARGA] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWGA] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALGA] = 2250;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWGA] = 2040;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWGA] = 2040;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWGA] = 2040;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWGA] = 2040;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARLB] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1449,6 +1568,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLB] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWLB] = 2400;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLB] = 2250;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLB] = 1360;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLB] = 1360;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLB] = 1360;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLB] = 1360;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL2B] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1459,6 +1584,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL2B] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL2B] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL2B] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL2B] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL2B] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL2B] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL2B] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL3B] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1469,6 +1600,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL3B] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL3B] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL3B] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL3B] = 1870;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL3B] = 1870;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL3B] = 1870;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL3B] = 1870;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARGB] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1479,6 +1616,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARGB] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWGB] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALGB] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWGB] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWGB] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWGB] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWGB] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARLA2] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1489,6 +1632,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLA2] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWLA2] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLA2] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLA2] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL2A2] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1499,6 +1648,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL2A2] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL2A2] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL2A2] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL2A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL2A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL2A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL2A2] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARL3A2] = 1440;
 #if !CONFIG_NEW_INTER_MODES
@@ -1509,6 +1664,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARL3A2] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWL3A2] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALL3A2] = 2500;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWL3A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWL3A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWL3A2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWL3A2] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARGA2] = 1200;
 #if !CONFIG_NEW_INTER_MODES
@@ -1519,6 +1680,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARGA2] = 1700;
   rd->thresh_mult[THR_COMP_NEW_NEWGA2] = 2000;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALGA2] = 2750;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWGA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWGA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWGA2] = 1700;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWGA2] = 1700;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARLL2] = 1600;
 #if !CONFIG_NEW_INTER_MODES
@@ -1529,6 +1696,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLL2] = 2200;
   rd->thresh_mult[THR_COMP_NEW_NEWLL2] = 2400;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLL2] = 3200;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLL2] = 2640;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLL2] = 2640;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLL2] = 2640;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLL2] = 2640;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARLL3] = 1600;
 #if !CONFIG_NEW_INTER_MODES
@@ -1539,6 +1712,12 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLL3] = 2200;
   rd->thresh_mult[THR_COMP_NEW_NEWLL3] = 2400;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLL3] = 3200;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLL3] = 2200;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLL3] = 2200;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLL3] = 2200;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLL3] = 2200;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARLG] = 1760;
 #if !CONFIG_NEW_INTER_MODES
@@ -1549,17 +1728,28 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_COMP_NEW_NEARLG] = 2640;
   rd->thresh_mult[THR_COMP_NEW_NEWLG] = 2400;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALLG] = 3200;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWLG] = 1760;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWLG] = 1760;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWLG] = 1760;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWLG] = 1760;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_COMP_NEAR_NEARBA] = 1600;
 #if !CONFIG_NEW_INTER_MODES
   rd->thresh_mult[THR_COMP_NEAREST_NEWBA] = 2000;
   rd->thresh_mult[THR_COMP_NEW_NEARESTBA] = 2000;
-
 #endif  // !CONFIG_NEW_INTER_MODES
   rd->thresh_mult[THR_COMP_NEAR_NEWBA] = 2200;
   rd->thresh_mult[THR_COMP_NEW_NEARBA] = 1980;
   rd->thresh_mult[THR_COMP_NEW_NEWBA] = 2640;
   rd->thresh_mult[THR_COMP_GLOBAL_GLOBALBA] = 3200;
+#if CONFIG_OPTFLOW_REFINEMENT
+  rd->thresh_mult[THR_COMP_NEAR_NEAR_OPTFLOWBA] = 2200;
+  rd->thresh_mult[THR_COMP_NEAR_NEW_OPTFLOWBA] = 2200;
+  rd->thresh_mult[THR_COMP_NEW_NEAR_OPTFLOWBA] = 2200;
+  rd->thresh_mult[THR_COMP_NEW_NEW_OPTFLOWBA] = 2200;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   rd->thresh_mult[THR_DC] = 1000;
   rd->thresh_mult[THR_PAETH] = 1000;
@@ -1574,14 +1764,25 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_D67_PRED] = 2000;
   rd->thresh_mult[THR_D113_PRED] = 2500;
   rd->thresh_mult[THR_D45_PRED] = 2500;
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
+#if CONFIG_NEW_REF_SIGNALING
+                               int (*factor_buf)[MB_MODE_COUNT],
+#else
                                int (*factor_buf)[MAX_MODES],
+#endif  // CONFIG_NEW_REF_SIGNALING
                                int use_adaptive_rd_thresh, BLOCK_SIZE bsize,
-                               THR_MODES best_mode_index) {
+#if !CONFIG_NEW_REF_SIGNALING
+                               MV_REFERENCE_FRAME *ref_frames,
+#endif  // !CONFIG_NEW_REF_SIGNALING
+                               PREDICTION_MODE best_mode) {
   assert(use_adaptive_rd_thresh > 0);
-  const THR_MODES top_mode = MAX_MODES;
+#if !CONFIG_NEW_REF_SIGNALING
+  const int best_mode_index =
+      get_prediction_mode_idx(best_mode, ref_frames[0], ref_frames[1]);
+#endif  // !CONFIG_NEW_REF_SIGNALING
   const int max_rd_thresh_factor = use_adaptive_rd_thresh * RD_THRESH_MAX_FACT;
 
   const int bsize_is_1_to_4 = bsize > cm->seq_params.sb_size;
@@ -1596,10 +1797,18 @@ void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
     max_size = AOMMIN(bsize + 2, (int)cm->seq_params.sb_size);
   }
 
-  for (THR_MODES mode = 0; mode < top_mode; ++mode) {
+#if CONFIG_NEW_REF_SIGNALING
+  for (PREDICTION_MODE mode = 0; mode < MB_MODE_COUNT; ++mode) {
+#else
+  for (THR_MODES mode = 0; mode < MAX_MODES; ++mode) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     for (BLOCK_SIZE bs = min_size; bs <= max_size; ++bs) {
       int *const fact = &factor_buf[bs][mode];
+#if CONFIG_NEW_REF_SIGNALING
+      if (mode == best_mode) {
+#else
       if (mode == best_mode_index) {
+#endif  // CONFIG_NEW_REF_SIGNALING
         *fact -= (*fact >> RD_THRESH_LOG_DEC_FACTOR);
       } else {
         *fact = AOMMIN(*fact + RD_THRESH_INC, max_rd_thresh_factor);

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <assert.h>
@@ -68,6 +69,8 @@ void aom_accounting_reset(Accounting *accounting) {
   accounting->syms.num_syms = 0;
   accounting->syms.num_binary_syms = 0;
   accounting->syms.num_multi_syms = 0;
+  accounting->syms.num_bypass_coded = 0;
+  accounting->syms.num_ctx_coded = 0;
   accounting->context.x = -1;
   accounting->context.y = -1;
   accounting->last_tell_frac = 0;

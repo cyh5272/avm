@@ -1,12 +1,13 @@
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "av1/arg_defs.h"
@@ -371,6 +372,11 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
                         "Enable intra secondary transform"
                         "(0: false, 1: true (default))"),
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  .enable_ibp = ARG_DEF(NULL, "enable-ibp", 1,
+                        "Enable intra bi-prediction"
+                        "(0: false, 1: true (default))"),
+#endif
   .min_partition_size =
       ARG_DEF(NULL, "min-partition-size", 1,
               "Set min partition size "
@@ -406,12 +412,6 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
               "including FLIPADST_DCT, DCT_FLIPADST, FLIPADST_FLIPADST, "
               "ADST_FLIPADST, FLIPADST_ADST, IDTX, V_DCT, H_DCT, V_ADST, "
               "H_ADST, V_FLIPADST, H_FLIPADST"),
-
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  .enable_dist_wtd_comp = ARG_DEF(NULL, "enable-dist-wtd-comp", 1,
-                                  "Enable distance-weighted compound "
-                                  "(0: false, 1: true (default))"),
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
   .enable_masked_comp = ARG_DEF(NULL, "enable-masked-comp", 1,
                                 "Enable masked (wedge/diff-wtd) compound "
@@ -468,6 +468,13 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
   .enable_angle_delta =
       ARG_DEF(NULL, "enable-angle-delta", 1,
               "Enable intra angle delta (0: false, 1: true (default))"),
+#if CONFIG_OPTFLOW_REFINEMENT
+  .enable_opfl_refine =
+      ARG_DEF(NULL, "enable-opfl-refine", 1,
+              "Enable optical flow MV refinement (0: off , 1: switchable per "
+              "block (default), 2: used in all blocks with simple compound "
+              "average, 3: auto (swtichable per frame by the encoder))"),
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   .enable_trellis_quant =
       ARG_DEF(NULL, "enable-trellis-quant", 1,
               "Enable trellis optimization of quantized coefficients "
@@ -575,6 +582,12 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
       ARG_DEF(NULL, "reduced-reference-set", 1,
               "Use reduced set of single and compound references (0: off "
               "(default), 1: on)"),
+#if CONFIG_NEW_REF_SIGNALING
+  .explicit_ref_frame_map =
+      ARG_DEF(NULL, "explicit-ref-frame-map", 1,
+              "Explicitly signal the reference frame mapping (0: off "
+              "(default), 1: on)"),
+#endif  // CONFIG_NEW_REF_SIGNALING
   .target_seq_level_idx = ARG_DEF(
       NULL, "target-seq-level-idx", 1,
       "Target sequence level index. "
@@ -669,6 +682,10 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
               "maximum number of drl reference MVs per reference. "
               "(0 (auto), 2-8 (fixed)) default is 0 (auto)."),
 #endif  // CONFIG_NEW_INTER_MODES
-
+#if CONFIG_REF_MV_BANK
+  .enable_refmvbank = ARG_DEF(NULL, "enable-refmvbank", 1,
+                              "Enable reference MV bank (0: false "
+                              "1: true)"),
+#endif  // CONFIG_REF_MV_BANK
 #endif  // CONFIG_AV1_ENCODER
 };

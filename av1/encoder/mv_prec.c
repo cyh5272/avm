@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2019, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "config/aom_config.h"
@@ -21,7 +22,7 @@ static AOM_INLINE int_mv get_ref_mv_for_mv_stats(
     const MB_MODE_INFO *mbmi, const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
     int ref_idx) {
   int ref_mv_idx = mbmi->ref_mv_idx;
-  if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
+  if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
     assert(has_second_ref(mbmi));
 #if !CONFIG_NEW_INTER_MODES
     ref_mv_idx += 1;
@@ -32,7 +33,7 @@ static AOM_INLINE int_mv get_ref_mv_for_mv_stats(
   const int8_t ref_frame_type = av1_ref_frame_type(ref_frames);
   const CANDIDATE_MV *curr_ref_mv_stack = mbmi_ext_frame->ref_mv_stack;
 
-  if (ref_frames[1] > INTRA_FRAME) {
+  if (is_inter_ref_frame(ref_frames[1])) {
     assert(ref_idx == 0 || ref_idx == 1);
     return ref_idx ? curr_ref_mv_stack[ref_mv_idx].comp_mv
                    : curr_ref_mv_stack[ref_mv_idx].this_mv;
@@ -201,7 +202,11 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
   const PREDICTION_MODE mode = mbmi->mode;
   const int is_compound = has_second_ref(mbmi);
 
-  if (mode == NEWMV || mode == NEW_NEWMV) {
+  if (mode == NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+      mode == NEW_NEWMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+      mode == NEW_NEWMV) {
     // All mvs are new
     for (int ref_idx = 0; ref_idx < 1 + is_compound; ++ref_idx) {
       const MV ref_mv =
@@ -210,7 +215,7 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
       keep_one_mv_stat(mv_stats, &ref_mv, &cur_mv, cpi);
     }
 #if CONFIG_NEW_INTER_MODES
-  } else if (mode == NEAR_NEWMV || mode == NEW_NEARMV) {
+  } else if (have_nearmv_newmv_in_inter_mode(mode)) {
 #else
   } else if (mode == NEAREST_NEWMV || mode == NEAR_NEWMV ||
              mode == NEW_NEARESTMV || mode == NEW_NEARMV) {
@@ -218,7 +223,11 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
     // has exactly one new_mv
     mv_stats->default_mvs += 1;
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+    const int ref_idx = (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW);
+#else
     const int ref_idx = (mode == NEAR_NEWMV);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #else
     const int ref_idx = (mode == NEAREST_NEWMV || mode == NEAR_NEWMV);
 #endif  // CONFIG_NEW_INTER_MODES

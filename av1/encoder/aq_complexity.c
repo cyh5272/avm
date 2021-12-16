@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <limits.h>
@@ -48,11 +49,17 @@ static int get_aq_c_strength(int q_index, aom_bit_depth_t bit_depth) {
 
 static bool is_frame_aq_enabled(const AV1_COMP *const cpi) {
   const AV1_COMMON *const cm = &cpi->common;
-  const RefreshFrameFlagsInfo *const refresh_frame_flags = &cpi->refresh_frame;
 
+#if CONFIG_NEW_REF_SIGNALING
+  (void)cm;
+  // TODO(kslu) enable this for nrs
+  return 0;
+#else
+  const RefreshFrameFlagsInfo *const refresh_frame_flags = &cpi->refresh_frame;
   return frame_is_intra_only(cm) || cm->features.error_resilient_mode ||
          refresh_frame_flags->alt_ref_frame ||
          (refresh_frame_flags->golden_frame && !cpi->rc.is_src_frame_alt_ref);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 // Segmentation only makes sense if the target bits per SB is above a threshold.

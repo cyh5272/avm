@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <assert.h>
@@ -68,6 +69,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, const RestorationUnitInfo *rui,
     aom_writer *const w, int plane, FRAME_COUNTS *counts);
 
+#if !CONFIG_AIMC
 static AOM_INLINE void write_intra_y_mode_kf(FRAME_CONTEXT *frame_ctx,
                                              const MB_MODE_INFO *mi,
                                              const MB_MODE_INFO *above_mi,
@@ -83,7 +85,7 @@ static AOM_INLINE void write_intra_y_mode_kf(FRAME_CONTEXT *frame_ctx,
   aom_write_symbol(w, mode, get_y_mode_cdf(frame_ctx, above_mi, left_mi),
                    INTRA_MODES);
 }
-
+#endif  // !CONFIG_AIMC
 static AOM_INLINE void write_inter_mode(aom_writer *w, PREDICTION_MODE mode,
                                         FRAME_CONTEXT *ec_ctx,
                                         const int16_t mode_ctx) {
@@ -168,11 +170,28 @@ static AOM_INLINE void write_drl_idx(
 
 static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
                                                  PREDICTION_MODE mode,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                                 const AV1_COMMON *cm,
+                                                 const MB_MODE_INFO *const mbmi,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
                                                  const int16_t mode_ctx) {
   assert(is_inter_compound_mode(mode));
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
+      is_opfl_refine_allowed(cm, mbmi)) {
+    const int use_optical_flow = mode > NEW_NEWMV;
+    aom_write_symbol(w, use_optical_flow,
+                     xd->tile_ctx->use_optflow_cdf[mode_ctx], 2);
+  }
+  int comp_mode_idx = opfl_get_comp_idx(mode);
+  aom_write_symbol(w, comp_mode_idx,
+                   xd->tile_ctx->inter_compound_mode_cdf[mode_ctx],
+                   INTER_COMPOUND_REF_TYPES);
+#else
   aom_write_symbol(w, INTER_COMPOUND_OFFSET(mode),
                    xd->tile_ctx->inter_compound_mode_cdf[mode_ctx],
                    INTER_COMPOUND_MODES);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 }
 
 #if CONFIG_NEW_TX_PARTITION
@@ -378,8 +397,12 @@ static int write_skip_mode(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     assert(!skip_mode);
     return 0;
   }
+#if CONFIG_NEW_REF_SIGNALING
+  if (segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
+#else
   if (segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME) ||
       segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     // These features imply single-reference mode, while skip mode implies
     // compound reference. Hence, the two are mutually exclusive.
     // In other words, skip_mode is implicitly 0 here.
@@ -393,16 +416,29 @@ static int write_skip_mode(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
 static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd, int segment_id,
-                                      aom_writer *w, const int is_inter) {
+                                      aom_writer *w, const int is_inter
+#if CONFIG_CONTEXT_DERIVATION
+                                      ,
+                                      const int skip_txfm
+#endif  // CONFIG_CONTEXT_DERIVATION
+) {
+#if !CONFIG_NEW_REF_SIGNALING
   if (!segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME)) {
+#endif  // !CONFIG_NEW_REF_SIGNALING
     if (segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
       assert(is_inter);
       return;
     }
     const int ctx = av1_get_intra_inter_context(xd);
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
-    aom_write_symbol(w, is_inter, ec_ctx->intra_inter_cdf[ctx], 2);
+#if CONFIG_CONTEXT_DERIVATION
+    aom_write_symbol(w, is_inter, ec_ctx->intra_inter_cdf[skip_txfm][ctx], 2);
+#else
+  aom_write_symbol(w, is_inter, ec_ctx->intra_inter_cdf[ctx], 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
+#if !CONFIG_NEW_REF_SIGNALING
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 }
 
 static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
@@ -686,8 +722,48 @@ static AOM_INLINE void write_segment_id(AV1_COMP *cpi,
 #endif
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+static AOM_INLINE void write_single_ref_nrs(
+    const MACROBLOCKD *xd, const RefFramesInfo *const ref_frames_info,
+    aom_writer *w) {
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  MV_REFERENCE_FRAME ref = mbmi->ref_frame[0];
+  const int n_refs = ref_frames_info->n_total_refs;
+  assert(ref < n_refs);
+  for (int i = 0; i < n_refs - 1; i++) {
+    const int bit = ref == i;
+    aom_write_symbol(w, bit, av1_get_pred_cdf_single_ref_nrs(xd, i, n_refs), 2);
+    if (bit) return;
+  }
+  assert(ref == (n_refs - 1));
+}
+
+static AOM_INLINE void write_compound_ref_nrs(
+    const MACROBLOCKD *xd, const RefFramesInfo *const ref_frames_info,
+    aom_writer *w) {
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  MV_REFERENCE_FRAME ref0 = mbmi->ref_frame[0];
+  MV_REFERENCE_FRAME ref1 = mbmi->ref_frame[1];
+  const int n_refs = ref_frames_info->n_total_refs;
+  assert(n_refs >= 2);
+  assert(ref0 < ref1);
+  int n_bits = 0;
+  for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
+    const int bit = ref0 == i || ref1 == i;
+    const int bit_type =
+        av1_get_compound_ref_bit_type(n_bits, ref_frames_info, ref0, i);
+    aom_write_symbol(
+        w, bit,
+        av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type, n_refs), 2);
+    n_bits += bit;
+  }
+  assert(IMPLIES(n_bits < 2, AOMMAX(ref0, ref1) == n_refs - 1));
+  assert(IMPLIES(n_bits < 1, AOMMIN(ref0, ref1) == n_refs - 2));
+}
+#else
 #define WRITE_REF_BIT(bname, pname) \
   aom_write_symbol(w, bname, av1_get_pred_cdf_##pname(xd), 2)
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 // This function encodes the reference frame
 static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
@@ -698,14 +774,20 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
 
   // If segment level coding of this signal is disabled...
   // or the segment allows multiple reference frame options
+#if CONFIG_NEW_REF_SIGNALING
+  if (segfeature_active(&cm->seg, segment_id, SEG_LVL_SKIP) ||
+      segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
+    assert(mbmi->ref_frame[0] == get_closest_pastcur_ref_index(cm));
+#else
   if (segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME)) {
     assert(!is_compound);
     assert(mbmi->ref_frame[0] ==
            get_segdata(&cm->seg, segment_id, SEG_LVL_REF_FRAME));
   } else if (segfeature_active(&cm->seg, segment_id, SEG_LVL_SKIP) ||
              segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
-    assert(!is_compound);
     assert(mbmi->ref_frame[0] == LAST_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
+    assert(!is_compound);
   } else {
     // does the feature use compound prediction or not
     // (if not specified at the frame/segment level)
@@ -715,13 +797,16 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
 #else
       if (is_comp_ref_allowed(mbmi->sb_type))
 #endif
-        aom_write_symbol(w, is_compound, av1_get_reference_mode_cdf(xd), 2);
+        aom_write_symbol(w, is_compound, av1_get_reference_mode_cdf(cm, xd), 2);
     } else {
       assert((!is_compound) ==
              (cm->current_frame.reference_mode == SINGLE_REFERENCE));
     }
 
     if (is_compound) {
+#if CONFIG_NEW_REF_SIGNALING
+      write_compound_ref_nrs(xd, &cm->ref_frames_info, w);
+#else
       const COMP_REFERENCE_TYPE comp_ref_type = has_uni_comp_refs(mbmi)
                                                     ? UNIDIR_COMP_REFERENCE
                                                     : BIDIR_COMP_REFERENCE;
@@ -768,8 +853,12 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
       if (!bit_bwd) {
         WRITE_REF_BIT(mbmi->ref_frame[1] == ALTREF2_FRAME, comp_bwdref_p1);
       }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
     } else {
+#if CONFIG_NEW_REF_SIGNALING
+      write_single_ref_nrs(xd, &cm->ref_frames_info, w);
+#else
       const int bit0 = (mbmi->ref_frame[0] <= ALTREF_FRAME &&
                         mbmi->ref_frame[0] >= BWDREF_FRAME);
       WRITE_REF_BIT(bit0, single_ref_p1);
@@ -794,6 +883,7 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
           WRITE_REF_BIT(bit4, single_ref_p5);
         }
       }
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
   }
 }
@@ -823,19 +913,13 @@ static AOM_INLINE void write_filter_intra_mode_info(
   }
 }
 
-#if CONFIG_ORIP
-static AOM_INLINE void write_angle_delta_hv(aom_writer *w, int angle_delta,
-                                            aom_cdf_prob *cdf) {
-  aom_write_symbol(w, get_angle_delta_to_idx(angle_delta), cdf,
-                   2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA);
-}
-#endif
-
+#if !CONFIG_AIMC
 static AOM_INLINE void write_angle_delta(aom_writer *w, int angle_delta,
                                          aom_cdf_prob *cdf) {
   aom_write_symbol(w, angle_delta + MAX_ANGLE_DELTA, cdf,
                    2 * MAX_ANGLE_DELTA + 1);
 }
+#endif  // !CONFIG_AIMC
 
 static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
                                               const MACROBLOCKD *xd,
@@ -843,19 +927,44 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
-  if (!av1_is_interp_needed(xd)) {
-#if CONFIG_REMOVE_DUAL_FILTER
-    assert(mbmi->interp_fltr ==
-           av1_unswitchable_filter(cm->features.interp_filter));
+  if (!av1_is_interp_needed(cm, xd)) {
+#if CONFIG_DEBUG
+#if CONFIG_OPTFLOW_REFINEMENT
+    // Sharp filter is always used whenever optical flow refinement is applied.
+    int mb_interp_filter =
+        (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
+            ? MULTITAP_SHARP
+            : cm->features.interp_filter;
 #else
-    int_interpfilters filters = av1_broadcast_interp_filter(
-        av1_unswitchable_filter(cm->features.interp_filter));
+    int mb_interp_filter = cm->features.interp_filter;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_REMOVE_DUAL_FILTER
+    assert(mbmi->interp_fltr == av1_unswitchable_filter(mb_interp_filter));
+#else
+    int_interpfilters filters =
+        av1_broadcast_interp_filter(av1_unswitchable_filter(mb_interp_filter));
     assert(mbmi->interp_filters.as_int == filters.as_int);
     (void)filters;
 #endif  // CONFIG_REMOVE_DUAL_FILTER
+    (void)mb_interp_filter;
+#endif  // CONFIG_DEBUG
     return;
   }
   if (cm->features.interp_filter == SWITCHABLE) {
+#if CONFIG_OPTFLOW_REFINEMENT
+    if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) {
+#if CONFIG_REMOVE_DUAL_FILTER
+      assert(IMPLIES(mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
+                     mbmi->interp_fltr == MULTITAP_SHARP));
+#else
+      assert(IMPLIES(
+          mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
+          mbmi->interp_filters.as_filters.x_filter == MULTITAP_SHARP &&
+              mbmi->interp_filters.as_filters.y_filter == MULTITAP_SHARP));
+#endif
+      return;
+    }
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_REMOVE_DUAL_FILTER
     const int ctx = av1_get_pred_context_switchable_interp(xd, 0);
     const InterpFilter filter = mbmi->interp_fltr;
@@ -1146,7 +1255,7 @@ void av1_write_sec_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
   }
 }
 #endif
-
+#if !CONFIG_AIMC
 static AOM_INLINE void write_intra_y_mode_nonkf(FRAME_CONTEXT *frame_ctx,
                                                 BLOCK_SIZE bsize,
                                                 PREDICTION_MODE mode,
@@ -1154,14 +1263,14 @@ static AOM_INLINE void write_intra_y_mode_nonkf(FRAME_CONTEXT *frame_ctx,
   aom_write_symbol(w, mode, frame_ctx->y_mode_cdf[size_group_lookup[bsize]],
                    INTRA_MODES);
 }
-
+#endif  // !CONFIG_AIMC
 #if CONFIG_MRLS
 static AOM_INLINE void write_mrl_index(FRAME_CONTEXT *ec_ctx, uint8_t mrl_index,
                                        aom_writer *w) {
   aom_write_symbol(w, mrl_index, ec_ctx->mrl_index_cdf, MRL_LINE_NUMBER);
 }
 #endif
-
+#if !CONFIG_AIMC
 static AOM_INLINE void write_intra_uv_mode(FRAME_CONTEXT *frame_ctx,
                                            UV_PREDICTION_MODE uv_mode,
                                            PREDICTION_MODE y_mode,
@@ -1170,7 +1279,7 @@ static AOM_INLINE void write_intra_uv_mode(FRAME_CONTEXT *frame_ctx,
   aom_write_symbol(w, uv_mode, frame_ctx->uv_mode_cdf[cfl_allowed][y_mode],
                    UV_INTRA_MODES - !cfl_allowed);
 }
-
+#endif  // !CONFIG_AIMC
 static AOM_INLINE void write_cfl_alphas(FRAME_CONTEXT *const ec_ctx,
                                         uint8_t idx, int8_t joint_sign,
                                         aom_writer *w) {
@@ -1350,8 +1459,53 @@ static AOM_INLINE void write_delta_q_params(AV1_COMP *cpi, int skip,
   }
 }
 
+#if CONFIG_AIMC
+// write mode set index and mode index in set for y component
+static AOM_INLINE void write_intra_luma_mode(MACROBLOCKD *const xd,
+                                             aom_writer *w) {
+  FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+  MB_MODE_INFO *const mbmi = xd->mi[0];
+  const int mode_idx = mbmi->y_mode_idx;
+  assert(mode_idx >= 0 && mode_idx < LUMA_MODE_COUNT);
+  assert(mbmi->joint_y_mode_delta_angle >= 0 &&
+         mbmi->joint_y_mode_delta_angle < LUMA_MODE_COUNT);
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
+  const int context = get_y_mode_idx_ctx(xd);
+  int mode_set_index = mode_idx < FIRST_MODE_COUNT ? 0 : 1;
+  mode_set_index += ((mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
+  aom_write_symbol(w, mode_set_index, ec_ctx->y_mode_set_cdf, INTRA_MODE_SETS);
+  if (mode_set_index == 0) {
+    aom_write_symbol(w, mode_idx, ec_ctx->y_mode_idx_cdf_0[context],
+                     FIRST_MODE_COUNT);
+  } else {
+    aom_write_symbol(
+        w,
+        mode_idx - FIRST_MODE_COUNT - (mode_set_index - 1) * SECOND_MODE_COUNT,
+        ec_ctx->y_mode_idx_cdf_1[context], SECOND_MODE_COUNT);
+  }
+  if (mbmi->joint_y_mode_delta_angle < NON_DIRECTIONAL_MODES_COUNT)
+    assert(mbmi->joint_y_mode_delta_angle == mbmi->y_mode_idx);
+}
+
+// write mode mode index for uv component
+static AOM_INLINE void write_intra_uv_mode(MACROBLOCKD *const xd,
+                                           CFL_ALLOWED_TYPE cfl_allowed,
+                                           aom_writer *w) {
+  FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+  MB_MODE_INFO *const mbmi = xd->mi[0];
+  const int uv_mode_idx = mbmi->uv_mode_idx;
+  assert(uv_mode_idx >= 0 && uv_mode_idx < UV_INTRA_MODES);
+  const int context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
+  aom_write_symbol(w, uv_mode_idx, ec_ctx->uv_mode_cdf[cfl_allowed][context],
+                   UV_INTRA_MODES - !cfl_allowed);
+}
+#endif  // CONFIG_AIMC
+
 static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
+#if !CONFIG_AIMC
                                                     int is_keyframe,
+#endif  // !CONFIG_AIMC
                                                     aom_writer *w) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &cpi->td.mb;
@@ -1364,60 +1518,37 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 #else
   const BLOCK_SIZE bsize = mbmi->sb_type;
 #endif
+#if !CONFIG_AIMC
+  const int use_angle_delta = av1_use_angle_delta(bsize);
+#endif  // !CONFIG_AIMC
 
   // Y mode.
 #if CONFIG_SDP
-  const int use_angle_delta = av1_use_angle_delta(bsize);
   if (xd->tree_type != CHROMA_PART) {
 #endif
-    if (is_keyframe) {
-      const MB_MODE_INFO *const above_mi = xd->above_mbmi;
-      const MB_MODE_INFO *const left_mi = xd->left_mbmi;
-      write_intra_y_mode_kf(ec_ctx, mbmi, above_mi, left_mi, mode, w);
-    } else {
-      write_intra_y_mode_nonkf(ec_ctx, bsize, mode, w);
-    }
-
-#if CONFIG_MRLS && CONFIG_ORIP
-    // Encoding reference line index before angle delta if ORIP is enable
-    if (cm->seq_params.enable_mrls && av1_is_directional_mode(mode)) {
-      write_mrl_index(ec_ctx, mbmi->mrl_index, w);
-    }
-#endif
-
-    // Y angle delta.
-#if !CONFIG_SDP
-    const int use_angle_delta = av1_use_angle_delta(bsize);
-#endif
-    if (use_angle_delta && av1_is_directional_mode(mode)) {
-#if CONFIG_ORIP
-      int signal_intra_filter =
-          av1_signal_orip_for_horver_modes(cm, mbmi, PLANE_TYPE_Y, bsize);
-      aom_cdf_prob *cdf_angle =
-          signal_intra_filter
-#if CONFIG_SDP
-              ? ec_ctx->angle_delta_cdf_hv[PLANE_TYPE_Y][mode - V_PRED]
-              : ec_ctx->angle_delta_cdf[PLANE_TYPE_Y][mode - V_PRED];
+#if CONFIG_AIMC
+    write_intra_luma_mode(xd, w);
 #else
-              ? ec_ctx->angle_delta_cdf_hv[mode - V_PRED]
-              : ec_ctx->angle_delta_cdf[mode - V_PRED];
+  if (is_keyframe) {
+    const MB_MODE_INFO *const above_mi = xd->above_mbmi;
+    const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+    write_intra_y_mode_kf(ec_ctx, mbmi, above_mi, left_mi, mode, w);
+  } else {
+    write_intra_y_mode_nonkf(ec_ctx, bsize, mode, w);
+  }
 
-#endif  // CONFIG_SDP
-      assert(mbmi->angle_delta[PLANE_TYPE_Y] >= -3 &&
-             mbmi->angle_delta[PLANE_TYPE_Y] <= ANGLE_DELTA_VALUE_ORIP);
-      if (signal_intra_filter)
-        write_angle_delta_hv(w, mbmi->angle_delta[PLANE_TYPE_Y], cdf_angle);
-      else
-        write_angle_delta(w, mbmi->angle_delta[PLANE_TYPE_Y], cdf_angle);
-#elif CONFIG_SDP
+  // Y angle delta.
+  if (use_angle_delta && av1_is_directional_mode(mode)) {
+#if CONFIG_SDP
     write_angle_delta(w, mbmi->angle_delta[PLANE_TYPE_Y],
                       ec_ctx->angle_delta_cdf[PLANE_TYPE_Y][mode - V_PRED]);
 #else
     write_angle_delta(w, mbmi->angle_delta[PLANE_TYPE_Y],
                       ec_ctx->angle_delta_cdf[mode - V_PRED]);
-#endif  // CONFIG_ORIP
-    }
-#if CONFIG_MRLS && !CONFIG_ORIP
+#endif  // CONFIG_SDP
+  }
+#endif  // CONFIG_AIMC
+#if CONFIG_MRLS
     // Encoding reference line index
     if (cm->seq_params.enable_mrls && av1_is_directional_mode(mode)) {
       write_mrl_index(ec_ctx, mbmi->mrl_index, w);
@@ -1435,9 +1566,10 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
   if (!cm->seq_params.monochrome && xd->is_chroma_ref) {
 #endif
     const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
+#if CONFIG_AIMC
+    write_intra_uv_mode(xd, is_cfl_allowed(xd), w);
+#else
     write_intra_uv_mode(ec_ctx, uv_mode, mode, is_cfl_allowed(xd), w);
-    if (uv_mode == UV_CFL_PRED)
-      write_cfl_alphas(ec_ctx, mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, w);
     if (use_angle_delta && av1_is_directional_mode(get_uv_mode(uv_mode))) {
 #if CONFIG_SDP
       if (cm->seq_params.enable_sdp) {
@@ -1454,6 +1586,9 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
                         ec_ctx->angle_delta_cdf[uv_mode - V_PRED]);
 #endif
     }
+#endif  // CONFIG_AIMC
+    if (uv_mode == UV_CFL_PRED)
+      write_cfl_alphas(ec_ctx, mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, w);
   }
 
   // Palette.
@@ -1467,7 +1602,7 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 
 static INLINE int16_t mode_context_analyzer(
     const int16_t mode_context, const MV_REFERENCE_FRAME *const rf) {
-  if (rf[1] <= INTRA_FRAME) return mode_context;
+  if (!is_inter_ref_frame(rf[1])) return mode_context;
 
   const int16_t newmv_ctx = mode_context & NEWMV_CTX_MASK;
   const int16_t refmv_ctx = (mode_context >> REFMV_OFFSET) & REFMV_CTX_MASK;
@@ -1483,7 +1618,7 @@ static INLINE int_mv get_ref_mv_from_stack(
   const int8_t ref_frame_type = av1_ref_frame_type(ref_frame);
   const CANDIDATE_MV *curr_ref_mv_stack = mbmi_ext_frame->ref_mv_stack;
 
-  if (ref_frame[1] > INTRA_FRAME) {
+  if (is_inter_ref_frame(ref_frame[1])) {
     assert(ref_idx == 0 || ref_idx == 1);
     return ref_idx ? curr_ref_mv_stack[ref_mv_idx].comp_mv
                    : curr_ref_mv_stack[ref_mv_idx].this_mv;
@@ -1499,7 +1634,7 @@ static INLINE int_mv get_ref_mv(const MACROBLOCK *x, int ref_idx) {
   const MACROBLOCKD *xd = &x->e_mbd;
   const MB_MODE_INFO *mbmi = xd->mi[0];
   int ref_mv_idx = mbmi->ref_mv_idx;
-  if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
+  if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
     assert(has_second_ref(mbmi));
 #if !CONFIG_NEW_INTER_MODES
     ref_mv_idx += 1;
@@ -1556,12 +1691,22 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
   write_delta_q_params(cpi, skip, w);
 
-  if (!mbmi->skip_mode) write_is_inter(cm, xd, mbmi->segment_id, w, is_inter);
+  if (!mbmi->skip_mode)
+    write_is_inter(cm, xd, mbmi->segment_id, w, is_inter
+#if CONFIG_CONTEXT_DERIVATION
+                   ,
+                   skip
+#endif  // CONFIG_CONTEXT_DERIVATION
+    );
 
   if (mbmi->skip_mode) return;
 
   if (!is_inter) {
+#if CONFIG_AIMC
+    write_intra_prediction_modes(cpi, w);
+#else
     write_intra_prediction_modes(cpi, 0, w);
+#endif  // CONFIG_AIMC
   } else {
     int16_t mode_ctx;
 
@@ -1575,7 +1720,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     // If segment skip is not enabled code the mode.
     if (!segfeature_active(seg, segment_id, SEG_LVL_SKIP)) {
       if (is_inter_compound_mode(mode))
-        write_inter_compound_mode(xd, w, mode, mode_ctx);
+        write_inter_compound_mode(xd, w, mode,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                  cm, mbmi,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                  mode_ctx);
       else if (is_inter_singleref_mode(mode))
         write_inter_mode(w, mode, ec_ctx, mode_ctx);
 
@@ -1589,7 +1738,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         assert(mbmi->ref_mv_idx == 0);
     }
 
-    if (mode == NEWMV || mode == NEW_NEWMV) {
+    if (mode == NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+        mode == NEW_NEWMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+        mode == NEW_NEWMV) {
       for (ref = 0; ref < 1 + is_compound; ++ref) {
         nmv_context *nmvc = &ec_ctx->nmvc;
         const int_mv ref_mv = get_ref_mv(x, ref);
@@ -1597,11 +1750,19 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                       allow_hp);
       }
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+    } else if (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW) {
+#else
     } else if (mode == NEAR_NEWMV) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
       av1_encode_mv(cpi, w, &mbmi->mv[1].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+#if CONFIG_OPTFLOW_REFINEMENT
+    } else if (mode == NEW_NEARMV || mode == NEW_NEARMV_OPTFLOW) {
+#else
     } else if (mode == NEW_NEARMV) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
       av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
@@ -1621,7 +1782,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     if (cpi->common.current_frame.reference_mode != COMPOUND_REFERENCE &&
         cpi->common.seq_params.enable_interintra_compound &&
         is_interintra_allowed(mbmi)) {
+#if CONFIG_NEW_REF_SIGNALING
+      const int interintra = mbmi->ref_frame[1] == INTRA_FRAME_NRS;
+#else
       const int interintra = mbmi->ref_frame[1] == INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
       const int bsize_group = size_group_lookup[bsize];
       aom_write_symbol(w, interintra, ec_ctx->interintra_cdf[bsize_group], 2);
       if (interintra) {
@@ -1639,12 +1804,21 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       }
     }
 
-    if (mbmi->ref_frame[1] != INTRA_FRAME) write_motion_mode(cm, xd, mbmi, w);
+#if CONFIG_NEW_REF_SIGNALING
+    if (mbmi->ref_frame[1] != INTRA_FRAME_NRS)
+#else
+    if (mbmi->ref_frame[1] != INTRA_FRAME)
+#endif  // CONFIG_NEW_REF_SIGNALING
+      write_motion_mode(cm, xd, mbmi, w);
 
-    // First write idx to indicate current compound inter prediction mode group
-    // Group A (0): dist_wtd_comp, compound_average
-    // Group B (1): interintra, compound_diffwtd, wedge
+      // First write idx to indicate current compound inter prediction mode
+      // group Group A (0): dist_wtd_comp, compound_average Group B (1):
+      // interintra, compound_diffwtd, wedge
+#if CONFIG_OPTFLOW_REFINEMENT
+    if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
+#else
     if (has_second_ref(mbmi)) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
       const int masked_compound_used = is_any_masked_compound_used(bsize) &&
                                        cm->seq_params.enable_masked_compound;
 
@@ -1657,20 +1831,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       }
 
       if (mbmi->comp_group_idx == 0) {
-        if (mbmi->compound_idx)
-          assert(mbmi->interinter_comp.type == COMPOUND_AVERAGE);
-
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-        if (cm->seq_params.order_hint_info.enable_dist_wtd_comp) {
-          const int comp_index_ctx = get_comp_index_context(cm, xd);
-          aom_write_symbol(w, mbmi->compound_idx,
-                           ec_ctx->compound_index_cdf[comp_index_ctx], 2);
-        } else {
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
-          assert(mbmi->compound_idx == 1);
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-        }
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
+        assert(mbmi->interinter_comp.type == COMPOUND_AVERAGE);
       } else {
         assert(cpi->common.current_frame.reference_mode != SINGLE_REFERENCE &&
                is_inter_compound_mode(mbmi->mode) &&
@@ -1770,7 +1931,11 @@ static AOM_INLINE void write_mb_modes_kf(
 #endif
   }
 
+#if CONFIG_AIMC
+  write_intra_prediction_modes(cpi, w);
+#else
   write_intra_prediction_modes(cpi, 1, w);
+#endif  // CONFIG_AIMC
 }
 
 #if CONFIG_RD_DEBUG
@@ -3012,7 +3177,11 @@ static AOM_INLINE void write_frame_size_with_refs(
   int found = 0;
 
   MV_REFERENCE_FRAME ref_frame;
+#if CONFIG_NEW_REF_SIGNALING
+  for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+#else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     const YV12_BUFFER_CONFIG *cfg = get_ref_frame_yv12_buf(cm, ref_frame);
 
     if (cfg != NULL) {
@@ -3187,8 +3356,13 @@ static AOM_INLINE void write_film_grain_params(
 
   if (!pars->update_parameters) {
     int ref_frame, ref_idx;
+#if CONFIG_NEW_REF_SIGNALING
+    for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ref_frame++) {
+      ref_idx = get_ref_frame_map_idx(cm, ref_frame);
+#else
     for (ref_frame = LAST_FRAME; ref_frame < REF_FRAMES; ref_frame++) {
       ref_idx = get_ref_frame_map_idx(cm, ref_frame);
+#endif  // CONFIG_NEW_REF_SIGNALING
       assert(ref_idx != INVALID_IDX);
       const RefCntBuffer *const buf = cm->ref_frame_map[ref_idx];
       if (buf->film_grain_params_present &&
@@ -3325,9 +3499,6 @@ static AOM_INLINE void write_sequence_header(
     aom_wb_write_bit(wb, seq_params->order_hint_info.enable_order_hint);
 
     if (seq_params->order_hint_info.enable_order_hint) {
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-      aom_wb_write_bit(wb, seq_params->order_hint_info.enable_dist_wtd_comp);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
       aom_wb_write_bit(wb, seq_params->order_hint_info.enable_ref_frame_mvs);
     }
     if (seq_params->force_screen_content_tools == 2) {
@@ -3358,6 +3529,15 @@ static AOM_INLINE void write_sequence_header(
 
 static AOM_INLINE void write_sequence_header_beyond_av1(
     const SequenceHeader *const seq_params, struct aom_write_bit_buffer *wb) {
+#if CONFIG_REF_MV_BANK
+  aom_wb_write_bit(wb, seq_params->enable_refmvbank);
+#endif  // CONFIG_REF_MV_BANK
+#if CONFIG_NEW_REF_SIGNALING
+  aom_wb_write_bit(wb, seq_params->explicit_ref_frame_map);
+  aom_wb_write_bit(wb, seq_params->max_reference_frames < 7);
+  if (seq_params->max_reference_frames < 7)
+    aom_wb_write_literal(wb, seq_params->max_reference_frames - 3, 2);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
   aom_wb_write_bit(wb, seq_params->enable_sdp);
 #endif
@@ -3372,6 +3552,13 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif
 #if CONFIG_ORIP
   aom_wb_write_bit(wb, seq_params->enable_orip);
+#endif
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (seq_params->order_hint_info.enable_order_hint)
+    aom_wb_write_literal(wb, seq_params->enable_opfl_refine, 2);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  aom_wb_write_bit(wb, seq_params->enable_ibp);
 #endif
 }
 
@@ -3432,7 +3619,11 @@ static AOM_INLINE void write_global_motion(AV1_COMP *cpi,
                                            struct aom_write_bit_buffer *wb) {
   AV1_COMMON *const cm = &cpi->common;
   int frame;
+#if CONFIG_NEW_REF_SIGNALING
+  for (frame = 0; frame < cm->ref_frames_info.n_total_refs; ++frame) {
+#else
   for (frame = LAST_FRAME; frame <= ALTREF_FRAME; ++frame) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     const WarpedMotionParams *ref_params =
         cm->prev_frame ? &cm->prev_frame->global_motion[frame]
                        : &default_warp_params;
@@ -3463,6 +3654,7 @@ static AOM_INLINE void write_global_motion(AV1_COMP *cpi,
   }
 }
 
+#if !CONFIG_NEW_REF_SIGNALING
 static int check_frame_refs_short_signaling(AV1_COMMON *const cm) {
   // Check whether all references are distinct frames.
   const RefCntBuffer *seen_bufs[FRAME_BUFFERS] = { NULL };
@@ -3530,6 +3722,7 @@ static int check_frame_refs_short_signaling(AV1_COMMON *const cm) {
 
   return frame_refs_short_signaling;
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 // New function based on HLS R18
 static AOM_INLINE void write_uncompressed_header_obu(
@@ -3542,7 +3735,9 @@ static AOM_INLINE void write_uncompressed_header_obu(
   CurrentFrame *const current_frame = &cm->current_frame;
   FeatureFlags *const features = &cm->features;
 
+#if !CONFIG_NEW_REF_SIGNALING
   current_frame->frame_refs_short_signaling = 0;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   if (seq_params->still_picture) {
     assert(cm->show_existing_frame == 0);
@@ -3707,6 +3902,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
           seq_params->order_hint_info.enable_order_hint;
 #endif  // FRAME_REFS_SHORT_SIGNALING
 
+#if !CONFIG_NEW_REF_SIGNALING
       if (current_frame->frame_refs_short_signaling) {
         // NOTE(zoeliu@google.com):
         //   An example solution for encoder-side implementation on frame refs
@@ -3726,12 +3922,26 @@ static AOM_INLINE void write_uncompressed_header_obu(
         const int gld_ref = get_ref_frame_map_idx(cm, GOLDEN_FRAME);
         aom_wb_write_literal(wb, gld_ref, REF_FRAMES_LOG2);
       }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_NEW_REF_SIGNALING
+      for (ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
+           ++ref_frame) {
+        assert(get_ref_frame_map_idx(cm, ref_frame) != INVALID_IDX);
+        // By default, no need to signal ref mapping indices in NRS because
+        // decoder can derive them unless order_hint is not available. Explicit
+        // signaling is enabled only when explicit_ref_frame_map is on.
+        if (seq_params->explicit_ref_frame_map ||
+            !seq_params->order_hint_info.enable_order_hint)
+          aom_wb_write_literal(wb, get_ref_frame_map_idx(cm, ref_frame),
+                               REF_FRAMES_LOG2);
+#else
       for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
         assert(get_ref_frame_map_idx(cm, ref_frame) != INVALID_IDX);
         if (!current_frame->frame_refs_short_signaling)
           aom_wb_write_literal(wb, get_ref_frame_map_idx(cm, ref_frame),
                                REF_FRAMES_LOG2);
+#endif  // CONFIG_NEW_REF_SIGNALING
         if (seq_params->frame_id_numbers_present_flag) {
           int i = get_ref_frame_map_idx(cm, ref_frame);
           int frame_id_len = seq_params->frame_id_length;
@@ -3766,6 +3976,11 @@ static AOM_INLINE void write_uncompressed_header_obu(
       }
       write_frame_interp_filter(features->interp_filter, wb);
       aom_wb_write_bit(wb, features->switchable_motion_mode);
+#if CONFIG_OPTFLOW_REFINEMENT
+      if (cm->seq_params.enable_opfl_refine == AOM_OPFL_REFINE_AUTO) {
+        aom_wb_write_literal(wb, features->opfl_refine_type, 2);
+      }
+#endif  // CONFIG_OPTFLOW_REFINEMENT
       if (frame_might_allow_ref_frame_mvs(cm)) {
         aom_wb_write_bit(wb, features->allow_ref_frame_mvs);
       } else {

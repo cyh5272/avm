@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "common/args.h"
@@ -94,6 +95,9 @@ int parse_cfg(const char *file, cfg_options_t *config) {
 #if CONFIG_IST
     GET_PARAMS(enable_ist);
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+    GET_PARAMS(enable_ibp);
+#endif
     GET_PARAMS(enable_flip_idtx);
     GET_PARAMS(enable_deblocking);
     GET_PARAMS(enable_cdef);
@@ -104,9 +108,6 @@ int parse_cfg(const char *file, cfg_options_t *config) {
     GET_PARAMS(enable_obmc);
     GET_PARAMS(enable_warped_motion);
     GET_PARAMS(enable_global_motion);
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-    GET_PARAMS(enable_dist_wtd_comp);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
     GET_PARAMS(enable_diff_wtd_comp);
     GET_PARAMS(enable_interintra_comp);
     GET_PARAMS(enable_masked_comp);
@@ -120,6 +121,9 @@ int parse_cfg(const char *file, cfg_options_t *config) {
     GET_PARAMS(enable_dual_filter);
 #endif  // !CONFIG_REMOVE_DUAL_FILTER
     GET_PARAMS(enable_angle_delta);
+#if CONFIG_OPTFLOW_REFINEMENT
+    GET_PARAMS(enable_opfl_refine);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     GET_PARAMS(enable_intra_edge_filter);
     GET_PARAMS(enable_tx64);
     GET_PARAMS(enable_smooth_interintra);
@@ -133,6 +137,9 @@ int parse_cfg(const char *file, cfg_options_t *config) {
 #if CONFIG_NEW_INTER_MODES
     GET_PARAMS(max_drl_refmvs);
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_REF_MV_BANK
+    GET_PARAMS(enable_refmvbank);
+#endif  // CONFIG_REF_MV_BANK
 
     fprintf(stderr, "\nInvalid parameter: %s", left);
     exit(-1);

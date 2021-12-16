@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_ENCODER_UTILS_H_
@@ -117,7 +118,11 @@ static AOM_INLINE void enc_setup_mi(CommonModeInfoParams *mi_params) {
 static AOM_INLINE void init_buffer_indices(
     ForceIntegerMVInfo *const force_intpel_info, int *const remapped_ref_idx) {
   int fb_idx;
+#if CONFIG_NEW_REF_SIGNALING
+  for (fb_idx = 0; fb_idx < INTER_REFS_PER_FRAME; ++fb_idx)
+#else
   for (fb_idx = 0; fb_idx < REF_FRAMES; ++fb_idx)
+#endif  // CONFIG_NEW_REF_SIGNALING
     remapped_ref_idx[fb_idx] = fb_idx;
   force_intpel_info->rate_index = 0;
   force_intpel_info->rate_size = 0;
@@ -868,7 +873,11 @@ static AOM_INLINE int combine_prior_with_tpl_boost(double min_factor,
 static AOM_INLINE void set_size_independent_vars(AV1_COMP *cpi) {
   int i;
   AV1_COMMON *const cm = &cpi->common;
+#if CONFIG_NEW_REF_SIGNALING
+  for (i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     cm->global_motion[i] = default_warp_params;
   }
   cpi->gm_info.search_done = 0;
@@ -877,6 +886,9 @@ static AOM_INLINE void set_size_independent_vars(AV1_COMP *cpi) {
   av1_set_rd_speed_thresholds(cpi);
   cm->features.interp_filter = SWITCHABLE;
   cm->features.switchable_motion_mode = 1;
+#if CONFIG_OPTFLOW_REFINEMENT
+  cm->features.opfl_refine_type = REFINE_SWITCHABLE;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 }
 
 static AOM_INLINE void release_scaled_references(AV1_COMP *cpi) {

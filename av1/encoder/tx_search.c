@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "av1/common/cfl.h"
@@ -2257,8 +2258,19 @@ static INLINE void predict_dc_only_block(
     TXB_CTX txb_ctx_tmp;
     const PLANE_TYPE plane_type = get_plane_type(plane);
     get_txb_ctx(plane_bsize, tx_size, plane, ta, tl, &txb_ctx_tmp);
+#if CONFIG_CONTEXT_DERIVATION
+    int zero_blk_rate = 0;
+    if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
+      zero_blk_rate = x->coeff_costs.coeff_costs[txs_ctx][plane_type]
+                          .txb_skip_cost[txb_ctx_tmp.txb_skip_ctx][1];
+    } else {
+      zero_blk_rate = x->coeff_costs.coeff_costs[txs_ctx][plane_type]
+                          .v_txb_skip_cost[txb_ctx_tmp.txb_skip_ctx][1];
+    }
+#else
     const int zero_blk_rate = x->coeff_costs.coeff_costs[txs_ctx][plane_type]
                                   .txb_skip_cost[txb_ctx_tmp.txb_skip_ctx][1];
+#endif  // CONFIG_CONTEXT_DERIVATION
     best_rd_stats->rate = zero_blk_rate;
 
     best_rd_stats->rdcost =
@@ -2421,6 +2433,11 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       // Therefore transform domain distortion is not valid for these
       // transform sizes.
       (txsize_sqr_up_map[tx_size] != TX_64X64) &&
+#if CONFIG_IST
+      // Use pixel domain distortion for IST
+      // TODO: Make IST compatible with tx domain distortion
+      !cm->seq_params.enable_ist &&
+#endif
       // Use pixel domain distortion for DC only blocks
       !dc_only_blk;
   // Flag to indicate if an extra calculation of distortion in the pixel domain

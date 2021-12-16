@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_ENUMS_H_
@@ -90,6 +91,14 @@ extern "C" {
 #if CONFIG_MRLS
 #define MRL_LINE_NUMBER 4
 #endif
+#if CONFIG_AIMC
+#define FIRST_MODE_COUNT 13
+#define SECOND_MODE_COUNT 16
+#define Y_MODE_CONTEXTS 3
+#define UV_MODE_CONTEXTS 2
+#define INTRA_MODE_SETS 4
+#define NON_DIRECTIONAL_MODES_COUNT 5
+#endif  // CONFIG_AIMC
 
 // Intra Secondary Transform
 #if CONFIG_IST
@@ -389,6 +398,7 @@ enum {
 #define EXT_TX_SETS_INTER 4  // Sets of transform selections for INTER
 #define EXT_TX_SETS_INTRA 3  // Sets of transform selections for INTRA
 
+#if !CONFIG_NEW_REF_SIGNALING
 enum {
   AOM_LAST_FLAG = 1 << 0,
   AOM_LAST2_FLAG = 1 << 1,
@@ -399,6 +409,7 @@ enum {
   AOM_ALT_FLAG = 1 << 6,
   AOM_REFFRAME_ALL = (1 << 7) - 1
 } UENUM1BYTE(AOM_REFFRAME);
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 enum {
   UNIDIR_COMP_REFERENCE,
@@ -507,6 +518,12 @@ enum {
   NEW_NEARMV,
   GLOBAL_GLOBALMV,
   NEW_NEWMV,
+#if CONFIG_OPTFLOW_REFINEMENT
+  NEAR_NEARMV_OPTFLOW,
+  NEAR_NEWMV_OPTFLOW,
+  NEW_NEARMV_OPTFLOW,
+  NEW_NEWMV_OPTFLOW,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   MB_MODE_COUNT,
   INTRA_MODE_START = DC_PRED,
 #if CONFIG_NEW_INTER_MODES
@@ -532,14 +549,19 @@ enum {
 #endif  // CONFIG_NEW_INTER_MODES
   COMP_INTER_MODE_END = MB_MODE_COUNT,
   COMP_INTER_MODE_NUM = COMP_INTER_MODE_END - COMP_INTER_MODE_START,
+#if CONFIG_OPTFLOW_REFINEMENT
+  COMP_OPTFLOW_MODE_START = NEAR_NEARMV_OPTFLOW,
+  INTER_COMPOUND_REF_TYPES = COMP_OPTFLOW_MODE_START - COMP_INTER_MODE_START,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_NEW_INTER_MODES
   INTER_MODE_START = NEARMV,
 #else
   INTER_MODE_START = NEARESTMV,
 #endif  // CONFIG_NEW_INTER_MODES
   INTER_MODE_END = MB_MODE_COUNT,
-  INTRA_MODES = PAETH_PRED + 1,  // PAETH_PRED has to be the last intra mode.
-  INTRA_INVALID = MB_MODE_COUNT  // For uv_mode in inter blocks
+  INTRA_MODES = PAETH_PRED + 1,   // PAETH_PRED has to be the last intra mode.
+  INTRA_INVALID = MB_MODE_COUNT,  // For uv_mode in inter blocks
+  MODE_INVALID = 255
 } UENUM1BYTE(PREDICTION_MODE);
 
 // TODO(ltrudeau) Do we really want to pack this?
@@ -586,9 +608,6 @@ enum {
 
 enum {
   COMPOUND_AVERAGE,
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  COMPOUND_DISTWTD,
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   COMPOUND_WEDGE,
   COMPOUND_DIFFWTD,
   COMPOUND_TYPES,
@@ -639,25 +658,18 @@ enum {
 #define MAX_ANGLE_DELTA 3
 #define ANGLE_STEP 3
 
-#if CONFIG_ORIP
-#define ADDITIONAL_ANGLE_DELTA 1
-#define TOTAL_NUM_ORIP_ANGLE_DELTA 2
-#define ANGLE_DELTA_VALUE_ORIP (MAX_ANGLE_DELTA + 1)
+#if CONFIG_AIMC
+// Total delta angles for one nominal directional mode
+#define TOTAL_ANGLE_DELTA_COUNT 7
 #endif
 
-#if CONFIG_NEW_INTER_MODES
-#define INTER_SINGLE_MODES (1 + NEWMV - NEARMV)
-#define INTER_COMPOUND_MODES (1 + NEW_NEWMV - NEAR_NEARMV)
-#else
-#define INTER_SINGLE_MODES (1 + NEWMV - NEARESTMV)
-#define INTER_COMPOUND_MODES (1 + NEW_NEWMV - NEAREST_NEARESTMV)
-#endif  // CONFIG_NEW_INTER_MODES
+#define INTER_SINGLE_MODES SINGLE_INTER_MODE_NUM
+#define INTER_COMPOUND_MODES COMP_INTER_MODE_NUM
 
 #define SKIP_CONTEXTS 3
 #define SKIP_MODE_CONTEXTS 3
 
-#define COMP_INDEX_CONTEXTS 6
-#define COMP_GROUP_IDX_CONTEXTS (6 * (1 + CONFIG_REMOVE_DIST_WTD_COMP))
+#define COMP_GROUP_IDX_CONTEXTS 12
 
 #define NMV_CONTEXTS 3
 #define NEWMV_MODE_CONTEXTS 6
@@ -708,6 +720,9 @@ enum {
 
 #define REF_CAT_LEVEL 640
 
+#if CONFIG_CONTEXT_DERIVATION
+#define INTRA_INTER_SKIP_TXFM_CONTEXTS 2
+#endif  // CONFIG_CONTEXT_DERIVATION
 #define INTRA_INTER_CONTEXTS 4
 #define COMP_INTER_CONTEXTS 5
 #define REF_CONTEXTS 3
@@ -722,6 +737,17 @@ enum {
 #endif  // CONFIG_NEW_TX_PARTITION
 typedef uint8_t TXFM_CONTEXT;
 
+#if CONFIG_NEW_REF_SIGNALING
+#define INTER_REFS_PER_FRAME 7
+#define REF_FRAMES (INTER_REFS_PER_FRAME + 1)
+#define MODE_CTX_REF_FRAMES \
+  (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 1)
+#define INTRA_FRAME_NRS (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2)
+// Used for indexing into arrays that contain reference data for
+// inter and intra.
+#define INTRA_FRAME_INDEX_NRS INTER_REFS_PER_FRAME
+#define AOM_REFFRAME_ALL ((1 << INTER_REFS_PER_FRAME) - 1)
+#else
 // An enum for single reference types (and some derived values).
 enum {
   NONE_FRAME = -1,
@@ -752,6 +778,12 @@ enum {
   SINGLE_REFS = FWD_REFS + BWD_REFS,
 };
 
+// NOTE: A limited number of unidirectional reference pairs can be signalled for
+//       compound prediction. The use of skip mode, on the other hand, makes it
+//       possible to have a reference pair not listed for explicit signaling.
+#define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
+#endif  // CONFIG_NEW_REF_SIGNALING
+
 #define REF_FRAMES_LOG2 3
 
 // REF_FRAMES for the cm->ref_frame_map array, 1 scratch frame for the new
@@ -762,6 +794,7 @@ enum {
 #define FWD_RF_OFFSET(ref) (ref - LAST_FRAME)
 #define BWD_RF_OFFSET(ref) (ref - BWDREF_FRAME)
 
+#if !CONFIG_NEW_REF_SIGNALING
 enum {
   LAST_LAST2_FRAMES,      // { LAST_FRAME, LAST2_FRAME }
   LAST_LAST3_FRAMES,      // { LAST_FRAME, LAST3_FRAME }
@@ -777,15 +810,11 @@ enum {
   //       that are explicitly signaled.
   UNIDIR_COMP_REFS = BWDREF_ALTREF_FRAMES + 1,
 } UENUM1BYTE(UNIDIR_COMP_REF);
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 #define TOTAL_COMP_REFS (FWD_REFS * BWD_REFS + TOTAL_UNIDIR_COMP_REFS)
 
 #define COMP_REFS (FWD_REFS * BWD_REFS + UNIDIR_COMP_REFS)
-
-// NOTE: A limited number of unidirectional reference pairs can be signalled for
-//       compound prediction. The use of skip mode, on the other hand, makes it
-//       possible to have a reference pair not listed for explicit signaling.
-#define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
 
 // Note: It includes single and compound references. So, it can take values from
 // NONE_FRAME to (MODE_CTX_REF_FRAMES - 1). Hence, it is not defined as an enum.
@@ -831,6 +860,12 @@ enum {
 // In large_scale_tile coding, external references are used.
 #define MAX_EXTERNAL_REFERENCES 128
 #define MAX_TILES 512
+
+#if CONFIG_IBP_DIR || CONFIG_IBP_DC
+#define DIR_MODES_0_90 17
+#define IBP_WEIGHT_SHIFT 8
+#define IBP_WEIGHT_MAX 255
+#endif
 
 /*!\endcond */
 

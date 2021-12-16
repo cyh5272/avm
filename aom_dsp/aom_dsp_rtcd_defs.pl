@@ -1,12 +1,12 @@
 ##
-## Copyright (c) 2017, Alliance for Open Media. All rights reserved
+## Copyright (c) 2021, Alliance for Open Media. All rights reserved
 ##
-## This source code is subject to the terms of the BSD 2 Clause License and
-## the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
-## was not distributed with this source code in the LICENSE file, you can
-## obtain it at www.aomedia.org/license/software. If the Alliance for Open
-## Media Patent License 1.0 was not distributed with this source code in the
-## PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+## This source code is subject to the terms of the BSD 3-Clause Clear License and the
+## Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear License was
+## not distributed with this source code in the LICENSE file, you can obtain it
+## at aomedia.org/license/software-license/bsd-3-c-c/.  If the Alliance for Open Media Patent
+## License 1.0 was not distributed with this source code in the PATENTS file, you
+## can obtain it at aomedia.org/license/patent-license/.
 ##
 sub aom_dsp_forward_decls() {
 print <<EOF
@@ -64,7 +64,10 @@ foreach $w (@tx_dims) {
   }
 }
 
-@pred_names = qw/dc dc_top dc_left dc_128 v h paeth smooth smooth_v smooth_h/;
+@pred_names = qw /
+              dc dc_top dc_left dc_128 v h paeth smooth smooth_v smooth_h ibp_dc
+              ibp_dc_top ibp_dc_left /
+    ;
 
 #
 # Intra prediction
@@ -606,21 +609,21 @@ specialize "aom_highbd_blend_a64_hmask", qw/sse4_1/;
 specialize "aom_highbd_blend_a64_vmask", qw/sse4_1/;
 specialize "aom_highbd_blend_a64_d16_mask", qw/sse4_1 avx2/;
 
-if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
-  #
-  # Block subtraction
-  #
-  add_proto qw/void aom_subtract_block/, "int rows, int cols, int16_t *diff_ptr, ptrdiff_t diff_stride, const uint8_t *src_ptr, ptrdiff_t src_stride, const uint8_t *pred_ptr, ptrdiff_t pred_stride";
-  specialize qw/aom_subtract_block neon msa sse2 avx2/;
+#
+# Block subtraction
+#
+add_proto qw/void aom_subtract_block/, "int rows, int cols, int16_t *diff_ptr, ptrdiff_t diff_stride, const uint8_t *src_ptr, ptrdiff_t src_stride, const uint8_t *pred_ptr, ptrdiff_t pred_stride";
+specialize qw/aom_subtract_block neon msa avx2/;
 
+add_proto qw/void aom_highbd_subtract_block/, "int rows, int cols, int16_t *diff_ptr, ptrdiff_t diff_stride, const uint8_t *src_ptr, ptrdiff_t src_stride, const uint8_t *pred_ptr, ptrdiff_t pred_stride, int bd";
+specialize qw/aom_highbd_subtract_block sse2/;
+
+if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   add_proto qw/int64_t/, "aom_sse", "const uint8_t *a, int a_stride, const uint8_t *b,int b_stride, int width, int height";
   specialize qw/aom_sse  sse4_1 avx2 neon/;
 
   add_proto qw/void/, "aom_get_blk_sse_sum", "const int16_t *data, int stride, int bw, int bh, int *x_sum, int64_t *x2_sum";
   specialize qw/aom_get_blk_sse_sum sse2 avx2/;
-
-  add_proto qw/void aom_highbd_subtract_block/, "int rows, int cols, int16_t *diff_ptr, ptrdiff_t diff_stride, const uint8_t *src_ptr, ptrdiff_t src_stride, const uint8_t *pred_ptr, ptrdiff_t pred_stride, int bd";
-  specialize qw/aom_highbd_subtract_block sse2/;
 
   add_proto qw/int64_t/, "aom_highbd_sse", "const uint8_t *a8, int a_stride, const uint8_t *b8,int b_stride, int width, int height";
   specialize qw/aom_highbd_sse  sse4_1 avx2 neon/;

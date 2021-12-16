@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "av1/common/pred_common.h"
@@ -28,7 +29,6 @@ static INLINE int is_interp_filter_good_match(
 
   if (skip_level == 1 && is_comp) {
     if (st->comp_type != mi->interinter_comp.type) return INT_MAX;
-    if (st->compound_idx != mi->compound_idx) return INT_MAX;
   }
 
   int mv_diff = 0;
@@ -53,7 +53,6 @@ static INLINE int save_interp_filter_search_stat(
       { mbmi->mv[0], mbmi->mv[1] },
       { mbmi->ref_frame[0], mbmi->ref_frame[1] },
       mbmi->interinter_comp.type,
-      mbmi->compound_idx,
       rd,
       pred_sse
     };
@@ -111,7 +110,11 @@ int av1_find_interp_filter_match(
         cpi->sf.interp_sf.use_interp_filter);
 
   if (!need_search || match_found_idx == -1)
-    set_default_interp_filters(mbmi, assign_filter);
+    set_default_interp_filters(mbmi,
+#if CONFIG_OPTFLOW_REFINEMENT
+                               &cpi->common,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                               assign_filter);
   return match_found_idx;
 }
 
@@ -127,6 +130,9 @@ static INLINE void swap_dst_buf(MACROBLOCKD *xd, const BUFFER_SET *dst_bufs[2],
 static INLINE int get_switchable_rate(MACROBLOCK *const x,
                                       const InterpFilter interp_fltr,
                                       const int ctx[2]) {
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (x->e_mbd.mi[0]->mode > NEW_NEWMV) return 0;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   const int inter_filter_cost =
       x->mode_costs.switchable_interp_costs[ctx[0]][interp_fltr];
   return SWITCHABLE_INTERP_RATE_FACTOR * inter_filter_cost;
@@ -135,6 +141,9 @@ static INLINE int get_switchable_rate(MACROBLOCK *const x,
 static INLINE int get_switchable_rate(MACROBLOCK *const x,
                                       const int_interpfilters filters,
                                       int dual_filter, const int ctx[2]) {
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (x->e_mbd.mi[0]->mode > NEW_NEWMV) return 0;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   const InterpFilter filter0 = filters.as_filters.y_filter;
   int inter_filter_cost =
       x->mode_costs.switchable_interp_costs[ctx[0]][filter0];
@@ -643,8 +652,12 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
       struct macroblockd_plane *const pd = &xd->plane[plane_idx];
       const int bw = pd->width;
       const int bh = pd->height;
-      const MV mv_q4 = clamp_mv_to_umv_border_sb(
-          xd, &mv, bw, bh, pd->subsampling_x, pd->subsampling_y);
+      const MV mv_q4 =
+          clamp_mv_to_umv_border_sb(xd, &mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                    0,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                    pd->subsampling_x, pd->subsampling_y);
       const int sub_x = (mv_q4.col & SUBPEL_MASK) << SCALE_EXTRA_BITS;
       const int sub_y = (mv_q4.row & SUBPEL_MASK) << SCALE_EXTRA_BITS;
       skip_hor_plane |= ((sub_x == 0) << plane_idx);
@@ -662,8 +675,7 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
   // vertical filter decision may be incorrect as temporary MC evaluation
   // overwrites the mask. Make skip_ver as 0 for this case so that mask is
   // populated during luma MC
-  if (is_compound && mbmi->compound_idx == 1 &&
-      mbmi->interinter_comp.type == COMPOUND_DIFFWTD) {
+  if (is_compound && mbmi->interinter_comp.type == COMPOUND_DIFFWTD) {
     assert(mbmi->comp_group_idx == 1);
     if (*skip_hor == 0 && *skip_ver == 1) *skip_ver = 0;
   }
@@ -717,8 +729,12 @@ int64_t av1_interpolation_filter_search(
   const int num_planes = av1_num_planes(cm);
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
-  const int need_search = av1_is_interp_needed(xd);
+  const int need_search = av1_is_interp_needed(cm, xd);
+#if CONFIG_NEW_REF_SIGNALING
+  const int ref_frame = COMPACT_INDEX0_NRS(xd->mi[0]->ref_frame[0]);
+#else
   const int ref_frame = xd->mi[0]->ref_frame[0];
+#endif  // CONFIG_NEW_REF_SIGNALING
   RD_STATS rd_stats_luma, rd_stats;
 
   // Initialization of rd_stats structures with default values
@@ -780,17 +796,34 @@ int64_t av1_interpolation_filter_search(
   }
   if (!need_search) {
 #if CONFIG_REMOVE_DUAL_FILTER
+#if CONFIG_OPTFLOW_REFINEMENT
+    assert(mbmi->interp_fltr ==
+           ((mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
+                ? MULTITAP_SHARP
+                : EIGHTTAP_REGULAR));
+#else
     assert(mbmi->interp_fltr == EIGHTTAP_REGULAR);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #else
     const int_interpfilters filters =
-        av1_broadcast_interp_filter(EIGHTTAP_REGULAR);
+#if CONFIG_OPTFLOW_REFINEMENT
+        (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
+            ? av1_broadcast_interp_filter(MULTITAP_SHARP)
+            :
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+            av1_broadcast_interp_filter(EIGHTTAP_REGULAR);
     assert(mbmi->interp_filters.as_int == filters.as_int);
     (void)filters;
 #endif  // CONFIG_REMOVE_DUAL_FILTER
     return 0;
   }
   if (args->modelled_rd != NULL) {
+#if CONFIG_OPTFLOW_REFINEMENT
+    if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV &&
+        !use_opfl_refine_all(cm, mbmi)) {
+#else
     if (has_second_ref(mbmi)) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
       const int ref_mv_idx = mbmi->ref_mv_idx;
       MV_REFERENCE_FRAME *refs = mbmi->ref_frame;
       const int mode0 = compound_ref0_mode(mbmi->mode);

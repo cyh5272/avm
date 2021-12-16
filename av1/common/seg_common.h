@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_SEG_COMMON_H_
@@ -30,8 +31,10 @@ enum {
   SEG_LVL_ALT_LF_Y_H,  // Use alternate loop filter value on y plane horizontal
   SEG_LVL_ALT_LF_U,    // Use alternate loop filter value on u plane
   SEG_LVL_ALT_LF_V,    // Use alternate loop filter value on v plane
-  SEG_LVL_REF_FRAME,   // Optional Segment reference frame
-  SEG_LVL_SKIP,        // Optional Segment (0,0) + skip mode
+#if !CONFIG_NEW_REF_SIGNALING
+  SEG_LVL_REF_FRAME,  // Optional Segment reference frame
+#endif                // !CONFIG_NEW_REF_SIGNALING
+  SEG_LVL_SKIP,       // Optional Segment (0,0) + skip mode
   SEG_LVL_GLOBALMV,
   SEG_LVL_MAX
 } UENUM1BYTE(SEG_LVL_FEATURES);

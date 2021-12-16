@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_CONTEXT_TREE_H_
@@ -49,9 +50,9 @@ typedef struct PICK_MODE_CONTEXT {
   // For current partition, only if all Y, U, and V transform blocks'
   // coefficients are quantized to 0, skippable is set to 1.
   int skippable;
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   THR_MODES best_mode_index;
-#endif  // CONFIG_INTERNAL_STATS
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   int hybrid_pred_diff;
   int comp_pred_diff;
   int single_pred_diff;

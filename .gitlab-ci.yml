@@ -4,7 +4,7 @@ stages:
   - test
   - report
 
-image: registry.gitlab.com/epirat/images/ubuntu2004:20210225223748
+image: registry.gitlab.com/aomediacodec/aom-testing/ubuntu2004:20211125032922
 
 default:
   tags:
@@ -21,18 +21,24 @@ workflow:
 Style Check:
   stage: check
   interruptible: true
-  image: registry.gitlab.com/aomediacodec/aom-testing/alpine3
-  before_script:
-    - apk add --no-cache git clang
+  image: registry.gitlab.com/aomediacodec/aom-testing/alpine3:20210901124702
+  variables:
+    DIFF_REF: $CI_MERGE_REQUEST_DIFF_BASE_SHA
   script:
+    - 'echo "Diff ref is: $DIFF_REF"'
+    - git fetch --unshallow
     - |
-      # Run clang-format
-      for f in $(git ls-files '*.[hc]pp' '*.cc' '*.[ch]' | grep -v third_party); do
-        clang-format -i --style=file $f
+      # Run clang-format check.
+      for f in $(git diff --diff-filter=ACMR --name-only $DIFF_REF '*.[hc]pp' '*.cc' '*.[ch]' \
+        | grep -v third_party); do
+        clang-format -i --style=file $f -n -Werror
       done
     - |
-      # Run cmake-format
-      git ls-files '*.cmake' 'CMakeLists.txt' | grep -v third_party | xargs cmake-format -i
+      # Run cmake-format check.
+      for f in $(git diff --diff-filter=ACMR --name-only $DIFF_REF '*.cmake' 'CMakeLists.txt' \
+        | grep -v third_party); do
+        cmake-format --check $f
+      done
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
@@ -41,7 +47,7 @@ Style Check:
 .commit-checks-common:
   stage: check
   interruptible: true
-  image: registry.gitlab.com/aomediacodec/aom-testing/alpine3
+  image: registry.gitlab.com/aomediacodec/aom-testing/alpine3:20210901124702
   script:
     - 'echo "Diff ref is: $DIFF_REF"'
     - git fetch --unshallow

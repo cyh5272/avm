@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AOM_DSP_BITREADER_H_
@@ -93,10 +94,22 @@ static INLINE void aom_process_accounting(const aom_reader *r ACCT_STR_PARAM) {
   }
 }
 
+#if CONFIG_THROUGHPUT_ANALYSIS
+static INLINE void aom_update_symb_counts(const aom_reader *r, int is_binary,
+                                          int is_context_coded) {
+#else
 static INLINE void aom_update_symb_counts(const aom_reader *r, int is_binary) {
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
   if (r->accounting != NULL) {
     r->accounting->syms.num_multi_syms += !is_binary;
     r->accounting->syms.num_binary_syms += !!is_binary;
+#if CONFIG_THROUGHPUT_ANALYSIS
+    if (is_context_coded) {
+      r->accounting->syms.num_ctx_coded += 1;
+    } else {
+      r->accounting->syms.num_bypass_coded += 1;
+    }
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
   }
 }
 #endif
@@ -141,7 +154,11 @@ static INLINE int aom_read_(aom_reader *r, int prob ACCT_STR_PARAM) {
 
 #if CONFIG_ACCOUNTING
   if (ACCT_STR_NAME) aom_process_accounting(r, ACCT_STR_NAME);
+#if CONFIG_THROUGHPUT_ANALYSIS
+  aom_update_symb_counts(r, 1, 0);
+#else
   aom_update_symb_counts(r, 1);
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
 #endif
   return bit;
 }
@@ -212,7 +229,11 @@ static INLINE int aom_read_cdf_(aom_reader *r, const aom_cdf_prob *cdf,
 
 #if CONFIG_ACCOUNTING
   if (ACCT_STR_NAME) aom_process_accounting(r, ACCT_STR_NAME);
+#if CONFIG_THROUGHPUT_ANALYSIS
+  aom_update_symb_counts(r, (nsymbs == 2), 1);
+#else
   aom_update_symb_counts(r, (nsymbs == 2));
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
 #endif
   return symb;
 }

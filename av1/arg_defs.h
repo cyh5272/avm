@@ -1,12 +1,13 @@
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #ifndef AOM_AV1_ARG_DEFS_H_
 #define AOM_AV1_ARG_DEFS_H_
@@ -151,6 +152,9 @@ typedef struct av1_codec_arg_definitions {
 #if CONFIG_IST
   arg_def_t enable_ist;
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  arg_def_t enable_ibp;
+#endif
   arg_def_t min_partition_size;
   arg_def_t max_partition_size;
 #if !CONFIG_REMOVE_DUAL_FILTER
@@ -161,9 +165,6 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t enable_order_hint;
   arg_def_t enable_tx64;
   arg_def_t enable_flip_idtx;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  arg_def_t enable_dist_wtd_comp;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   arg_def_t enable_masked_comp;
   arg_def_t enable_onesided_comp;
   arg_def_t enable_interintra_comp;
@@ -183,6 +184,9 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t enable_palette;
   arg_def_t enable_intrabc;
   arg_def_t enable_angle_delta;
+#if CONFIG_OPTFLOW_REFINEMENT
+  arg_def_t enable_opfl_refine;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   arg_def_t enable_trellis_quant;
   arg_def_t enable_qm;
   arg_def_t qm_min;
@@ -222,6 +226,9 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t gf_max_pyr_height;
   arg_def_t max_reference_frames;
   arg_def_t reduced_reference_set;
+#if CONFIG_NEW_REF_SIGNALING
+  arg_def_t explicit_ref_frame_map;
+#endif  // CONFIG_NEW_REF_SIGNALING
   arg_def_t target_seq_level_idx;
   arg_def_t set_min_cr;
   arg_def_t input_color_primaries;
@@ -240,6 +247,9 @@ typedef struct av1_codec_arg_definitions {
 #if CONFIG_NEW_INTER_MODES
   arg_def_t max_drl_refmvs;
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_REF_MV_BANK
+  arg_def_t enable_refmvbank;
+#endif  // CONFIG_REF_MV_BANK
 #endif  // CONFIG_AV1_ENCODER
 } av1_codec_arg_definitions_t;
 

@@ -1,16 +1,18 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <stdbool.h>
 #include "common/rawenc.h"
+#include <stdlib.h>
 
 #define BATCH_SIZE 8
 // When writing greyscale color, batch 8 writes for low bit-depth, 4 writes
@@ -78,9 +80,23 @@ static void raw_write_image_file_or_md5(const aom_image_t *img,
     }
     const unsigned char *buf = img->planes[plane];
     const int stride = img->stride[plane];
-    for (int y = 0; y < h; ++y) {
-      writer_func(file_or_md5, buf, bytes_per_sample, w);
-      buf += stride;
+    if (high_bitdepth && img->bit_depth == 8) {
+      // convert 16-bit buffer to 8-bit (input bitdepth) buffer
+      uint8_t *buf8 = (uint8_t *)malloc(sizeof(*buf8) * w);
+      for (int y = 0; y < h; ++y) {
+        uint16_t *buf16 = (uint16_t *)buf;
+        for (int x = 0; x < w; ++x) {
+          buf8[x] = buf16[x] & 0xff;
+        }
+        writer_func(file_or_md5, buf8, 1, w);
+        buf += stride;
+      }
+      free(buf8);
+    } else {
+      for (int y = 0; y < h; ++y) {
+        writer_func(file_or_md5, buf, bytes_per_sample, w);
+        buf += stride;
+      }
     }
   }
 }

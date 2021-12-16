@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <limits.h>
@@ -277,11 +278,9 @@ static int find_fp_qindex(aom_bit_depth_t bit_depth) {
   aom_clear_system_state();
 #if CONFIG_EXTQUANT
   return av1_find_qindex(FIRST_PASS_Q, bit_depth, 0,
-                         bit_depth == AOM_BITS_8
-                             ? QINDEX_RANGE_8_BITS - 1
-                             : bit_depth == AOM_BITS_10
-                                   ? QINDEX_RANGE_10_BITS - 1
-                                   : QINDEX_RANGE - 1);
+                         bit_depth == AOM_BITS_8    ? QINDEX_RANGE_8_BITS - 1
+                         : bit_depth == AOM_BITS_10 ? QINDEX_RANGE_10_BITS - 1
+                                                    : QINDEX_RANGE - 1);
 #else
   return av1_find_qindex(FIRST_PASS_Q, bit_depth, 0, QINDEX_RANGE - 1);
 #endif
@@ -362,7 +361,11 @@ static int firstpass_intra_prediction(
 #else
   xd->mi[0]->sb_type = bsize;
 #endif
+#if CONFIG_NEW_REF_SIGNALING
+  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
+#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
   set_mi_row_col(xd, tile, mb_row * mb_scale, mi_size_high[bsize],
                  mb_col * mb_scale, mi_size_wide[bsize], mi_params->mi_rows,
                  mi_params->mi_cols);
@@ -690,8 +693,13 @@ static int firstpass_inter_prediction(
     xd->mi[0]->mode = NEWMV;
     xd->mi[0]->mv[0].as_mv = best_mv;
     xd->mi[0]->tx_size = TX_4X4;
+#if CONFIG_NEW_REF_SIGNALING
+    xd->mi[0]->ref_frame[0] = get_closest_pastcur_ref_index(cm);
+    xd->mi[0]->ref_frame[1] = INVALID_IDX;
+#else
     xd->mi[0]->ref_frame[0] = LAST_FRAME;
     xd->mi[0]->ref_frame[1] = NONE_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
     av1_enc_build_inter_predictor(cm, xd, mb_row * mb_scale, mb_col * mb_scale,
                                   NULL, bsize, AOM_PLANE_Y, AOM_PLANE_Y);
     av1_encode_sby_pass1(cpi, x, bsize);
@@ -929,6 +937,11 @@ static void first_pass_tiles(AV1_COMP *cpi) {
   }
 }
 
+#if CONFIG_NEW_REF_SIGNALING
+#define LAST_FRAME_PROXY 0
+#define GOLDEN_FRAME_PROXY 2  // Any proxy index will do
+#endif                        // CONFIG_NEW_REF_SIGNALING
+
 void av1_first_pass_row(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
                         int mb_row) {
   MACROBLOCK *const x = &td->mb;
@@ -952,10 +965,17 @@ void av1_first_pass_row(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   AV1EncRowMultiThreadInfo *const enc_row_mt = &mt_info->enc_row_mt;
   AV1EncRowMultiThreadSync *const row_mt_sync = &tile_data->row_mt_sync;
 
+#if CONFIG_NEW_REF_SIGNALING
+  const YV12_BUFFER_CONFIG *const last_frame =
+      get_ref_frame_yv12_buf(cm, LAST_FRAME_PROXY);
+  const YV12_BUFFER_CONFIG *golden_frame =
+      get_ref_frame_yv12_buf(cm, GOLDEN_FRAME_PROXY);
+#else
   const YV12_BUFFER_CONFIG *const last_frame =
       get_ref_frame_yv12_buf(cm, LAST_FRAME);
   const YV12_BUFFER_CONFIG *golden_frame =
       get_ref_frame_yv12_buf(cm, GOLDEN_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
   const YV12_BUFFER_CONFIG *alt_ref_frame = NULL;
   const int alt_ref_offset =
       FIRST_PASS_ALT_REF_DISTANCE -
@@ -1103,10 +1123,17 @@ void av1_first_pass(AV1_COMP *cpi, const int64_t ts_duration) {
 
   av1_init_tile_data(cpi);
 
+#if CONFIG_NEW_REF_SIGNALING
+  const YV12_BUFFER_CONFIG *const last_frame =
+      get_ref_frame_yv12_buf(cm, LAST_FRAME_PROXY);
+  const YV12_BUFFER_CONFIG *golden_frame =
+      get_ref_frame_yv12_buf(cm, GOLDEN_FRAME_PROXY);
+#else
   const YV12_BUFFER_CONFIG *const last_frame =
       get_ref_frame_yv12_buf(cm, LAST_FRAME);
   const YV12_BUFFER_CONFIG *golden_frame =
       get_ref_frame_yv12_buf(cm, GOLDEN_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
   YV12_BUFFER_CONFIG *const this_frame = &cm->cur_frame->buf;
   // First pass code requires valid last and new frame buffers.
   assert(this_frame != NULL);
@@ -1200,9 +1227,15 @@ void av1_first_pass(AV1_COMP *cpi, const int64_t ts_duration) {
        ((this_frame_stats->intra_error /
          DOUBLE_DIVIDE_CHECK(this_frame_stats->coded_error)) > 2.0))) {
     if (golden_frame != NULL) {
+#if CONFIG_NEW_REF_SIGNALING
+      assign_frame_buffer_p(
+          &cm->ref_frame_map[get_ref_frame_map_idx(cm, GOLDEN_FRAME_PROXY)],
+          cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME_PROXY)]);
+#else
       assign_frame_buffer_p(
           &cm->ref_frame_map[get_ref_frame_map_idx(cm, GOLDEN_FRAME)],
           cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME)]);
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
     twopass->sr_update_lag = 1;
   } else {
@@ -1212,17 +1245,32 @@ void av1_first_pass(AV1_COMP *cpi, const int64_t ts_duration) {
   aom_extend_frame_borders(this_frame, num_planes);
 
   // The frame we just compressed now becomes the last frame.
+#if CONFIG_NEW_REF_SIGNALING
+  assign_frame_buffer_p(
+      &cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME_PROXY)],
+      cm->cur_frame);
+#else
   assign_frame_buffer_p(
       &cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME)], cm->cur_frame);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   // Special case for the first frame. Copy into the GF buffer as a second
   // reference.
+#if CONFIG_NEW_REF_SIGNALING
+  if (current_frame->frame_number == 0 &&
+      get_ref_frame_map_idx(cm, GOLDEN_FRAME_PROXY) != INVALID_IDX) {
+    assign_frame_buffer_p(
+        &cm->ref_frame_map[get_ref_frame_map_idx(cm, GOLDEN_FRAME_PROXY)],
+        cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME_PROXY)]);
+  }
+#else
   if (current_frame->frame_number == 0 &&
       get_ref_frame_map_idx(cm, GOLDEN_FRAME) != INVALID_IDX) {
     assign_frame_buffer_p(
         &cm->ref_frame_map[get_ref_frame_map_idx(cm, GOLDEN_FRAME)],
         cm->ref_frame_map[get_ref_frame_map_idx(cm, LAST_FRAME)]);
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   print_reconstruction_frame(last_frame, current_frame->frame_number,
                              /*do_print=*/0);

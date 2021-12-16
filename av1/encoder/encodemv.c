@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <math.h>
@@ -232,7 +233,7 @@ int_mv av1_get_ref_mv_from_stack(int ref_idx,
   const CANDIDATE_MV *curr_ref_mv_stack =
       mbmi_ext->ref_mv_stack[ref_frame_type];
 
-  if (ref_frame[1] > INTRA_FRAME) {
+  if (is_inter_ref_frame(ref_frame[1])) {
     assert(ref_idx == 0 || ref_idx == 1);
     return ref_idx ? curr_ref_mv_stack[ref_mv_idx].comp_mv
                    : curr_ref_mv_stack[ref_mv_idx].this_mv;
@@ -248,7 +249,7 @@ int_mv av1_get_ref_mv(const MACROBLOCK *x, int ref_idx) {
   const MACROBLOCKD *xd = &x->e_mbd;
   const MB_MODE_INFO *mbmi = xd->mi[0];
   int ref_mv_idx = mbmi->ref_mv_idx;
-  if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
+  if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
     assert(has_second_ref(mbmi));
 #if !CONFIG_NEW_INTER_MODES
     ref_mv_idx += 1;
@@ -276,7 +277,11 @@ int_mv av1_find_best_ref_mv_from_stack(int allow_hp,
                                        int is_integer) {
   int_mv mv;
   bool found_ref_mv = false;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   int range = AOMMIN(mbmi_ext->ref_mv_count[ref_frame], MAX_REF_MV_STACK_SIZE);
   for (int i = 0; i < range; i++) {
     mv = av1_get_ref_mv_from_stack(0, ref_frames, i, mbmi_ext);
@@ -296,7 +301,11 @@ int_mv av1_find_first_ref_mv_from_stack(int allow_hp,
                                         int is_integer) {
   int_mv mv;
   const int ref_idx = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 0, mbmi_ext);
   lower_mv_precision(&mv.as_mv, allow_hp, is_integer);
   return mv;
@@ -308,7 +317,11 @@ void av1_find_best_ref_mvs_from_stack(int allow_hp,
                                       int_mv *nearest_mv, int_mv *near_mv,
                                       int is_integer) {
   const int ref_idx = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
+#else
   MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
+#endif  // CONFIG_NEW_REF_SIGNALING
   *nearest_mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 0, mbmi_ext);
   lower_mv_precision(&nearest_mv->as_mv, allow_hp, is_integer);
   *near_mv = av1_get_ref_mv_from_stack(ref_idx, ref_frames, 1, mbmi_ext);

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "config/aom_config.h"
@@ -327,9 +328,16 @@ void av1_fwd_stxfm(tran_low_t *coeff, TxfmParam *txfm_param) {
     const int log2width = tx_size_wide_log2[txfm_param->tx_size];
     const int sb_size = (width >= 8 && height >= 8) ? 8 : 4;
     const int16_t *scan_order_in;
+#if CONFIG_IST_FIX_B076
+    // Align scan order of IST with primary transform scan order
+    const SCAN_ORDER *scan_order_out =
+        get_scan(txfm_param->tx_size, txfm_param->tx_type);
+    const int16_t *const scan = scan_order_out->scan;
+#else
     const int16_t *scan_order_out = (sb_size == 4)
                                         ? stx_scan_orders_4x4[log2width - 2]
                                         : stx_scan_orders_8x8[log2width - 2];
+#endif  // CONFIG_IST_FIX_B076
     tran_low_t buf0[64] = { 0 }, buf1[64] = { 0 };
     tran_low_t *tmp = buf0;
     tran_low_t *src = coeff;
@@ -357,7 +365,12 @@ void av1_fwd_stxfm(tran_low_t *coeff, TxfmParam *txfm_param) {
     memset(coeff, 0, width * height * sizeof(tran_low_t));
     tmp = buf1;
     for (int i = 0; i < sb_size * sb_size; i++) {
+#if CONFIG_IST_FIX_B076
+      // Align scan order of IST with primary transform scan order
+      coeff[scan[i]] = *tmp++;
+#else
       coeff[scan_order_out[i]] = *tmp++;
+#endif  // CONFIG_IST_FIX_B076
     }
   }
 }

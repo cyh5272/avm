@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <math.h>
@@ -16,6 +17,18 @@
 #include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
 
+#if CONFIG_AIMC
+PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi) {
+  if (!mi) return DC_PRED;
+#if CONFIG_SDP
+  if (is_inter_block(mi, SHARED_PART) || is_intrabc_block(mi, SHARED_PART))
+    return DC_PRED;
+#else
+  if (is_inter_block(mi) || is_intrabc_block(mi)) return DC_PRED;
+#endif  // CONFIG_SDP
+  return mi->joint_y_mode_delta_angle;
+}
+#else
 PREDICTION_MODE av1_left_block_mode(const MB_MODE_INFO *left_mi) {
   if (!left_mi) return DC_PRED;
 #if CONFIG_SDP
@@ -37,6 +50,7 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
 #endif
   return above_mi->mode;
 }
+#endif  // CONFIG_AIMC
 
 void av1_set_entropy_contexts(const MACROBLOCKD *xd,
                               struct macroblockd_plane *pd, int plane,
