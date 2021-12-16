@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_BLOCKD_H_
@@ -18,6 +19,7 @@
 #include "aom_ports/mem.h"
 #include "aom_scale/yv12config.h"
 
+#include "av1/common/alloccommon.h"
 #include "av1/common/common_data.h"
 #include "av1/common/quant_common.h"
 #include "av1/common/entropy.h"
@@ -109,6 +111,12 @@ static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
     NEWMV,      // NEW_NEARMV
     GLOBALMV,   // GLOBAL_GLOBALMV
     NEWMV,      // NEW_NEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+    NEARMV,  // NEAR_NEARMV_OPTFLOW
+    NEARMV,  // NEAR_NEWMV_OPTFLOW
+    NEWMV,   // NEW_NEARMV_OPTFLOW
+    NEWMV,   // NEW_NEWMV_OPTFLOW
+#endif       // CONFIG_OPTFLOW_REFINEMENT
   };
   assert(NELEMENTS(lut) == MB_MODE_COUNT);
   assert(is_inter_compound_mode(mode) || is_inter_singleref_mode(mode));
@@ -148,6 +156,12 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
     NEARMV,     // NEW_NEARMV
     GLOBALMV,   // GLOBAL_GLOBALMV
     NEWMV,      // NEW_NEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+    NEARMV,  // NEAR_NEARMV_OPTFLOW
+    NEWMV,   // NEAR_NEWMV_OPTFLOW
+    NEARMV,  // NEW_NEARMV_OPTFLOW
+    NEWMV,   // NEW_NEWMV_OPTFLOW
+#endif       // CONFIG_OPTFLOW_REFINEMENT
   };
   assert(NELEMENTS(lut) == MB_MODE_COUNT);
   assert(is_inter_compound_mode(mode));
@@ -156,12 +170,28 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
 
 static INLINE int have_nearmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEARMV || mode == NEAR_NEARMV || mode == NEAR_NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+          mode == NEAR_NEARMV_OPTFLOW || mode == NEAR_NEWMV_OPTFLOW ||
+          mode == NEW_NEARMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
           mode == NEW_NEARMV);
+}
+
+static INLINE int have_nearmv_newmv_in_inter_mode(PREDICTION_MODE mode) {
+  return mode == NEAR_NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+         mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+         mode == NEW_NEARMV;
 }
 
 #if CONFIG_NEW_INTER_MODES
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+          mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
+          mode == NEW_NEWMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
           mode == NEW_NEARMV);
 }
 static INLINE int have_drl_index(PREDICTION_MODE mode) {
@@ -236,6 +266,21 @@ typedef struct {
   DIFFWTD_MASK_TYPE mask_type;
   COMPOUND_TYPE type;
 } INTERINTER_COMPOUND_DATA;
+
+#if CONFIG_OPTFLOW_REFINEMENT
+// Macros for optical flow experiment where offsets are added in nXn blocks
+// rather than adding a single offset to the entire prediction unit.
+#define OF_MIN_BSIZE_LOG2 2
+#define OF_BSIZE_LOG2 3
+// Block size to use to divide up the prediction unit
+#define OF_MIN_BSIZE (1 << OF_MIN_BSIZE_LOG2)
+#define OF_BSIZE (1 << OF_BSIZE_LOG2)
+#define N_OF_OFFSETS_1D (1 << (MAX_SB_SIZE_LOG2 - OF_BSIZE_LOG2))
+// Maximum number of offsets to be computed
+#define N_OF_OFFSETS (N_OF_OFFSETS_1D * N_OF_OFFSETS_1D)
+#else
+#define N_OF_OFFSETS 1
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
 #define INTER_TX_SIZE_BUF_LEN 16
 #define TXK_TYPE_BUF_LEN 64
@@ -319,6 +364,18 @@ typedef struct MB_MODE_INFO {
   /*! \brief Reference line index for multiple reference line selection. */
   uint8_t mrl_index;
 #endif
+#if CONFIG_AIMC
+  /*! \brief mode index of y mode and y delta angle after re-ordering. */
+  uint8_t y_mode_idx;
+  /*! \brief mode index of uv mode after re-ordering. */
+  uint8_t uv_mode_idx;
+  /*! \brief joint mode index of y mode and y delta angle before re-ordering. */
+  uint8_t joint_y_mode_delta_angle;
+  /*! \brief re-ordered mode list for y mode and y delta angle. */
+  uint8_t y_intra_mode_list[LUMA_MODE_COUNT];
+  /*! \brief re-ordered mode list for uv mode. */
+  uint8_t uv_intra_mode_list[UV_INTRA_MODES];
+#endif  // CONFIG_AIMC
   /**@}*/
 
   /*****************************************************************************
@@ -371,8 +428,6 @@ typedef struct MB_MODE_INFO {
 #endif
   /*! \brief Indicates if masked compound is used(1) or not (0). */
   uint8_t comp_group_idx : 1;
-  /*! \brief Indicates whether dist_wtd_comp(0) is used or not (0). */
-  uint8_t compound_idx : 1;
   /*! \brief Whether to use interintra wedge */
   uint8_t use_wedge_interintra : 1;
   /*! \brief CDEF strength per BLOCK_64X64 */
@@ -434,20 +489,39 @@ static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
   return uv2y[mode];
 }
 
+static INLINE int is_inter_ref_frame(MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_NEW_REF_SIGNALING
+  return ref_frame != INTRA_FRAME_NRS && ref_frame != INVALID_IDX;
+#else
+  return ref_frame > INTRA_FRAME;
+#endif  // CONFIG_NEW_REF_SIGNALING
+}
+
 #if CONFIG_SDP
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi, int tree_type) {
-  return is_intrabc_block(mbmi, tree_type) || mbmi->ref_frame[0] > INTRA_FRAME;
+#if CONFIG_NEW_REF_SIGNALING
+  return is_intrabc_block(mbmi, tree_type) ||
+         mbmi->ref_frame[0] != INTRA_FRAME_NRS;
+#else
+  return is_intrabc_block(mbmi, tree_type) ||
+         is_inter_ref_frame(mbmi->ref_frame[0]);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 #else
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi) {
-  return is_intrabc_block(mbmi) || mbmi->ref_frame[0] > INTRA_FRAME;
+#if CONFIG_NEW_REF_SIGNALING
+  return is_intrabc_block(mbmi) || mbmi->ref_frame[0] != INTRA_FRAME_NRS;
+#else
+  return is_intrabc_block(mbmi) || is_inter_ref_frame(mbmi->ref_frame[0]);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 #endif
 
 static INLINE int has_second_ref(const MB_MODE_INFO *mbmi) {
-  return mbmi->ref_frame[1] > INTRA_FRAME;
+  return is_inter_ref_frame(mbmi->ref_frame[1]);
 }
 
+#if !CONFIG_NEW_REF_SIGNALING
 static INLINE int has_uni_comp_refs(const MB_MODE_INFO *mbmi) {
   return has_second_ref(mbmi) && (!((mbmi->ref_frame[0] >= BWDREF_FRAME) ^
                                     (mbmi->ref_frame[1] >= BWDREF_FRAME)));
@@ -484,10 +558,15 @@ static INLINE MV_REFERENCE_FRAME comp_ref1(int ref_idx) {
   assert(NELEMENTS(lut) == TOTAL_UNIDIR_COMP_REFS);
   return lut[ref_idx];
 }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_AIMC
+PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi);
+#else
 PREDICTION_MODE av1_left_block_mode(const MB_MODE_INFO *left_mi);
 
 PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi);
+#endif  // CONFIG_AIMC
 
 static INLINE int is_global_mv_block(const MB_MODE_INFO *const mbmi,
                                      TransformationType type) {
@@ -647,6 +726,30 @@ struct scale_factors;
 
 /*!\endcond */
 
+#if CONFIG_REF_MV_BANK
+#define REF_MV_BANK_SIZE 4
+
+/*! \brief Variables related to reference MV bank. */
+typedef struct {
+  /*!
+   * Number of ref MVs in the buffer.
+   */
+  int rmb_count[MODE_CTX_REF_FRAMES];
+  /*!
+   * Index corresponding to the first ref MV in the buffer.
+   */
+  int rmb_start_idx[MODE_CTX_REF_FRAMES];
+  /*!
+   * Circular buffer storing the ref MVs.
+   */
+  CANDIDATE_MV rmb_buffer[MODE_CTX_REF_FRAMES][REF_MV_BANK_SIZE];
+  /*!
+   * Total number of mbmi updates conducted in SB
+   */
+  int rmb_sb_hits;
+} REF_MV_BANK;
+#endif  // CONFIG_REF_MV_BANK
+
 /*! \brief Variables related to current coding block.
  *
  * This is a common set of variables used by both encoder and decoder.
@@ -666,6 +769,16 @@ typedef struct macroblockd {
    * Same as cm->mi_params.mi_stride, copied here for convenience.
    */
   int mi_stride;
+
+#if CONFIG_REF_MV_BANK
+  /**
+   * \name Reference MV bank info.
+   */
+  /**@{*/
+  REF_MV_BANK ref_mv_bank;     /*!< Ref mv bank to update */
+  REF_MV_BANK *ref_mv_bank_pt; /*!< Pointer to bank to refer to */
+  /**@}*/
+#endif  // CONFIG_REF_MV_BANK
 
   /*!
    * True if current block transmits chroma information.
@@ -729,6 +842,18 @@ typedef struct macroblockd {
    * up_available == true; otherwise NULL.
    */
   MB_MODE_INFO *above_mbmi;
+#if CONFIG_AIMC
+  /*!
+   * MB_MODE_INFO for 4x4 block to the bottom-left of the current block, if
+   * left_available == true; otherwise NULL.
+   */
+  MB_MODE_INFO *bottom_left_mbmi;
+  /*!
+   * MB_MODE_INFO for 4x4 block to the top-right of the current block, if
+   * up_available == true; otherwise NULL.
+   */
+  MB_MODE_INFO *above_right_mbmi;
+#endif  // CONFIG_AIMC
   /*!
    * Above chroma reference block if is_chroma_ref == true for the current block
    * and chroma_up_available == true; otherwise NULL.
@@ -905,7 +1030,11 @@ typedef struct macroblockd {
    * Counts of each reference frame in the above and left neighboring blocks.
    * NOTE: Take into account both single and comp references.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  uint8_t neighbors_ref_counts[INTER_REFS_PER_FRAME];
+#else
   uint8_t neighbors_ref_counts[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   /*!
    * Current CDFs of all the symbols for the current tile.
@@ -1047,6 +1176,18 @@ typedef struct macroblockd {
   /** ccso blk v */
   uint8_t ccso_blk_v;
 #endif
+
+#if CONFIG_CONTEXT_DERIVATION
+  /** buffer to store AOM_PLANE_U txfm coefficient signs */
+  int32_t tmp_sign[1024];
+  /** variable to store AOM_PLANE_U eob value */
+  uint16_t eob_u;
+#endif  // CONFIG_CONTEXT_DERIVATION
+
+#if CONFIG_CONTEXT_DERIVATION
+  /** variable to store eob_u flag */
+  uint8_t eob_u_flag;
+#endif  // CONFIG_CONTEXT_DERIVATION
 } MACROBLOCKD;
 
 /*!\cond */
@@ -1431,8 +1572,14 @@ static INLINE int block_signals_sec_tx_type(const MACROBLOCKD *xd,
   const int height = tx_size_high[tx_size];
   const int sb_size = (width >= 8 && height >= 8) ? 8 : 4;
   bool ist_eob = 1;
+#if CONFIG_IST_FIX_B076
+  // Updated EOB condition
+  if (((sb_size == 4) && (eob > IST_4x4_HEIGHT)) ||
+      ((sb_size == 8) && (eob > IST_8x8_HEIGHT))) {
+#else
   if (((sb_size == 4) && (eob > IST_4x4_HEIGHT - 1)) ||
       ((sb_size == 8) && (eob > IST_8x8_HEIGHT - 1))) {
+#endif  // CONFIG_IST_FIX_B076
     ist_eob = 0;
   }
   const int depth = tx_size_to_depth(tx_size, bs);
@@ -1625,8 +1772,13 @@ void av1_set_entropy_contexts(const MACROBLOCKD *xd,
 
 #define MAX_INTERINTRA_SB_SQUARE 32 * 32
 static INLINE int is_interintra_mode(const MB_MODE_INFO *mbmi) {
-  return (mbmi->ref_frame[0] > INTRA_FRAME &&
+#if CONFIG_NEW_REF_SIGNALING
+  return (is_inter_ref_frame(mbmi->ref_frame[0]) &&
+          mbmi->ref_frame[1] == INTRA_FRAME_NRS);
+#else
+  return (is_inter_ref_frame(mbmi->ref_frame[0]) &&
           mbmi->ref_frame[1] == INTRA_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int is_interintra_allowed_bsize(const BLOCK_SIZE bsize) {
@@ -1638,7 +1790,7 @@ static INLINE int is_interintra_allowed_mode(const PREDICTION_MODE mode) {
 }
 
 static INLINE int is_interintra_allowed_ref(const MV_REFERENCE_FRAME rf[2]) {
-  return (rf[0] > INTRA_FRAME) && (rf[1] <= INTRA_FRAME);
+  return is_inter_ref_frame(rf[0]) && !is_inter_ref_frame(rf[1]);
 }
 
 static INLINE int is_interintra_allowed(const MB_MODE_INFO *mbmi) {
@@ -1665,8 +1817,13 @@ static INLINE int is_interintra_allowed_bsize_group(int group) {
 }
 
 static INLINE int is_interintra_pred(const MB_MODE_INFO *mbmi) {
-  return mbmi->ref_frame[0] > INTRA_FRAME &&
+#if CONFIG_NEW_REF_SIGNALING
+  return is_inter_ref_frame(mbmi->ref_frame[0]) &&
+         mbmi->ref_frame[1] == INTRA_FRAME_NRS && is_interintra_allowed(mbmi);
+#else
+  return is_inter_ref_frame(mbmi->ref_frame[0]) &&
          mbmi->ref_frame[1] == INTRA_FRAME && is_interintra_allowed(mbmi);
+#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int get_vartx_max_txsize(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
@@ -1707,7 +1864,11 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
 #else
   if (is_motion_variation_allowed_bsize(mbmi->sb_type) &&
 #endif
+#if CONFIG_NEW_REF_SIGNALING
+      is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME_NRS &&
+#else
       is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
+#endif  // CONFIG_NEW_REF_SIGNALING
       is_motion_variation_allowed_compound(mbmi)) {
     if (!check_num_overlappable_neighbors(mbmi)) return SIMPLE_TRANSLATION;
     assert(!has_second_ref(mbmi));

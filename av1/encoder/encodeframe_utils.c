@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "aom_ports/system_state.h"
@@ -362,7 +363,7 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
 
   if (dry_run) return;
 
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   {
     unsigned int *const mode_chosen_counts =
         (unsigned int *)cpi->mode_chosen_counts;  // Cast const away.
@@ -388,7 +389,7 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
       ++mode_chosen_counts[ctx->best_mode_index];
     }
   }
-#endif
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   if (!frame_is_intra_only(cm)) {
 #if CONFIG_SDP
     if (is_inter_block(mi_addr, xd->tree_type)) {
@@ -520,11 +521,17 @@ static void update_palette_cdf(MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
 }
 
 void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
-                         MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
+                         MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi
+#if !CONFIG_AIMC
+                         ,
                          const MB_MODE_INFO *above_mi,
-                         const MB_MODE_INFO *left_mi, const int intraonly) {
+                         const MB_MODE_INFO *left_mi, const int intraonly
+#endif  // !CONFIG_AIMC
+) {
   FRAME_CONTEXT *fc = xd->tile_ctx;
+#if !CONFIG_AIMC
   const PREDICTION_MODE y_mode = mbmi->mode;
+#endif  // !CONFIG_AIMC
   (void)counts;
 #if CONFIG_SDP
   const BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
@@ -534,21 +541,37 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_SDP
   if (xd->tree_type != CHROMA_PART) {
 #endif
-    if (intraonly) {
-#if CONFIG_ENTROPY_STATS
-      const PREDICTION_MODE above = av1_above_block_mode(above_mi);
-      const PREDICTION_MODE left = av1_left_block_mode(left_mi);
-      const int above_ctx = intra_mode_context[above];
-      const int left_ctx = intra_mode_context[left];
-      ++counts->kf_y_mode[above_ctx][left_ctx][y_mode];
-#endif  // CONFIG_ENTROPY_STATS
-      update_cdf(get_y_mode_cdf(fc, above_mi, left_mi), y_mode, INTRA_MODES);
+#if CONFIG_AIMC
+    const int context = get_y_mode_idx_ctx(xd);
+    const int mode_idx = mbmi->y_mode_idx;
+    int mode_set_index = mode_idx < FIRST_MODE_COUNT ? 0 : 1;
+    mode_set_index += ((mode_idx - FIRST_MODE_COUNT) / SECOND_MODE_COUNT);
+    update_cdf(fc->y_mode_set_cdf, mode_set_index, INTRA_MODE_SETS);
+    if (mode_set_index == 0) {
+      update_cdf(fc->y_mode_idx_cdf_0[context], mode_idx, FIRST_MODE_COUNT);
     } else {
-#if CONFIG_ENTROPY_STATS
-      ++counts->y_mode[size_group_lookup[bsize]][y_mode];
-#endif  // CONFIG_ENTROPY_STATS
-      update_cdf(fc->y_mode_cdf[size_group_lookup[bsize]], y_mode, INTRA_MODES);
+      update_cdf(fc->y_mode_idx_cdf_1[context],
+                 mode_idx - FIRST_MODE_COUNT -
+                     SECOND_MODE_COUNT * (mode_set_index - 1),
+                 SECOND_MODE_COUNT);
     }
+#else
+  if (intraonly) {
+#if CONFIG_ENTROPY_STATS
+    const PREDICTION_MODE above = av1_above_block_mode(above_mi);
+    const PREDICTION_MODE left = av1_left_block_mode(left_mi);
+    const int above_ctx = intra_mode_context[above];
+    const int left_ctx = intra_mode_context[left];
+    ++counts->kf_y_mode[above_ctx][left_ctx][y_mode];
+#endif  // CONFIG_ENTROPY_STATS
+    update_cdf(get_y_mode_cdf(fc, above_mi, left_mi), y_mode, INTRA_MODES);
+  } else {
+#if CONFIG_ENTROPY_STATS
+    ++counts->y_mode[size_group_lookup[bsize]][y_mode];
+#endif  // CONFIG_ENTROPY_STATS
+    update_cdf(fc->y_mode_cdf[size_group_lookup[bsize]], y_mode, INTRA_MODES);
+  }
+#endif  // CONFIG_AIMC
 #if CONFIG_MRLS
     if (cm->seq_params.enable_mrls && av1_is_directional_mode(mbmi->mode)) {
       update_cdf(fc->mrl_index_cdf, mbmi->mrl_index, MRL_LINE_NUMBER);
@@ -582,37 +605,22 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
                    FILTER_INTRA_MODES);
       }
     }
+#if !CONFIG_AIMC
     if (av1_is_directional_mode(mbmi->mode) && av1_use_angle_delta(bsize)) {
 #if CONFIG_ENTROPY_STATS
       ++counts->angle_delta[mbmi->mode - V_PRED]
                            [mbmi->angle_delta[PLANE_TYPE_Y] + MAX_ANGLE_DELTA];
 #endif
 
-#if CONFIG_ORIP
-      int signal_intra_filter =
-          av1_signal_orip_for_horver_modes(cm, mbmi, PLANE_TYPE_Y, bsize);
-      if (signal_intra_filter) {
 #if CONFIG_SDP
-        update_cdf(fc->angle_delta_cdf_hv[PLANE_TYPE_Y][mbmi->mode - V_PRED],
+      update_cdf(fc->angle_delta_cdf[PLANE_TYPE_Y][mbmi->mode - V_PRED],
 #else
-        update_cdf(fc->angle_delta_cdf_hv[mbmi->mode - V_PRED],
+      update_cdf(fc->angle_delta_cdf[mbmi->mode - V_PRED],
 #endif
-                   get_angle_delta_to_idx(mbmi->angle_delta[PLANE_TYPE_Y]),
-                   2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA);
-      } else {
-#endif
-#if CONFIG_SDP
-        update_cdf(fc->angle_delta_cdf[PLANE_TYPE_Y][mbmi->mode - V_PRED],
-#else
-    update_cdf(fc->angle_delta_cdf[mbmi->mode - V_PRED],
-#endif
-                   mbmi->angle_delta[PLANE_TYPE_Y] + MAX_ANGLE_DELTA,
-                   2 * MAX_ANGLE_DELTA + 1);
-
-#if CONFIG_ORIP
-      }
-#endif
+                 mbmi->angle_delta[PLANE_TYPE_Y] + MAX_ANGLE_DELTA,
+                 2 * MAX_ANGLE_DELTA + 1);
     }
+#endif  // !CONFIG_AIMC
 #if CONFIG_SDP
   }
 #endif
@@ -623,11 +631,17 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #endif
     const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
     const CFL_ALLOWED_TYPE cfl_allowed = is_cfl_allowed(xd);
-#if CONFIG_ENTROPY_STATS
+#if CONFIG_ENTROPY_STATS && !CONFIG_AIMC
     ++counts->uv_mode[cfl_allowed][y_mode][uv_mode];
-#endif  // CONFIG_ENTROPY_STATS
-    update_cdf(fc->uv_mode_cdf[cfl_allowed][y_mode], uv_mode,
+#endif  // CONFIG_ENTROPY_STATS && !CONFIG_AIMC
+#if CONFIG_AIMC
+    const int uv_context = av1_is_directional_mode(mbmi->mode) ? 1 : 0;
+    update_cdf(fc->uv_mode_cdf[cfl_allowed][uv_context], mbmi->uv_mode_idx,
                UV_INTRA_MODES - !cfl_allowed);
+#else
+  update_cdf(fc->uv_mode_cdf[cfl_allowed][y_mode], uv_mode,
+             UV_INTRA_MODES - !cfl_allowed);
+#endif  // CONFIG_AIMC
     if (uv_mode == UV_CFL_PRED) {
       const int8_t joint_sign = mbmi->cfl_alpha_signs;
       const uint8_t idx = mbmi->cfl_alpha_idx;
@@ -653,6 +667,7 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
         update_cdf(cdf_v, CFL_IDX_V(idx), CFL_ALPHABET_SIZE);
       }
     }
+#if !CONFIG_AIMC
     if (av1_is_directional_mode(get_uv_mode(uv_mode)) &&
         av1_use_angle_delta(bsize)) {
 #if CONFIG_ENTROPY_STATS
@@ -669,11 +684,12 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
                    mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA,
                    2 * MAX_ANGLE_DELTA + 1);
 #else
-    update_cdf(fc->angle_delta_cdf[uv_mode - UV_V_PRED],
-               mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA,
-               2 * MAX_ANGLE_DELTA + 1);
+      update_cdf(fc->angle_delta_cdf[uv_mode - UV_V_PRED],
+                 mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA,
+                 2 * MAX_ANGLE_DELTA + 1);
 #endif
     }
+#endif  // !CONFIG_AIMC
 #if CONFIG_SDP
   }
 #endif
@@ -1120,11 +1136,10 @@ int av1_get_q_for_deltaq_objective(AV1_COMP *const cpi, BLOCK_SIZE bsize,
   offset = AOMMAX(offset, -delta_q_info->delta_q_res * 9 + 1);
   int qindex = cm->quant_params.base_qindex + offset;
 #if CONFIG_EXTQUANT
-  qindex = AOMMIN(qindex, cm->seq_params.bit_depth == AOM_BITS_8
-                              ? MAXQ_8_BITS
-                              : cm->seq_params.bit_depth == AOM_BITS_10
-                                    ? MAXQ_10_BITS
-                                    : MAXQ);
+  qindex =
+      AOMMIN(qindex, cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+                     : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                               : MAXQ);
 #else
   qindex = AOMMIN(qindex, MAXQ);
 #endif
@@ -1216,8 +1231,15 @@ static void avg_nmv(nmv_context *nmv_left, nmv_context *nmv_tr, int wt_left,
 void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                          int wt_left, int wt_tr) {
   AVERAGE_CDF(ctx_left->txb_skip_cdf, ctx_tr->txb_skip_cdf, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  AVERAGE_CDF(ctx_left->v_txb_skip_cdf, ctx_tr->v_txb_skip_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
   AVERAGE_CDF(ctx_left->eob_extra_cdf, ctx_tr->eob_extra_cdf, 2);
   AVERAGE_CDF(ctx_left->dc_sign_cdf, ctx_tr->dc_sign_cdf, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  AVERAGE_CDF(ctx_left->v_dc_sign_cdf, ctx_tr->v_dc_sign_cdf, 2);
+  AVERAGE_CDF(ctx_left->v_ac_sign_cdf, ctx_tr->v_ac_sign_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
   AVERAGE_CDF(ctx_left->eob_flag_cdf16, ctx_tr->eob_flag_cdf16, 5);
   AVERAGE_CDF(ctx_left->eob_flag_cdf32, ctx_tr->eob_flag_cdf32, 6);
   AVERAGE_CDF(ctx_left->eob_flag_cdf64, ctx_tr->eob_flag_cdf64, 7);
@@ -1240,8 +1262,13 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->refmv_cdf, ctx_tr->refmv_cdf, 2);
   AVERAGE_CDF(ctx_left->drl_cdf, ctx_tr->drl_cdf, 2);
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  AVERAGE_CDF(ctx_left->inter_compound_mode_cdf,
+              ctx_tr->inter_compound_mode_cdf, INTER_COMPOUND_REF_TYPES);
+#else
   AVERAGE_CDF(ctx_left->inter_compound_mode_cdf,
               ctx_tr->inter_compound_mode_cdf, INTER_COMPOUND_MODES);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   AVERAGE_CDF(ctx_left->compound_type_cdf, ctx_tr->compound_type_cdf,
               MASKED_COMPOUND_TYPES);
   AVERAGE_CDF(ctx_left->wedge_idx_cdf, ctx_tr->wedge_idx_cdf, 16);
@@ -1268,10 +1295,12 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->palette_uv_mode_cdf, ctx_tr->palette_uv_mode_cdf, 2);
   AVERAGE_CDF(ctx_left->comp_inter_cdf, ctx_tr->comp_inter_cdf, 2);
   AVERAGE_CDF(ctx_left->single_ref_cdf, ctx_tr->single_ref_cdf, 2);
+  AVERAGE_CDF(ctx_left->comp_ref_cdf, ctx_tr->comp_ref_cdf, 2);
+#if !CONFIG_NEW_REF_SIGNALING
   AVERAGE_CDF(ctx_left->comp_ref_type_cdf, ctx_tr->comp_ref_type_cdf, 2);
   AVERAGE_CDF(ctx_left->uni_comp_ref_cdf, ctx_tr->uni_comp_ref_cdf, 2);
-  AVERAGE_CDF(ctx_left->comp_ref_cdf, ctx_tr->comp_ref_cdf, 2);
   AVERAGE_CDF(ctx_left->comp_bwdref_cdf, ctx_tr->comp_bwdref_cdf, 2);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_NEW_TX_PARTITION
   // Square blocks
   AVERAGE_CDF(ctx_left->inter_4way_txfm_partition_cdf[0],
@@ -1286,13 +1315,15 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #else   // CONFIG_NEW_TX_PARTITION
   AVERAGE_CDF(ctx_left->txfm_partition_cdf, ctx_tr->txfm_partition_cdf, 2);
 #endif  // CONFIG_NEW_TX_PARTITION
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  AVERAGE_CDF(ctx_left->compound_index_cdf, ctx_tr->compound_index_cdf, 2);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   AVERAGE_CDF(ctx_left->comp_group_idx_cdf, ctx_tr->comp_group_idx_cdf, 2);
   AVERAGE_CDF(ctx_left->skip_mode_cdfs, ctx_tr->skip_mode_cdfs, 2);
   AVERAGE_CDF(ctx_left->skip_txfm_cdfs, ctx_tr->skip_txfm_cdfs, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  AVERAGE_CDF(ctx_left->intra_inter_cdf[0], ctx_tr->intra_inter_cdf[0], 2);
+  AVERAGE_CDF(ctx_left->intra_inter_cdf[1], ctx_tr->intra_inter_cdf[1], 2);
+#else
   AVERAGE_CDF(ctx_left->intra_inter_cdf, ctx_tr->intra_inter_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
   avg_nmv(&ctx_left->nmvc, &ctx_tr->nmvc, wt_left, wt_tr);
   avg_nmv(&ctx_left->ndvc, &ctx_tr->ndvc, wt_left, wt_tr);
   AVERAGE_CDF(ctx_left->intrabc_cdf, ctx_tr->intrabc_cdf, 2);
@@ -1310,7 +1341,16 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #if CONFIG_MRLS
   AVERAGE_CDF(ctx_left->mrl_index_cdf, ctx_tr->mrl_index_cdf, MRL_LINE_NUMBER);
 #endif
+#if CONFIG_AIMC
+  AVERAGE_CDF(ctx_left->y_mode_set_cdf, ctx_tr->y_mode_set_cdf,
+              INTRA_MODE_SETS);
+  AVERAGE_CDF(ctx_left->y_mode_idx_cdf_0, ctx_tr->y_mode_idx_cdf_0,
+              FIRST_MODE_COUNT);
+  AVERAGE_CDF(ctx_left->y_mode_idx_cdf_1, ctx_tr->y_mode_idx_cdf_1,
+              SECOND_MODE_COUNT);
+#else
   AVERAGE_CDF(ctx_left->y_mode_cdf, ctx_tr->y_mode_cdf, INTRA_MODES);
+#endif  // CONFIG_AIMC
   AVG_CDF_STRIDE(ctx_left->uv_mode_cdf[0], ctx_tr->uv_mode_cdf[0],
                  UV_INTRA_MODES - 1, CDF_SIZE(UV_INTRA_MODES));
   AVERAGE_CDF(ctx_left->uv_mode_cdf[1], ctx_tr->uv_mode_cdf[1], UV_INTRA_MODES);
@@ -1345,13 +1385,12 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #endif
   AVERAGE_CDF(ctx_left->switchable_interp_cdf, ctx_tr->switchable_interp_cdf,
               SWITCHABLE_FILTERS);
+#if !CONFIG_AIMC
   AVERAGE_CDF(ctx_left->kf_y_cdf, ctx_tr->kf_y_cdf, INTRA_MODES);
   AVERAGE_CDF(ctx_left->angle_delta_cdf, ctx_tr->angle_delta_cdf,
               2 * MAX_ANGLE_DELTA + 1);
-#if CONFIG_ORIP
-  AVERAGE_CDF(ctx_left->angle_delta_cdf_hv, ctx_tr->angle_delta_cdf_hv,
-              2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA);
-#endif
+#endif  // !CONFIG_AIMC
+
 #if CONFIG_NEW_TX_PARTITION
   // Square blocks
   AVERAGE_CDF(ctx_left->intra_4way_txfm_partition_cdf[0],
@@ -1462,10 +1501,10 @@ void av1_backup_sb_state(SB_FIRST_PASS_STATS *sb_fp_stats, const AV1_COMP *cpi,
   sb_fp_stats->current_qindex =
       cm->mi_params.mi_alloc[alloc_mi_idx].current_qindex;
 
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   memcpy(sb_fp_stats->mode_chosen_counts, cpi->mode_chosen_counts,
          sizeof(sb_fp_stats->mode_chosen_counts));
-#endif  // CONFIG_INTERNAL_STATS
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
 }
 
 void av1_restore_sb_state(const SB_FIRST_PASS_STATS *sb_fp_stats, AV1_COMP *cpi,
@@ -1494,10 +1533,10 @@ void av1_restore_sb_state(const SB_FIRST_PASS_STATS *sb_fp_stats, AV1_COMP *cpi,
   cm->mi_params.mi_alloc[alloc_mi_idx].current_qindex =
       sb_fp_stats->current_qindex;
 
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   memcpy(cpi->mode_chosen_counts, sb_fp_stats->mode_chosen_counts,
          sizeof(sb_fp_stats->mode_chosen_counts));
-#endif  // CONFIG_INTERNAL_STATS
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
 }
 
 // Update the rate costs of some symbols according to the frequency directed

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "apps/aomenc.h"
@@ -151,9 +152,6 @@ static const int av1_arg_ctrl_map[] = { AOME_SET_CPUUSED,
                                         AV1E_SET_ENABLE_ORDER_HINT,
                                         AV1E_SET_ENABLE_TX64,
                                         AV1E_SET_ENABLE_FLIP_IDTX,
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-                                        AV1E_SET_ENABLE_DIST_WTD_COMP,
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
                                         AV1E_SET_ENABLE_MASKED_COMP,
                                         AV1E_SET_ENABLE_ONESIDED_COMP,
                                         AV1E_SET_ENABLE_INTERINTRA_COMP,
@@ -351,9 +349,6 @@ const arg_def_t *av1_ctrl_args[] = {
   &g_av1_codec_arg_defs.enable_order_hint,
   &g_av1_codec_arg_defs.enable_tx64,
   &g_av1_codec_arg_defs.enable_flip_idtx,
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  &g_av1_codec_arg_defs.enable_dist_wtd_comp,
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   &g_av1_codec_arg_defs.enable_masked_comp,
   &g_av1_codec_arg_defs.enable_onesided_comp,
   &g_av1_codec_arg_defs.enable_interintra_comp,
@@ -444,9 +439,21 @@ const arg_def_t *av1_key_val_args[] = {
 #if CONFIG_IST
   &g_av1_codec_arg_defs.enable_ist,
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  &g_av1_codec_arg_defs.enable_ibp,
+#endif
+#if CONFIG_NEW_REF_SIGNALING
+  &g_av1_codec_arg_defs.explicit_ref_frame_map,
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_NEW_INTER_MODES
   &g_av1_codec_arg_defs.max_drl_refmvs,
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_REF_MV_BANK
+  &g_av1_codec_arg_defs.enable_refmvbank,
+#endif  // CONFIG_REF_MV_BANK
+#if CONFIG_OPTFLOW_REFINEMENT
+  &g_av1_codec_arg_defs.enable_opfl_refine,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_CCSO
   &g_av1_codec_arg_defs.enable_ccso,
 #endif
@@ -594,6 +601,9 @@ static void init_config(cfg_options_t *config) {
 #if CONFIG_IST
   config->enable_ist = 1;
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  config->enable_ibp = 1;
+#endif
   config->enable_flip_idtx = 1;
   config->enable_deblocking = 1;
   config->enable_cdef = 1;
@@ -604,9 +614,6 @@ static void init_config(cfg_options_t *config) {
   config->enable_obmc = 1;
   config->enable_warped_motion = 1;
   config->enable_global_motion = 1;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  config->enable_dist_wtd_comp = 1;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   config->enable_diff_wtd_comp = 1;
   config->enable_interintra_comp = 1;
   config->enable_masked_comp = 1;
@@ -620,6 +627,12 @@ static void init_config(cfg_options_t *config) {
   config->enable_dual_filter = 1;
 #endif  // !CONFIG_REMOVE_DUAL_FILTER
   config->enable_angle_delta = 1;
+#if CONFIG_OPTFLOW_REFINEMENT
+  config->enable_opfl_refine = 1;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_NEW_REF_SIGNALING
+  config->explicit_ref_frame_map = 0;
+#endif  // CONFIG_NEW_REF_SIGNALING
   config->enable_intra_edge_filter = 1;
   config->enable_tx64 = 1;
   config->enable_smooth_interintra = 1;
@@ -630,6 +643,9 @@ static void init_config(cfg_options_t *config) {
   config->enable_ref_frame_mvs = 1;
   config->enable_reduced_reference_set = 0;
   config->reduced_tx_type_set = 0;
+#if CONFIG_REF_MV_BANK
+  config->enable_refmvbank = 1;
+#endif
 }
 
 /* Parses global config arguments into the AvxEncoderConfig. Note that
@@ -1374,15 +1390,25 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_reduced_reference_set);
   fprintf(stdout, "Reduced transform set          : %d\n",
           encoder_cfg->reduced_tx_type_set);
+
+#if CONFIG_NEW_INTER_MODES || CONFIG_REF_MV_BANK
+  fprintf(stdout, "Tool setting (Ref MVs)         :");
 #if CONFIG_NEW_INTER_MODES
-  fprintf(stdout, "Tool setting (Ref MVs)         : max-drl-refmvs (%d)\n",
-          encoder_cfg->max_drl_refmvs);
+  fprintf(stdout, " max-drl-refmvs (%d)", encoder_cfg->max_drl_refmvs);
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_NEW_INTER_MODES && CONFIG_REF_MV_BANK
+  fprintf(stdout, " ,");
+#endif  // CONFIG_NEW_INTER_MODES && CONFIG_REF_MV_BANK
+#if CONFIG_REF_MV_BANK
+  fprintf(stdout, " Refmv Bank (%d)", encoder_cfg->enable_refmvbank);
+#endif  // CONFIG_REF_MV_BANK
+  fprintf(stdout, "\n");
+#endif  // CONFIG_NEW_INTER_MODES || CONFIG_REF_MV_BANK
 
   fprintf(
       stdout, "Tool setting (Partition)       : T-Type (%d), 4:1/1:4 (%d)\n",
       encoder_cfg->enable_ab_partitions, encoder_cfg->enable_1to4_partitions);
-  fprintf(stdout, "Disable ml transform speed features          : %d\n",
+  fprintf(stdout, "Disable ml tx speed features   : %d\n",
           encoder_cfg->disable_ml_transform_speed_features);
 #if CONFIG_SDP
   fprintf(stdout, "                               : SDP (%d)\n",
@@ -1416,21 +1442,43 @@ static void show_stream_config(struct stream_state *stream,
 #if CONFIG_ORIP
           ", ORIP(%d)"
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+          ", IBP(%d)"
+#endif
           "\n",
           encoder_cfg->enable_intra_edge_filter,
 
 #if CONFIG_MRLS
 #if CONFIG_ORIP
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+          encoder_cfg->enable_orip, encoder_cfg->enable_ibp);
+#else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
           encoder_cfg->enable_orip);
+#endif
+#else
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+          encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls);
 #endif
+#endif
 #else
 #if CONFIG_ORIP
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip,
+          encoder_cfg->enable_ibp);
+#else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip);
+#endif
+#else
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra);
+#endif
 #endif
 #endif
   fprintf(stdout,
@@ -1439,19 +1487,11 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_obmc, encoder_cfg->enable_warped_motion,
           encoder_cfg->enable_global_motion);
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  fprintf(stdout,
-          "                               : DistCompound (%d), DiffCompound "
-          "(%d), InterIntra (%d)\n",
-          encoder_cfg->enable_dist_wtd_comp, encoder_cfg->enable_diff_wtd_comp,
-          encoder_cfg->enable_interintra_comp);
-#else
   fprintf(stdout,
           "                               : DiffCompound "
           "(%d), InterIntra (%d)\n",
           encoder_cfg->enable_diff_wtd_comp,
           encoder_cfg->enable_interintra_comp);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
   fprintf(stdout,
           "                               : MaskCompound: (%d), "
@@ -1465,6 +1505,11 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_interinter_wedge,
           encoder_cfg->enable_interintra_wedge,
           encoder_cfg->enable_ref_frame_mvs);
+
+#if CONFIG_OPTFLOW_REFINEMENT
+  fprintf(stdout, "                               : OptflowRefinement (%d)\n",
+          encoder_cfg->enable_opfl_refine);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
   fprintf(stdout,
           "Tool setting (Transform)       : Flip & IDT (%d), TX_64 (%d)\n",

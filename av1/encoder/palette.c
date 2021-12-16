@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <math.h>
@@ -280,8 +281,9 @@ static AOM_INLINE void palette_rd_y(
   }
   // Collect mode stats for multiwinner mode processing
   const int txfm_search_done = 1;
+  const MV_REFERENCE_FRAME refs[2] = { -1, -1 };
   store_winner_mode_stats(
-      &cpi->common, x, mbmi, NULL, NULL, NULL, THR_DC, color_map, bsize,
+      &cpi->common, x, mbmi, NULL, NULL, NULL, refs, DC_PRED, color_map, bsize,
       this_rd, cpi->sf.winner_mode_sf.multi_winner_mode_type, txfm_search_done);
   if (this_rd < *best_rd) {
     *best_rd = this_rd;
@@ -491,6 +493,10 @@ void av1_rd_pick_palette_intra_sby(
     }
 
     mbmi->mode = DC_PRED;
+#if CONFIG_AIMC
+    mbmi->joint_y_mode_delta_angle = DC_PRED;
+    mbmi->y_mode_idx = DC_PRED;
+#endif  // CONFIG_AIMC
     mbmi->filter_intra_mode_info.use_filter_intra = 0;
 
     uint16_t color_cache[2 * PALETTE_MAX_SIZE];
@@ -686,6 +692,15 @@ void av1_rd_pick_palette_intra_sbuv(const AV1_COMP *cpi, MACROBLOCK *x,
                            &plane_block_height, &rows, &cols);
 
   mbmi->uv_mode = UV_DC_PRED;
+#if CONFIG_AIMC
+  if (av1_is_directional_mode(mbmi->mode))
+    mbmi->uv_mode_idx = 1;
+  else
+    mbmi->uv_mode_idx = 0;
+  dc_mode_cost = get_uv_mode_cost(mbmi, x->mode_costs, is_cfl_allowed(xd),
+                                  mbmi->uv_mode_idx);
+  assert(mbmi->uv_mode_idx >= 0 && mbmi->uv_mode_idx < UV_INTRA_MODES);
+#endif                         // CONFIG_AIMC
   int count_buf[1 << 12];      // Maximum (1 << 12) color levels.
   int count_buf_8bit[1 << 8];  // Maximum (1 << 8) bins for hbd path.
   if (seq_params->use_highbitdepth) {

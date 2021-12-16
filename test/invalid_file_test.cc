@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <cstdio>
@@ -120,11 +121,7 @@ class InvalidFileTest : public ::libaom_test::DecoderTest,
   FILE *res_file_;
 };
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
-TEST_P(InvalidFileTest, ReturnCode) { RunTest(); }
-#else
 TEST_P(InvalidFileTest, DISABLED_ReturnCode) { RunTest(); }
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP && !COMP_REMOVE_DUAL_FILTER
 
 // If res_filename (the third field) is NULL, then the result filename is
 // filename + ".res" by default. Set res_filename to a string if the result

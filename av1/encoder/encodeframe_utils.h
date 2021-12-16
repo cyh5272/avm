@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_ENCODEFRAME_UTILS_H_
@@ -54,12 +55,16 @@ typedef struct SB_FIRST_PASS_STATS {
   int split_count;
   FRAME_COUNTS fc;
   InterModeRdModel inter_mode_rd_models[BLOCK_SIZES_ALL];
+#if CONFIG_NEW_REF_SIGNALING
+  int thresh_freq_fact[BLOCK_SIZES_ALL][MB_MODE_COUNT];
+#else
   int thresh_freq_fact[BLOCK_SIZES_ALL][MAX_MODES];
+#endif  // CONFIG_NEW_REF_SIGNALING
   int current_qindex;
 
-#if CONFIG_INTERNAL_STATS
+#if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   unsigned int mode_chosen_counts[MAX_MODES];
-#endif  // CONFIG_INTERNAL_STATS
+#endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
 } SB_FIRST_PASS_STATS;
 
 // This structure contains block size related
@@ -290,9 +295,13 @@ void av1_update_inter_mode_stats(FRAME_CONTEXT *fc, FRAME_COUNTS *counts,
                                  PREDICTION_MODE mode, int16_t mode_context);
 
 void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
-                         MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
+                         MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi
+#if !CONFIG_AIMC
+                         ,
                          const MB_MODE_INFO *above_mi,
-                         const MB_MODE_INFO *left_mi, const int intraonly);
+                         const MB_MODE_INFO *left_mi, const int intraonly
+#endif  // !CONFIG_AIMC
+);
 
 void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
                          int mi_row, int mi_col, BLOCK_SIZE bsize,

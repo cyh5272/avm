@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <math.h>
@@ -44,7 +45,9 @@ static const int segment_id[ENERGY_SPAN] = { 0, 1, 1, 2, 3, 4 };
 
 void av1_vaq_frame_setup(AV1_COMP *cpi) {
   AV1_COMMON *cm = &cpi->common;
+#if !CONFIG_NEW_REF_SIGNALING
   const RefreshFrameFlagsInfo *const refresh_frame_flags = &cpi->refresh_frame;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   const int base_qindex = cm->quant_params.base_qindex;
   struct segmentation *seg = &cm->seg;
   int i;
@@ -65,9 +68,13 @@ void av1_vaq_frame_setup(AV1_COMP *cpi) {
     av1_disable_segmentation(seg);
     return;
   }
+#if CONFIG_NEW_REF_SIGNALING
+  if (frame_is_intra_only(cm) || cm->features.error_resilient_mode) {
+#else
   if (frame_is_intra_only(cm) || cm->features.error_resilient_mode ||
       refresh_frame_flags->alt_ref_frame ||
       (refresh_frame_flags->golden_frame && !cpi->rc.is_src_frame_alt_ref)) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     cpi->vaq_refresh = 1;
 
     av1_enable_segmentation(seg);

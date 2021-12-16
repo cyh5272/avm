@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "aom_ports/system_state.h"
@@ -496,15 +497,25 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
   const int num_planes = av1_num_planes(cm);
   MV_REFERENCE_FRAME ref_frame;
 
+#if CONFIG_NEW_REF_SIGNALING
+  for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+    // Need to convert from AOM_REFFRAME to index into ref_mask (subtract 1).
+    if (cm->ref_frame_flags & (1 << ref_frame)) {
+#else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
     // Need to convert from AOM_REFFRAME to index into ref_mask (subtract 1).
-    if (cpi->ref_frame_flags & av1_ref_frame_flag_list[ref_frame]) {
+    if (cm->ref_frame_flags & av1_ref_frame_flag_list[ref_frame]) {
+#endif  // CONFIG_NEW_REF_SIGNALING
       BufferPool *const pool = cm->buffer_pool;
       const YV12_BUFFER_CONFIG *const ref =
           get_ref_frame_yv12_buf(cm, ref_frame);
 
       if (ref == NULL) {
+#if CONFIG_NEW_REF_SIGNALING
+        cpi->scaled_ref_buf[ref_frame] = NULL;
+#else
         cpi->scaled_ref_buf[ref_frame - 1] = NULL;
+#endif  // CONFIG_NEW_REF_SIGNALING
         continue;
       }
 
@@ -524,7 +535,11 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
           }
         }
         int force_scaling = 0;
+#if CONFIG_NEW_REF_SIGNALING
+        RefCntBuffer *new_fb = cpi->scaled_ref_buf[ref_frame];
+#else
         RefCntBuffer *new_fb = cpi->scaled_ref_buf[ref_frame - 1];
+#endif  // CONFIG_NEW_REF_SIGNALING
         if (new_fb == NULL) {
           const int new_fb_idx = get_free_fb(cm);
           if (new_fb_idx == INVALID_IDX) {
@@ -555,18 +570,30 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
           else
             av1_resize_and_extend_frame_nonnormative(
                 ref, &new_fb->buf, (int)cm->seq_params.bit_depth, num_planes);
+#if CONFIG_NEW_REF_SIGNALING
+          cpi->scaled_ref_buf[ref_frame] = new_fb;
+#else
           cpi->scaled_ref_buf[ref_frame - 1] = new_fb;
+#endif  // CONFIG_NEW_REF_SIGNALING
           alloc_frame_mvs(cm, new_fb);
         }
       } else {
         RefCntBuffer *buf = get_ref_frame_buf(cm, ref_frame);
         buf->buf.y_crop_width = ref->y_crop_width;
         buf->buf.y_crop_height = ref->y_crop_height;
+#if CONFIG_NEW_REF_SIGNALING
+        cpi->scaled_ref_buf[ref_frame] = buf;
+#else
         cpi->scaled_ref_buf[ref_frame - 1] = buf;
+#endif  // CONFIG_NEW_REF_SIGNALING
         ++buf->ref_count;
       }
     } else {
+#if CONFIG_NEW_REF_SIGNALING
+      if (!has_no_stats_stage(cpi)) cpi->scaled_ref_buf[ref_frame] = NULL;
+#else
       if (!has_no_stats_stage(cpi)) cpi->scaled_ref_buf[ref_frame - 1] = NULL;
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
   }
 }
@@ -582,7 +609,10 @@ BLOCK_SIZE av1_select_sb_size(const AV1_COMP *const cpi) {
 
   assert(oxcf->tool_cfg.superblock_size == AOM_SUPERBLOCK_SIZE_DYNAMIC);
 
-  if (cpi->svc.number_spatial_layers > 1 ||
+  if (
+#if CONFIG_SVC_ENCODER
+      cpi->svc.number_spatial_layers > 1 ||
+#endif  // CONFIG_SVC_ENCODER
       oxcf->resize_cfg.resize_mode != RESIZE_NONE) {
     // Use the configured size (top resolution) for spatial layers or
     // on resize.
@@ -843,7 +873,11 @@ int av1_recode_loop_test_global_motion(WarpedMotionParams *const global_motion,
                                        int *const gm_params_cost) {
   int i;
   int recode = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  for (i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#else
   for (i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_NEW_REF_SIGNALING
     if (global_motion[i].wmtype != IDENTITY &&
         global_motion_used[i] * GM_RECODE_LOOP_NUM4X4_FACTOR <
             gm_params_cost[i]) {

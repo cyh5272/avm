@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "config/aom_config.h"
@@ -35,8 +36,15 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
 #endif
 
   av1_copy(cm->fc->txb_skip_cdf, av1_default_txb_skip_cdfs[index]);
+#if CONFIG_CONTEXT_DERIVATION
+  av1_copy(cm->fc->v_txb_skip_cdf, av1_default_v_txb_skip_cdfs[index]);
+#endif  // CONFIG_CONTEXT_DERIVATION
   av1_copy(cm->fc->eob_extra_cdf, av1_default_eob_extra_cdfs[index]);
   av1_copy(cm->fc->dc_sign_cdf, av1_default_dc_sign_cdfs[index]);
+#if CONFIG_CONTEXT_DERIVATION
+  av1_copy(cm->fc->v_dc_sign_cdf, av1_default_v_dc_sign_cdfs[index]);
+  av1_copy(cm->fc->v_ac_sign_cdf, av1_default_v_ac_sign_cdfs[index]);
+#endif  // CONFIG_CONTEXT_DERIVATION
   av1_copy(cm->fc->coeff_br_cdf, av1_default_coeff_lps_multi_cdfs[index]);
   av1_copy(cm->fc->coeff_base_cdf, av1_default_coeff_base_multi_cdfs[index]);
   av1_copy(cm->fc->coeff_base_eob_cdf,
@@ -85,8 +93,15 @@ static AOM_INLINE void reset_nmv_counter(nmv_context *nmv) {
 
 void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->txb_skip_cdf, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  RESET_CDF_COUNTER(fc->v_txb_skip_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
   RESET_CDF_COUNTER(fc->eob_extra_cdf, 2);
   RESET_CDF_COUNTER(fc->dc_sign_cdf, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  RESET_CDF_COUNTER(fc->v_dc_sign_cdf, 2);
+  RESET_CDF_COUNTER(fc->v_ac_sign_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
   RESET_CDF_COUNTER(fc->eob_flag_cdf16, 5);
   RESET_CDF_COUNTER(fc->eob_flag_cdf32, 6);
   RESET_CDF_COUNTER(fc->eob_flag_cdf64, 7);
@@ -108,7 +123,12 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->drl_cdf, 2);
   RESET_CDF_COUNTER(fc->refmv_cdf, 2);
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  RESET_CDF_COUNTER(fc->use_optflow_cdf, 2);
+  RESET_CDF_COUNTER(fc->inter_compound_mode_cdf, INTER_COMPOUND_REF_TYPES);
+#else
   RESET_CDF_COUNTER(fc->inter_compound_mode_cdf, INTER_COMPOUND_MODES);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   RESET_CDF_COUNTER(fc->compound_type_cdf, MASKED_COMPOUND_TYPES);
   RESET_CDF_COUNTER(fc->wedge_idx_cdf, 16);
   RESET_CDF_COUNTER(fc->interintra_cdf, 2);
@@ -129,10 +149,12 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->palette_uv_mode_cdf, 2);
   RESET_CDF_COUNTER(fc->comp_inter_cdf, 2);
   RESET_CDF_COUNTER(fc->single_ref_cdf, 2);
+  RESET_CDF_COUNTER(fc->comp_ref_cdf, 2);
+#if !CONFIG_NEW_REF_SIGNALING
   RESET_CDF_COUNTER(fc->comp_ref_type_cdf, 2);
   RESET_CDF_COUNTER(fc->uni_comp_ref_cdf, 2);
-  RESET_CDF_COUNTER(fc->comp_ref_cdf, 2);
   RESET_CDF_COUNTER(fc->comp_bwdref_cdf, 2);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_NEW_TX_PARTITION
   // Square blocks
   RESET_CDF_COUNTER(fc->inter_4way_txfm_partition_cdf[0], 4);
@@ -143,13 +165,15 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #else   // CONFIG_NEW_TX_PARTITION
   RESET_CDF_COUNTER(fc->txfm_partition_cdf, 2);
 #endif  // CONFIG_NEW_TX_PARTITION
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  RESET_CDF_COUNTER(fc->compound_index_cdf, 2);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   RESET_CDF_COUNTER(fc->comp_group_idx_cdf, 2);
   RESET_CDF_COUNTER(fc->skip_mode_cdfs, 2);
-  RESET_CDF_COUNTER(fc->skip_txfm_cdfs, 2);
+#if CONFIG_CONTEXT_DERIVATION
+  RESET_CDF_COUNTER(fc->intra_inter_cdf[0], 2);
+  RESET_CDF_COUNTER(fc->intra_inter_cdf[1], 2);
+#else
   RESET_CDF_COUNTER(fc->intra_inter_cdf, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
+  RESET_CDF_COUNTER(fc->skip_txfm_cdfs, 2);
   reset_nmv_counter(&fc->nmvc);
   reset_nmv_counter(&fc->ndvc);
   RESET_CDF_COUNTER(fc->intrabc_cdf, 2);
@@ -164,7 +188,13 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->switchable_restore_cdf, RESTORE_SWITCHABLE_TYPES);
   RESET_CDF_COUNTER(fc->wiener_restore_cdf, 2);
   RESET_CDF_COUNTER(fc->sgrproj_restore_cdf, 2);
+#if CONFIG_AIMC
+  RESET_CDF_COUNTER(fc->y_mode_set_cdf, INTRA_MODE_SETS);
+  RESET_CDF_COUNTER(fc->y_mode_idx_cdf_0, FIRST_MODE_COUNT);
+  RESET_CDF_COUNTER(fc->y_mode_idx_cdf_1, SECOND_MODE_COUNT);
+#else
   RESET_CDF_COUNTER(fc->y_mode_cdf, INTRA_MODES);
+#endif  // CONFIG_AIMC
   RESET_CDF_COUNTER_STRIDE(fc->uv_mode_cdf[0], UV_INTRA_MODES - 1,
                            CDF_SIZE(UV_INTRA_MODES));
   RESET_CDF_COUNTER(fc->uv_mode_cdf[1], UV_INTRA_MODES);
@@ -195,13 +225,10 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   }
 #endif
   RESET_CDF_COUNTER(fc->switchable_interp_cdf, SWITCHABLE_FILTERS);
+#if !CONFIG_AIMC
   RESET_CDF_COUNTER(fc->kf_y_cdf, INTRA_MODES);
-#if CONFIG_ORIP
-  RESET_CDF_COUNTER(fc->angle_delta_cdf_hv,
-                    2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA);
-#endif
-
   RESET_CDF_COUNTER(fc->angle_delta_cdf, 2 * MAX_ANGLE_DELTA + 1);
+#endif  // !CONFIG_AIMC
 #if CONFIG_NEW_TX_PARTITION
   RESET_CDF_COUNTER(fc->intra_4way_txfm_partition_cdf[0], 4);
   // Rectangular blocks

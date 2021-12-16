@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_AV1_COMMON_INT_H_
@@ -30,6 +31,9 @@
 #include "av1/common/tile_common.h"
 #include "av1/common/timing.h"
 #include "av1/common/odintrin.h"
+#if CONFIG_IBP_DIR
+#include "av1/common/warped_motion.h"
+#endif
 #include "av1/encoder/hash_motion.h"
 #include "aom_dsp/grain_synthesis.h"
 #include "aom_dsp/grain_table.h"
@@ -89,6 +93,14 @@ extern "C" {
 #define TXCOEFF_TIMER 0
 #define TXCOEFF_COST_TIMER 0
 
+#if CONFIG_NEW_REF_SIGNALING
+#define COMPACT_INDEX0_NRS(r) \
+  (((r) == INTRA_FRAME_NRS) ? INTRA_FRAME_INDEX_NRS : (r))
+
+#define COMPACT_INDEX1_NRS(r) \
+  (!is_inter_ref_frame((r)) ? INTRA_FRAME_INDEX_NRS : (r))
+#endif  // CONFIG_NEW_REF_SIGNALING
+
 /*!\cond */
 
 enum {
@@ -110,7 +122,6 @@ enum {
   REFRESH_FRAME_CONTEXT_BACKWARD,
 } UENUM1BYTE(REFRESH_FRAME_CONTEXT_MODE);
 
-#define MFMV_STACK_SIZE 3
 typedef struct {
   int_mv mfmv0;
   uint8_t ref_frame_offset;
@@ -137,7 +148,13 @@ typedef struct RefCntBuffer {
   int ref_count;
 
   unsigned int order_hint;
+#if CONFIG_NEW_REF_SIGNALING
+  int ref_order_hints[INTER_REFS_PER_FRAME];
+  int ref_display_order_hint[INTER_REFS_PER_FRAME];
+#else
   unsigned int ref_order_hints[INTER_REFS_PER_FRAME];
+  unsigned int ref_display_order_hint[INTER_REFS_PER_FRAME];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   // These variables are used only in encoder and compare the absolute
   // display order hint to compute the relative distance and overcome
@@ -145,7 +162,6 @@ typedef struct RefCntBuffer {
   // distance when a very old frame is used as a reference.
   unsigned int display_order_hint;
   unsigned int absolute_poc;
-  unsigned int ref_display_order_hint[INTER_REFS_PER_FRAME];
   // Frame's level within the hierarchical structure
   unsigned int pyramid_level;
 
@@ -158,7 +174,11 @@ typedef struct RefCntBuffer {
   // the sizes that can be derived from the buf structure)
   int width;
   int height;
+#if CONFIG_NEW_REF_SIGNALING
+  WarpedMotionParams global_motion[INTER_REFS_PER_FRAME];
+#else
   WarpedMotionParams global_motion[REF_FRAMES];
+#endif                 // CONFIG_NEW_REF_SIGNALING
   int showable_frame;  // frame can be used as show existing frame in future
   uint8_t film_grain_params_present;
   aom_film_grain_t film_grain_params;
@@ -177,6 +197,9 @@ typedef struct RefCntBuffer {
   int8_t mode_deltas[MAX_MODE_LF_DELTAS];
 
   FRAME_CONTEXT frame_context;
+#if CONFIG_NEW_REF_SIGNALING
+  int base_qindex;
+#endif  // CONFIG_NEW_REF_SIGNALING
 } RefCntBuffer;
 
 typedef struct BufferPool {
@@ -213,6 +236,23 @@ typedef struct {
   int cdef_bits; /*!< Number of CDEF strength values in bits */
 } CdefInfo;
 
+#if CONFIG_OPTFLOW_REFINEMENT
+enum {
+  /*!
+   * MV refinement disabled for the current frame.
+   */
+  REFINE_NONE = 0,
+  /*!
+   * MV refinement is switchable per block for the current frame.
+   */
+  REFINE_SWITCHABLE = 1,
+  /*!
+   * MV refinement applied to all compound blocks for the current frame.
+   */
+  REFINE_ALL = 2,
+} UENUM1BYTE(OPTFLOW_REFINE_TYPE);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+
 #if CONFIG_CCSO
 /** ccso info */
 typedef struct {
@@ -248,12 +288,8 @@ typedef struct {
                                 // frame_sign_bias
                                 // if 0, enable_dist_wtd_comp and
                                 // enable_ref_frame_mvs must be set as 0.
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  int enable_dist_wtd_comp;  // 0 - disable dist-wtd compound modes
-                             // 1 - enable it
-#endif                       // !CONFIG_REMOVE_DIST_WTD_COMP
-  int enable_ref_frame_mvs;  // 0 - disable ref frame mvs
-                             // 1 - enable it
+  int enable_ref_frame_mvs;     // 0 - disable ref frame mvs
+                                // 1 - enable it
 } OrderHintInfo;
 
 // Sequence header structure.
@@ -277,6 +313,10 @@ typedef struct SequenceHeader {
   BLOCK_SIZE sb_size;  // Size of the superblock used for this frame
   int mib_size;        // Size of the superblock in units of MI blocks
   int mib_size_log2;   // Log 2 of above.
+#if CONFIG_NEW_REF_SIGNALING
+  int explicit_ref_frame_map;  // Explicitly signal the reference frame mapping
+  int max_reference_frames;    // Number of reference frames allowed
+#endif
 
   OrderHintInfo order_hint_info;
 
@@ -303,8 +343,15 @@ typedef struct SequenceHeader {
 #if CONFIG_IST
   uint8_t enable_ist;  // enables/disables intra secondary transform
 #endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  uint8_t enable_ibp;  // enables/disables intra bi-prediction(IBP)
+#endif
   uint8_t enable_interintra_compound;  // enables/disables interintra_compound
   uint8_t enable_masked_compound;      // enables/disables masked compound
+#if CONFIG_OPTFLOW_REFINEMENT
+  aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type for
+                                            // this frame
+#endif
 #if !CONFIG_REMOVE_DUAL_FILTER
   uint8_t enable_dual_filter;    // 0 - disable dual interpolation filter
 #endif                           // !CONFIG_REMOVE_DUAL_FILTER
@@ -321,6 +368,9 @@ typedef struct SequenceHeader {
 #if CONFIG_CCSO
   uint8_t enable_ccso;  // To turn on/off CCSO
 #endif
+#if CONFIG_REF_MV_BANK
+  uint8_t enable_refmvbank;  // To turn on/off Ref MV Bank
+#endif                       // CONFIG_REF_MV_BANK
   BITSTREAM_PROFILE profile;
 
   // Color config.
@@ -379,7 +429,9 @@ typedef struct {
   unsigned int frame_number;
   SkipModeInfo skip_mode_info;
   int refresh_frame_flags;  // Which ref frames are overwritten by this frame
+#if !CONFIG_NEW_REF_SIGNALING
   int frame_refs_short_signaling;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 } CurrentFrame;
 
 /*!\endcond */
@@ -457,6 +509,13 @@ typedef struct {
    */
   int max_drl_bits;
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  /*!
+   * Ternary symbol for optical flow refinement type. 0: do not refine,
+   * 1: always refine, 2: switchable at block level.
+   */
+  OPTFLOW_REFINE_TYPE opfl_refine_type;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 } FeatureFlags;
 
 /*!
@@ -793,10 +852,86 @@ struct CommonContexts {
   int num_mi_cols;   /*!< Corresponds to cm->mi_params.mi_cols */
 };
 
+#if CONFIG_THROUGHPUT_ANALYSIS
+struct total_sym_stats {
+  /** Frame number (decoding order)*/
+  int frame_dec_order;
+  /** Total number of bits*/
+  int64_t tot_bits;
+  /** total ctx coded symbols. */
+  int64_t tot_ctx_syms;
+  /** total bypass coded symbols. */
+  int64_t tot_bypass_syms;
+  /** peak ctx coded symbols. */
+  int peak_ctx_syms;
+  /** peak bypass coded symbols. */
+  int peak_bypass_syms;
+  /** peak bits. */
+  int peak_bits;
+};
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
+
+#if CONFIG_NEW_REF_SIGNALING
+/*!
+ * \brief Structure to contain information about the reference frame mapping
+ * scheme.
+ */
+typedef struct {
+  /*!
+   * Distance of ref frame from current frame. Negative value indicates
+   * reference in the future, and positive value indicates reference in
+   * the past from the current frame
+   */
+  int ref_frame_distance[INTER_REFS_PER_FRAME];
+  /*!
+   * Total number of reference buffers available to the current frame.
+   */
+  int n_total_refs;
+  /*!
+   * Contains the indices of the frames in ref_frame_map that are future
+   * references.
+   */
+  int future_refs[INTER_REFS_PER_FRAME];
+  /*!
+   * Number of future references.
+   */
+  int n_future_refs;
+  /*!
+   * Contains the indices of the frames in ref_frame_map that are past
+   * references.
+   */
+  int past_refs[INTER_REFS_PER_FRAME];
+  /*!
+   * Number of past references.
+   */
+  int n_past_refs;
+  /*!
+   * Contains the indices of the frames in ref_frame_map with same order hint
+   * as current frame. -1 if unset.
+   */
+  int cur_refs[INTER_REFS_PER_FRAME];
+  /*!
+   * Number of references with the same order hint.
+   */
+  int n_cur_refs;
+} RefFramesInfo;
+#endif  // CONFIG_NEW_REF_SIGNALING
+
 /*!
  * \brief Top level common structure used by both encoder and decoder.
  */
 typedef struct AV1Common {
+#if CONFIG_THROUGHPUT_ANALYSIS
+  /*!
+   * Symbol stats.
+   */
+  struct total_sym_stats sym_stats;
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
+  /*!
+   * Bitmask indicating which reference buffers may be referenced by this frame.
+   */
+  int ref_frame_flags;
+
   /*!
    * Information about the current frame that is being coded.
    */
@@ -884,6 +1019,35 @@ typedef struct AV1Common {
    */
   RefCntBuffer *cur_frame;
 
+#if CONFIG_NEW_REF_SIGNALING
+  /*!
+   * An alternative to remapped_ref_idx (above) which contains a mapping to
+   * ref_frame_map[] according to a "usefulness" score. It also contains all
+   * other relevant data to aid the reference mapping and signaling.
+   */
+  RefFramesInfo ref_frames_info;
+  /*!
+   * For encoder, we have a two-level mapping from reference frame type to the
+   * corresponding buffer in the buffer pool:
+   * * 'remapped_ref_idx[i - 1]' maps reference type 'i' (range: 0 ...
+   * INTER_REFS_PER_FRAME - 1) to a remapped index 'j' in the same range.
+   * * Later, 'cm->ref_frame_map[j]' maps the remapped index 'j' to a pointer to
+   * the reference counted buffer structure RefCntBuffer, taken from the buffer
+   * pool cm->buffer_pool->frame_bufs.
+   *
+   *      0,               ...,            INTER_REFS_PER_FRAME - 1
+   *      |                                           |
+   *      v                                           v
+   * remapped_ref_idx[0],  ...,     remapped_ref_idx[INTER_REFS_PER_FRAME- 1]
+   *      |                                           |
+   *      v                                           v
+   * ref_frame_map[],      ...,                ref_frame_map[]
+   *
+   * Note: INTRA_FRAME always refers to the current frame, so there's no need to
+   * have a remapped index for the same.
+   */
+  int remapped_ref_idx[REF_FRAMES];
+#else
   /*!
    * For encoder, we have a two-level mapping from reference frame type to the
    * corresponding buffer in the buffer pool:
@@ -905,6 +1069,7 @@ typedef struct AV1Common {
    * have a remapped index for the same.
    */
   int remapped_ref_idx[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   /*!
    * Scale of the current frame with respect to itself.
@@ -1027,7 +1192,11 @@ typedef struct AV1Common {
   /*!
    * Global motion parameters for each reference frame.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  WarpedMotionParams global_motion[INTER_REFS_PER_FRAME];
+#else
   WarpedMotionParams global_motion[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   /*!
    * Elements part of the sequence header, that are applicable for all the
@@ -1088,13 +1257,21 @@ typedef struct AV1Common {
    * ref_frame_sign_bias[k] is 1 if relative distance between reference 'k' and
    * current frame is positive; and 0 otherwise.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  int ref_frame_sign_bias[INTER_REFS_PER_FRAME];
+#else
   int ref_frame_sign_bias[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
   /*!
    * ref_frame_side[k] is 1 if relative distance between reference 'k' and
    * current frame is positive, -1 if relative distance is 0; and 0 otherwise.
    * TODO(jingning): This can be combined with sign_bias later.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  int8_t ref_frame_side[INTER_REFS_PER_FRAME];
+#else
   int8_t ref_frame_side[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SMVP_IMPROVEMENT
   /*!
    * relative distance between reference 'k' and current frame.
@@ -1120,6 +1297,13 @@ typedef struct AV1Common {
    * (in the range 0 ... (number_spatial_layers - 1)).
    */
   int spatial_layer_id;
+
+#if CONFIG_IBP_DIR
+  /*!
+   * Weights for IBP of directional modes.
+   */
+  uint8_t *ibp_directional_weights[TX_SIZES_ALL][DIR_MODES_0_90];
+#endif
 
 #if TXCOEFF_TIMER
   int64_t cum_txcoeff_timer;
@@ -1244,8 +1428,16 @@ static INLINE int frame_is_sframe(const AV1_COMMON *cm) {
   return cm->current_frame.frame_type == S_FRAME;
 }
 
-// These functions take a reference frame label between LAST_FRAME and
-// EXTREF_FRAME inclusive.  Note that this is different to the indexing
+#if CONFIG_NEW_REF_SIGNALING
+static INLINE int get_ref_frame_map_idx(const AV1_COMMON *const cm,
+                                        const int ref_frame) {
+  return (ref_frame >= 0 && ref_frame < REF_FRAMES)
+             ? cm->remapped_ref_idx[ref_frame]
+             : INVALID_IDX;
+}
+#else
+// This function takes a reference frame label between LAST_FRAME and
+// EXTREF_FRAME inclusive. Note that this is different to the indexing
 // previously used by the frame_refs[] array.
 static INLINE int get_ref_frame_map_idx(const AV1_COMMON *const cm,
                                         const MV_REFERENCE_FRAME ref_frame) {
@@ -1253,6 +1445,7 @@ static INLINE int get_ref_frame_map_idx(const AV1_COMMON *const cm,
              ? cm->remapped_ref_idx[ref_frame - LAST_FRAME]
              : INVALID_IDX;
 }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
 static INLINE RefCntBuffer *get_ref_frame_buf(
     const AV1_COMMON *const cm, const MV_REFERENCE_FRAME ref_frame) {
@@ -1278,7 +1471,11 @@ static INLINE RefCntBuffer *get_primary_ref_frame_buf(
     const AV1_COMMON *const cm) {
   const int primary_ref_frame = cm->features.primary_ref_frame;
   if (primary_ref_frame == PRIMARY_REF_NONE) return NULL;
+#if CONFIG_NEW_REF_SIGNALING
+  const int map_idx = get_ref_frame_map_idx(cm, primary_ref_frame);
+#else
   const int map_idx = get_ref_frame_map_idx(cm, primary_ref_frame + 1);
+#endif  // CONFIG_NEW_REF_SIGNALING
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
 
@@ -1468,6 +1665,19 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
     xd->left_mbmi = NULL;
   }
 
+#if CONFIG_AIMC
+  if (xd->up_available) {
+    xd->above_right_mbmi = xd->mi[-xd->mi_stride + bw - 1];
+  } else {
+    xd->above_right_mbmi = NULL;
+  }
+  if (xd->left_available) {
+    xd->bottom_left_mbmi = xd->mi[-1 + xd->mi_stride * (bh - 1)];
+  } else {
+    xd->bottom_left_mbmi = NULL;
+  }
+#endif  // CONFIG_AIMC
+
   const int chroma_ref = ((mi_row & 0x01) || !(bh & 0x01) || !ss_y) &&
                          ((mi_col & 0x01) || !(bw & 0x01) || !ss_x);
   xd->is_chroma_ref = chroma_ref;
@@ -1507,6 +1717,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
     if (!(mi_row & (xd->width - 1))) xd->is_first_horizontal_rect = 1;
 }
 
+#if !CONFIG_AIMC
 static INLINE aom_cdf_prob *get_y_mode_cdf(FRAME_CONTEXT *tile_ctx,
                                            const MB_MODE_INFO *above_mi,
                                            const MB_MODE_INFO *left_mi) {
@@ -1516,6 +1727,7 @@ static INLINE aom_cdf_prob *get_y_mode_cdf(FRAME_CONTEXT *tile_ctx,
   const int left_ctx = intra_mode_context[left];
   return tile_ctx->kf_y_cdf[above_ctx][left_ctx];
 }
+#endif  // !CONFIG_AIMC
 
 static INLINE void update_partition_context(MACROBLOCKD *xd, int mi_row,
                                             int mi_col, BLOCK_SIZE subsize,
@@ -2223,7 +2435,162 @@ static INLINE int is_valid_seq_level_idx(AV1_LEVEL seq_level_idx) {
           seq_level_idx != SEQ_LEVEL_7_0 && seq_level_idx != SEQ_LEVEL_7_1 &&
           seq_level_idx != SEQ_LEVEL_7_2 && seq_level_idx != SEQ_LEVEL_7_3);
 }
+#if CONFIG_IBP_DIR
+// Intra derivative for second directional predictor of IBP
+// second_dr_intra_derivative[x] = 64*64/dr_intra_derivative[x]
+static const int16_t second_dr_intra_derivative[90] = {
+  0,    0, 0,        //
+  4,    0, 0,        // 3, ...
+  7,    0, 0,        // 6, ...
+  11,   0, 0, 0, 0,  // 9, ...
+  15,   0, 0,        // 14, ...
+  19,   0, 0,        // 17, ...
+  23,   0, 0,        // 20, ...
+  27,   0, 0,        // 23, ... (113 & 203 are base angles)
+  31,   0, 0,        // 26, ...
+  35,   0, 0,        // 29, ...
+  40,   0, 0, 0,     // 32, ...
+  46,   0, 0,        // 36, ...
+  51,   0, 0,        // 39, ...
+  58,   0, 0,        // 42, ...
+  64,   0, 0,        // 45, ... (45 & 135 are base angles)
+  72,   0, 0,        // 48, ...
+  80,   0, 0,        // 51, ...
+  91,   0, 0, 0,     // 54, ...
+  102,  0, 0,        // 58, ...
+  117,  0, 0,        // 61, ...
+  132,  0, 0,        // 64, ...
+  152,  0, 0,        // 67, ... (67 & 157 are base angles)
+  178,  0, 0,        // 70, ...
+  216,  0, 0,        // 73, ...
+  273,  0, 0, 0, 0,  // 76, ...
+  372,  0, 0,        // 81, ...
+  585,  0, 0,        // 84, ...
+  1365, 0, 0,        // 87, ...
+};
 
+// Generate the weights per pixel position for IBP
+static void av1_dr_prediction_z1_info(uint8_t *weights, int bw, int bh,
+                                      int txw_log2, int txh_log2, int dy,
+                                      int mode) {
+  int32_t r, c, y;
+
+  int len0 = -1;
+  int len1 = -1;
+  int f0 = 1024;
+  int f1 = 1024;
+  int f2 = 1024;
+  int d0 = 0;
+  int d1 = 0;
+  int d2 = 0;
+  if (mode == D67_PRED) {
+    f0 = ((bw <= 8) && (bh <= 8)) ? 512 : 1024;
+    f1 = ((bw <= 8) && (bh <= 8)) ? 256 : 512;
+    f2 = ((bw <= 8) && (bh <= 8)) ? 128 : 256;
+    d0 = ROUND_POWER_OF_TWO(f0 - f1, (txh_log2 - 1));
+    d1 = ROUND_POWER_OF_TWO(f1 - f2, (txw_log2 - 1));
+    d2 = ROUND_POWER_OF_TWO(f2, (txw_log2 - 1));
+  }
+  if (mode == V_PRED) {
+    f0 = ((bw <= 8) && (bh <= 8)) ? 256 : 512;
+    f1 = ((bw <= 8) && (bh <= 8)) ? 128 : 256;
+    f2 = ((bw <= 8) && (bh <= 8)) ? 64 : 128;
+    d0 = ROUND_POWER_OF_TWO(f0 - f1, (txh_log2 - 2));
+    d1 = ROUND_POWER_OF_TWO(f1 - f2, (txw_log2 - 1));
+    d2 = ROUND_POWER_OF_TWO(f2, (txw_log2 - 1));
+  }
+
+  for (r = 0; r < bh; ++r) {
+    if (mode == D67_PRED) {
+      len0 = (bh - r) >> 1;
+      len1 = ((bh - r) >> 1) + (bw >> 1);
+    }
+    if (mode == V_PRED) {
+      len0 = (bh - r) >> 2;
+      len1 = ((bh - r) >> 2) + (bw >> 1);
+    }
+    y = dy;
+    for (c = 0; c < bw; ++c, y += dy) {
+      uint32_t dist = ((r + 1) << 6) + y;
+      int16_t shift = 0;
+      int16_t div = resolve_divisor_32(dist, &shift);
+      shift -= DIV_LUT_BITS;
+      int32_t weight0 = ROUND_POWER_OF_TWO(y * div, shift);
+      if ((len0 > -1) && (len1 > -1)) {
+        int weight1 = IBP_WEIGHT_MAX - weight0;
+        if (c <= len0) {
+          int fac = ((len0 - c) * d0 + f1);
+          weight1 = (fac > f0) ? weight1 * f0 : weight1 * fac;
+        } else if (c <= len1) {
+          int fac = ((len1 - c) * d1 + f2);
+          weight1 = (fac > f1) ? weight1 * f1 : weight1 * fac;
+        } else {
+          int fac = (f2 - (c - len1) * d2);
+          weight1 = (fac < 0) ? 0 : weight1 * fac;
+        }
+        weight1 = ROUND_POWER_OF_TWO(weight1, 10);
+        weight0 = IBP_WEIGHT_MAX - weight1;
+      }
+      weights[c] = weight0;
+    }
+    weights += bw;
+  }
+}
+static const uint8_t angle_to_mode_index[90] = {
+  0, 0, 0,  0, 0, 0,  0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0,  0, 0, 0,  0, 0, 0,
+  0, 0, 0,  0, 0, 0,  0, 0, 0,  0, 0, 0, 0, 16, 0, 0, 15, 0, 0, 14, 0, 0, 13,
+  0, 0, 12, 0, 0, 11, 0, 0, 10, 0, 0, 0, 9, 0,  0, 8, 0,  0, 7, 0,  0, 6, 0,
+  0, 5, 0,  0, 4, 0,  0, 3, 0,  0, 0, 0, 2, 0,  0, 1, 0,  0, 0, 0,  0
+};
+
+// Generate weights for IBP of one directional mode
+static INLINE void init_ibp_info_per_mode(
+    uint8_t *weights[TX_SIZES_ALL][DIR_MODES_0_90], int block_idx, int mode,
+    int delta, int txw, int txh, int txw_log2, int txh_log2) {
+  const int angle = mode_to_angle_map[mode] + delta * 3;
+  const int mode_idx = angle_to_mode_index[angle];
+  const int dy = second_dr_intra_derivative[angle];
+  weights[block_idx][mode_idx] =
+      (uint8_t *)(aom_calloc(txw * txh, sizeof(uint8_t)));
+  av1_dr_prediction_z1_info(weights[block_idx][mode_idx], txw, txh, txw_log2,
+                            txh_log2, dy, mode);
+  return;
+}
+
+// Generate weights for IBP of directional modes
+static INLINE void init_ibp_info(
+    uint8_t *weights[TX_SIZES_ALL][DIR_MODES_0_90]) {
+  assert(weights != NULL);
+  for (TX_SIZE iblock = TX_4X4; iblock < TX_SIZES_ALL; iblock++) {
+    const int txw = tx_size_wide[iblock];
+    const int txh = tx_size_high[iblock];
+    const int txw_log2 = tx_size_wide_log2[iblock];
+    const int txh_log2 = tx_size_high_log2[iblock];
+    for (int delta = -3; delta < 0; delta++) {
+      init_ibp_info_per_mode(weights, iblock, V_PRED, delta, txw, txh, txw_log2,
+                             txh_log2);
+      init_ibp_info_per_mode(weights, iblock, D67_PRED, delta, txw, txh,
+                             txw_log2, txh_log2);
+      init_ibp_info_per_mode(weights, iblock, D45_PRED, delta, txw, txh,
+                             txw_log2, txh_log2);
+    }
+    for (int delta = 0; delta <= 3; delta++) {
+      init_ibp_info_per_mode(weights, iblock, D67_PRED, delta, txw, txh,
+                             txw_log2, txh_log2);
+      init_ibp_info_per_mode(weights, iblock, D45_PRED, delta, txw, txh,
+                             txw_log2, txh_log2);
+    }
+  }
+}
+static INLINE void free_ibp_info(
+    uint8_t *weights[TX_SIZES_ALL][DIR_MODES_0_90]) {
+  for (int i = 0; i < TX_SIZES_ALL; i++) {
+    for (int j = 0; j < DIR_MODES_0_90; j++) {
+      aom_free(weights[i][j]);
+    }
+  }
+}
+#endif
 /*!\endcond */
 
 #ifdef __cplusplus

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "aom_ports/system_state.h"
@@ -26,6 +27,8 @@
 #include "av1/encoder/partition_search.h"
 #include "av1/encoder/reconinter_enc.h"
 #include "av1/encoder/tokenize.h"
+
+#include "aom_util/debug_util.h"
 
 #if CONFIG_TUNE_VMAF
 #include "av1/encoder/tune_vmaf.h"
@@ -548,6 +551,10 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       if (intra_tx_size != max_txsize_rect_lookup[bsize])
         ++x->txfm_search_info.txb_split_count;
     }
+#if CONFIG_REF_MV_BANK
+    if (cm->seq_params.enable_refmvbank && is_inter)
+      av1_update_ref_mv_bank(cm, xd, mbmi);
+#endif  // CONFIG_REF_MV_BANK
   }
 #if CONFIG_SDP
   if (txfm_params->tx_mode_search_type == TX_MODE_SELECT &&
@@ -960,8 +967,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   const BLOCK_SIZE bsize = mbmi->sb_type;
 #endif
   FRAME_CONTEXT *fc = xd->tile_ctx;
+#if CONFIG_NEW_REF_SIGNALING
+  const int seg_ref_active = 0;
+#else
   const int seg_ref_active =
       segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   if (current_frame->skip_mode_info.skip_mode_flag && !seg_ref_active &&
       is_comp_ref_allowed(bsize)) {
@@ -1039,8 +1050,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #else
   if (!is_inter_block(mbmi)) {
 #endif
-    av1_sum_intra_stats(cm, td->counts, xd, mbmi, xd->above_mbmi, xd->left_mbmi,
-                        frame_is_intra_only(cm));
+    av1_sum_intra_stats(cm, td->counts, xd, mbmi
+#if !CONFIG_AIMC
+                        ,
+                        xd->above_mbmi, xd->left_mbmi, frame_is_intra_only(cm)
+#endif  // !CONFIG_AIMC
+    );
   }
 #if CONFIG_SDP
   if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
@@ -1068,11 +1083,25 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif
 
   if (!seg_ref_active) {
-#if CONFIG_ENTROPY_STATS
+#if CONFIG_ENTROPY_STATS && !CONFIG_CONTEXT_DERIVATION
     counts->intra_inter[av1_get_intra_inter_context(xd)][inter_block]++;
-#endif
+#endif  // CONFIG_ENTROPY_STATS && !CONFIG_CONTEXT_DERIVATION
+#if CONFIG_CONTEXT_DERIVATION
+#if CONFIG_SDP
+    const int skip_txfm = mbmi->skip_txfm[xd->tree_type == CHROMA_PART];
+#else
+    const int skip_txfm = mbmi->skip_txfm;
+#endif  // CONFIG_SDP
+#if CONFIG_ENTROPY_STATS
+    counts->intra_inter[skip_txfm][av1_get_intra_inter_context(xd)]
+                       [inter_block]++;
+#endif  // CONFIG_ENTROPY_STATS
+    update_cdf(fc->intra_inter_cdf[skip_txfm][av1_get_intra_inter_context(xd)],
+               inter_block, 2);
+#else
     update_cdf(fc->intra_inter_cdf[av1_get_intra_inter_context(xd)],
                inter_block, 2);
+#endif  // CONFIG_CONTEXT_DERIVATION
     // If the segment reference feature is enabled we have only a single
     // reference frame allowed for the segment so exclude it from
     // the reference frame counts used to work out probabilities.
@@ -1082,14 +1111,33 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       if (current_frame->reference_mode == REFERENCE_MODE_SELECT) {
         if (is_comp_ref_allowed(bsize)) {
 #if CONFIG_ENTROPY_STATS
-          counts->comp_inter[av1_get_reference_mode_context(xd)]
+          counts->comp_inter[av1_get_reference_mode_context(cm, xd)]
                             [has_second_ref(mbmi)]++;
 #endif  // CONFIG_ENTROPY_STATS
-          update_cdf(av1_get_reference_mode_cdf(xd), has_second_ref(mbmi), 2);
+          update_cdf(av1_get_reference_mode_cdf(cm, xd), has_second_ref(mbmi),
+                     2);
         }
       }
 
       if (has_second_ref(mbmi)) {
+#if CONFIG_NEW_REF_SIGNALING
+        const int n_refs = cm->ref_frames_info.n_total_refs;
+        int n_bits = 0;
+        assert(ref0 < ref1);
+        for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
+          const int bit = ref0 == i || ref1 == i;
+          const int bit_type = av1_get_compound_ref_bit_type(
+              n_bits, &cm->ref_frames_info, ref0, i);
+          update_cdf(av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type,
+                                                       n_refs),
+                     bit, 2);
+#if CONFIG_ENTROPY_STATS
+          counts->comp_ref[av1_get_ref_pred_context_nrs(xd, i, n_refs)]
+                          [bit_type][i - n_bits][bit]++;
+#endif  // CONFIG_ENTROPY_STATS
+          n_bits += bit;
+        }
+#else
         const COMP_REFERENCE_TYPE comp_ref_type = has_uni_comp_refs(mbmi)
                                                       ? UNIDIR_COMP_REFERENCE
                                                       : BIDIR_COMP_REFERENCE;
@@ -1159,7 +1207,21 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
           }
         }
+#endif  // CONFIG_NEW_REF_SIGNALING
       } else {
+#if CONFIG_NEW_REF_SIGNALING
+        const int n_refs = cm->ref_frames_info.n_total_refs;
+        const MV_REFERENCE_FRAME ref0_nrs = mbmi->ref_frame[0];
+        for (int i = 0; i < n_refs - 1; i++) {
+          const int bit = ref0_nrs == i;
+          update_cdf(av1_get_pred_cdf_single_ref_nrs(xd, i, n_refs), bit, 2);
+#if CONFIG_ENTROPY_STATS
+          counts->single_ref[av1_get_ref_pred_context_nrs(xd, i, n_refs)][i]
+                            [bit]++;
+#endif  // CONFIG_ENTROPY_STATS
+          if (bit) break;
+        }
+#else
         const int bit = (ref0 >= BWDREF_FRAME);
         update_cdf(av1_get_pred_cdf_single_ref_p1(xd), bit, 2);
 #if CONFIG_ENTROPY_STATS
@@ -1203,12 +1265,17 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
           }
         }
+#endif  // CONFIG_NEW_REF_SIGNALING
       }
 
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
         const int bsize_group = size_group_lookup[bsize];
+#if CONFIG_NEW_REF_SIGNALING
+        if (mbmi->ref_frame[1] == INTRA_FRAME_NRS) {
+#else
         if (mbmi->ref_frame[1] == INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_ENTROPY_STATS
           counts->interintra[bsize_group][1]++;
 #endif
@@ -1245,7 +1312,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               ? motion_mode_allowed(xd->global_motion, xd, mbmi,
                                     cm->features.allow_warped_motion)
               : SIMPLE_TRANSLATION;
+#if CONFIG_NEW_REF_SIGNALING
+      if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
+#else
       if (mbmi->ref_frame[1] != INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
         if (motion_allowed == WARPED_CAUSAL) {
 #if CONFIG_ENTROPY_STATS
           counts->motion_mode[bsize][mbmi->motion_mode]++;
@@ -1260,7 +1331,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
       }
 
+#if CONFIG_OPTFLOW_REFINEMENT
+      if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
+#else
       if (has_second_ref(mbmi)) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
         assert(current_frame->reference_mode != SINGLE_REFERENCE &&
                is_inter_compound_mode(mbmi->mode) &&
                mbmi->motion_mode == SIMPLE_TRANSLATION);
@@ -1276,18 +1351,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                      mbmi->comp_group_idx, 2);
         }
 
-        if (mbmi->comp_group_idx == 0) {
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-          const int comp_index_ctx = get_comp_index_context(cm, xd);
-#if CONFIG_ENTROPY_STATS
-          ++counts->compound_index[comp_index_ctx][mbmi->compound_idx];
-#endif
-          update_cdf(fc->compound_index_cdf[comp_index_ctx], mbmi->compound_idx,
-                     2);
-#else
-          assert(mbmi->compound_idx == 1);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
-        } else {
+        if (mbmi->comp_group_idx == 1) {
           assert(masked_compound_used);
           if (is_interinter_compound_used(COMPOUND_WEDGE, bsize)) {
 #if CONFIG_ENTROPY_STATS
@@ -1327,16 +1391,37 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
     const int16_t mode_ctx =
         av1_mode_context_analyzer(mbmi_ext->mode_context, mbmi->ref_frame);
     if (has_second_ref(mbmi)) {
+#if CONFIG_OPTFLOW_REFINEMENT
+      if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
+          is_opfl_refine_allowed(cm, mbmi)) {
+        const int use_optical_flow = mode > NEW_NEWMV;
+#if CONFIG_ENTROPY_STATS
+        ++counts->use_optflow[mode_ctx][use_optical_flow];
+#endif
+        update_cdf(fc->use_optflow_cdf[mode_ctx], use_optical_flow, 2);
+      }
+      const int comp_mode_idx = opfl_get_comp_idx(mode);
+#if CONFIG_ENTROPY_STATS
+      ++counts->inter_compound_mode[mode_ctx][comp_mode_idx];
+#endif
+      update_cdf(fc->inter_compound_mode_cdf[mode_ctx], comp_mode_idx,
+                 INTER_COMPOUND_REF_TYPES);
+#else
 #if CONFIG_ENTROPY_STATS
       ++counts->inter_compound_mode[mode_ctx][INTER_COMPOUND_OFFSET(mode)];
 #endif
       update_cdf(fc->inter_compound_mode_cdf[mode_ctx],
                  INTER_COMPOUND_OFFSET(mode), INTER_COMPOUND_MODES);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     } else {
       av1_update_inter_mode_stats(fc, counts, mode, mode_ctx);
     }
 
-    const int new_mv = mbmi->mode == NEWMV || mbmi->mode == NEW_NEWMV;
+    const int new_mv = mbmi->mode == NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+                       mbmi->mode == NEW_NEWMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                       mbmi->mode == NEW_NEWMV;
 #if CONFIG_NEW_INTER_MODES
     if (have_drl_index(mbmi->mode)) {
       const int16_t mode_ctx_pristine =
@@ -1389,8 +1474,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                               allow_hp);
         }
 #if CONFIG_NEW_INTER_MODES
-      } else if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
-        const int ref = mbmi->mode == NEAR_NEWMV;
+      } else if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
+        const int ref =
+#if CONFIG_OPTFLOW_REFINEMENT
+            mbmi->mode == NEAR_NEWMV_OPTFLOW ||
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+            mbmi->mode == NEAR_NEWMV;
         const int_mv ref_mv = av1_get_ref_mv(x, ref);
         av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
                             allow_hp);
@@ -1492,8 +1581,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       mbmi->delta_lf_from_base = xd->delta_lf_from_base;
     }
     if (has_second_ref(mbmi)) {
-      if (mbmi->compound_idx == 0 ||
-          mbmi->interinter_comp.type == COMPOUND_AVERAGE)
+      if (mbmi->interinter_comp.type == COMPOUND_AVERAGE)
         mbmi->comp_group_idx = 0;
       else
         mbmi->comp_group_idx = 1;
@@ -1536,8 +1624,12 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       }
       set_ref_ptrs(cm, xd, mbmi->ref_frame[0], mbmi->ref_frame[1]);
     } else {
+#if CONFIG_NEW_REF_SIGNALING
+      const int seg_ref_active = 0;
+#else
       const int seg_ref_active =
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active) {
         // If the segment reference feature is enabled we have only a single
         // reference frame allowed for the segment so exclude it from
@@ -1571,8 +1663,12 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #else
       const int inter_block = is_inter_block(mbmi);
 #endif
+#if CONFIG_NEW_REF_SIGNALING
+      const int seg_ref_active = 0;
+#else
       const int seg_ref_active =
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
         const MOTION_MODE motion_allowed =
             cm->features.switchable_motion_mode
@@ -1580,7 +1676,11 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                                       cm->features.allow_warped_motion)
                 : SIMPLE_TRANSLATION;
 
+#if CONFIG_NEW_REF_SIGNALING
+        if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
+#else
         if (mbmi->ref_frame[1] != INTRA_FRAME) {
+#endif  // CONFIG_NEW_REF_SIGNALING
           if (motion_allowed >= OBMC_CAUSAL) {
             td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
           }

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <limits.h>
@@ -306,7 +307,11 @@ static void set_good_speed_features_framesize_independent(
 
   // Speed 0 for all speed features that give neutral coding performance change.
   sf->gm_sf.gm_disable_recode = 1;
+#if CONFIG_NEW_REF_SIGNALING
+  sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_LEV2;
+#else
   sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_L2_L3;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   sf->part_sf.less_rectangular_check_level = 1;
   sf->part_sf.ml_prune_4_partition = 1;
@@ -329,9 +334,6 @@ static void set_good_speed_features_framesize_independent(
   sf->inter_sf.prune_wedge_pred_diff_based = 1;
   sf->inter_sf.reduce_inter_modes = 1;
   sf->inter_sf.selective_ref_frame = 1;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  sf->inter_sf.use_dist_wtd_comp_flag = DIST_WTD_COMP_SKIP_MV_SEARCH;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
 #if !CONFIG_REMOVE_DUAL_FILTER
   sf->interp_sf.use_fast_interpolation_filter_search = 1;
@@ -359,7 +361,11 @@ static void set_good_speed_features_framesize_independent(
   sf->hl_sf.superres_auto_search_type = SUPERRES_AUTO_DUAL;
 
   if (speed >= 1) {
+#if CONFIG_NEW_REF_SIGNALING
+    sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_LEV3;
+#else
     sf->gm_sf.gm_search_type = GM_REDUCED_REF_SEARCH_SKIP_L2_L3_ARF2;
+#endif  // CONFIG_NEW_REF_SIGNALING
     sf->gm_sf.prune_ref_frame_for_gm_search = boosted ? 0 : 1;
 
     sf->part_sf.intra_cnn_split = 1;
@@ -434,9 +440,6 @@ static void set_good_speed_features_framesize_independent(
     sf->inter_sf.prune_compound_using_neighbors = 1;
     sf->inter_sf.prune_comp_type_by_comp_avg = 2;
     sf->inter_sf.selective_ref_frame = 3;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-    sf->inter_sf.use_dist_wtd_comp_flag = DIST_WTD_COMP_DISABLED;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
     // TODO(Sachin): Enable/Enhance this speed feature for speed 2 & 3
 #if !CONFIG_REMOVE_DUAL_FILTER
@@ -513,10 +516,9 @@ static void set_good_speed_features_framesize_independent(
         frame_is_intra_only(&cpi->common) ? 0 : 1;
     sf->winner_mode_sf.enable_winner_mode_for_use_tx_domain_dist = 1;
     sf->winner_mode_sf.motion_mode_for_winner_cand =
-        boosted
-            ? 0
-            : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
-                                                                         : 2;
+        boosted                                                      ? 0
+        : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
+                                                                     : 2;
 
     // TODO(any): evaluate if these lpf features can be moved to speed 2.
     // For screen content, "prune_sgr_based_on_wiener = 2" cause large quality
@@ -535,7 +537,9 @@ static void set_good_speed_features_framesize_independent(
     sf->part_sf.prune_ab_partition_using_split_info = 1;
     sf->part_sf.early_term_after_none_split = 1;
 
+#if !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.alt_ref_search_fp = 1;
+#endif  // !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.txfm_rd_gate_level = boosted ? 0 : 4;
 
     sf->inter_sf.prune_inter_modes_based_on_tpl = boosted ? 0 : 3;
@@ -730,15 +734,14 @@ static AOM_INLINE void init_inter_sf(INTER_MODE_SPEED_FEATURES *inter_sf) {
   inter_sf->adaptive_rd_thresh = 0;
   inter_sf->model_based_post_interp_filter_breakout = 0;
   inter_sf->reduce_inter_modes = 0;
+#if !CONFIG_NEW_REF_SIGNALING
   inter_sf->alt_ref_search_fp = 0;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   inter_sf->selective_ref_frame = 0;
   inter_sf->prune_ref_frame_for_rect_partitions = 0;
   inter_sf->disable_wedge_search_var_thresh = 0;
   inter_sf->fast_wedge_sign_estimate = 0;
   inter_sf->prune_wedge_pred_diff_based = 0;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  inter_sf->use_dist_wtd_comp_flag = DIST_WTD_COMP_ENABLED;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   inter_sf->reuse_inter_intra_mode = 0;
   inter_sf->disable_sb_level_coeff_cost_upd = 0;
   inter_sf->disable_sb_level_mv_cost_upd = 0;

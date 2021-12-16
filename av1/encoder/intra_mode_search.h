@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 /*!\file
@@ -87,6 +88,9 @@ typedef struct IntraModeSearchState {
   UV_PREDICTION_MODE mode_uv; /*!< \brief The best uv mode */
   PALETTE_MODE_INFO pmi_uv;   /*!< \brief Color map if mode_uv is palette */
   int8_t uv_angle_delta;      /*!< \brief Angle delta if mode_uv directional */
+#if CONFIG_AIMC
+  int uv_mode_idx; /*!< \brief UV mode Index */
+#endif             // CONFIG_AIMC
   /**@}*/
 
   /*!
@@ -94,6 +98,13 @@ typedef struct IntraModeSearchState {
    */
   int64_t best_pred_rd[REFERENCE_MODES];
 } IntraModeSearchState;
+
+#if CONFIG_AIMC
+/*!\brief Get mode cost for chroma channels.
+ */
+int get_uv_mode_cost(MB_MODE_INFO *mbmi, const ModeCosts mode_costs,
+                     CFL_ALLOWED_TYPE cfl_allowed, int mode_index);
+#endif  // CONFIG_AIMC
 
 /*!\brief Evaluate a given intra-mode for inter frames.
  *
@@ -266,7 +277,7 @@ void av1_count_colors_highbd(const uint8_t *src8, int stride, int rows,
                              int cols, int bit_depth, int *val_count,
                              int *val_count_8bit, int *num_color_bins,
                              int *num_colors);
-
+#if !CONFIG_AIMC
 /*! \brief set the luma intra mode and delta angles for a given mode index.
  * \param[in]    mode_idx           mode index in intra mode decision
  *                                  process.
@@ -274,7 +285,7 @@ void av1_count_colors_highbd(const uint8_t *src8, int stride, int rows,
  *                                  the mode info for the current macroblock.
  */
 void set_y_mode_and_delta_angle(const int mode_idx, MB_MODE_INFO *const mbmi);
-
+#endif
 /*! \brief prune luma intra mode    based on the model rd.
  * \param[in]    this_model_rd      model rd for current mode.
  * \param[in]    best_model_rd      Best model RD seen for this block so

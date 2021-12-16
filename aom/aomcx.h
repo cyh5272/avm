@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #ifndef AOM_AOM_AOMCX_H_
 #define AOM_AOM_AOMCX_H_
@@ -847,23 +848,9 @@ enum aome_enc_control_id {
    */
   AV1E_SET_ENABLE_FLIP_IDTX = 81,
 
-/* Note: enum value 82 unused */
+  /* Note: enum value 82 unused */
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  /*!\brief Codec control function to turn on / off dist-wtd compound mode
-   * at sequence level, int parameter
-   *
-   * This will enable or disable distance-weighted compound mode.
-   * \attention If AV1E_SET_ENABLE_ORDER_HINT is 0, then this flag is forced
-   * to 0.
-   *
-   * - 0 = disable
-   * - 1 = enable (default)
-   */
-  AV1E_SET_ENABLE_DIST_WTD_COMP = 83,
-#else
-/* Note: enum value 83 unused */
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
+  /* Note: enum value 83 unused */
 
   /*!\brief Codec control function to turn on / off ref frame mvs (mfmv) usage
    * at sequence level, int parameter
@@ -1214,8 +1201,9 @@ enum aome_enc_control_id {
    */
   AV1E_SET_MIN_CR = 144,
 
-  /* NOTE: enums 145-149 unused */
+/* NOTE: enums 145-149 unused */
 
+#if CONFIG_SVC_ENCODER
   /*!\brief Codec control function to set the layer id, aom_svc_layer_id_t*
    * parameter
    */
@@ -1231,6 +1219,7 @@ enum aome_enc_control_id {
    * aom_svc_ref_frame_config_t* parameter
    */
   AV1E_SET_SVC_REF_FRAME_CONFIG = 152,
+#endif  // CONFIG_SVC_ENCODER
 
   /*!\brief Codec control function to set the path to the VMAF model used when
    * tuning the encoder for VMAF, const char* parameter
@@ -1402,6 +1391,7 @@ typedef enum {
   AOM_TUNE_VMAF_NEG_MAX_GAIN = 7,
 } aom_tune_metric;
 
+#if CONFIG_SVC_ENCODER
 #define AOM_MAX_LAYERS 32   /**< Max number of layers */
 #define AOM_MAX_SS_LAYERS 4 /**< Max number of spatial layers */
 #define AOM_MAX_TS_LAYERS 8 /**< Max number of temporal layers */
@@ -1435,6 +1425,7 @@ typedef struct aom_svc_ref_frame_config {
   int ref_idx[7];
   int refresh[8]; /**< Refresh flag for each of the 8 slots. */
 } aom_svc_ref_frame_config_t;
+#endif  // CONFIG_SVC_ENCODER
 
 /*!\cond */
 /*!\brief Encoder control function parameter type
@@ -1597,11 +1588,6 @@ AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_TX64, int)
 
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_FLIP_IDTX, int)
 #define AOM_CTRL_AV1E_SET_ENABLE_FLIP_IDTX
-
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_DIST_WTD_COMP, int)
-#define AOM_CTRL_AV1E_SET_ENABLE_DIST_WTD_COMP
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_REF_FRAME_MVS, int)
 #define AOM_CTRL_AV1E_SET_ENABLE_REF_FRAME_MVS
@@ -1827,6 +1813,7 @@ AOM_CTRL_USE_TYPE(AV1E_SET_TIER_MASK, unsigned int)
 AOM_CTRL_USE_TYPE(AV1E_SET_MIN_CR, unsigned int)
 #define AOM_CTRL_AV1E_SET_MIN_CR
 
+#if CONFIG_SVC_ENCODER
 AOM_CTRL_USE_TYPE(AV1E_SET_SVC_LAYER_ID, aom_svc_layer_id_t *)
 #define AOME_CTRL_AV1E_SET_SVC_LAYER_ID
 
@@ -1835,6 +1822,7 @@ AOM_CTRL_USE_TYPE(AV1E_SET_SVC_PARAMS, aom_svc_params_t *)
 
 AOM_CTRL_USE_TYPE(AV1E_SET_SVC_REF_FRAME_CONFIG, aom_svc_ref_frame_config_t *)
 #define AOME_CTRL_AV1E_SET_SVC_REF_FRAME_CONFIG
+#endif  // CONFIG_SVC_ENCODER
 
 AOM_CTRL_USE_TYPE(AV1E_ENABLE_SB_MULTIPASS_UNIT_TEST, unsigned int)
 #define AOM_CTRL_AV1E_ENABLE_SB_MULTIPASS_UNIT_TEST

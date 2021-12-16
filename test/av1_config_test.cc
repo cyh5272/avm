@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2018, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #include <string.h>
 
@@ -109,11 +110,7 @@ TEST(Av1Config, WriteInvalidInputs) {
   ASSERT_EQ(-1, write_av1config(&av1_config, 4, &bytes_written, NULL));
 }
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
-TEST(Av1Config, GetAv1ConfigFromLobfObu) {
-#else
 TEST(Av1Config, DISABLED_GetAv1ConfigFromLobfObu) {
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
   // Test parsing of a Sequence Header OBU with the reduced_still_picture_header
   // unset-- aka a full Sequence Header OBU.
   ASSERT_TRUE(VerifyAv1c(kLobfFullSequenceHeaderObu,
@@ -125,11 +122,7 @@ TEST(Av1Config, DISABLED_GetAv1ConfigFromLobfObu) {
                          false));
 }
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
-TEST(Av1Config, GetAv1ConfigFromAnnexBObu) {
-#else
 TEST(Av1Config, DISABLED_GetAv1ConfigFromAnnexBObu) {
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
   // Test parsing of a Sequence Header OBU with the reduced_still_picture_header
   // unset-- aka a full Sequence Header OBU.
   ASSERT_TRUE(VerifyAv1c(kAnnexBFullSequenceHeaderObu,
@@ -141,11 +134,7 @@ TEST(Av1Config, DISABLED_GetAv1ConfigFromAnnexBObu) {
                          true));
 }
 
-#if !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
-TEST(Av1Config, ReadWriteConfig) {
-#else
 TEST(Av1Config, DISABLED_ReadWriteConfig) {
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP && !CONFIG_REMOVE_DUAL_FILTER
   Av1Config av1_config;
   memset(&av1_config, 0, sizeof(av1_config));
 

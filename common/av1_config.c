@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2018, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #include <stdio.h>
 #include <string.h>
@@ -232,6 +233,26 @@ static int parse_color_config(struct aom_read_bit_buffer *reader,
 // Parse Sequence Header OBU for coding tools beyond AV1
 int parse_sequence_header_beyond_av1(struct aom_read_bit_buffer *reader) {
   int result = 0;
+#if CONFIG_REF_MV_BANK
+  AV1C_READ_BIT_OR_RETURN_ERROR(enable_refmvbank);
+#endif  // CONFIG_REF_MV_BANK
+#if CONFIG_NEW_REF_SIGNALING
+  int reduced_ref_frame_set = 0;
+  do {
+    reduced_ref_frame_set = aom_rb_read_bit(reader);
+    if (result == -1) {
+      fprintf(stderr,
+              "av1c: Error reading bit for \" reduced_ref_frame_set \", "
+              "value=%d result=%d.\n",
+              reduced_ref_frame_set, result);
+      return -1;
+    }
+  } while (0);
+  if (reduced_ref_frame_set) {
+    AV1C_READ_BITS_OR_RETURN_ERROR(max_reference_frames, 2);
+  }
+  AV1C_READ_BIT_OR_RETURN_ERROR(explicit_ref_frame_map);
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_SDP
   AV1C_READ_BIT_OR_RETURN_ERROR(enable_sdp);
 #endif
@@ -246,6 +267,9 @@ int parse_sequence_header_beyond_av1(struct aom_read_bit_buffer *reader) {
 #endif
 #if CONFIG_ORIP
   AV1C_READ_BIT_OR_RETURN_ERROR(enable_orip);
+#endif
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  AV1C_READ_BIT_OR_RETURN_ERROR(enable_ibp);
 #endif
 
   return 0;
@@ -368,10 +392,10 @@ static int parse_sequence_header(const uint8_t *const buffer, size_t length,
 
     AV1C_READ_BIT_OR_RETURN_ERROR(enable_order_hint);
     if (enable_order_hint) {
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-      AV1C_READ_BIT_OR_RETURN_ERROR(enable_dist_wtd_comp);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
       AV1C_READ_BIT_OR_RETURN_ERROR(enable_ref_frame_mvs);
+#if CONFIG_OPTFLOW_REFINEMENT
+      AV1C_READ_BIT_OR_RETURN_ERROR(enable_opfl_refine);
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     }
 
     const int SELECT_SCREEN_CONTENT_TOOLS = 2;

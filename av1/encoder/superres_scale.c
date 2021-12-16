@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "av1/encoder/encoder_alloc.h"
@@ -349,12 +350,14 @@ static size_params_type calculate_next_size_params(AV1_COMP *cpi) {
   size_params_type rsz = { frm_dim_cfg->width, frm_dim_cfg->height,
                            SCALE_NUMERATOR };
   int resize_denom = SCALE_NUMERATOR;
+#if CONFIG_SVC_ENCODER
   if (has_no_stats_stage(cpi) && cpi->use_svc &&
       cpi->svc.spatial_layer_id < cpi->svc.number_spatial_layers - 1) {
     rsz.resize_width = cpi->common.width;
     rsz.resize_height = cpi->common.height;
     return rsz;
   }
+#endif  // CONFIG_SVC_ENCODER
   if (is_stat_generation_stage(cpi)) return rsz;
   if (resize_pending_params->width && resize_pending_params->height) {
     rsz.resize_width = resize_pending_params->width;

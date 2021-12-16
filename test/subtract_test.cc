@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <tuple>
@@ -47,7 +48,7 @@ TEST_P(AV1SubtractBlockTest, SimpleSubtract) {
     const int block_width = block_size_wide[bsize];
     const int block_height = block_size_high[bsize];
     int16_t *diff = reinterpret_cast<int16_t *>(
-        aom_memalign(16, sizeof(*diff) * block_width * block_height * 2));
+        aom_memalign(32, sizeof(*diff) * block_width * block_height * 2));
     uint8_t *pred = reinterpret_cast<uint8_t *>(
         aom_memalign(16, block_width * block_height * 2));
     uint8_t *src = reinterpret_cast<uint8_t *>(
@@ -93,10 +94,11 @@ TEST_P(AV1SubtractBlockTest, SimpleSubtract) {
 INSTANTIATE_TEST_SUITE_P(C, AV1SubtractBlockTest,
                          ::testing::Values(aom_subtract_block_c));
 
-#if HAVE_SSE2
-INSTANTIATE_TEST_SUITE_P(SSE2, AV1SubtractBlockTest,
-                         ::testing::Values(aom_subtract_block_sse2));
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(AVX2, AV1SubtractBlockTest,
+                         ::testing::Values(aom_subtract_block_avx2));
 #endif
+
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(NEON, AV1SubtractBlockTest,
                          ::testing::Values(aom_subtract_block_neon));

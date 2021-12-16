@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <assert.h>
@@ -28,6 +29,7 @@
 #include "av1/common/alloccommon.h"
 #include "av1/common/av1_common_int.h"
 #include "av1/common/av1_loopfilter.h"
+#include "av1/common/pred_common.h"
 #include "av1/common/quant_common.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/reconintra.h"
@@ -479,7 +481,12 @@ int av1_receive_compressed_data(AV1Decoder *pbi, size_t size,
     // TODO(jkoleszar): Error concealment is undefined and non-normative
     // at this point, but if it becomes so, [0] may not always be the correct
     // thing to do here.
+#if CONFIG_NEW_REF_SIGNALING
+    const int last_frame = get_closest_pastcur_ref_index(cm);
+    RefCntBuffer *ref_buf = get_ref_frame_buf(cm, last_frame);
+#else
     RefCntBuffer *ref_buf = get_ref_frame_buf(cm, LAST_FRAME);
+#endif  // CONFIG_NEW_REF_SIGNALING
     if (ref_buf != NULL) ref_buf->buf.corrupted = 1;
   }
 

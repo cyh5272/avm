@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 /*! \file
@@ -90,7 +91,9 @@ typedef struct {
   //! The color map needed to reconstruct palette mode.
   uint8_t color_index_map[MAX_SB_SQUARE];
   //! The current winner mode.
-  THR_MODES mode_index;
+  REFERENCE_MODE mode;
+  //! Reference frame(s) for winner mode.
+  int refs[2];
 } WinnerModeStats;
 
 /*! \brief Each source plane of the current macroblock
@@ -164,6 +167,10 @@ typedef struct macroblock_plane {
 typedef struct {
   //! Cost to skip txfm for the current txfm block.
   int txb_skip_cost[TXB_SKIP_CONTEXTS][2];
+#if CONFIG_CONTEXT_DERIVATION
+  //! Cost to skip txfm for the current AOM_PLANE_V txfm block.
+  int v_txb_skip_cost[V_TXB_SKIP_CONTEXTS][2];
+#endif  // CONFIG_CONTEXT_DERIVATION
   /*! \brief Cost for encoding the base_eob of a level.
    *
    * Decoder uses base_eob to derive the base_level as base_eob := base_eob+1.
@@ -181,6 +188,12 @@ typedef struct {
   int eob_extra_cost[EOB_COEF_CONTEXTS][2];
   //! Cost for encoding the dc_sign
   int dc_sign_cost[DC_SIGN_CONTEXTS][2];
+#if CONFIG_CONTEXT_DERIVATION
+  //! Cost for encoding the AOM_PLANE_V txfm coefficient dc_sign
+  int v_dc_sign_cost[CROSS_COMPONENT_CONTEXTS][DC_SIGN_CONTEXTS][2];
+  //! Cost for encoding the AOM_PLANE_V txfm coefficient ac_sign
+  int v_ac_sign_cost[CROSS_COMPONENT_CONTEXTS][2];
+#endif  // CONFIG_CONTEXT_DERIVATION
   //! Cost for encoding an increment to the coefficient
   int lps_cost[LEVEL_CONTEXTS][COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
 } LV_MAP_COEFF_COST;
@@ -220,7 +233,11 @@ typedef struct {
   //! Number of ref mvs in the drl.
   uint8_t ref_mv_count[MODE_CTX_REF_FRAMES];
   //! Global mvs
+#if CONFIG_NEW_REF_SIGNALING
+  int_mv global_mvs[INTER_REFS_PER_FRAME];
+#else
   int_mv global_mvs[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
   //! Context used to encode the current mode.
   int16_t mode_context[MODE_CTX_REF_FRAMES];
 } MB_MODE_INFO_EXT;
@@ -240,7 +257,11 @@ typedef struct {
   uint8_t ref_mv_count;
   // TODO(Ravi/Remya): Reduce the buffer size of global_mvs
   //! \copydoc MB_MODE_INFO_EXT::global_mvs
+#if CONFIG_NEW_REF_SIGNALING
+  int_mv global_mvs[INTER_REFS_PER_FRAME];
+#else
   int_mv global_mvs[REF_FRAMES];
+#endif  // CONFIG_NEW_REF_SIGNALING
   //! \copydoc MB_MODE_INFO_EXT::mode_context
   int16_t mode_context;
   //! Offset of current coding block's coeff buffer relative to the sb.
@@ -617,8 +638,10 @@ typedef struct {
   int mbmode_cost[BLOCK_SIZE_GROUPS][INTRA_MODES];
   //! Luma mode cost for intra frame.
   int y_mode_costs[INTRA_MODES][INTRA_MODES][INTRA_MODES];
+#if !CONFIG_AIMC
   //! Chroma mode cost
   int intra_uv_mode_cost[CFL_ALLOWED_TYPES][INTRA_MODES][UV_INTRA_MODES];
+#endif  // !CONFIG_AIMC
   //! filter_intra_cost
   int filter_intra_cost[BLOCK_SIZES_ALL][2];
   //! filter_intra_mode_cost
@@ -627,17 +650,7 @@ typedef struct {
   //! angle_delta_cost
   int angle_delta_cost[PARTITION_STRUCTURE_NUM][DIRECTIONAL_MODES]
                       [2 * MAX_ANGLE_DELTA + 1];
-#if CONFIG_ORIP
-  //! angle_delta_cost_hv
-  int angle_delta_cost_hv[PARTITION_STRUCTURE_NUM][TOTAL_NUM_ORIP_ANGLE_DELTA]
-                         [2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA];
-#endif
 #else
-#if CONFIG_ORIP
-  //! angle_delta_cost_hv
-  int angle_delta_cost_hv[TOTAL_NUM_ORIP_ANGLE_DELTA]
-                         [2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA];
-#endif
   //! angle_delta_cost
   int angle_delta_cost[DIRECTIONAL_MODES][2 * MAX_ANGLE_DELTA + 1];
 #endif
@@ -646,6 +659,16 @@ typedef struct {
   //! mrl_index_cost
   int mrl_index_cost[MRL_LINE_NUMBER];
 #endif
+#if CONFIG_AIMC
+  //! y primary flag cost
+  int y_primary_flag_cost[INTRA_MODE_SETS];
+  //! y first mode cost
+  int y_first_mode_costs[Y_MODE_CONTEXTS][FIRST_MODE_COUNT];
+  //! y second mode cost
+  int y_second_mode_costs[Y_MODE_CONTEXTS][SECOND_MODE_COUNT];
+  //! uv mode cost
+  int intra_uv_mode_cost[CFL_ALLOWED_TYPES][UV_MODE_CONTEXTS][UV_INTRA_MODES];
+#endif  // CONFIG_AIMC
 
 #if CONFIG_IST
   //! Cost of signaling secondary transform index
@@ -706,10 +729,15 @@ typedef struct {
    * \name Inter Costs: Ref Frame Types
    ****************************************************************************/
   /**@{*/
+#if CONFIG_NEW_REF_SIGNALING
+  //! single_ref_cost
+  int single_ref_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1][2];
+  //! comp_ref_cost
+  int comp_ref_cost[REF_CONTEXTS][COMPREF_BIT_TYPES][INTER_REFS_PER_FRAME - 2]
+                   [2];
+#else
   //! single_ref_cost
   int single_ref_cost[REF_CONTEXTS][SINGLE_REFS - 1][2];
-  //! comp_inter_cost
-  int comp_inter_cost[COMP_INTER_CONTEXTS][2];
   //! comp_ref_type_cost
   int comp_ref_type_cost[COMP_REF_TYPE_CONTEXTS]
                         [CDF_SIZE(COMP_REFERENCE_TYPES)];
@@ -726,6 +754,9 @@ typedef struct {
    * Includes ALTREF_FRAME, ALTREF2_FRAME, and BWDREF_FRAME.
    */
   int comp_bwdref_cost[REF_CONTEXTS][BWD_REFS - 1][2];
+#endif  // CONFIG_NEW_REF_SIGNALING
+  //! comp_inter_cost
+  int comp_inter_cost[COMP_INTER_CONTEXTS][2];
   /**@}*/
 
   /*****************************************************************************
@@ -733,10 +764,23 @@ typedef struct {
    ****************************************************************************/
   /**@{*/
   //! intra_inter_cost
+#if CONFIG_CONTEXT_DERIVATION
+  int intra_inter_cost[INTRA_INTER_SKIP_TXFM_CONTEXTS][INTRA_INTER_CONTEXTS][2];
+#else
   int intra_inter_cost[INTRA_INTER_CONTEXTS][2];
+#endif  // CONFIG_CONTEXT_DERIVATION
   //! inter_compound_mode_cost
+#if CONFIG_OPTFLOW_REFINEMENT
+  /*! use_optflow_cost */
+  int use_optflow_cost[INTER_COMPOUND_MODE_CONTEXTS][2];
+  /*! inter_compound_mode_cost */
+  int inter_compound_mode_cost[INTER_COMPOUND_MODE_CONTEXTS]
+                              [INTER_COMPOUND_REF_TYPES];
+#else
+  /*! inter_compound_mode_cost */
   int inter_compound_mode_cost[INTER_COMPOUND_MODE_CONTEXTS]
                               [INTER_COMPOUND_MODES];
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   //! compound_type_cost
   int compound_type_cost[BLOCK_SIZES_ALL][MASKED_COMPOUND_TYPES];
   //! wedge_idx_cost
@@ -753,10 +797,6 @@ typedef struct {
    * \name Inter Costs: Compound Masks
    ****************************************************************************/
   /**@{*/
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  //! comp_idx_cost
-  int comp_idx_cost[COMP_INDEX_CONTEXTS][2];
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   //! comp_group_idx_cost
   int comp_group_idx_cost[COMP_GROUP_IDX_CONTEXTS][2];
   /**@}*/
@@ -1094,7 +1134,11 @@ typedef struct macroblock {
    * current mode. If the current best rd is already <= threshold, then we skip
    * the current mode.
    */
+#if CONFIG_NEW_REF_SIGNALING
+  int thresh_freq_fact[BLOCK_SIZES_ALL][MB_MODE_COUNT];
+#else
   int thresh_freq_fact[BLOCK_SIZES_ALL][MAX_MODES];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   /*! \brief Tracks the winner modes in the current coding block.
    *
@@ -1135,9 +1179,6 @@ typedef struct macroblock {
   // TODO(any): try to consolidate this speed feature with winner mode
   // processing.
   struct inter_modes_info *inter_modes_info;
-
-  //! How to blend the compound predictions.
-  uint8_t compound_idx;
 
   //! A caches of results of compound type search so they can be reused later.
   COMP_RD_STATS comp_rd_stats[MAX_COMP_RD_STATS];

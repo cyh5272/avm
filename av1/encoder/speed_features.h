@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_SPEED_FEATURES_H_
@@ -33,18 +34,15 @@ typedef struct MESH_PATTERN {
 
 enum {
   GM_FULL_SEARCH,
+#if CONFIG_NEW_REF_SIGNALING
+  GM_REDUCED_REF_SEARCH_SKIP_LEV2,
+  GM_REDUCED_REF_SEARCH_SKIP_LEV3,
+#else
   GM_REDUCED_REF_SEARCH_SKIP_L2_L3,
   GM_REDUCED_REF_SEARCH_SKIP_L2_L3_ARF2,
+#endif  // CONFIG_NEW_REF_SIGNALING
   GM_DISABLE_SEARCH
 } UENUM1BYTE(GM_SEARCH_TYPE);
-
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-enum {
-  DIST_WTD_COMP_ENABLED,
-  DIST_WTD_COMP_SKIP_MV_SEARCH,
-  DIST_WTD_COMP_DISABLED,
-} UENUM1BYTE(DIST_WTD_COMP_FLAG);
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
 enum {
   INTRA_ALL = (1 << DC_PRED) | (1 << V_PRED) | (1 << H_PRED) | (1 << D45_PRED) |
@@ -100,6 +98,7 @@ enum {
 };
 #endif  // CONFIG_NEW_INTER_MODES
 
+#if !CONFIG_NEW_REF_SIGNALING
 enum {
   DISABLE_ALL_INTER_SPLIT = (1 << THR_COMP_GA) | (1 << THR_COMP_LA) |
                             (1 << THR_ALTR) | (1 << THR_GOLD) | (1 << THR_LAST),
@@ -111,6 +110,7 @@ enum {
   LAST_AND_INTRA_SPLIT_ONLY = (1 << THR_COMP_GA) | (1 << THR_COMP_LA) |
                               (1 << THR_ALTR) | (1 << THR_GOLD)
 };
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
 enum {
   TXFM_CODING_SF = 1,
@@ -607,7 +607,10 @@ typedef struct INTER_MODE_SPEED_FEATURES {
   // 2 implies prune horiz, vert and extended partition
   int prune_ref_frame_for_rect_partitions;
 
+#if !CONFIG_NEW_REF_SIGNALING
+  // Removed with CONFIG_NEW_REF_SIGNALING for now.
   int alt_ref_search_fp;
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   // flag to skip NEWMV mode in drl if the motion search result is the same
   int skip_repeated_newmv;
@@ -727,11 +730,6 @@ typedef struct INTER_MODE_SPEED_FEATURES {
 
   // Disable interinter_wedge
   int disable_interinter_wedge;
-
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  // Decide when and how to use joint_comp.
-  DIST_WTD_COMP_FLAG use_dist_wtd_comp_flag;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
 
   // Whether to override and disable sb level coeff cost updates, if
   // cpi->oxcf.cost_upd_freq.coeff = COST_UPD_SB (i.e. set at SB level)

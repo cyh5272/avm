@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include "av1/common/warped_motion.h"
@@ -26,7 +27,11 @@ static AOM_INLINE void accumulate_rd_opt(ThreadData *td, ThreadData *td_t) {
   for (int i = 0; i < REFERENCE_MODES; i++)
     td->rd_counts.comp_pred_diff[i] += td_t->rd_counts.comp_pred_diff[i];
 
+#if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; i++)
+#else
   for (int i = 0; i < REF_FRAMES; i++)
+#endif  // CONFIG_NEW_REF_SIGNALING
     td->rd_counts.global_motion_used[i] +=
         td_t->rd_counts.global_motion_used[i];
 
@@ -473,6 +478,10 @@ static int enc_row_mt_worker_hook(void *arg1, void *unused) {
     cfl_init(&td->mb.e_mbd.cfl, &cm->seq_params);
     av1_crc32c_calculator_init(
         &td->mb.txfm_search_info.mb_rd_record.crc_calculator);
+#if CONFIG_REF_MV_BANK
+    av1_zero(td->mb.e_mbd.ref_mv_bank);
+    td->mb.e_mbd.ref_mv_bank_pt = &td->mb.e_mbd.ref_mv_bank;
+#endif  // CONFIG_REF_MV_BANK}
 
     av1_encode_sb_row(cpi, td, tile_row, tile_col, current_mi_row);
 #if CONFIG_MULTITHREAD
@@ -794,6 +803,11 @@ static AOM_INLINE void prepare_enc_workers(AV1_COMP *cpi, AVxWorkerHook hook,
             thread_data->td->mb.tmp_pred_bufs[j];
       }
     }
+#if CONFIG_REF_MV_BANK
+    av1_zero(thread_data->td->mb.e_mbd.ref_mv_bank);
+    thread_data->td->mb.e_mbd.ref_mv_bank_pt =
+        &thread_data->td->mb.e_mbd.ref_mv_bank;
+#endif  // CONFIG_REF_MV_BANK
   }
 }
 

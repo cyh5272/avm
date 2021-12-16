@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_ENCODER_ALLOC_H_
@@ -318,7 +319,9 @@ static AOM_INLINE void dealloc_compressor_data(AV1_COMP *cpi) {
     aom_free(cpi->level_params.level_info[i]);
   }
 
+#if CONFIG_SVC_ENCODER
   if (cpi->use_svc) av1_free_svc_cyclic_refresh(cpi);
+#endif  // CONFIG_SVC_ENCODE
 
   if (cpi->consec_zero_mv) {
     aom_free(cpi->consec_zero_mv);

@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2019, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <float.h>
@@ -343,7 +344,11 @@ static int simple_motion_search_get_best_ref(
   for (int ref_idx = 0; ref_idx < num_refs; ref_idx++) {
     const int ref = refs[ref_idx];
 
-    if (cpi->ref_frame_flags & av1_ref_frame_flag_list[ref]) {
+#if CONFIG_NEW_REF_SIGNALING
+    if (cm->ref_frame_flags & (1 << ref)) {
+#else
+    if (cm->ref_frame_flags & av1_ref_frame_flag_list[ref]) {
+#endif  // CONFIG_NEW_REF_SIGNALING
       const FULLPEL_MV *start_mvs = sms_tree->start_mvs;
       unsigned int curr_sse = 0, curr_var = 0;
       int_mv best_mv =
@@ -397,11 +402,14 @@ static AOM_INLINE void simple_motion_search_prune_part_features(
   assert(mi_size_wide[bsize] == mi_size_high[bsize]);
   // Setting up motion search
   int ref_list[1];
+#if CONFIG_NEW_REF_SIGNALING
+  ref_list[0] = get_closest_pastcur_ref_index(&cpi->common);
+#else
   ref_list[0] = LAST_FRAME;
-  if (!(cpi->ref_frame_flags & av1_ref_frame_flag_list[LAST_FRAME]) &&
-      !(cpi->ref_frame_flags & av1_ref_frame_flag_list[ALTREF_FRAME])) {
+  if (!(cpi->common.ref_frame_flags & av1_ref_frame_flag_list[LAST_FRAME]) &&
+      !(cpi->common.ref_frame_flags & av1_ref_frame_flag_list[ALTREF_FRAME])) {
     for (int i = LAST_FRAME; i <= ALTREF_FRAME; i++) {
-      if (cpi->ref_frame_flags & av1_ref_frame_flag_list[i]) {
+      if (cpi->common.ref_frame_flags & av1_ref_frame_flag_list[i]) {
         ref_list[0] = i;
         break;
       }
@@ -410,6 +418,7 @@ static AOM_INLINE void simple_motion_search_prune_part_features(
     // Setting up motion search
     ref_list[0] = cpi->rc.is_src_frame_alt_ref ? ALTREF_FRAME : LAST_FRAME;
   }
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   const int num_refs = 1;
   const int use_subpixel = 1;
@@ -1458,11 +1467,10 @@ int evaluate_ab_partition_based_on_split(
   // Threshold for number of winners
   // Conservative pruning for high quantizers
   const int num_win_thresh = AOMMIN(3 * (2 * (MAXQ - qindex) / MAXQ), 3);
-  int sub_part_win = (rect_part_win_info == NULL)
-                         ? (pc_tree->partitioning == rect_part)
-                         : (rect_part == PARTITION_HORZ)
-                               ? rect_part_win_info->rect_part_win[HORZ]
-                               : rect_part_win_info->rect_part_win[VERT];
+  int sub_part_win =
+      (rect_part_win_info == NULL)    ? (pc_tree->partitioning == rect_part)
+      : (rect_part == PARTITION_HORZ) ? rect_part_win_info->rect_part_win[HORZ]
+                                      : rect_part_win_info->rect_part_win[VERT];
   num_win += (sub_part_win) ? 1 : 0;
   if (pc_tree->split[split_idx1]) {
     num_win +=

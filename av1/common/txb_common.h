@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2017, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_TXB_COMMON_H_
@@ -354,11 +355,27 @@ static INLINE void get_txb_ctx(const BLOCK_SIZE plane_bsize,
     }
   } else {
     const int ctx_base = get_entropy_context(tx_size, a, l);
+#if CONFIG_CONTEXT_DERIVATION
+    int ctx_offset = 0;
+    if (plane == AOM_PLANE_U) {
+      ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                    num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                       ? 10
+                       : 7;
+    } else {
+      ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                    num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                       ? (V_TXB_SKIP_CONTEXT_OFFSET >> 1)
+                       : 0;
+    }
+    txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
+#else
     const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
                             num_pels_log2_lookup[txsize_to_bsize[tx_size]])
                                ? 10
                                : 7;
     txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
+#endif  // CONFIG_CONTEXT_DERIVATION
   }
 #undef MAX_TX_SIZE_UNIT
 }

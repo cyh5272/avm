@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <limits.h>
@@ -45,14 +46,13 @@ CYCLIC_REFRESH *av1_cyclic_refresh_alloc(int mi_rows, int mi_cols
     return NULL;
   }
 #if CONFIG_EXTQUANT
-  assert(bit_depth == AOM_BITS_8
-             ? (MAXQ_8_BITS <= (QINDEX_RANGE_8_BITS - 1))
-             : bit_depth == AOM_BITS_10
-                   ? (MAXQ_10_BITS <= (QINDEX_RANGE_10_BITS - 1))
-                   : (MAXQ <= (QINDEX_RANGE - 1)));
-  const uint16_t qinit = bit_depth == AOM_BITS_8
-                             ? MAXQ_8_BITS
-                             : bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ;
+  assert(bit_depth == AOM_BITS_8 ? (MAXQ_8_BITS <= (QINDEX_RANGE_8_BITS - 1))
+         : bit_depth == AOM_BITS_10
+             ? (MAXQ_10_BITS <= (QINDEX_RANGE_10_BITS - 1))
+             : (MAXQ <= (QINDEX_RANGE - 1)));
+  const uint16_t qinit = bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+                         : bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                    : MAXQ;
   for (int i = 0; i < mi_rows * mi_cols; ++i) cr->last_coded_q_map[i] = qinit;
 #else
   assert(MAXQ <= 255);
@@ -377,7 +377,9 @@ void av1_cyclic_refresh_update_parameters(AV1_COMP *const cpi) {
   int qp_max_thresh = 118 * MAXQ >> 7;
   cr->apply_cyclic_refresh = 1;
   if (frame_is_intra_only(cm) || is_lossless_requested(&cpi->oxcf.rc_cfg) ||
+#if CONFIG_SVC_ENCODER
       cpi->svc.temporal_layer_id > 0 ||
+#endif  // CONFIG_SVC_ENCODER
       rc->avg_frame_qindex[INTER_FRAME] < qp_thresh ||
       (rc->frames_since_key > 20 &&
        rc->avg_frame_qindex[INTER_FRAME] > qp_max_thresh) ||
@@ -416,10 +418,12 @@ void av1_cyclic_refresh_update_parameters(AV1_COMP *const cpi) {
     cr->percent_refresh = 10;
     cr->rate_ratio_qdelta = 1.5;
     cr->rate_boost_fac = 10;
+#if !CONFIG_NEW_REF_SIGNALING
     if (cpi->refresh_frame.golden_frame) {
       cr->percent_refresh = 0;
       cr->rate_ratio_qdelta = 1.0;
     }
+#endif  // !CONFIG_NEW_REF_SIGNALING
   }
   // Weight for segment prior to encoding: take the average of the target
   // number for the frame to be encoded and the actual from the previous frame.
@@ -457,9 +461,9 @@ void av1_cyclic_refresh_setup(AV1_COMP *const cpi) {
 #if CONFIG_EXTQUANT
       for (int i = 0; i <= (cm->mi_params.mi_rows * cm->mi_params.mi_cols); i++)
         cr->last_coded_q_map[i] =
-            cm->seq_params.bit_depth == AOM_BITS_8
-                ? MAXQ_8_BITS
-                : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ;
+            cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+            : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                      : MAXQ;
 #else
       memset(cr->last_coded_q_map, MAXQ,
              cm->mi_params.mi_rows * cm->mi_params.mi_cols *
@@ -511,9 +515,9 @@ void av1_cyclic_refresh_setup(AV1_COMP *const cpi) {
     const int qindex2 = clamp(
         quant_params->base_qindex + quant_params->y_dc_delta_q + qindex_delta,
         0,
-        cm->seq_params.bit_depth == AOM_BITS_8
-            ? MAXQ_8_BITS
-            : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ);
+        cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+        : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                  : MAXQ);
 #else
     const int qindex2 = clamp(
         quant_params->base_qindex + quant_params->y_dc_delta_q + qindex_delta,
@@ -545,6 +549,8 @@ void av1_cyclic_refresh_reset_resize(AV1_COMP *const cpi) {
   CYCLIC_REFRESH *const cr = cpi->cyclic_refresh;
   memset(cr->map, 0, cm->mi_params.mi_rows * cm->mi_params.mi_cols);
   cr->sb_index = 0;
+#if !CONFIG_NEW_REF_SIGNALING
   cpi->refresh_frame.golden_frame = true;
+#endif  // !CONFIG_NEW_REF_SIGNALING
   cr->apply_cyclic_refresh = 0;
 }

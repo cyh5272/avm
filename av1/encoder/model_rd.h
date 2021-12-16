@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2020, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_MODEL_RD_H_
@@ -176,7 +177,11 @@ static AOM_INLINE void model_rd_for_sb(
   // Hence quantizer step is also 8 times. To get effective quantizer
   // we need to divide by 8 before sending to modeling function.
   int plane;
+#if CONFIG_NEW_REF_SIGNALING
+  const int ref = COMPACT_INDEX0_NRS(xd->mi[0]->ref_frame[0]);
+#else
   const int ref = xd->mi[0]->ref_frame[0];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   int64_t rate_sum = 0;
   int64_t dist_sum = 0;
@@ -227,7 +232,11 @@ static AOM_INLINE void model_rd_for_sb_with_curvfit(
   // Note our transform coeffs are 8 times an orthogonal transform.
   // Hence quantizer step is also 8 times. To get effective quantizer
   // we need to divide by 8 before sending to modeling function.
+#if CONFIG_NEW_REF_SIGNALING
+  const int ref = COMPACT_INDEX0_NRS(xd->mi[0]->ref_frame[0]);
+#else
   const int ref = xd->mi[0]->ref_frame[0];
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   int64_t rate_sum = 0;
   int64_t dist_sum = 0;

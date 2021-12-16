@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_COMMON_ENTROPYMODE_H_
@@ -62,6 +63,10 @@ extern "C" {
 
 #define KF_MODE_CONTEXTS 5
 
+#if CONFIG_NEW_REF_SIGNALING
+#define COMPREF_BIT_TYPES 3
+#endif  // CONFIG_NEW_REF_SIGNALING
+
 struct AV1Common;
 
 typedef struct {
@@ -71,9 +76,17 @@ typedef struct {
 
 typedef struct frame_contexts {
   aom_cdf_prob txb_skip_cdf[TX_SIZES][TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
+#if CONFIG_CONTEXT_DERIVATION
+  aom_cdf_prob v_txb_skip_cdf[V_TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
+#endif  // CONFIG_CONTEXT_DERIVATION
   aom_cdf_prob eob_extra_cdf[TX_SIZES][PLANE_TYPES][EOB_COEF_CONTEXTS]
                             [CDF_SIZE(2)];
   aom_cdf_prob dc_sign_cdf[PLANE_TYPES][DC_SIGN_CONTEXTS][CDF_SIZE(2)];
+#if CONFIG_CONTEXT_DERIVATION
+  aom_cdf_prob v_dc_sign_cdf[CROSS_COMPONENT_CONTEXTS][DC_SIGN_CONTEXTS]
+                            [CDF_SIZE(2)];
+  aom_cdf_prob v_ac_sign_cdf[CROSS_COMPONENT_CONTEXTS][CDF_SIZE(2)];
+#endif  // CONFIG_CONTEXT_DERIVATION
   aom_cdf_prob eob_flag_cdf16[PLANE_TYPES][2][CDF_SIZE(5)];
   aom_cdf_prob eob_flag_cdf32[PLANE_TYPES][2][CDF_SIZE(6)];
   aom_cdf_prob eob_flag_cdf64[PLANE_TYPES][2][CDF_SIZE(7)];
@@ -99,8 +112,14 @@ typedef struct frame_contexts {
   aom_cdf_prob refmv_cdf[REFMV_MODE_CONTEXTS][CDF_SIZE(2)];
 #endif  // CONFIG_NEW_INTER_MODES
 
+#if CONFIG_OPTFLOW_REFINEMENT
+  aom_cdf_prob use_optflow_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(2)];
+  aom_cdf_prob inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS]
+                                      [CDF_SIZE(INTER_COMPOUND_REF_TYPES)];
+#else
   aom_cdf_prob inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS]
                                       [CDF_SIZE(INTER_COMPOUND_MODES)];
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   aom_cdf_prob compound_type_cdf[BLOCK_SIZES_ALL]
                                 [CDF_SIZE(MASKED_COMPOUND_TYPES)];
   aom_cdf_prob wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(16)];
@@ -122,12 +141,19 @@ typedef struct frame_contexts {
                                  [CDF_SIZE(2)];
   aom_cdf_prob palette_uv_mode_cdf[PALETTE_UV_MODE_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob comp_inter_cdf[COMP_INTER_CONTEXTS][CDF_SIZE(2)];
+#if CONFIG_NEW_REF_SIGNALING
+  aom_cdf_prob single_ref_cdf[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1]
+                             [CDF_SIZE(2)];
+  aom_cdf_prob comp_ref_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]
+                           [INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)];
+#else
   aom_cdf_prob single_ref_cdf[REF_CONTEXTS][SINGLE_REFS - 1][CDF_SIZE(2)];
   aom_cdf_prob comp_ref_type_cdf[COMP_REF_TYPE_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob uni_comp_ref_cdf[UNI_COMP_REF_CONTEXTS][UNIDIR_COMP_REFS - 1]
                                [CDF_SIZE(2)];
   aom_cdf_prob comp_ref_cdf[REF_CONTEXTS][FWD_REFS - 1][CDF_SIZE(2)];
   aom_cdf_prob comp_bwdref_cdf[REF_CONTEXTS][BWD_REFS - 1][CDF_SIZE(2)];
+#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_NEW_TX_PARTITION
   aom_cdf_prob inter_4way_txfm_partition_cdf[2][TXFM_PARTITION_INTER_CONTEXTS]
                                             [CDF_SIZE(4)];
@@ -136,11 +162,15 @@ typedef struct frame_contexts {
 #else   // CONFIG_NEW_TX_PARTITION
   aom_cdf_prob txfm_partition_cdf[TXFM_PARTITION_CONTEXTS][CDF_SIZE(2)];
 #endif  // CONFIG_NEW_TX_PARTITION
-  aom_cdf_prob compound_index_cdf[COMP_INDEX_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob comp_group_idx_cdf[COMP_GROUP_IDX_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob skip_mode_cdfs[SKIP_MODE_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob skip_txfm_cdfs[SKIP_CONTEXTS][CDF_SIZE(2)];
+#if CONFIG_CONTEXT_DERIVATION
+  aom_cdf_prob intra_inter_cdf[INTRA_INTER_SKIP_TXFM_CONTEXTS]
+                              [INTRA_INTER_CONTEXTS][CDF_SIZE(2)];
+#else
   aom_cdf_prob intra_inter_cdf[INTRA_INTER_CONTEXTS][CDF_SIZE(2)];
+#endif  // CONFIG_CONTEXT_DERIVATION
   nmv_context nmvc;
   nmv_context ndvc;
   aom_cdf_prob intrabc_cdf[CDF_SIZE(2)];
@@ -150,12 +180,23 @@ typedef struct frame_contexts {
   aom_cdf_prob switchable_restore_cdf[CDF_SIZE(RESTORE_SWITCHABLE_TYPES)];
   aom_cdf_prob wiener_restore_cdf[CDF_SIZE(2)];
   aom_cdf_prob sgrproj_restore_cdf[CDF_SIZE(2)];
+#if !CONFIG_AIMC
   aom_cdf_prob y_mode_cdf[BLOCK_SIZE_GROUPS][CDF_SIZE(INTRA_MODES)];
   aom_cdf_prob uv_mode_cdf[CFL_ALLOWED_TYPES][INTRA_MODES]
                           [CDF_SIZE(UV_INTRA_MODES)];
+#endif  // !CONFIG_AIMC
 #if CONFIG_MRLS
   aom_cdf_prob mrl_index_cdf[CDF_SIZE(MRL_LINE_NUMBER)];
 #endif
+#if CONFIG_AIMC
+  // y mode cdf
+  aom_cdf_prob y_mode_set_cdf[CDF_SIZE(INTRA_MODE_SETS)];
+  aom_cdf_prob y_mode_idx_cdf_0[Y_MODE_CONTEXTS][CDF_SIZE(FIRST_MODE_COUNT)];
+  aom_cdf_prob y_mode_idx_cdf_1[Y_MODE_CONTEXTS][CDF_SIZE(SECOND_MODE_COUNT)];
+  // uv mode cdf
+  aom_cdf_prob uv_mode_cdf[CFL_ALLOWED_TYPES][UV_MODE_CONTEXTS]
+                          [CDF_SIZE(UV_INTRA_MODES)];
+#endif  // CONFIG_AIMC
 #if CONFIG_SDP
   aom_cdf_prob partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                             [CDF_SIZE(EXT_PARTITION_TYPES)];
@@ -164,6 +205,7 @@ typedef struct frame_contexts {
 #endif
   aom_cdf_prob switchable_interp_cdf[SWITCHABLE_FILTER_CONTEXTS]
                                     [CDF_SIZE(SWITCHABLE_FILTERS)];
+#if !CONFIG_AIMC
   /* kf_y_cdf is discarded after use, so does not require persistent storage.
      However, we keep it with the other CDFs in this struct since it needs to
      be copied to each tile to support parallelism just like the others.
@@ -174,20 +216,11 @@ typedef struct frame_contexts {
 #if CONFIG_SDP
   aom_cdf_prob angle_delta_cdf[PARTITION_STRUCTURE_NUM][DIRECTIONAL_MODES]
                               [CDF_SIZE(2 * MAX_ANGLE_DELTA + 1)];
-#if CONFIG_ORIP
-  aom_cdf_prob angle_delta_cdf_hv[PARTITION_STRUCTURE_NUM]
-                                 [TOTAL_NUM_ORIP_ANGLE_DELTA]
-                                 [CDF_SIZE(2 * MAX_ANGLE_DELTA + 1 +
-                                           ADDITIONAL_ANGLE_DELTA)];
-#endif
 #else
   aom_cdf_prob angle_delta_cdf[DIRECTIONAL_MODES]
                               [CDF_SIZE(2 * MAX_ANGLE_DELTA + 1)];
-#if CONFIG_ORIP
-  aom_cdf_prob angle_delta_cdf_hv[TOTAL_NUM_ORIP_ANGLE_DELTA][CDF_SIZE(
-      2 * MAX_ANGLE_DELTA + 1 + ADDITIONAL_ANGLE_DELTA)];
 #endif
-#endif
+#endif  // !CONFIG_AIMC
 
 #if CONFIG_NEW_TX_PARTITION
   aom_cdf_prob intra_4way_txfm_partition_cdf[2][TX_SIZE_CONTEXTS][CDF_SIZE(4)];
@@ -279,6 +312,28 @@ static INLINE int16_t av1_drl_ctx(int16_t mode_ctx) {
   return ctx;
 }
 #endif  // CONFIG_NEW_INTER_MODES
+
+#if CONFIG_OPTFLOW_REFINEMENT
+static const int comp_idx_to_opfl_mode[5] = { NEAR_NEARMV_OPTFLOW,
+                                              NEAR_NEWMV_OPTFLOW,
+                                              NEW_NEARMV_OPTFLOW, -1,
+                                              NEW_NEWMV_OPTFLOW };
+
+static INLINE int opfl_get_comp_idx(int mode) {
+  switch (mode) {
+    case NEAR_NEARMV:
+    case NEAR_NEARMV_OPTFLOW: return INTER_COMPOUND_OFFSET(NEAR_NEARMV);
+    case NEAR_NEWMV:
+    case NEAR_NEWMV_OPTFLOW: return INTER_COMPOUND_OFFSET(NEAR_NEWMV);
+    case NEW_NEARMV:
+    case NEW_NEARMV_OPTFLOW: return INTER_COMPOUND_OFFSET(NEW_NEARMV);
+    case NEW_NEWMV:
+    case NEW_NEWMV_OPTFLOW: return INTER_COMPOUND_OFFSET(NEW_NEWMV);
+    case GLOBAL_GLOBALMV: return INTER_COMPOUND_OFFSET(GLOBAL_GLOBALMV);
+    default: assert(0); return 0;
+  }
+}
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 
 // Returns the context for palette color index at row 'r' and column 'c',
 // along with the 'color_order' of neighbors and the 'color_idx'.

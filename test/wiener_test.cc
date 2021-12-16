@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2018, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <tuple>
@@ -272,12 +273,12 @@ TEST_P(WienerTest, DISABLED_Speed) {
 
 INSTANTIATE_TEST_SUITE_P(C, WienerTest, ::testing::Values(compute_stats_opt_c));
 
-#if HAVE_SSE4_1
+#if HAVE_SSE4_1 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 INSTANTIATE_TEST_SUITE_P(SSE4_1, WienerTest,
                          ::testing::Values(av1_compute_stats_sse4_1));
 #endif  // HAVE_SSE4_1
 
-#if HAVE_AVX2
+#if HAVE_AVX2 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 
 INSTANTIATE_TEST_SUITE_P(AVX2, WienerTest,
                          ::testing::Values(av1_compute_stats_avx2));
@@ -572,12 +573,12 @@ TEST_P(WienerTestHighbd, DISABLED_Speed) {
 INSTANTIATE_TEST_SUITE_P(C, WienerTestHighbd,
                          ::testing::Values(compute_stats_highbd_opt_c));
 
-#if HAVE_SSE4_1
+#if HAVE_SSE4_1 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 INSTANTIATE_TEST_SUITE_P(SSE4_1, WienerTestHighbd,
                          ::testing::Values(av1_compute_stats_highbd_sse4_1));
 #endif  // HAVE_SSE4_1
 
-#if HAVE_AVX2
+#if HAVE_AVX2 && !CONFIG_EXCLUDE_SIMD_MISMATCH
 INSTANTIATE_TEST_SUITE_P(AVX2, WienerTestHighbd,
                          ::testing::Values(av1_compute_stats_highbd_avx2));
 #endif  // HAVE_AVX2

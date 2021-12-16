@@ -1,12 +1,12 @@
 ##
-## Copyright (c) 2017, Alliance for Open Media. All rights reserved
+## Copyright (c) 2021, Alliance for Open Media. All rights reserved
 ##
-## This source code is subject to the terms of the BSD 2 Clause License and
-## the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
-## was not distributed with this source code in the LICENSE file, you can
-## obtain it at www.aomedia.org/license/software. If the Alliance for Open
-## Media Patent License 1.0 was not distributed with this source code in the
-## PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+## This source code is subject to the terms of the BSD 3-Clause Clear License and the
+## Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear License was
+## not distributed with this source code in the LICENSE file, you can obtain it
+## at aomedia.org/license/software-license/bsd-3-c-c/.  If the Alliance for Open Media Patent
+## License 1.0 was not distributed with this source code in the PATENTS file, you
+## can obtain it at aomedia.org/license/patent-license/.
 ##
 sub av1_common_forward_decls() {
 print <<EOF
@@ -115,9 +115,40 @@ else {
     specialize qw/av1_dr_prediction_z3 avx2 neon/;
 }
 
+#if CONFIG_IBP_DIR
+add_proto qw / void av1_ibp_dr_prediction_z1 /,
+    "uint8_t* weights, uint8_t *dst, ptrdiff_t stride, uint8_t* second_pred, ptrdiff_t second_stride, int bw, int bh";
+add_proto qw / void av1_ibp_dr_prediction_z3 /,
+    "uint8_t* weights, uint8_t *dst, ptrdiff_t stride, uint8_t* second_pred, ptrdiff_t second_stride, int bw, int bh";
+#endif
+
 # FILTER_INTRA predictor functions
 add_proto qw/void av1_filter_intra_predictor/, "uint8_t *dst, ptrdiff_t stride, TX_SIZE tx_size, const uint8_t *above, const uint8_t *left, int mode";
 specialize qw/av1_filter_intra_predictor sse4_1 neon/;
+
+# optical flow interpolation function
+if (aom_config("CONFIG_OPTFLOW_REFINEMENT") eq "yes") {
+  add_proto qw/void av1_bicubic_grad_interpolation/, "const int16_t *pred_src,int16_t *x_grad,int16_t *y_grad,const int blk_width,const int blk_height";
+  specialize qw/av1_bicubic_grad_interpolation sse4_1/;
+
+  add_proto qw/void av1_bicubic_grad_interpolation_highbd/, "const int16_t *pred_src,int16_t *x_grad,int16_t *y_grad,const int blk_width,const int blk_height";
+  specialize qw/av1_bicubic_grad_interpolation_highbd sse4_1/;
+
+  add_proto qw/int av1_opfl_mv_refinement_nxn_lowbd/, " const uint8_t *p0, int pstride0, const uint8_t *p1, int pstride1, const int16_t *gx0, const int16_t *gy0, const int16_t *gx1, const int16_t *gy1, int gstride, int bw, int bh, int n, int d0, int d1, int grad_prec_bits, int mv_prec_bits, int *vx0, int *vy0, int *vx1, int *vy1";
+  specialize qw/av1_opfl_mv_refinement_nxn_lowbd sse4_1/;
+
+  add_proto qw/int av1_opfl_mv_refinement_nxn_highbd/, " const uint16_t *p0, int pstride0, const uint16_t *p1, int pstride1, const int16_t *gx0, const int16_t *gy0, const int16_t *gx1, const int16_t *gy1, int gstride, int bw, int bh, int n, int d0, int d1, int grad_prec_bits, int mv_prec_bits, int *vx0, int *vy0, int *vx1, int *vy1";
+  specialize qw/av1_opfl_mv_refinement_nxn_highbd sse4_1/;
+
+  add_proto qw/int av1_opfl_mv_refinement_nxn_interp_grad/, " const int16_t *pdiff, int pstride,const int16_t *gx, const int16_t *gy, int gstride, int bw, int bh, int n,int d0, int d1, int grad_prec_bits,int mv_prec_bits, int *vx0, int *vy0,int *vx1, int *vy1";
+  specialize qw/av1_opfl_mv_refinement_nxn_interp_grad sse4_1/;
+
+  add_proto qw/void av1_copy_pred_array/, "const uint8_t *src1, const uint8_t *src2, int16_t *dst1,int16_t *dst2, int bw, int bh,int d0, int d1";
+  specialize qw/av1_copy_pred_array sse4_1/;
+
+  add_proto qw/void av1_copy_pred_array_highbd/, "const uint16_t *src1, const uint16_t *src2, int16_t *dst1,int16_t *dst2, int bw, int bh, int d0, int d1";
+  specialize qw/av1_copy_pred_array_highbd sse4_1/;
+}
 
 # High bitdepth functions
 
@@ -273,6 +304,13 @@ else {
   add_proto qw/void av1_highbd_dr_prediction_z3/, "uint16_t *dst, ptrdiff_t stride, int bw, int bh, const uint16_t *above, const uint16_t *left, int upsample_left, int dx, int dy, int bd";
   specialize qw/av1_highbd_dr_prediction_z3 avx2/;
 }
+
+#if CONFIG_IBP_DIR
+add_proto qw / void av1_highbd_ibp_dr_prediction_z1 /,
+    "uint8_t* weights, uint16_t *dst, ptrdiff_t stride, uint16_t* second_pred, ptrdiff_t second_stride, int bw, int bh";
+add_proto qw / void av1_highbd_ibp_dr_prediction_z3 /,
+    "uint8_t* weights, uint16_t *dst, ptrdiff_t stride, uint16_t* second_pred, ptrdiff_t second_stride, int bw, int bh";
+#endif
 
 # build compound seg mask functions
 add_proto qw/void av1_build_compound_diffwtd_mask/, "uint8_t *mask, DIFFWTD_MASK_TYPE mask_type, const uint8_t *src0, int src0_stride, const uint8_t *src1, int src1_stride, int h, int w";
@@ -432,10 +470,14 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/av1_get_crc32c_value sse4_2/;
 
   add_proto qw/void av1_compute_stats/,  "int wiener_win, const uint8_t *dgd8, const uint8_t *src8, int h_start, int h_end, int v_start, int v_end, int dgd_stride, int src_stride, int64_t *M, int64_t *H";
-  specialize qw/av1_compute_stats sse4_1 avx2/;
+  if (aom_config("CONFIG_EXCLUDE_SIMD_MISMATCH") ne "yes") {
+      specialize qw/av1_compute_stats sse4_1 avx2/;
+  }
 
   add_proto qw/void av1_compute_stats_highbd/,  "int wiener_win, const uint8_t *dgd8, const uint8_t *src8, int h_start, int h_end, int v_start, int v_end, int dgd_stride, int src_stride, int64_t *M, int64_t *H, aom_bit_depth_t bit_depth";
-  specialize qw/av1_compute_stats_highbd sse4_1 avx2/;
+  if (aom_config("CONFIG_EXCLUDE_SIMD_MISMATCH") ne "yes") {
+      specialize qw/av1_compute_stats_highbd sse4_1 avx2/;
+  }
 
   add_proto qw/void av1_calc_proj_params/, " const uint8_t *src8, int width, int height, int src_stride, const uint8_t *dat8, int dat_stride, int32_t *flt0, int flt0_stride, int32_t *flt1, int flt1_stride, int64_t H[2][2], int64_t C[2], const sgr_params_type *params";
   specialize qw/av1_calc_proj_params avx2/;
@@ -449,7 +491,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/av1_get_horver_correlation_full sse4_1 avx2 neon/;
 
   add_proto qw/void av1_nn_predict/, " const float *input_nodes, const NN_CONFIG *const nn_config, int reduce_prec, float *const output";
-  specialize qw/av1_nn_predict sse3 neon/;
+  if (aom_config("CONFIG_EXCLUDE_SIMD_MISMATCH") ne "yes") {
+    specialize qw/av1_nn_predict sse3 neon/;
+  }
 }
 # end encoder functions
 

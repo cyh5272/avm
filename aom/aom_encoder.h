@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 #ifndef AOM_AOM_AOM_ENCODER_H_
 #define AOM_AOM_AOM_ENCODER_H_
@@ -200,6 +201,22 @@ typedef enum {
   AOM_SUPERRES_AUTO,
 } aom_superres_mode;
 
+#if CONFIG_OPTFLOW_REFINEMENT
+/*!\brief Frame super-resolution mode. */
+typedef enum {
+  /**< MV refinement is disabled for all frames. */
+  AOM_OPFL_REFINE_NONE,
+  /**< MV refinement is switchable per block and signaled by the encoder for all
+   * frames. */
+  AOM_OPFL_REFINE_SWITCHABLE,
+  /**< MV refinement is done for all compound average blocks for all frames. */
+  AOM_OPFL_REFINE_ALL,
+  /**< One among the three above types is automatically selected by the encoder
+   * for each frame. */
+  AOM_OPFL_REFINE_AUTO,
+} aom_opfl_refine_type;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+
 /*!\brief Encoder Config Options
  *
  * This type allows to enumerate and control flags defined for encoder control
@@ -266,6 +283,12 @@ typedef struct cfg_options {
    */
   unsigned int enable_ist;
 #endif  // CONFIG_IST
+#if CONFIG_IBP_DC || CONFIG_IBP_DIR
+  /*!\brief enable Intra Bi-Prediction (IBP)
+   *
+   */
+  unsigned int enable_ibp;
+#endif  // CONFIG_IBP_DC || CONFIG_IBP_DIR
   /*!\brief enable flip and identity transform type
    *
    */
@@ -300,12 +323,6 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_global_motion;
-#if !CONFIG_REMOVE_DIST_WTD_COMP
-  /*!\brief enable dist weighted compound
-   *
-   */
-  unsigned int enable_dist_wtd_comp;
-#endif  // !CONFIG_REMOVE_DIST_WTD_COMP
   /*!\brief enable diff weighted compound
    *
    */
@@ -352,6 +369,12 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_angle_delta;
+#if CONFIG_OPTFLOW_REFINEMENT
+  /*!\brief enable optical flow refinement
+   *
+   */
+  aom_opfl_refine_type enable_opfl_refine;
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   /*!\brief enable intra edge filter
    *
    */
@@ -388,6 +411,12 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_reduced_reference_set;
+#if CONFIG_NEW_REF_SIGNALING
+  /*!\brief explicitly signal reference frame mapping
+   *
+   */
+  unsigned int explicit_ref_frame_map;
+#endif  // CONFIG_NEW_REF_SIGNALING
   /*!\brief use reduced transform type set
    *
    */
@@ -398,6 +427,12 @@ typedef struct cfg_options {
    */
   unsigned int max_drl_refmvs;
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_REF_MV_BANK
+  /*!\brief enable reference MV Bank
+   *
+   */
+  unsigned int enable_refmvbank;
+#endif
 } cfg_options_t;
 
 /*!\brief Encoded Frame Flags

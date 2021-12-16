@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #ifndef AOM_AV1_ENCODER_ENCODEMV_H_
@@ -85,7 +86,11 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   const PREDICTION_MODE this_mode = mbmi->mode;
+#if CONFIG_OPTFLOW_REFINEMENT
+  if (this_mode == NEW_NEWMV || this_mode == NEW_NEWMV_OPTFLOW) {
+#else
   if (this_mode == NEW_NEWMV) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
     const int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
     const int_mv ref_mv_1 = av1_get_ref_mv(x, 1);
     if (mbmi->mv[0].as_int == ref_mv_0.as_int ||
@@ -93,7 +98,11 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
       return 0;
     }
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  } else if (this_mode == NEAR_NEWMV || this_mode == NEAR_NEWMV_OPTFLOW) {
+#else
   } else if (this_mode == NEAR_NEWMV) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #else
   } else if (this_mode == NEAREST_NEWMV || this_mode == NEAR_NEWMV) {
 #endif  // CONFIG_NEW_INTER_MODES
@@ -102,7 +111,11 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
       return 0;
     }
 #if CONFIG_NEW_INTER_MODES
+#if CONFIG_OPTFLOW_REFINEMENT
+  } else if (this_mode == NEW_NEARMV || this_mode == NEW_NEARMV_OPTFLOW) {
+#else
   } else if (this_mode == NEW_NEARMV) {
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #else
   } else if (this_mode == NEW_NEARESTMV || this_mode == NEW_NEARMV) {
 #endif  // CONFIG_NEW_INTER_MODES

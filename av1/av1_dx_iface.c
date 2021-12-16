@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 2 Clause License and
- * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
- * was not distributed with this source code in the LICENSE file, you can
- * obtain it at www.aomedia.org/license/software. If the Alliance for Open
- * Media Patent License 1.0 was not distributed with this source code in the
- * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ * This source code is subject to the terms of the BSD 3-Clause Clear License
+ * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
+ * License was not distributed with this source code in the LICENSE file, you
+ * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * aomedia.org/license/patent-license/.
  */
 
 #include <stdlib.h>
@@ -108,12 +109,23 @@ static aom_codec_err_t decoder_init(aom_codec_ctx_t *ctx) {
     priv->tile_mode = 0;
     priv->decode_tile_row = -1;
     priv->decode_tile_col = -1;
+#if CONFIG_IBP_DIR
+    init_ibp_info(ctx->priv->ibp_directional_weights);
+#endif
   }
 
   return AOM_CODEC_OK;
 }
 
 static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
+#if CONFIG_THROUGHPUT_ANALYSIS
+  printf(
+      "avg_ctx_syms : %d\t avg_bypass_syms : %d\t max_ctx_syms : %d\t "
+      "max_bypass_syms : %d\t max_bits : %d\t total_bits : %d\n",
+      (int)(tot_ctx_syms / tot_frames), (int)(tot_bypass_syms / tot_frames),
+      max_ctx_syms, max_bypass_syms, (int)(max_bits / 8), (int)(tot_bits / 8));
+#endif  // CONFIG_THROUGHPUT_ANALYSIS
+
   if (ctx->frame_worker != NULL) {
     AVxWorker *const worker = ctx->frame_worker;
     FrameWorkerData *const frame_worker_data = (FrameWorkerData *)worker->data1;
@@ -138,6 +150,9 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
     av1_free_internal_frame_buffers(&ctx->buffer_pool->int_frame_buffers);
   }
 
+#if CONFIG_IBP_DIR
+  free_ibp_info(ctx->base.ibp_directional_weights);
+#endif
   aom_free(ctx->frame_worker);
   aom_free(ctx->buffer_pool);
   aom_img_free(&ctx->img);
@@ -472,6 +487,11 @@ static aom_codec_err_t init_decoder(aom_codec_alg_priv_t *ctx) {
   frame_worker_data->pbi->is_fwd_kf_present = 0;
   frame_worker_data->pbi->enable_subgop_stats = ctx->enable_subgop_stats;
   frame_worker_data->pbi->is_arf_frame_present = 0;
+#if CONFIG_IBP_DIR
+  memcpy(frame_worker_data->pbi->common.ibp_directional_weights,
+         ctx->base.ibp_directional_weights,
+         sizeof(ctx->base.ibp_directional_weights));
+#endif
   worker->hook = frame_worker_hook;
 
   init_buffer_callbacks(ctx);
