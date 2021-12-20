@@ -29,6 +29,18 @@ static int compare_score_data_asc(const void *a, const void *b) {
   }
 }
 
+static void bubble_sort_ref_scores(RefScoreData *scores, int n_ranked) {
+  for (int i = n_ranked - 1; i > 0; --i) {
+    for (int j = 0; j < i; j++) {
+      if (compare_score_data_asc(&scores[j], &scores[j + 1]) > 0) {
+        RefScoreData score_temp = scores[j];
+        scores[j] = scores[j + 1];
+        scores[j + 1] = score_temp;
+      }
+    }
+  }
+}
+
 // Checks to see if a particular reference frame is already in the reference
 // frame map
 static int is_in_ref_score(RefScoreData *map, int disp_order, int score,
@@ -139,7 +151,7 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
   }
 
   // Sort the references according to their score
-  qsort(scores, n_ranked, sizeof(scores[0]), compare_score_data_asc);
+  bubble_sort_ref_scores(scores, n_ranked);
 
   cm->ref_frames_info.n_total_refs =
       AOMMIN(n_ranked, cm->seq_params.max_reference_frames);
