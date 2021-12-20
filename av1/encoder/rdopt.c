@@ -5581,7 +5581,7 @@ static INLINE void update_search_state(
 }
 
 // Find the best RD for a reference frame (among single reference modes)
-// and store +10% of it in the 0-th element in ref_frame_rd.
+// and store +10% of it in the 0-th (or last for NRS) element in ref_frame_rd.
 static AOM_INLINE void find_top_ref(int64_t ref_frame_rd[REF_FRAMES]) {
   int64_t ref_copy[REF_FRAMES - 1];
 #if CONFIG_NEW_REF_SIGNALING
@@ -5792,9 +5792,14 @@ static int skip_inter_mode(AV1_COMP *cpi, MACROBLOCK *x, const BLOCK_SIZE bsize,
   if (sf->inter_sf.prune_compound_using_single_ref && comp_pred) {
     // After we done with single reference modes, find the 2nd best RD
     // for a reference frame. Only search compound modes that have a reference
-    // frame at least as good as the 2nd best.
+    // frame at least as good as 110% the best one.
     if (!args->prune_cpd_using_sr_stats_ready &&
+#if CONFIG_NEW_REF_SIGNALING
+        *args->num_single_modes_processed ==
+            cpi->common.ref_frames_info.n_total_refs * SINGLE_INTER_MODE_NUM) {
+#else
         *args->num_single_modes_processed == NUM_SINGLE_REF_MODES) {
+#endif  // CONFIG_NEW_REF_SIGNALING
       find_top_ref(ref_frame_rd);
       args->prune_cpd_using_sr_stats_ready = 1;
     }
