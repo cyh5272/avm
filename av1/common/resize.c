@@ -23,6 +23,9 @@
 #include "aom_scale/aom_scale.h"
 #include "av1/common/common.h"
 #include "av1/common/resize.h"
+#if CONFIG_EXT_SUPERRES
+#include "av1/common/lanczos_resample.h"
+#endif  // CONFIG_EXT_SUPERRES
 
 #include "config/aom_dsp_rtcd.h"
 #include "config/aom_scale_rtcd.h"
@@ -1043,6 +1046,48 @@ Error:
   aom_free(arrbuf);
   aom_free(arrbuf2);
 }
+
+#if CONFIG_EXT_SUPERRES
+void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
+                                   int width, int in_stride, uint8_t *output,
+                                   int height2, int width2, int out_stride,
+                                   int subx, int suby, int is_hbd, int bd,
+                                   int denom, int num) {
+  int coeff_prec_bits = 14;
+  int extra_prec_bits = 2;
+  WIN_TYPE win = WIN_LANCZOS;
+  EXT_TYPE ext = EXT_REPEAT;
+  ClipProfile clip = { bd, 0 };
+  int horz_a = 5;
+  int vert_a = 5;
+  double horz_x0 = subx ? (double)('d') : (double)('c');
+  double vert_x0 = suby ? (double)('d') : (double)('c');
+
+  RationalResampleFilter horz_rf;
+  RationalResampleFilter vert_rf;
+
+  if (!get_resample_filter(num, denom, horz_a, horz_x0, ext, win, subx,
+                           coeff_prec_bits, &horz_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, suby,
+                           coeff_prec_bits, &vert_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+
+  if (is_hbd) {
+    const int16_t *input16 = CONVERT_TO_SHORTPTR(input);
+    int16_t *output16 = CONVERT_TO_SHORTPTR(output);
+    resample_2d(input16, width, height, in_stride, &horz_rf, &vert_rf,
+                extra_prec_bits, &clip, output16, width2, height2, out_stride);
+  } else {
+    resample_2d_8b(input, width, height, in_stride, &horz_rf, &vert_rf,
+                   extra_prec_bits, &clip, output, width2, height2, out_stride);
+  }
+}
+#endif  // CONFIG_EXT_SUPERRES
 
 static void highbd_upscale_normative_rect(const uint8_t *const input,
                                           int height, int width, int in_stride,
