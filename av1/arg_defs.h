@@ -145,6 +145,9 @@ typedef struct av1_codec_arg_definitions {
 #if CONFIG_PEF
   arg_def_t enable_pef;
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  arg_def_t enable_deband;
+#endif
   arg_def_t disable_ml_partition_speed_features;
 #if CONFIG_EXT_RECUR_PARTITIONS
   arg_def_t erp_pruning_level;

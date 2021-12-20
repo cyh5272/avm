@@ -82,6 +82,9 @@ struct av1_extracfg {
 #if CONFIG_PEF
   unsigned int enable_pef;
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  unsigned int enable_deband;
+#endif
   unsigned int force_video_mode;
   unsigned int enable_obmc;
   unsigned int enable_trellis_quant;
@@ -425,6 +428,9 @@ static struct av1_extracfg default_extra_cfg = {
 #if CONFIG_PEF
   1,                            // enable_pef
 #endif                          // CONFIG_PEF
+#if CONFIG_DEBAND
+  1,  // enable_deband
+#endif
   0,                            // force_video_mode
   1,                            // enable_obmc
   3,                            // enable_trellis_quant
@@ -960,6 +966,9 @@ static void update_encoder_config(cfg_options_t *cfg,
 #if CONFIG_PEF
   cfg->enable_pef = extra_cfg->enable_pef;
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  cfg->enable_deband = extra_cfg->enable_deband;
+#endif
   cfg->superblock_size =
       (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)     ? 64
       : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
@@ -1089,10 +1098,14 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #if CONFIG_PEF
   extra_cfg->enable_pef = cfg->enable_pef;
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  extra_cfg->enable_deband = cfg->enable_deband;
+#endif
   extra_cfg->superblock_size =
       (cfg->superblock_size == 64)    ? AOM_SUPERBLOCK_SIZE_64X64
       : (cfg->superblock_size == 128) ? AOM_SUPERBLOCK_SIZE_128X128
                                       : AOM_SUPERBLOCK_SIZE_DYNAMIC;
+
   extra_cfg->enable_warped_motion = cfg->enable_warped_motion;
   extra_cfg->enable_diff_wtd_comp = cfg->enable_diff_wtd_comp;
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1423,6 +1436,9 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
     }
   }
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  tool_cfg->enable_deband = extra_cfg->enable_deband;
+#endif
 #if CONFIG_ADAPTIVE_MVD
   tool_cfg->enable_adaptive_mvd = extra_cfg->enable_adaptive_mvd;
 #endif  // CONFIG_ADAPTIVE_MVD
@@ -2141,6 +2157,7 @@ static aom_codec_err_t ctrl_set_enable_cdef(aom_codec_alg_priv_t *ctx,
   extra_cfg.enable_cdef = CAST(AV1E_SET_ENABLE_CDEF, args);
   return update_extra_cfg(ctx, &extra_cfg);
 }
+
 
 static aom_codec_err_t ctrl_set_enable_restoration(aom_codec_alg_priv_t *ctx,
                                                    va_list args) {
@@ -3785,6 +3802,11 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                               err_string)) {
     extra_cfg.enable_pef = arg_parse_int_helper(&arg, err_string);
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_deband, argv,
+                              err_string)) {
+    extra_cfg.enable_deband = arg_parse_int_helper(&arg, err_string);
+#endif
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.force_video_mode,
                               argv, err_string)) {
     extra_cfg.force_video_mode = arg_parse_uint_helper(&arg, err_string);
@@ -4477,6 +4499,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #if CONFIG_PEF
         1,
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+        1,
+#endif
         1, 1,
 #if CONFIG_EXTENDED_WARP_PREDICTION
         1, 1,   1,

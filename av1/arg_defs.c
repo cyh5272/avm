@@ -360,6 +360,10 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
                         "Enable prediction enhancement filter (0: false "
                         "1: true)"),
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  .enable_deband = ARG_DEF(NULL, "enable-deband", 1,
+                         "Enable debanding (0: false 1: true)"),
+#endif
   .disable_ml_partition_speed_features =
       ARG_DEF(NULL, "disable-ml-partition-speed-features", 1,
               "Disable ML partition speed features "

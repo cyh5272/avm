@@ -894,6 +894,10 @@ typedef struct {
   // enable implicit masked blending
   bool enable_imp_msk_bld;
 #endif  // CONFIG_D071_IMP_MSK_BLD
+#if CONFIG_DEBAND
+  // Indicates if deband should be enabled.
+  bool enable_deband;
+#endif
   // When enabled, video mode should be used even for single frame input.
   bool force_video_mode;
   // Indicates if the error resiliency features should be enabled.

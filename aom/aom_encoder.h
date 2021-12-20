@@ -434,6 +434,12 @@ typedef struct cfg_options {
    */
   unsigned int enable_pef;
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  /*!\brief enable debanding algorithm
+   *
+   */
+  unsigned int enable_deband;
+#endif
   /*!\brief enable OBMC
    *
    */

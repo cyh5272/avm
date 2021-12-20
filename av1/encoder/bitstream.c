@@ -4145,6 +4145,13 @@ static AOM_INLINE void encode_ccso(const AV1_COMMON *cm,
 }
 #endif
 
+#if CONFIG_DEBAND
+static AOM_INLINE void encode_deband(const AV1_COMMON *cm,
+                                   struct aom_write_bit_buffer *wb) {
+  aom_wb_write_literal(wb, cm->deband_info.deband_enable, 1);
+}
+#endif
+
 static AOM_INLINE void write_delta_q(struct aom_write_bit_buffer *wb,
                                      int delta_q) {
   if (delta_q != 0) {
@@ -4852,6 +4859,9 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #if CONFIG_PEF
   aom_wb_write_bit(wb, seq_params->enable_pef);
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  aom_wb_write_bit(wb, seq_params->enable_deband);
+#endif
 #if CONFIG_ORIP
   aom_wb_write_bit(wb, seq_params->enable_orip);
 #endif
@@ -5491,6 +5501,11 @@ static AOM_INLINE void write_uncompressed_header_obu(
 #if CONFIG_CCSO
     if (!features->coded_lossless && cm->seq_params.enable_ccso) {
       encode_ccso(cm, wb);
+    }
+#endif
+#if CONFIG_DEBAND
+    if (!features->coded_lossless && cm->seq_params.enable_deband) {
+      encode_deband(cm, wb);
     }
 #endif
   }

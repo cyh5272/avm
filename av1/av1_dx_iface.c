@@ -34,6 +34,10 @@
 #include "av1/decoder/decodeframe.h"
 #include "av1/decoder/obu.h"
 
+#if CONFIG_DEBAND
+#include "av1/common/debanding.h"
+#endif
+
 #include "av1/av1_iface_common.h"
 
 struct aom_codec_alg_priv {
@@ -63,6 +67,11 @@ struct aom_codec_alg_priv {
   aom_image_t image_with_grain;
   aom_codec_frame_buffer_t grain_image_frame_buffers[MAX_NUM_SPATIAL_LAYERS];
   size_t num_grain_image_frame_buffers;
+#if CONFIG_DEBAND
+  aom_image_t image_debanded;
+  aom_codec_frame_buffer_t image_debanded_frame_buffers[MAX_NUM_SPATIAL_LAYERS];
+  size_t num_image_debanded_frame_buffers;
+#endif
   int need_resync;  // wait for key/intra-only frame
   // BufferPool that holds all reference frames. Shared by all the FrameWorkers.
   BufferPool *buffer_pool;
@@ -99,6 +108,9 @@ static aom_codec_err_t decoder_init(aom_codec_ctx_t *ctx) {
       ctx->config.dec = &priv->cfg;
     }
     priv->num_grain_image_frame_buffers = 0;
+#if CONFIG_DEBAND
+    priv->num_image_debanded_frame_buffers = 0;
+#endif
     // Turn row_mt on by default.
     priv->row_mt = 1;
 
@@ -139,6 +151,12 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
   }
 
   if (ctx->buffer_pool) {
+#if CONFIG_DEBAND
+    for (size_t i = 0; i < ctx->num_image_debanded_frame_buffers; i++) {
+      ctx->buffer_pool->release_fb_cb(ctx->buffer_pool->cb_priv,
+                                      &ctx->image_debanded_frame_buffers[i]);
+    }
+#endif
     for (size_t i = 0; i < ctx->num_grain_image_frame_buffers; i++) {
       ctx->buffer_pool->release_fb_cb(ctx->buffer_pool->cb_priv,
                                       &ctx->grain_image_frame_buffers[i]);
@@ -152,6 +170,9 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
   aom_free(ctx->buffer_pool);
   aom_img_free(&ctx->img);
   aom_img_free(&ctx->image_with_grain);
+#if CONFIG_DEBAND
+  aom_img_free(&ctx->image_debanded);
+#endif
   aom_free(ctx);
   return AOM_CODEC_OK;
 }
@@ -629,6 +650,15 @@ static aom_codec_err_t decoder_decode(aom_codec_alg_priv_t *ctx,
 #endif  // CONFIG_OUTPUT_FRAME_BASED_ON_ORDER_HINT
     pbi->num_output_frames = 0;
     unlock_buffer_pool(pool);
+#if CONFIG_DEBAND
+    for (size_t j = 0; j < ctx->num_image_debanded_frame_buffers; j++) {
+      pool->release_fb_cb(pool->cb_priv, &ctx->image_debanded_frame_buffers[j]);
+      ctx->image_debanded_frame_buffers[j].data = NULL;
+      ctx->image_debanded_frame_buffers[j].size = 0;
+      ctx->image_debanded_frame_buffers[j].priv = NULL;
+    }
+    ctx->num_image_debanded_frame_buffers = 0;
+#endif
     for (size_t j = 0; j < ctx->num_grain_image_frame_buffers; j++) {
       pool->release_fb_cb(pool->cb_priv, &ctx->grain_image_frame_buffers[j]);
       ctx->grain_image_frame_buffers[j].data = NULL;
@@ -715,6 +745,145 @@ static void *AllocWithGetFrameBufferCb(void *priv, size_t size) {
   if (param->fb->data == NULL || param->fb->size < size) return NULL;
   return param->fb->data;
 }
+
+#if CONFIG_DEBAND
+static void copy_rect(uint8_t *src, int src_stride, uint8_t *dst,
+                      int dst_stride, int width, int height,
+                      int use_high_bit_depth) {
+  int hbd_coeff = use_high_bit_depth ? 2 : 1;
+  while (height) {
+    memcpy(dst, src, width * sizeof(uint8_t) * hbd_coeff);
+    src += src_stride;
+    dst += dst_stride;
+    --height;
+  }
+  return;
+}
+
+int copy_image_for_deband(const aom_image_t *src,
+                          aom_image_t *dst) {
+  int height, width;
+  int use_high_bit_depth = 0;
+  int chroma_subsamp_x = 0;
+  int chroma_subsamp_y = 0;
+
+  switch (src->fmt) {
+     case AOM_IMG_FMT_AOMI420:
+    case AOM_IMG_FMT_I420:
+      use_high_bit_depth = 0;
+      chroma_subsamp_x = 1;
+      chroma_subsamp_y = 1;
+      break;
+    case AOM_IMG_FMT_I42016:
+      use_high_bit_depth = 1;
+      chroma_subsamp_x = 1;
+      chroma_subsamp_y = 1;
+      break;
+      //    case AOM_IMG_FMT_444A:
+    case AOM_IMG_FMT_I444:
+      use_high_bit_depth = 0;
+      chroma_subsamp_x = 0;
+      chroma_subsamp_y = 0;
+      break;
+    case AOM_IMG_FMT_I44416:
+      use_high_bit_depth = 1;
+      chroma_subsamp_x = 0;
+      chroma_subsamp_y = 0;
+      break;
+    case AOM_IMG_FMT_I422:
+      use_high_bit_depth = 0;
+      chroma_subsamp_x = 1;
+      chroma_subsamp_y = 0;
+      break;
+    case AOM_IMG_FMT_I42216:
+      use_high_bit_depth = 1;
+      chroma_subsamp_x = 1;
+      chroma_subsamp_y = 0;
+      break;
+    default:  // unknown input format
+      fprintf(stderr, "Deband error: input format is not supported!\n");
+      return -1;
+  }
+
+  dst->fmt = src->fmt;
+  dst->bit_depth = src->bit_depth;
+
+  dst->w = src->w;
+  dst->h = src->h;
+  dst->r_w = src->r_w;
+  dst->r_h = src->r_h;
+  dst->d_w = src->d_w;
+  dst->d_h = src->d_h;
+
+  dst->cp = src->cp;
+  dst->tc = src->tc;
+  dst->mc = src->mc;
+
+  dst->monochrome = src->monochrome;
+  dst->csp = src->csp;
+  dst->range = src->range;
+
+  dst->x_chroma_shift = src->x_chroma_shift;
+  dst->y_chroma_shift = src->y_chroma_shift;
+
+  dst->temporal_id = src->temporal_id;
+  dst->spatial_id = src->spatial_id;
+
+  width = src->d_w % 2 ? src->d_w + 1 : src->d_w;
+  height = src->d_h % 2 ? src->d_h + 1 : src->d_h;
+
+  copy_rect(src->planes[AOM_PLANE_Y], src->stride[AOM_PLANE_Y],
+            dst->planes[AOM_PLANE_Y], dst->stride[AOM_PLANE_Y], src->d_w,
+            src->d_h, use_high_bit_depth);
+
+  // Note that dst is already assumed to be aligned to even.
+  // extend_even(dst->planes[AOM_PLANE_Y], dst->stride[AOM_PLANE_Y], src->d_w,
+  //             src->d_h, use_high_bit_depth);
+
+  if (!src->monochrome) {
+    copy_rect(src->planes[AOM_PLANE_U], src->stride[AOM_PLANE_U],
+              dst->planes[AOM_PLANE_U], dst->stride[AOM_PLANE_U],
+              width >> chroma_subsamp_x, height >> chroma_subsamp_y,
+              use_high_bit_depth);
+
+    copy_rect(src->planes[AOM_PLANE_V], src->stride[AOM_PLANE_V],
+              dst->planes[AOM_PLANE_V], dst->stride[AOM_PLANE_V],
+              width >> chroma_subsamp_x, height >> chroma_subsamp_y,
+              use_high_bit_depth);
+  }
+
+  return 0;
+}
+
+static aom_image_t *alloc_image_deband(aom_codec_alg_priv_t *ctx,
+                                       aom_image_t *img,
+                                       aom_image_t *img_deband) {
+  BufferPool *const pool = ctx->buffer_pool;
+  aom_codec_frame_buffer_t *fb =
+      &ctx->image_debanded_frame_buffers[ctx->num_image_debanded_frame_buffers];
+  AllocCbParam param;
+  param.pool = pool;
+  param.fb = fb;
+  if (!aom_img_alloc_with_cb(img_deband, img->fmt, img->w, img->h, 16,
+                             AllocWithGetFrameBufferCb, &param)) {
+    return NULL;
+  }
+
+  img_deband->user_priv = img->user_priv;
+  img_deband->fb_priv = fb->priv;
+  aom_img_remove_metadata(img_deband);
+  img_deband->metadata = img->metadata;
+  img->metadata = NULL;
+
+  if(copy_image_for_deband(img, img_deband)) {
+    pool->release_fb_cb(pool->cb_priv, fb);
+    return NULL;
+  }
+
+  ctx->num_image_debanded_frame_buffers++;
+  return img_deband;
+}
+#endif
 
 // If grain_params->apply_grain is false, returns img. Otherwise, adds film
 // grain to img, saves the result in grain_img, and returns grain_img.
@@ -871,8 +1040,26 @@ static aom_image_t *decoder_get_frame(aom_codec_alg_priv_t *ctx,
         img->temporal_id = cm->temporal_layer_id;
         img->spatial_id = cm->spatial_layer_id;
         if (pbi->skip_film_grain) grain_params->apply_grain = 0;
-        aom_image_t *res =
-            add_grain_if_needed(ctx, img, &ctx->image_with_grain, grain_params);
+        aom_image_t *res = NULL;
+#if CONFIG_DEBAND
+        const int do_deband =
+            !cm->features.coded_lossless && cm->deband_info.deband_enable;
+        if (do_deband) {
+            DebandInfo *const dbi = &cm->deband_info;
+            if(avm_deband_init(dbi, img->w, img->h, img->bit_depth, 0)) {
+              aom_image_t *img_deb = alloc_image_deband(ctx, img,
+                                                        &ctx->image_debanded);
+              if (!img_deb) {
+                aom_internal_error(&pbi->common.error, AOM_CODEC_CORRUPT_FRAME,
+                                   "Debanding failed at allocation\n");
+              }
+              avm_deband_frame(img_deb, dbi);
+              avm_deband_close(dbi, 0);
+              img = img_deb;
+          }
+        }
+#endif
+        res = add_grain_if_needed(ctx, img, &ctx->image_with_grain, grain_params);
         if (!res) {
           aom_internal_error(&pbi->common.error, AOM_CODEC_CORRUPT_FRAME,
                              "Grain systhesis failed\n");

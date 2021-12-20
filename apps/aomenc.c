@@ -481,6 +481,9 @@ const arg_def_t *av1_key_val_args[] = {
 #if CONFIG_PEF
   &g_av1_codec_arg_defs.enable_pef,
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  &g_av1_codec_arg_defs.enable_deband,
+#endif
 #if CONFIG_IBC_SR_EXT
   &g_av1_codec_arg_defs.enable_intrabc_ext,
 #endif  // CONFIG_IBC_SR_EXT
@@ -700,6 +703,9 @@ static void init_config(cfg_options_t *config) {
 #if CONFIG_WIENER_NONSEP
   config->enable_wiener_nonsep = 1;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_DEBAND
+  config->enable_deband = 1;
+#endif
 #if CONFIG_CCSO
   config->enable_ccso = 1;
 #endif
@@ -1658,6 +1664,9 @@ static void show_stream_config(struct stream_state *stream,
 #if CONFIG_CCSO
           "CCSO (%d), "
 #endif
+#if CONFIG_DEBAND
+          "Deband (%d), "
+#endif
 #if CONFIG_PC_WIENER && CONFIG_WIENER_NONSEP
           "LoopRestoration (%d: [%d/%d/%d/%d])\n",
 #elif CONFIG_PC_WIENER || CONFIG_WIENER_NONSEP
@@ -1668,6 +1677,9 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_deblocking, encoder_cfg->enable_cdef,
 #if CONFIG_CCSO
           encoder_cfg->enable_ccso,
+#endif
+#if CONFIG_DEBAND
+          encoder_cfg->enable_deband,
 #endif
           encoder_cfg->enable_restoration, encoder_cfg->enable_wiener,
           encoder_cfg->enable_sgrproj

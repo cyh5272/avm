@@ -3777,6 +3777,13 @@ static AOM_INLINE void setup_ccso(AV1_COMMON *cm,
 }
 #endif
 
+#if CONFIG_DEBAND
+static AOM_INLINE void setup_deband(AV1_COMMON *cm,
+                                  struct aom_read_bit_buffer *rb) {
+  cm->deband_info.deband_enable = aom_rb_read_literal(rb, 1);
+}
+#endif
+
 static INLINE int read_delta_q(struct aom_read_bit_buffer *rb) {
   return aom_rb_read_bit(rb) ? aom_rb_read_inv_signed_literal(rb, 6) : 0;
 }
@@ -6488,6 +6495,9 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 #if CONFIG_PEF
   seq_params->enable_pef = aom_rb_read_bit(rb);
 #endif  // CONFIG_PEF
+#if CONFIG_DEBAND
+  seq_params->enable_deband = aom_rb_read_bit(rb);
+#endif
 #if CONFIG_ORIP
   seq_params->enable_orip = aom_rb_read_bit(rb);
 #endif
@@ -7787,6 +7797,11 @@ static int read_uncompressed_header(AV1Decoder *pbi,
     setup_ccso(cm, rb);
   }
 #endif
+#if CONFIG_DEBAND
+  if (!features->coded_lossless && seq_params->enable_deband) {
+    setup_deband(cm, rb);
+  }
+#endif
 
 #if CONFIG_PAR_HIDING
   if (features->coded_lossless || !cm->seq_params.enable_parity_hiding)
@@ -8163,7 +8178,6 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
       extend_ccso_border(ext_rec_y, CCSO_PADDING_SIZE, xd);
     }
 #endif
-
     const int do_loop_restoration =
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
         cm->rst_info[0].frame_cross_restoration_type != RESTORE_NONE ||

@@ -67,6 +67,7 @@
 #include "av1/encoder/mv_prec.h"
 #include "av1/encoder/pass2_strategy.h"
 #include "av1/encoder/pickcdef.h"
+#include "av1/encoder/pickdeband.h"
 #if CONFIG_CCSO
 #include "av1/encoder/pickccso.h"
 #endif
@@ -474,6 +475,9 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #if CONFIG_D071_IMP_MSK_BLD
   seq->enable_imp_msk_bld = tool_cfg->enable_imp_msk_bld;
 #endif  // CONFIG_D071_IMP_MSK_BLD
+#if CONFIG_DEBAND
+  seq->enable_deband = tool_cfg->enable_deband;
+#endif
 #if CONFIG_EXTENDED_WARP_PREDICTION
   seq->seq_enabled_motion_modes =
       oxcf->motion_mode_cfg.seq_enabled_motion_modes;
@@ -2281,6 +2285,28 @@ static void save_pre_filter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
 }
 #endif  // CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
 
+#if CONFIG_DEBAND
+/*!\brief Select and apply debanding process
+ *
+ * \ingroup high_level_algo
+ */
+static void avm_debanding(AV1_COMP *cpi, AV1_COMMON *cm,
+                          MACROBLOCKD *xd, int use_debanding) {
+  if (use_debanding) {
+    DebandInfo *const dbi = &cm->deband_info;
+    int bit_depth = xd->bd;
+    int frame_width = xd->plane[0].dst.width;
+    int frame_height = xd->plane[0].dst.height;
+    if(avm_deband_init(dbi, frame_width, frame_height, bit_depth, 1)) {
+      avm_deband_search(&cm->cur_frame->buf, cpi->source, cm, xd);
+      avm_deband_close(&cm->deband_info, 1);
+    }
+  } else {
+    cm->deband_info.deband_enable = 0;
+  }
+}
+#endif
+
 /*!\brief Select and apply cdef filters and switchable restoration filters
  *
  * \ingroup high_level_algo
@@ -3199,6 +3225,15 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
 
 #ifdef OUTPUT_YUV_REC
   aom_write_one_yuv_frame(cm, &cm->cur_frame->buf);
+#endif
+
+#if CONFIG_DEBAND
+  MACROBLOCKD *xd = &cpi->td.mb.e_mbd;
+  const int use_debanding = cm->seq_params.enable_deband &&
+                            !cm->features.all_lossless &&
+                            !cm->tiles.large_scale;
+
+  avm_debanding(cpi, cm, xd, use_debanding);
 #endif
 
   av1_finalize_encoded_frame(cpi);

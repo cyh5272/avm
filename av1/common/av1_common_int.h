@@ -369,6 +369,63 @@ typedef struct {
 } CcsoInfo;
 #endif
 
+#if CONFIG_DEBAND
+/** deband buffers */
+typedef struct DebandBuffers {
+  /** c_values (encoder-only) */
+  float *c_values;
+  /** mask buffer */
+  uint32_t *mask_dp;
+  /** histogram for the c_values */
+  uint16_t *c_values_histograms;
+  /** filtering step buffer */
+  uint16_t *filter_mode_buffer;
+} DebandBuffers;
+
+/** deband & CAMBI info */
+typedef struct {
+  /** deband enable */
+  bool deband_enable;
+  /** frame to deband */
+  uint16_t *frame;
+  /** mask frame buffer */
+  uint16_t *mask;
+  /** stride from frame, mask and c_values buffers */
+  int stride;
+  /** frame height for 'frame', mask and c_values buffers */
+  int height;
+  /** visibility threshold for contrast */
+  uint16_t *tvi_for_diff;
+  /** weight per contrast to determine score */
+  int *diffs_weights;
+  /** weight per scale to determine score (encoder-only) */
+  int scale_weights[5];
+  /** banding contrasts to evaluate */
+  uint16_t *diffs_to_consider;
+  /** window size over which banding is assessed */
+  uint16_t window_size;
+  /** number of pixels in the window */
+  uint16_t pixels_in_window;
+  /** ratio of worst banding pixels used to determine the score */
+  double topk;
+  /** visibility threshold */
+  double tvi_threshold;
+  /** max log 2 number of contrasts */
+  uint16_t max_log_contrast;
+  /** number of contrasts */
+  int num_diffs;
+  /** number of bins for the histogram in CAMBI */
+  int num_bins;
+  /** Pointer to data to deband */
+  uint16_t *dst;
+  /** stride to dst */
+  int dst_stride;
+  /** dst bitdepth */
+  int dst_bd;
+  /** buffers used in CAMBI and debanding */
+  DebandBuffers buffers;
+} DebandInfo;
+#endif
 /*!\cond */
 
 typedef struct {
@@ -536,6 +593,9 @@ typedef struct SequenceHeader {
 #if CONFIG_IMPROVED_GLOBAL_MOTION
   bool enable_global_motion;
 #endif  // CONFIG_IMPROVED_GLOBAL_MOTION
+#if CONFIG_DEBAND
+  uint8_t enable_deband;  // To turn on/off debanding
+#endif
   BITSTREAM_PROFILE profile;
 
   // Color config.
@@ -1591,6 +1651,13 @@ typedef struct AV1Common {
    * CCSO (Cross Component Sample Offset) parameters.
    */
   CcsoInfo ccso_info;
+#endif
+
+#if CONFIG_DEBAND
+  /*!
+   * Deband parameters.
+   */
+  DebandInfo deband_info;
 #endif
 
   /*!
