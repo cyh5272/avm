@@ -830,7 +830,7 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
   if (ref_pruning_enabled && (frame_idx < gop_length)) {
     for (idx = 0; idx < INTER_REFS_PER_FRAME; ++idx) {
 #if CONFIG_NEW_REF_SIGNALING
-      const MV_REFERENCE_FRAME refs[2] = { idx + 1, INVALID_IDX };
+      const MV_REFERENCE_FRAME refs[2] = { idx, INVALID_IDX };
       if (prune_ref_by_selective_ref_frame_nrs(cpi, NULL, refs)) {
 #else
       const MV_REFERENCE_FRAME refs[2] = { idx + 1, NONE_FRAME };
