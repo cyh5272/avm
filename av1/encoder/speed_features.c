@@ -529,9 +529,7 @@ static void set_good_speed_features_framesize_independent(
     sf->part_sf.prune_ab_partition_using_split_info = 1;
     sf->part_sf.early_term_after_none_split = 1;
 
-#if !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.alt_ref_search_fp = 1;
-#endif  // !CONFIG_NEW_REF_SIGNALING
     sf->inter_sf.txfm_rd_gate_level = boosted ? 0 : 4;
 
     sf->inter_sf.prune_inter_modes_based_on_tpl = boosted ? 0 : 3;
@@ -722,9 +720,7 @@ static AOM_INLINE void init_inter_sf(INTER_MODE_SPEED_FEATURES *inter_sf) {
   inter_sf->adaptive_rd_thresh = 0;
   inter_sf->model_based_post_interp_filter_breakout = 0;
   inter_sf->reduce_inter_modes = 0;
-#if !CONFIG_NEW_REF_SIGNALING
   inter_sf->alt_ref_search_fp = 0;
-#endif  // !CONFIG_NEW_REF_SIGNALING
   inter_sf->selective_ref_frame = 0;
   inter_sf->prune_ref_frame_for_rect_partitions = 0;
   inter_sf->disable_wedge_search_var_thresh = 0;

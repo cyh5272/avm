@@ -4390,6 +4390,12 @@ static AOM_INLINE void disable_reference(
   }
 }
 
+static AOM_INLINE void disable_inter_references_except_top(
+    bool ref_combo[REF_FRAMES][REF_FRAMES + 1]) {
+  for (MV_REFERENCE_FRAME ref = 1; ref < REF_FRAMES; ++ref)
+    disable_reference(ref, ref_combo);
+}
+
 static const MV_REFERENCE_FRAME reduced_ref_combos[][2] = {
   { 0, INVALID_IDX },
   { 1, INVALID_IDX },
@@ -4579,13 +4585,20 @@ static AOM_INLINE void init_mode_skip_mask(mode_skip_mask_t *mask,
 #endif  // !CONFIG_NEW_INTER_MODES
     }
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
   if (cpi->rc.is_src_frame_alt_ref) {
     if (sf->inter_sf.alt_ref_search_fp) {
+#if CONFIG_NEW_REF_SIGNALING
+      mask->pred_modes[0] = 0;
+      disable_inter_references_except_top(mask->ref_combo);
+      disable_reference(INTRA_FRAME_NRS, mask->ref_combo);
+#else
       assert(cm->ref_frame_flags & av1_ref_frame_flag_list[ALTREF_FRAME]);
       mask->pred_modes[ALTREF_FRAME] = 0;
       disable_inter_references_except_altref(mask->ref_combo);
       disable_reference(INTRA_FRAME, mask->ref_combo);
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
   }
 
@@ -4594,15 +4607,19 @@ static AOM_INLINE void init_mode_skip_mask(mode_skip_mask_t *mask,
       int sad_thresh = x->best_pred_mv_sad + (x->best_pred_mv_sad >> 3);
       // Conservatively skip the modes w.r.t. BWDREF, ALTREF2 and ALTREF, if
       // those are past frames
+#if CONFIG_NEW_REF_SIGNALING
+      for (ref_frame = 4; ref_frame < INTER_REFS_PER_FRAME; ref_frame++) {
+        if (cpi->ref_frame_dist_info.ref_relative_dist[ref_frame] < 0)
+#else
       for (ref_frame = BWDREF_FRAME; ref_frame <= ALTREF_FRAME; ref_frame++) {
         if (cpi->ref_frame_dist_info.ref_relative_dist[ref_frame - LAST_FRAME] <
             0)
+#endif  // CONFIG_NEW_REF_SIGNALING
           if (x->pred_mv_sad[ref_frame] > sad_thresh)
             mask->pred_modes[ref_frame] |= INTER_ALL;
       }
     }
   }
-#endif  // !CONFIG_NEW_REF_SIGNALING
 
   if (bsize > sf->part_sf.max_intra_bsize) {
 #if CONFIG_NEW_REF_SIGNALING

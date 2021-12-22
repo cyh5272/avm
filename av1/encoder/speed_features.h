@@ -607,10 +607,8 @@ typedef struct INTER_MODE_SPEED_FEATURES {
   // 2 implies prune horiz, vert and extended partition
   int prune_ref_frame_for_rect_partitions;
 
-#if !CONFIG_NEW_REF_SIGNALING
-  // Removed with CONFIG_NEW_REF_SIGNALING for now.
+  // Prune reference frames for ALTREF
   int alt_ref_search_fp;
-#endif  // !CONFIG_NEW_REF_SIGNALING
 
   // flag to skip NEWMV mode in drl if the motion search result is the same
   int skip_repeated_newmv;
