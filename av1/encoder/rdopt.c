@@ -6157,9 +6157,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     // Populating valid_refs[idx] = 1 ensures that
     // 'inter_cost_info_from_tpl.best_inter_cost' does not correspond to a
     // pruned ref frame.
-    int valid_refs[INTER_REFS_PER_FRAME];
+    int valid_refs[INTER_REFS_PER_FRAME] = { 0 };
 #if CONFIG_NEW_REF_SIGNALING
-    for (MV_REFERENCE_FRAME frame = 0; frame < INTER_REFS_PER_FRAME; frame++) {
+    for (MV_REFERENCE_FRAME frame = 0; frame < cm->ref_frames_info.n_total_refs;
+         frame++) {
       const MV_REFERENCE_FRAME refs[2] = { frame, INVALID_IDX };
       valid_refs[frame] = x->tpl_keep_ref_frame[frame] ||
                           !prune_ref_by_selective_ref_frame_nrs(cpi, x, refs);

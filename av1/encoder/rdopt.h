@@ -214,12 +214,13 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
     }
   }
 
-  int dir_refrank[2][2] = { { -1, -1 }, { -1, -1 } };
-  int d0 = get_dir_rank(cm, ref_frame[0], dir_refrank[0]);
+  int dir_refrank0[2] = { -1, -1 };
+  int dir_refrank1[2] = { -1, -1 };
+  int d0 = get_dir_rank(cm, ref_frame[0], dir_refrank0);
   assert(d0 != -1);
   int d1 = -1;
   if (comp_pred) {
-    d1 = get_dir_rank(cm, ref_frame[1], dir_refrank[1]);
+    d1 = get_dir_rank(cm, ref_frame[1], dir_refrank1);
     assert(d1 != -1);
   }
   const int one_sided_comp = (d0 == d1);
@@ -229,35 +230,35 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
     case 1:
       if (comp_pred) {
         if (one_sided_comp) {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 1) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
         } else {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 2) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;
         }
       } else {
-        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 2) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 2) return 1;
       }
       break;
     case 2:
       if (comp_pred) {
         if (one_sided_comp) {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
         } else {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 1) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
         }
       } else {
-        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 3) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 3) return 1;
       }
       break;
     case 3:
     default:
       if (comp_pred) {
         if (one_sided_comp) {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
         } else {
-          if (AOMMIN(dir_refrank[0][d0], dir_refrank[1][d1]) > 0) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
         }
       } else {
-        if (dir_refrank[0][d0] > INTER_REFS_PER_FRAME - 4) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 4) return 1;
       }
       break;
   }

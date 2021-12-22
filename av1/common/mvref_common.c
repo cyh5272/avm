@@ -1643,6 +1643,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
   const RefCntBuffer *ref_buf[INTER_REFS_PER_FRAME];
 
 #if CONFIG_NEW_REF_SIGNALING
+  for (int i = 0; i < INTER_REFS_PER_FRAME; i++) ref_buf[i] = NULL;
   for (int index = 0; index < cm->ref_frames_info.n_past_refs; index++) {
     const int ref_frame = cm->ref_frames_info.past_refs[index];
     cm->ref_frame_side[ref_frame] = 0;
@@ -1751,8 +1752,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
     n_refs_used += ret;
   }
   if (closest_ref[0][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
-    const int ret = motion_field_projection(cm, closest_ref[0][1], 2, 0);
-    n_refs_used += ret;
+    motion_field_projection(cm, closest_ref[0][1], 2, 0);
   }
 #else
   // Do projection on closest past and future refs if they exist
