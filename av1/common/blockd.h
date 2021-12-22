@@ -487,7 +487,8 @@ static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
 
 static INLINE int is_inter_ref_frame(MV_REFERENCE_FRAME ref_frame) {
 #if CONFIG_NEW_REF_SIGNALING
-  return ref_frame != INTRA_FRAME_NRS && ref_frame != INVALID_IDX;
+  return ref_frame != INTRA_FRAME_NRS && ref_frame != INTRA_FRAME_INDEX_NRS &&
+         ref_frame != INVALID_IDX;
 #else
   return ref_frame > INTRA_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
