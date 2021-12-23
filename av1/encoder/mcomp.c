@@ -37,7 +37,7 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
                                        const MvCosts *mv_costs,
 #if CONFIG_ADAPTIVE_MVD
                                        int is_adaptive_mvd,
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
                                        const MV *ref_mv) {
   mv_cost_params->ref_mv = ref_mv;
   mv_cost_params->full_ref_mv = get_fullmv_from_mv(ref_mv);
@@ -46,17 +46,17 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
   mv_cost_params->sad_per_bit = mv_costs->sadperbit;
 #if CONFIG_ADAPTIVE_MVD
   if (is_adaptive_mvd) {
-    mv_cost_params->mvjcost = mv_costs->res_nmv_joint_cost;
-    mv_cost_params->mvcost[0] = mv_costs->res_mv_cost_stack[0];
-    mv_cost_params->mvcost[1] = mv_costs->res_mv_cost_stack[1];
+    mv_cost_params->mvjcost = mv_costs->amvd_nmv_joint_cost;
+    mv_cost_params->mvcost[0] = mv_costs->amvd_mv_cost_stack[0];
+    mv_cost_params->mvcost[1] = mv_costs->amvd_mv_cost_stack[1];
   } else {
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
     mv_cost_params->mvjcost = mv_costs->nmv_joint_cost;
     mv_cost_params->mvcost[0] = mv_costs->mv_cost_stack[0];
     mv_cost_params->mvcost[1] = mv_costs->mv_cost_stack[1];
 #if CONFIG_ADAPTIVE_MVD
   }
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 }
 
 static INLINE void init_ms_buffers(MSBuffers *ms_buffers, const MACROBLOCK *x) {
@@ -102,7 +102,7 @@ void av1_make_default_fullpel_ms_params(
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 
   // High level params
   ms_params->bsize = bsize;
@@ -145,12 +145,12 @@ void av1_make_default_fullpel_ms_params(
   av1_set_mv_search_range(&ms_params->mv_limits, ref_mv);
 
   // Mvcost params
+
+  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs,
 #if CONFIG_ADAPTIVE_MVD
-  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs, is_adaptive_mvd,
+                      is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                       ref_mv);
-#else
-  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs, ref_mv);
-#endif
 }
 
 void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
@@ -162,7 +162,7 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   // High level params
   ms_params->allow_hp = cm->features.allow_high_precision_mv;
   ms_params->forced_stop = cpi->sf.mv_sf.subpel_force_stop;
@@ -172,13 +172,11 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
   av1_set_subpel_mv_search_range(&ms_params->mv_limits, &x->mv_limits, ref_mv);
 
   // Mvcost params
+  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs,
 #if CONFIG_ADAPTIVE_MVD
-  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs, is_adaptive_mvd,
+                      is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                       ref_mv);
-#else
-  init_mv_cost_params(&ms_params->mv_cost_params, &x->mv_costs, ref_mv);
-#endif
-
   // Subpel variance params
   ms_params->var_params.vfp = &cpi->fn_ptr[bsize];
   ms_params->var_params.subpel_search_type =
@@ -3006,7 +3004,7 @@ static AOM_INLINE int setup_center_error_facade(
 }
 
 #if CONFIG_JOINT_MVD
-// joint mvd motion search for near_new and new_near mode
+// motion search for joint mvd coding
 int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                      SUBPEL_MOTION_SEARCH_PARAMS *ms_params, MV ref_mv,
                      MV *start_mv, MV *bestmv, int *distortion,
@@ -3038,11 +3036,7 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   *bestmv = *start_mv;
   *best_other_mv = *other_mv;
 
-  const int cur_ref_side = cm->ref_frame_side[mbmi->ref_frame[ref_idx]];
-  const int other_ref_side = cm->ref_frame_side[mbmi->ref_frame[1 - ref_idx]];
-
-  const int same_side = (cur_ref_side > 0 && other_ref_side > 0) ||
-                        (cur_ref_side == 0 && other_ref_side == 0);
+  const int same_side = is_ref_frame_same_side(cm, mbmi);
 
   const int cur_ref_dist =
       cm->ref_frame_relative_dist[mbmi->ref_frame[ref_idx]];
@@ -3069,7 +3063,7 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   uint8_t do_refine_search_grid[SEARCH_GRID_STRIDE_8P *
                                 SEARCH_GRID_STRIDE_8P] = { 0 };
   int grid_center = SEARCH_GRID_CENTER_8P;
-  int grid_coord = grid_center;
+  int grid_coord;
 
   // do_refine_search_grid[grid_coord] = 0;
 
@@ -3186,9 +3180,10 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   }
   return besterr;
 }
-#endif
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
-// motion search for near_new and new_near mode
+// motion search for near_new and new_near mode when adaptive MVD resolution is
+// applied
 int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         SUBPEL_MOTION_SEARCH_PARAMS *ms_params, MV start_mv,
                         MV *bestmv, int *distortion, unsigned int *sse1) {
@@ -3220,7 +3215,6 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   }
 
   MV iter_center_mv = start_mv;
-  hstep = 8 >> round;
   const int cand_pos[4][2] = {
     { 0, -1 },  // left
     { 0, +1 },  // right
@@ -3268,7 +3262,7 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   }
   return besterr;
 }
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 
 int av1_find_best_sub_pixel_tree_pruned_evenmore(
     MACROBLOCKD *xd, const AV1_COMMON *const cm,

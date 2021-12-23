@@ -1820,14 +1820,22 @@ static void build_inter_predictors_8x8_and_bigger(
 #if CONFIG_OPTFLOW_REFINEMENT
   int_mv mv_refined[2 * N_OF_OFFSETS];
   const int use_optflow_refinement =
+#if CONFIG_JOINT_MVD
+      (mi->mode > JOINT_NEWMV ||
+#else
       (mi->mode > NEW_NEWMV ||
+#endif  // CONFIG_JOINT_MVD
        (cm->features.opfl_refine_type == REFINE_ALL &&
         mi->mode != GLOBAL_GLOBALMV &&
         mi->interinter_comp.type == COMPOUND_AVERAGE)) &&
       is_compound && is_opfl_refine_allowed(cm, mi);
-
+#if CONFIG_JOINT_MVD
+  assert(IMPLIES(mi->mode > JOINT_NEWMV,
+                 cm->features.opfl_refine_type == REFINE_SWITCHABLE));
+#else
   assert(IMPLIES(mi->mode > NEW_NEWMV,
                  cm->features.opfl_refine_type == REFINE_SWITCHABLE));
+#endif  // CONFIG_JOINT_MVD
   assert(IMPLIES(use_optflow_refinement, !build_for_obmc));
 
   // Optical flow refinement with masked comp types or with non-sharp

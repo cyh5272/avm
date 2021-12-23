@@ -206,11 +206,18 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
 #if CONFIG_ADAPTIVE_MVD
 static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
                                                  const PREDICTION_MODE mode) {
-  return (mode == NEAR_NEWMV || mode == NEW_NEARMV) &&
+  return (mode == NEAR_NEWMV || mode == NEW_NEARMV
+#if CONFIG_OPTFLOW_REFINEMENT
+          || mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW
+#endif
+          ) &&
          cm->seq_params.enable_adaptive_mvd;
 }
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
+// get the base reference frame list for joint MVD coding, the MVD for base
+// reference frame is the same as the joint MVD, the MVD for the other reference
+// frame is scaled from the joint MVD.
 static INLINE int get_joint_mvd_base_ref_list(const AV1_COMMON *const cm,
                                               const MB_MODE_INFO *mbmi) {
   int base_ref_list = 0;
@@ -228,7 +235,22 @@ static INLINE int get_joint_mvd_base_ref_list(const AV1_COMMON *const cm,
   }
   return base_ref_list;
 }
-#endif
+// check whether the direction of two reference frames are from same side
+static INLINE int is_ref_frame_same_side(const AV1_COMMON *const cm,
+                                         const MB_MODE_INFO *mbmi) {
+  int is_same_side = 0;
+  int cur_ref_side = 0;
+  int other_ref_side = 0;
+  if (has_second_ref(mbmi)) {
+    cur_ref_side = cm->ref_frame_side[mbmi->ref_frame[0]];
+    other_ref_side = cm->ref_frame_side[mbmi->ref_frame[1]];
+
+    is_same_side = (cur_ref_side > 0 && other_ref_side > 0) ||
+                   (cur_ref_side == 0 && other_ref_side == 0);
+  }
+  return is_same_side;
+}
+#endif  // CONFIG_JOINT_MVD
 
 void av1_init_comp_mode(InterPredParams *inter_pred_params);
 
@@ -558,9 +580,14 @@ static INLINE void set_default_interp_filters(
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     InterpFilter frame_interp_filter) {
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+  mbmi->interp_fltr =
+      (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi))
+#else
   mbmi->interp_fltr = (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
-                          ? MULTITAP_SHARP
-                          : av1_unswitchable_filter(frame_interp_filter);
+#endif  // CONFIG_JOINT_MVD
+          ? MULTITAP_SHARP
+          : av1_unswitchable_filter(frame_interp_filter);
 #else
   mbmi->interp_fltr = av1_unswitchable_filter(frame_interp_filter);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -572,8 +599,12 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   if (mbmi->skip_mode) return 0;
 #if CONFIG_OPTFLOW_REFINEMENT
-  // No interpolation filter search when optical flow MV refinement is used.
+    // No interpolation filter search when optical flow MV refinement is used.
+#if CONFIG_JOINT_MVD
+  if (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi)) return 0;
+#else
   if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) return 0;
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   if (mbmi->motion_mode == WARPED_CAUSAL) return 0;
   if (is_nontrans_global_motion(xd, xd->mi[0])) return 0;

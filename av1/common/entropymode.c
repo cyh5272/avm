@@ -649,11 +649,17 @@ static const aom_cdf_prob
       { AOM_CDF2(16384) }, { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
       { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
     };
-
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_JOINT_MVD
+#if CONFIG_OPTFLOW_REFINEMENT
+static const aom_cdf_prob
+    default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(
+        INTER_COMPOUND_REF_TYPES)] = {
+#else
 static const aom_cdf_prob
     default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(
         INTER_COMPOUND_MODES)] = {
+#endif
       { AOM_CDF6(8510, 13103, 16330, 17536, 24536) },
       { AOM_CDF6(12805, 16117, 19655, 20891, 26891) },
       { AOM_CDF6(13700, 16333, 19425, 20305, 26305) },
@@ -664,9 +670,15 @@ static const aom_cdf_prob
       { AOM_CDF6(19368, 22274, 23890, 24364, 29364) }
     };
 #else
+#if CONFIG_OPTFLOW_REFINEMENT
 static const aom_cdf_prob
     default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS]
                                    [CDF_SIZE(INTER_COMPOUND_REF_TYPES)] = {
+#else
+static const aom_cdf_prob
+    default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS]
+                                   [CDF_SIZE(INTER_COMPOUND_REF_TYPES)] = {
+#endif
                                      { AOM_CDF5(10510, 17103, 22330, 24536) },
                                      { AOM_CDF5(14805, 20117, 24655, 25891) },
                                      { AOM_CDF5(15700, 20333, 24425, 25305) },
@@ -676,19 +688,7 @@ static const aom_cdf_prob
                                      { AOM_CDF5(22458, 25512, 28304, 29008) },
                                      { AOM_CDF5(21368, 24274, 26890, 27364) }
                                    };
-#else
-static const aom_cdf_prob
-    default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(
-        INTER_COMPOUND_MODES)] = { { AOM_CDF5(10510, 17103, 22330, 24536) },
-                                   { AOM_CDF5(14805, 20117, 24655, 25891) },
-                                   { AOM_CDF5(15700, 20333, 24425, 25305) },
-                                   { AOM_CDF5(15047, 20124, 24840, 25223) },
-                                   { AOM_CDF5(22632, 25637, 28394, 29608) },
-                                   { AOM_CDF5(15703, 20315, 24653, 25122) },
-                                   { AOM_CDF5(22458, 25512, 28304, 29008) },
-                                   { AOM_CDF5(21368, 24274, 26890, 27364) } };
-#endif
-#endif  // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_JOINT_MVD
 #else
 static const aom_cdf_prob default_newmv_cdf[NEWMV_MODE_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(24035) }, { AOM_CDF2(16630) }, { AOM_CDF2(15339) },

@@ -40,9 +40,12 @@ static const int mode_lf_lut[] = {
   1, 1, 1, 0, 1, 1,  // INTER_COMPOUND_MODES (GLOBAL_GLOBALMV == 0)
 #else
   1, 1, 1, 0, 1,  // INTER_COMPOUND_MODES (GLOBAL_GLOBALMV == 0)
-#endif
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
   1, 1, 1, 1,
+#if CONFIG_JOINT_MVD
+  1,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 };
 #else

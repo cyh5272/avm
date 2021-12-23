@@ -257,7 +257,7 @@ int parse_sequence_header_beyond_av1(struct aom_read_bit_buffer *reader) {
 
 #if CONFIG_ADAPTIVE_MVD
   AV1C_READ_BIT_OR_RETURN_ERROR(enable_adaptive_mvd);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   return 0;
 }
 

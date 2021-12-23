@@ -29,7 +29,7 @@
 #include "av1/encoder/tokenize.h"
 #if CONFIG_ADAPTIVE_MVD
 #include "av1/common/reconinter.h"
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 
 #include "aom_util/debug_util.h"
 
@@ -1297,7 +1297,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+      if (has_second_ref(mbmi) && mbmi->mode <= JOINT_NEWMV) {
+#else
       if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
+#endif  // CONFIG_JOINT_MVD
 #else
       if (has_second_ref(mbmi)) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1355,7 +1359,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_OPTFLOW_REFINEMENT
       if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
           is_opfl_refine_allowed(cm, mbmi)) {
+#if CONFIG_JOINT_MVD
+        const int use_optical_flow = mode > JOINT_NEWMV;
+#else
         const int use_optical_flow = mode > NEW_NEWMV;
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_ENTROPY_STATS
         ++counts->use_optflow[mode_ctx][use_optical_flow];
 #endif
@@ -1383,13 +1391,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                        mbmi->mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                        mbmi->mode == NEW_NEWMV;
-    const int new_mv = mbmi->mode == NEWMV || mbmi->mode == NEW_NEWMV;
 #if CONFIG_JOINT_MVD
     const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
-#endif
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
     const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_NEW_INTER_MODES
     if (have_drl_index(mbmi->mode)) {
       const int16_t mode_ctx_pristine =
@@ -1441,32 +1448,24 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
 #if CONFIG_ADAPTIVE_MVD
                               is_adaptive_mvd,
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
                               allow_hp);
         }
 #if CONFIG_NEW_INTER_MODES
-#if CONFIG_JOINT_MVD
-      } else if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV ||
-                 mbmi->mode == JOINT_NEWMV) {
-#else
-      } else if (mbmi->mode == NEAR_NEWMV || mbmi->mode == NEW_NEARMV) {
-#endif
-#if CONFIG_JOINT_MVD
-        const int ref = (mbmi->mode == NEAR_NEWMV || jmvd_base_ref_list);
-#else
-        const int ref = mbmi->mode == NEAR_NEWMV;
       } else if (have_nearmv_newmv_in_inter_mode(mbmi->mode)) {
         const int ref =
 #if CONFIG_OPTFLOW_REFINEMENT
             mbmi->mode == NEAR_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+            jmvd_base_ref_list ||
+#endif  // CONFIG_JOINT_MVD
             mbmi->mode == NEAR_NEWMV;
-#endif
         const int_mv ref_mv = av1_get_ref_mv(x, ref);
         av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
 #if CONFIG_ADAPTIVE_MVD
                             is_adaptive_mvd,
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
                             allow_hp);
 #else
       } else if (mbmi->mode == NEAREST_NEWMV || mbmi->mode == NEAR_NEWMV) {

@@ -865,21 +865,23 @@ typedef struct {
   int nmv_joint_cost[MV_JOINTS];
 
 #if CONFIG_ADAPTIVE_MVD
-  //! Costs for coding the zero components in near_newmv and new_nearmv mode.
-  int res_nmv_joint_cost[MV_JOINTS];
-#endif
+  //! Costs for coding the zero components when adaptive MVD resolution is
+  //! applied
+  int amvd_nmv_joint_cost[MV_JOINTS];
+#endif  // CONFIG_ADAPTIVE_MVD
 
   //! Allocates memory for 1/4-pel motion vector costs.
   int nmv_cost_alloc[2][MV_VALS];
   //! Allocates memory for 1/8-pel motion vector costs.
   int nmv_cost_hp_alloc[2][MV_VALS];
 #if CONFIG_ADAPTIVE_MVD
-  //! Allocates memory for 1/4-pel motion vector costs.
-  int res_nmv_cost_alloc[2][MV_VALS];
-  //! Allocates memory for 1/8-pel motion vector costs when near_new or new_near
-  //! mode is used.
-  int res_nmv_cost_hp_alloc[2][MV_VALS];
-#endif
+  //! Allocates memory for 1/4-pel motion vector costs when adaptive MVD
+  //! resolution is applied
+  int amvd_nmv_cost_alloc[2][MV_VALS];
+  //! Allocates memory for 1/8-pel motion vector costs when adaptive MVD
+  //! resolution is applied mode is used.
+  int amvd_nmv_cost_hp_alloc[2][MV_VALS];
+#endif  // CONFIG_ADAPTIVE_MVD
   //! Points to the middle of \ref nmv_cost_alloc
   int *nmv_cost[2];
   //! Points to the middle of \ref nmv_cost_hp_alloc
@@ -889,13 +891,13 @@ typedef struct {
   int *res_nmv_cost[2];
   //! Points to the middle of \ref nmv_cost_hp_alloc
   int *res_nmv_cost_hp[2];
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   //! Points to the nmv_cost_hp in use.
   int **mv_cost_stack;
 #if CONFIG_ADAPTIVE_MVD
   //! Points to the nmv_cost_hp in use.
-  int **res_mv_cost_stack;
-#endif
+  int **amvd_mv_cost_stack;
+#endif  // CONFIG_ADAPTIVE_MVD
   /**@}*/
 } MvCosts;
 

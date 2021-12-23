@@ -95,9 +95,9 @@ typedef struct {
   // TODO(huisu@google.com): we can update dv_joint_cost per SB.
   int joint_mv[MV_JOINTS];
 #if CONFIG_ADAPTIVE_MVD
-  int res_joint_mv[MV_JOINTS];
+  int amvd_joint_mv[MV_JOINTS];
   int res_mv_component[2][MV_VALS];
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 } IntraBCMVCosts;
 
 static INLINE void av1_init_rd_stats(RD_STATS *rd_stats) {

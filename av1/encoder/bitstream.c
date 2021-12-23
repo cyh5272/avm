@@ -185,7 +185,11 @@ static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
 #if CONFIG_OPTFLOW_REFINEMENT
   if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
       is_opfl_refine_allowed(cm, mbmi)) {
+#if CONFIG_JOINT_MVD
+    const int use_optical_flow = mode > JOINT_NEWMV;
+#else
     const int use_optical_flow = mode > NEW_NEWMV;
+#endif  // CONFIG_JOINT_MVD
     aom_write_symbol(w, use_optical_flow,
                      xd->tile_ctx->use_optflow_cdf[mode_ctx], 2);
   }
@@ -889,9 +893,18 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   }
   if (cm->features.interp_filter == SWITCHABLE) {
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+    if (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi)) {
+#else
     if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) {
+#endif  // CONFIG_JOINT_MVD
+#if CONFIG_JOINT_MVD
+      assert(IMPLIES(mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi),
+                     mbmi->interp_fltr == MULTITAP_SHARP));
+#else
       assert(IMPLIES(mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
                      mbmi->interp_fltr == MULTITAP_SHARP));
+#endif  // CONFIG_JOINT_MVD
       return;
     }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1676,7 +1689,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
 #if CONFIG_JOINT_MVD
     const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
-#endif
+#endif  // CONFIG_JOINT_MVD
 
     // If segment skip is not enabled code the mode.
     if (!segfeature_active(seg, segment_id, SEG_LVL_SKIP)) {
@@ -1711,29 +1724,31 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                       allow_hp);
       }
 #if CONFIG_NEW_INTER_MODES
-#if CONFIG_JOINT_MVD
-    } else if (mode == NEAR_NEWMV ||
-               (mode == JOINT_NEWMV && jmvd_base_ref_list == 1)) {
-#else
+    } else if (mode == NEAR_NEWMV
 #if CONFIG_OPTFLOW_REFINEMENT
-    } else if (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW) {
-#else
-    } else if (mode == NEAR_NEWMV) {
-#endif
+               || mode == NEAR_NEWMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+               || (mode == JOINT_NEWMV && jmvd_base_ref_list == 1)
+#endif  // CONFIG_JOINT_MVD
+#if CONFIG_JOINT_MVD && CONFIG_OPTFLOW_REFINEMENT
+               || (mode == JOINT_NEWMV_OPTFLOW && jmvd_base_ref_list == 1)
+#endif  // CONFIG_JOINT_MVD && CONFIG_OPTFLOW_REFINEMENT
+    ) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
       av1_encode_mv(cpi, w, &mbmi->mv[1].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+    } else if (mode == NEW_NEARMV
 #if CONFIG_OPTFLOW_REFINEMENT
-    } else if (mode == NEW_NEARMV || mode == NEW_NEARMV_OPTFLOW) {
-#else
-#if CONFIG_JOINT_MVD
-    } else if (mode == NEW_NEARMV ||
-               (mode == JOINT_NEWMV && jmvd_base_ref_list == 0)) {
-#else
-    } else if (mode == NEW_NEARMV) {
+               || mode == NEW_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#endif
+#if CONFIG_JOINT_MVD
+               || (mode == JOINT_NEWMV && jmvd_base_ref_list == 0)
+#endif  // CONFIG_JOINT_MVD
+#if CONFIG_JOINT_MVD && CONFIG_OPTFLOW_REFINEMENT
+               || (mode == JOINT_NEWMV_OPTFLOW && jmvd_base_ref_list == 0)
+#endif  // CONFIG_JOINT_MVD && CONFIG_OPTFLOW_REFINEMENT
+    ) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
       av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
@@ -1777,7 +1792,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       // group Group A (0): dist_wtd_comp, compound_average Group B (1):
       // interintra, compound_diffwtd, wedge
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+    if (has_second_ref(mbmi) && mbmi->mode <= JOINT_NEWMV) {
+#else
     if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
+#endif  // CONFIG_JOINT_MVD
 #else
     if (has_second_ref(mbmi)) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -3532,7 +3551,7 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif
 #if CONFIG_ADAPTIVE_MVD
   aom_wb_write_bit(wb, seq_params->enable_adaptive_mvd);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 }
 
 static AOM_INLINE void write_global_motion_params(

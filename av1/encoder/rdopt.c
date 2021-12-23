@@ -151,7 +151,7 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEWLA,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLA,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLA,
   THR_COMP_GLOBAL_GLOBALLA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -159,13 +159,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLA,
   THR_COMP_NEW_NEAR_OPTFLOWLA,
   THR_COMP_NEW_NEW_OPTFLOWLA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLA,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL2A,
   THR_COMP_NEAR_NEWL2A,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL2A,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL2A,
   THR_COMP_GLOBAL_GLOBALL2A,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -173,13 +176,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL2A,
   THR_COMP_NEW_NEAR_OPTFLOWL2A,
   THR_COMP_NEW_NEW_OPTFLOWL2A,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL2A,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL3A,
   THR_COMP_NEAR_NEWL3A,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL3A,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL3A,
   THR_COMP_GLOBAL_GLOBALL3A,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -187,13 +193,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL3A,
   THR_COMP_NEW_NEAR_OPTFLOWL3A,
   THR_COMP_NEW_NEW_OPTFLOWL3A,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL3A,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARGA,
   THR_COMP_NEAR_NEWGA,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWGA,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWGA,
   THR_COMP_GLOBAL_GLOBALGA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -201,13 +210,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWGA,
   THR_COMP_NEW_NEAR_OPTFLOWGA,
   THR_COMP_NEW_NEW_OPTFLOWGA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWGA,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARLB,
   THR_COMP_NEAR_NEWLB,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLB,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLB,
   THR_COMP_GLOBAL_GLOBALLB,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -215,13 +227,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLB,
   THR_COMP_NEW_NEAR_OPTFLOWLB,
   THR_COMP_NEW_NEW_OPTFLOWLB,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLB,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL2B,
   THR_COMP_NEAR_NEWL2B,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL2B,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL2B,
   THR_COMP_GLOBAL_GLOBALL2B,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -229,13 +244,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL2B,
   THR_COMP_NEW_NEAR_OPTFLOWL2B,
   THR_COMP_NEW_NEW_OPTFLOWL2B,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL2B,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL3B,
   THR_COMP_NEAR_NEWL3B,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL3B,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL3B,
   THR_COMP_GLOBAL_GLOBALL3B,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -243,13 +261,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL3B,
   THR_COMP_NEW_NEAR_OPTFLOWL3B,
   THR_COMP_NEW_NEW_OPTFLOWL3B,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL3B,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARGB,
   THR_COMP_NEAR_NEWGB,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWGB,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWGB,
   THR_COMP_GLOBAL_GLOBALGB,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -257,13 +278,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWGB,
   THR_COMP_NEW_NEAR_OPTFLOWGB,
   THR_COMP_NEW_NEW_OPTFLOWGB,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWGB,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARLA2,
   THR_COMP_NEAR_NEWLA2,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLA2,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLA2,
   THR_COMP_GLOBAL_GLOBALLA2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -271,13 +295,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLA2,
   THR_COMP_NEW_NEAR_OPTFLOWLA2,
   THR_COMP_NEW_NEW_OPTFLOWLA2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLA2,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL2A2,
   THR_COMP_NEAR_NEWL2A2,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL2A2,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL2A2,
   THR_COMP_GLOBAL_GLOBALL2A2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -285,13 +312,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL2A2,
   THR_COMP_NEW_NEAR_OPTFLOWL2A2,
   THR_COMP_NEW_NEW_OPTFLOWL2A2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL2A2,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARL3A2,
   THR_COMP_NEAR_NEWL3A2,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWL3A2,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWL3A2,
   THR_COMP_GLOBAL_GLOBALL3A2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -299,13 +329,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWL3A2,
   THR_COMP_NEW_NEAR_OPTFLOWL3A2,
   THR_COMP_NEW_NEW_OPTFLOWL3A2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWL3A2,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARGA2,
   THR_COMP_NEAR_NEWGA2,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWGA2,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWGA2,
   THR_COMP_GLOBAL_GLOBALGA2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -313,13 +346,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWGA2,
   THR_COMP_NEW_NEAR_OPTFLOWGA2,
   THR_COMP_NEW_NEW_OPTFLOWGA2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWGA2,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARLL2,
   THR_COMP_NEAR_NEWLL2,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLL2,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLL2,
   THR_COMP_GLOBAL_GLOBALLL2,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -327,13 +363,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLL2,
   THR_COMP_NEW_NEAR_OPTFLOWLL2,
   THR_COMP_NEW_NEW_OPTFLOWLL2,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLL2,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARLL3,
   THR_COMP_NEAR_NEWLL3,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLL3,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLL3,
   THR_COMP_GLOBAL_GLOBALLL3,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -341,13 +380,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLL3,
   THR_COMP_NEW_NEAR_OPTFLOWLL3,
   THR_COMP_NEW_NEW_OPTFLOWLL3,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLL3,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARLG,
   THR_COMP_NEAR_NEWLG,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWLG,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWLG,
   THR_COMP_GLOBAL_GLOBALLG,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -355,13 +397,16 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWLG,
   THR_COMP_NEW_NEAR_OPTFLOWLG,
   THR_COMP_NEW_NEW_OPTFLOWLG,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWLG,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_COMP_NEW_NEARBA,
   THR_COMP_NEAR_NEWBA,
 #if CONFIG_JOINT_MVD
   THR_COMP_JOINT_NEWBA,
-#endif
+#endif  // CONFIG_JOINT_MVD
   THR_COMP_NEW_NEWBA,
   THR_COMP_GLOBAL_GLOBALBA,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -369,6 +414,9 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_COMP_NEAR_NEW_OPTFLOWBA,
   THR_COMP_NEW_NEAR_OPTFLOWBA,
   THR_COMP_NEW_NEW_OPTFLOWBA,
+#if CONFIG_JOINT_MVD
+  THR_COMP_JOINT_NEW_OPTFLOWBA,
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
   THR_DC,
@@ -976,7 +1024,11 @@ static int cost_mv_ref(const ModeCosts *const mode_costs, PREDICTION_MODE mode,
     int use_optical_flow_cost = 0;
     if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
         is_opfl_refine_allowed(cm, mbmi)) {
+#if CONFIG_JOINT_MVD
+      const int use_optical_flow = mode > JOINT_NEWMV;
+#else
       const int use_optical_flow = mode > NEW_NEWMV;
+#endif  // CONFIG_JOINT_MVD
       use_optical_flow_cost =
           mode_costs->use_optflow_cost[mode_context][use_optical_flow];
     }
@@ -1432,6 +1484,9 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
                             inter_mode_info *mode_info) {
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
+#if CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
+  const AV1_COMMON *const cm = &cpi->common;
+#endif  // CONFIG_JOINT_MVD || CONFIG_JOINT_MVD
   const int is_comp_pred = has_second_ref(mbmi);
   const PREDICTION_MODE this_mode = mbmi->mode;
   const int refs[2] = { mbmi->ref_frame[0],
@@ -1483,35 +1538,49 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
         cur_mv[1].as_int = args->single_newmv[ref_mv_idx][refs[1]].as_int;
         clamp_mv_in_range(x, &cur_mv[1], 1);
       }
-
-      // aomenc2
-      if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
-          !valid_mv1) {
+#if CONFIG_ADAPTIVE_MVD
+      if (cm->seq_params.enable_adaptive_mvd) {
         av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
                                                      NULL, 0, rate_mv, 1);
       } else {
-        const int_mv ref_mv = av1_get_ref_mv(x, 1);
-        *rate_mv = av1_mv_bit_cost(&cur_mv[1].as_mv, &ref_mv.as_mv,
+#endif  // CONFIG_ADAPTIVE_MVD
+        // aomenc2
+        if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
+            !valid_mv1) {
+          av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
+                                                       NULL, 0, rate_mv, 1);
+        } else {
+          const int_mv ref_mv = av1_get_ref_mv(x, 1);
+          *rate_mv = av1_mv_bit_cost(&cur_mv[1].as_mv, &ref_mv.as_mv,
 #if CONFIG_ADAPTIVE_MVD
-                                   x->mv_costs.res_nmv_joint_cost,
-                                   x->mv_costs.res_mv_cost_stack,
+                                     x->mv_costs.amvd_nmv_joint_cost,
+                                     x->mv_costs.amvd_mv_cost_stack,
 #else
                                    x->mv_costs.nmv_joint_cost,
                                    x->mv_costs.mv_cost_stack,
-#endif
-                                   MV_COST_WEIGHT);
+#endif  // CONFIG_ADAPTIVE_MVD
+                                     MV_COST_WEIGHT);
+        }
+#if CONFIG_ADAPTIVE_MVD
       }
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
+#if CONFIG_OPTFLOW_REFINEMENT
+    } else if (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) {
+#else
     } else if (this_mode == JOINT_NEWMV) {
-      const AV1_COMMON *const cm = &cpi->common;
+#endif
       if (!cm->seq_params.enable_joint_mvd) return INT64_MAX;
-      const int cur_ref_side = cm->ref_frame_side[mbmi->ref_frame[0]];
-      const int other_ref_side = cm->ref_frame_side[mbmi->ref_frame[1]];
-
-      const int same_side = (cur_ref_side > 0 && other_ref_side > 0) ||
-                            (cur_ref_side == 0 && other_ref_side == 0);
+      const int same_side = is_ref_frame_same_side(cm, mbmi);
       // skip JOINT_NEWMV mode when two reference frames are from same side
       if (same_side) return INT64_MAX;
+
+      const int first_ref_dist =
+          cm->ref_frame_relative_dist[mbmi->ref_frame[0]];
+      const int sec_ref_dist = cm->ref_frame_relative_dist[mbmi->ref_frame[1]];
+
+      if (first_ref_dist > 2 * sec_ref_dist) return INT64_MAX;
+      if (sec_ref_dist > 2 * first_ref_dist) return INT64_MAX;
 
       const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
       const int valid_mv_base = (!jmvd_base_ref_list && valid_mv0) ||
@@ -1521,18 +1590,9 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
             args->single_newmv[ref_mv_idx][refs[jmvd_base_ref_list]].as_int;
         clamp_mv_in_range(x, &cur_mv[jmvd_base_ref_list], jmvd_base_ref_list);
       }
-      // aomenc3
-      if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
-          !valid_mv_base) {
-        av1_compound_single_motion_search_interinter(
-            cpi, x, bsize, cur_mv, NULL, 0, rate_mv, jmvd_base_ref_list);
-      } else {
-        const int_mv ref_mv = av1_get_ref_mv(x, jmvd_base_ref_list);
-        *rate_mv = av1_mv_bit_cost(&cur_mv[jmvd_base_ref_list].as_mv,
-                                   &ref_mv.as_mv, x->mv_costs.nmv_joint_cost,
-                                   x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
-      }
-#endif
+      av1_compound_single_motion_search_interinter(
+          cpi, x, bsize, cur_mv, NULL, 0, rate_mv, jmvd_base_ref_list);
+#endif  // CONFIG_JOINT_MVD
     } else {
 #if CONFIG_NEW_INTER_MODES
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1547,24 +1607,32 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
         cur_mv[0].as_int = args->single_newmv[ref_mv_idx][refs[0]].as_int;
         clamp_mv_in_range(x, &cur_mv[0], 0);
       }
-
-      // aomenc3
-      if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
-          !valid_mv0) {
+#if CONFIG_ADAPTIVE_MVD
+      if (cm->seq_params.enable_adaptive_mvd) {
         av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
                                                      NULL, 0, rate_mv, 0);
       } else {
-        const int_mv ref_mv = av1_get_ref_mv(x, 0);
-        *rate_mv = av1_mv_bit_cost(&cur_mv[0].as_mv, &ref_mv.as_mv,
+#endif  // CONFIG_ADAPTIVE_MVD
+        // aomenc3
+        if (cpi->sf.inter_sf.comp_inter_joint_search_thresh <= bsize ||
+            !valid_mv0) {
+          av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
+                                                       NULL, 0, rate_mv, 0);
+        } else {
+          const int_mv ref_mv = av1_get_ref_mv(x, 0);
+          *rate_mv = av1_mv_bit_cost(&cur_mv[0].as_mv, &ref_mv.as_mv,
 #if CONFIG_ADAPTIVE_MVD
-                                   x->mv_costs.res_nmv_joint_cost,
-                                   x->mv_costs.res_mv_cost_stack,
+                                     x->mv_costs.amvd_nmv_joint_cost,
+                                     x->mv_costs.amvd_mv_cost_stack,
 #else
                                    x->mv_costs.nmv_joint_cost,
                                    x->mv_costs.mv_cost_stack,
-#endif
-                                   MV_COST_WEIGHT);
+#endif  // CONFIG_ADAPTIVE_MVD
+                                     MV_COST_WEIGHT);
+        }
+#if CONFIG_ADAPTIVE_MVD
       }
+#endif  // CONFIG_ADAPTIVE_MVD
     }
   } else {
     // Single ref case.
@@ -3460,7 +3528,11 @@ static int64_t handle_inter_mode(
     // Compute modelled RD if enabled
     if (args->modelled_rd != NULL) {
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+      if (is_comp_pred && this_mode <= JOINT_NEWMV) {
+#else
       if (is_comp_pred && this_mode <= NEW_NEWMV) {
+#endif  // CONFIG_JOINT_MVD
 #else
       if (is_comp_pred) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -5474,7 +5546,11 @@ static int skip_inter_mode(AV1_COMP *cpi, MACROBLOCK *x, const BLOCK_SIZE bsize,
   // modes
   if (sf->inter_sf.prune_comp_search_by_single_result > 0 &&
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+      this_mode <= JOINT_NEWMV &&
+#else
       this_mode <= NEW_NEWMV &&
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       comp_pred) {
     if (compound_skip_by_single_states(cpi, args->search_state, this_mode,
@@ -5947,14 +6023,22 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_OPTFLOW_REFINEMENT
     // Optical flow compound modes are only enabled with enable_order_hint
     // and when prediction is bi-directional
+#if CONFIG_JOINT_MVD
+    if (this_mode > JOINT_NEWMV &&
+#else
     if (this_mode > NEW_NEWMV &&
+#endif  // CONFIG_JOINT_MVD
         (!cm->seq_params.order_hint_info.enable_order_hint ||
          !has_second_ref(mbmi) || !is_opfl_refine_allowed(cm, mbmi)))
       continue;
     // In REFINE_ALL, optical flow refinement has been applied to regular
     // compound modes.
     if (cm->features.opfl_refine_type == REFINE_ALL &&
+#if CONFIG_JOINT_MVD
+        (this_mode > JOINT_NEWMV || this_mode == GLOBAL_GLOBALMV))
+#else
         (this_mode > NEW_NEWMV || this_mode == GLOBAL_GLOBALMV))
+#endif  // CONFIG_JOINT_MVD
       continue;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
@@ -6317,7 +6401,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         search_state.best_mbmode.mode == NEW_NEWMV ||
 #if CONFIG_JOINT_MVD
         search_state.best_mbmode.mode == JOINT_NEWMV ||
+#if CONFIG_OPTFLOW_REFINEMENT
+        search_state.best_mbmode.mode == JOINT_NEWMV_OPTFLOW ||
 #endif
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
         search_state.best_mbmode.mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT

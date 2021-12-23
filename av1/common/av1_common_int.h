@@ -329,10 +329,10 @@ typedef struct SequenceHeader {
 #endif
 #if CONFIG_ADAPTIVE_MVD
   uint8_t enable_adaptive_mvd;  // enables/disables adaptive MVD resolution
-#endif
+#endif                          // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-  uint8_t enable_joint_mvd;  // enables/disables joint MVD coding
-#endif
+  uint8_t enable_joint_mvd;            // enables/disables joint MVD coding
+#endif                                 // CONFIG_JOINT_MVD
   uint8_t enable_interintra_compound;  // enables/disables interintra_compound
   uint8_t enable_masked_compound;      // enables/disables masked compound
 #if CONFIG_OPTFLOW_REFINEMENT

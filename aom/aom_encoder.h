@@ -294,7 +294,7 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_adaptive_mvd;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   /*!\brief enable joint MVD coding
    *

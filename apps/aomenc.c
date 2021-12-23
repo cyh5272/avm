@@ -453,10 +453,10 @@ const arg_def_t *av1_key_val_args[] = {
 #endif  // CONFIG_IBC_SR_EXT
 #if CONFIG_ADAPTIVE_MVD
   &g_av1_codec_arg_defs.enable_adaptive_mvd,
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   &g_av1_codec_arg_defs.enable_joint_mvd,
-#endif
+#endif  // CONFIG_JOINT_MVD
   NULL,
 };
 
@@ -606,7 +606,7 @@ static void init_config(cfg_options_t *config) {
 #endif
 #if CONFIG_ADAPTIVE_MVD
   config->enable_adaptive_mvd = 1;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   config->enable_joint_mvd = 1;
 #endif
@@ -1498,7 +1498,7 @@ static void show_stream_config(struct stream_state *stream,
   fprintf(stdout,
           "                               : Adaptive MVD resolution: (%d)\n",
           encoder_cfg->enable_adaptive_mvd);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   fprintf(stdout, "                               : Joint MVD coding: (%d)\n",
           encoder_cfg->enable_joint_mvd);

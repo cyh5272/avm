@@ -684,7 +684,7 @@ static int handle_wedge_inter_intra_mode(
     av1_compound_single_motion_search(cpi, x, bsize, &tmp_mv->as_mv,
 #if CONFIG_JOINT_MVD
                                       &tmp_mv->as_mv,
-#endif
+#endif  // CONFIG_JOINT_MVD
                                       intrapred, mask, bw, tmp_rate_mv, 0);
     if (mbmi->mv[0].as_int != tmp_mv->as_int) {
       mbmi->mv[0].as_int = tmp_mv->as_int;
@@ -847,7 +847,11 @@ static INLINE int compute_valid_comp_types(
   // For implementation simplicity, set compound type to COMPOUND_AVERAGE for
   // now to avoid compound type RD search. In practice, dist_wtd will always
   // be applied instead.
+#if CONFIG_JOINT_MVD
+  if (this_mode > JOINT_NEWMV) {
+#else
   if (this_mode > NEW_NEWMV) {
+#endif  // CONFIG_JOINT_MVD
     *try_average_and_distwtd_comp = 0;
     valid_comp_types[0] = COMPOUND_AVERAGE;
     return 1;
@@ -1292,7 +1296,11 @@ int av1_compound_type_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int comp_group_idx_ctx = get_comp_group_idx_context(cm, xd);
 
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+  if (this_mode > JOINT_NEWMV)
+#else
   if (this_mode > NEW_NEWMV)
+#endif  // CONFIG_JOINT_MVD
     av1_zero_array(masked_type_cost, COMPOUND_TYPES);
   else
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1309,7 +1317,11 @@ int av1_compound_type_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   // stored stats and update the mbmi appropriately.
   if (match_found &&
 #if CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_JOINT_MVD
+      this_mode <= JOINT_NEWMV &&
+#else
       this_mode <= NEW_NEWMV &&
+#endif  // CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       cpi->sf.inter_sf.reuse_compound_type_decision) {
     return populate_reuse_comp_type_data(x, mbmi, &best_type_stats, cur_mv,

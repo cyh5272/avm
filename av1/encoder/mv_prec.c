@@ -19,7 +19,7 @@
 #include "av1/encoder/mv_prec.h"
 #if CONFIG_ADAPTIVE_MVD
 #include "av1/common/reconinter.h"
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 
 static AOM_INLINE int_mv get_ref_mv_for_mv_stats(
     const MB_MODE_INFO *mbmi, const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
@@ -60,7 +60,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
                                          int comp_idx, const AV1_COMP *cpi,
 #if CONFIG_ADAPTIVE_MVD
                                          int is_adaptive_mvd,
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
                                          int *rates) {
   assert(comp_val != 0 && "mv component should not have zero value!");
   const int sign = comp_val < 0;
@@ -82,11 +82,11 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   nmv_component *cur_mvcomp_ctx = &mvcomp_ctx[comp_idx];
   aom_cdf_prob *sign_cdf = cur_mvcomp_ctx->sign_cdf;
 #if CONFIG_ADAPTIVE_MVD
-  aom_cdf_prob *class_cdf = is_adaptive_mvd ? cur_mvcomp_ctx->res_classes_cdf
+  aom_cdf_prob *class_cdf = is_adaptive_mvd ? cur_mvcomp_ctx->amvd_classes_cdf
                                             : cur_mvcomp_ctx->classes_cdf;
 #else
   aom_cdf_prob *class_cdf = cur_mvcomp_ctx->classes_cdf;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   aom_cdf_prob *class0_cdf = cur_mvcomp_ctx->class0_cdf;
   aom_cdf_prob(*bits_cdf)[3] = cur_mvcomp_ctx->bits_cdf;
   aom_cdf_prob *frac_part_cdf = mv_class
@@ -110,7 +110,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   } else {
 #if CONFIG_ADAPTIVE_MVD
     if (!is_adaptive_mvd) {
-#endif
+#endif                                           // CONFIG_ADAPTIVE_MVD
       const int n = mv_class + CLASS0_BITS - 1;  // number of bits
       for (int i = 0; i < n; ++i) {
         int_bit_rate += get_symbol_cost(bits_cdf[i], (int_part >> i) & 1);
@@ -118,20 +118,20 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
       }
 #if CONFIG_ADAPTIVE_MVD
     }
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   }
   rates[r_idx++] = int_bit_rate;
 #if CONFIG_ADAPTIVE_MVD
   int use_fractional_mv = 1;
   if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || int_part > 0))
     use_fractional_mv = 0;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_ADAPTIVE_MVD
   const int frac_part_rate =
       use_fractional_mv ? get_symbol_cost(frac_part_cdf, frac_part) : 0;
 #else
   const int frac_part_rate = get_symbol_cost(frac_part_cdf, frac_part);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   rates[r_idx++] = frac_part_rate;
 #if CONFIG_ADAPTIVE_MVD
   const int high_part_rate = (use_hp && use_fractional_mv)
@@ -140,17 +140,17 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
 #else
   const int high_part_rate =
       use_hp ? get_symbol_cost(high_part_cdf, high_part) : 0;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_ADAPTIVE_MVD
   if (use_fractional_mv) {
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
     update_cdf(frac_part_cdf, frac_part, MV_FP_SIZE);
     if (use_hp) {
       update_cdf(high_part_cdf, high_part, 2);
     }
 #if CONFIG_ADAPTIVE_MVD
   }
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   rates[r_idx++] = high_part_rate;
 
   mv_stats->last_bit_zero += !high_part;
@@ -171,10 +171,10 @@ static AOM_INLINE void keep_one_mv_stat(MV_STATS *mv_stats, const MV *ref_mv,
   MB_MODE_INFO *mbmi = xd->mi[0];
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
   aom_cdf_prob *joint_cdf =
-      is_adaptive_mvd ? nmvc->restrained_joints_cdf : nmvc->joints_cdf;
+      is_adaptive_mvd ? nmvc->amvd_joints_cdf : nmvc->joints_cdf;
 #else
   aom_cdf_prob *joint_cdf = nmvc->joints_cdf;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
   const int use_hp = cpi->common.features.allow_high_precision_mv;
 
   const MV diff = { cur_mv->row - ref_mv->row, cur_mv->col - ref_mv->col };
@@ -194,7 +194,7 @@ static AOM_INLINE void keep_one_mv_stat(MV_STATS *mv_stats, const MV *ref_mv,
   if (is_adaptive_mvd)
     update_cdf(joint_cdf, mv_joint, MV_JOINTS);
   else
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
     update_cdf(joint_cdf, mv_joint, MV_JOINTS);
 
   mv_stats->total_mv_rate += mv_joint_rate;
@@ -217,7 +217,7 @@ static AOM_INLINE void keep_one_mv_stat(MV_STATS *mv_stats, const MV *ref_mv,
     const int comp_rate =
         comp_val ? keep_one_comp_stat(mv_stats, comp_val, comp_idx, cpi, rates)
                  : 0;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
     // TODO(chiyotsai@google.com): Properly get hp rate when use_hp is false
     const int hp_rate =
         hp_comp_val ? rates[0] + rates[1] + rates[2] + rates[3] + rates[4] : 0;

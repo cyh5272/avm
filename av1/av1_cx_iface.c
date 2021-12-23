@@ -125,8 +125,8 @@ struct av1_extracfg {
   int enable_ist;  // enable intra secondary transform
 #endif             // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  int enable_ibp;                // enable intra bi-prediction
-#endif                           // CONFIG_IBP_DC or CONFIG_IBP_DIR
+  int enable_ibp;  // enable intra bi-prediction
+#endif             // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
   int enable_adaptive_mvd;  // enable adaptive MVD resolution
@@ -416,8 +416,8 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable intra secondary transform
 #endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  1,                       // enable intra bi-prediction
-#endif                     // CONFIG_IBP_DC or CONFIG_IBP_DIR
+  1,    // enable intra bi-prediction
+#endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
   1,    // enable adaptive mvd resolution
@@ -887,10 +887,10 @@ static void update_encoder_config(cfg_options_t *cfg,
 #endif
 #if CONFIG_ADAPTIVE_MVD
   cfg->enable_adaptive_mvd = extra_cfg->enable_adaptive_mvd;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   cfg->enable_joint_mvd = extra_cfg->enable_joint_mvd;
-#endif
+#endif  // CONFIG_JOINT_MVD
   cfg->max_partition_size = extra_cfg->max_partition_size;
   cfg->min_partition_size = extra_cfg->min_partition_size;
   cfg->enable_intra_edge_filter = extra_cfg->enable_intra_edge_filter;
@@ -968,10 +968,10 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #endif
 #if CONFIG_ADAPTIVE_MVD
   extra_cfg->enable_adaptive_mvd = cfg->enable_adaptive_mvd;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   extra_cfg->enable_joint_mvd = cfg->enable_joint_mvd;
-#endif
+#endif  // CONFIG_JOINT_MVD
   extra_cfg->max_partition_size = cfg->max_partition_size;
   extra_cfg->min_partition_size = cfg->min_partition_size;
   extra_cfg->enable_intra_edge_filter = cfg->enable_intra_edge_filter;
@@ -1209,10 +1209,10 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
 #endif
 #if CONFIG_ADAPTIVE_MVD
   tool_cfg->enable_adaptive_mvd = extra_cfg->enable_adaptive_mvd;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   tool_cfg->enable_joint_mvd = extra_cfg->enable_joint_mvd;
-#endif
+#endif  // CONFIG_JOINT_MVD
   tool_cfg->force_video_mode = extra_cfg->force_video_mode;
   tool_cfg->enable_palette = extra_cfg->enable_palette;
   // FIXME(debargha): Should this be:
@@ -3632,12 +3632,12 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_adaptive_mvd,
                               argv, err_string)) {
     extra_cfg.enable_adaptive_mvd = arg_parse_int_helper(&arg, err_string);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_joint_mvd,
                               argv, err_string)) {
     extra_cfg.enable_joint_mvd = arg_parse_int_helper(&arg, err_string);
-#endif
+#endif  // CONFIG_JOINT_MVD
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.min_partition_size,
                               argv, err_string)) {
     extra_cfg.min_partition_size = arg_parse_int_helper(&arg, err_string);

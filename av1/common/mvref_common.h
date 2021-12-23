@@ -229,7 +229,6 @@ static INLINE uint8_t av1_drl_ctx(const uint16_t *ref_mv_weight, int ref_idx) {
 
 // TODO(jingning): Consider the use of lookup table for (num / den)
 // altogether.
-#if CONFIG_JOINT_MVD
 static int div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730, 2340,
                             2048, 1820,  1638, 1489, 1365, 1260, 1170, 1092,
                             1024, 963,   910,  862,  819,  780,  744,  712,
@@ -247,7 +246,6 @@ static AOM_INLINE void get_mv_projection(MV *output, MV ref, int num, int den) {
   output->row = (int16_t)clamp(mv_row, clamp_min, clamp_max);
   output->col = (int16_t)clamp(mv_col, clamp_min, clamp_max);
 }
-#endif
 
 void av1_setup_frame_buf_refs(AV1_COMMON *cm);
 void av1_setup_frame_sign_bias(AV1_COMMON *cm);

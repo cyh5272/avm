@@ -100,10 +100,10 @@ int parse_cfg(const char *file, cfg_options_t *config) {
 #endif
 #if CONFIG_ADAPTIVE_MVD
     GET_PARAMS(enable_adaptive_mvd);
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
     GET_PARAMS(enable_joint_mvd);
-#endif
+#endif  // CONFIG_JOINT_MVD
     GET_PARAMS(enable_flip_idtx);
     GET_PARAMS(enable_deblocking);
     GET_PARAMS(enable_cdef);

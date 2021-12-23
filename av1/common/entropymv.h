@@ -79,8 +79,8 @@ enum {
 typedef struct {
   aom_cdf_prob classes_cdf[CDF_SIZE(MV_CLASSES)];
 #if CONFIG_ADAPTIVE_MVD
-  aom_cdf_prob res_classes_cdf[CDF_SIZE(MV_CLASSES)];
-#endif
+  aom_cdf_prob amvd_classes_cdf[CDF_SIZE(MV_CLASSES)];
+#endif  // CONFIG_ADAPTIVE_MVD
   aom_cdf_prob class0_fp_cdf[CLASS0_SIZE][CDF_SIZE(MV_FP_SIZE)];
   aom_cdf_prob fp_cdf[CDF_SIZE(MV_FP_SIZE)];
   aom_cdf_prob sign_cdf[CDF_SIZE(2)];
@@ -93,8 +93,8 @@ typedef struct {
 typedef struct {
   aom_cdf_prob joints_cdf[CDF_SIZE(MV_JOINTS)];
 #if CONFIG_ADAPTIVE_MVD
-  aom_cdf_prob restrained_joints_cdf[CDF_SIZE(MV_JOINTS)];
-#endif
+  aom_cdf_prob amvd_joints_cdf[CDF_SIZE(MV_JOINTS)];
+#endif  // CONFIG_ADAPTIVE_MVD
   nmv_component comps[2];
 } nmv_context;
 
