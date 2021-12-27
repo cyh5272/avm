@@ -156,6 +156,9 @@ TEST(IntrabcTest, DvValidation) {
 
   AV1_COMMON cm;
   memset(&cm, 0, sizeof(cm));
+#if CONFIG_IBC_SR_EXT
+  cm.features.global_intrabc_flag = 1;
+#endif
 
   for (const DvTestCase &dv_case : kDvCases) {
     const int mi_row = xd.tile.mi_row_start + dv_case.mi_row_offset;

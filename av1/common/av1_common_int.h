@@ -428,7 +428,13 @@ typedef struct {
    * If true, palette tool and/or intra block copy tools may be used.
    */
   bool allow_screen_content_tools;
-  bool allow_intrabc;       /*!< If true, intra block copy tool may be used. */
+  bool allow_intrabc; /*!< If true, intra block copy tool may be used. */
+#if CONFIG_IBC_SR_EXT
+  bool global_intrabc_flag; /*!< If true, intra block copy tool may use the
+                               global search range. */
+  bool local_intrabc_flag; /*!< If true, intra block copy tool may use the local
+                             search range. */
+#endif
   bool allow_warped_motion; /*!< If true, frame may use warped motion mode. */
   /*!
    * If true, using previous frames' motion vectors for prediction is allowed.

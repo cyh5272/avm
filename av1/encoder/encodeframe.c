@@ -715,6 +715,9 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
        mi_col < tile_info->mi_col_end; mi_col += mib_size, sb_col_in_tile++) {
     (*(enc_row_mt->sync_read_ptr))(row_mt_sync, sb_row, sb_col_in_tile);
 
+#if CONFIG_IBC_SR_EXT
+    av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
+#endif
     if (tile_data->allow_update_cdf && row_mt_enabled &&
         (tile_info->mi_row_start != mi_row)) {
       if ((tile_info->mi_col_start == mi_col)) {
@@ -1300,7 +1303,13 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
     cm->last_frame_seg_map = cm->prev_frame->seg_map;
   else
     cm->last_frame_seg_map = NULL;
+#if CONFIG_IBC_SR_EXT
+  if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
+       cm->features.global_intrabc_flag) ||
+      features->coded_lossless) {
+#else
   if (features->allow_intrabc || features->coded_lossless) {
+#endif
     av1_set_default_ref_deltas(cm->lf.ref_deltas);
     av1_set_default_mode_deltas(cm->lf.mode_deltas);
   } else if (cm->prev_frame) {
@@ -1365,7 +1374,12 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
   if (features->allow_intrabc && !cpi->intrabc_used) {
     features->allow_intrabc = 0;
   }
+#if CONFIG_IBC_SR_EXT
+  if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
+       cm->features.global_intrabc_flag)) {
+#else
   if (features->allow_intrabc) {
+#endif
     cm->delta_q_info.delta_lf_present_flag = 0;
   }
 
