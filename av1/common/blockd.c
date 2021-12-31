@@ -56,7 +56,7 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
 void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride) {
   av1_zero(xd->is_mi_coded);
   xd->is_mi_coded_stride = stride;
-}  // CONFIG_IBC_SR_EXT
+}
 
 void av1_mark_block_as_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
                              BLOCK_SIZE bsize, BLOCK_SIZE sb_size) {
@@ -85,7 +85,7 @@ void av1_mark_block_as_not_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
     memset(row_ptr, 0, mi_size_wide[bsize] * sizeof(xd->is_mi_coded[0]));
   }
 }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 void av1_set_entropy_contexts(const MACROBLOCKD *xd,
                               struct macroblockd_plane *pd, int plane,
