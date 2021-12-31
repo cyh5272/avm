@@ -1855,7 +1855,7 @@ static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi,
           !is_intrabc_block(mbmi, tree_type));
 #else
   return (is_inter_block(mbmi, tree_type));
-#endif
+#endif // 
 }
 #else
 static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi) {

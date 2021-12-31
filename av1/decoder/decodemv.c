@@ -48,7 +48,7 @@ static void read_cdef(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
   if (cm->features.coded_lossless) return;
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag) {
+      cm->features.allow_global_intrabc) {
 #else
   if (cm->features.allow_intrabc) {
 #endif
@@ -98,7 +98,7 @@ static void read_ccso(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
   if (cm->features.coded_lossless) return;
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;

@@ -1305,7 +1305,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
     cm->last_frame_seg_map = NULL;
 #if CONFIG_IBC_SR_EXT
   if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.global_intrabc_flag) ||
+       cm->features.allow_global_intrabc) ||
       features->coded_lossless) {
 #else
   if (features->allow_intrabc || features->coded_lossless) {
@@ -1376,7 +1376,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
   }
 #if CONFIG_IBC_SR_EXT
   if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.global_intrabc_flag)) {
+       cm->features.allow_global_intrabc)) {
 #else
   if (features->allow_intrabc) {
 #endif

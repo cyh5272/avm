@@ -3588,7 +3588,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   for (enum IntrabcMotionDirection dir = IBC_MOTION_ABOVE;
        dir < IBC_MOTION_DIRECTIONS; ++dir) {
 #if CONFIG_IBC_SR_EXT
-    if (frame_is_intra_only(cm) && cm->features.global_intrabc_flag) {
+    if (frame_is_intra_only(cm) && cm->features.allow_global_intrabc) {
 #endif
       switch (dir) {
         case IBC_MOTION_ABOVE:

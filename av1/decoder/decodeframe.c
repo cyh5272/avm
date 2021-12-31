@@ -2029,7 +2029,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
   const int num_planes = av1_num_planes(cm);
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2233,7 +2233,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
 
 #if CONFIG_IBC_SR_EXT
   if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.global_intrabc_flag) ||
+       cm->features.allow_global_intrabc) ||
       cm->features.coded_lossless) {
 #else
   if (cm->features.allow_intrabc || cm->features.coded_lossless) {
@@ -2292,7 +2292,7 @@ static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
 
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2312,7 +2312,7 @@ static AOM_INLINE void setup_ccso(AV1_COMMON *cm,
                                   struct aom_read_bit_buffer *rb) {
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -5291,8 +5291,8 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   int frame_size_override_flag = 0;
   features->allow_intrabc = 0;
 #if CONFIG_IBC_SR_EXT
-  features->global_intrabc_flag = 0;
-  features->local_intrabc_flag = 0;
+  features->allow_global_intrabc = 0;
+  features->allow_local_intrabc = 0;
 #endif
   features->primary_ref_frame = PRIMARY_REF_NONE;
 
@@ -5474,9 +5474,9 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       features->allow_intrabc = aom_rb_read_bit(rb);
 #if CONFIG_IBC_SR_EXT
     if (features->allow_intrabc) {
-      features->global_intrabc_flag = aom_rb_read_bit(rb);
-      features->local_intrabc_flag =
-          features->global_intrabc_flag ? aom_rb_read_bit(rb) : 1;
+      features->allow_global_intrabc = aom_rb_read_bit(rb);
+      features->allow_local_intrabc =
+          features->allow_global_intrabc ? aom_rb_read_bit(rb) : 1;
     }
 #endif
     features->allow_ref_frame_mvs = 0;
@@ -5492,9 +5492,9 @@ static int read_uncompressed_header(AV1Decoder *pbi,
         features->allow_intrabc = aom_rb_read_bit(rb);
 #if CONFIG_IBC_SR_EXT
       if (features->allow_intrabc) {
-        features->global_intrabc_flag = aom_rb_read_bit(rb);
-        features->local_intrabc_flag =
-            features->global_intrabc_flag ? aom_rb_read_bit(rb) : 1;
+        features->allow_global_intrabc = aom_rb_read_bit(rb);
+        features->allow_local_intrabc =
+            features->allow_global_intrabc ? aom_rb_read_bit(rb) : 1;
       }
 #endif
 
@@ -5579,8 +5579,8 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #if CONFIG_IBC_SR_EXT
       if (features->allow_screen_content_tools && !av1_superres_scaled(cm)) {
         features->allow_intrabc = aom_rb_read_bit(rb);
-        features->global_intrabc_flag = 0;
-        features->local_intrabc_flag = features->allow_intrabc;
+        features->allow_global_intrabc = 0;
+        features->allow_local_intrabc = features->allow_intrabc;
       }
 #endif
 
@@ -5673,7 +5673,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag) {
+      cm->features.allow_global_intrabc) {
 #else
   if (features->allow_intrabc) {
 #endif
@@ -5731,7 +5731,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
     cm->delta_q_info.delta_q_res = 1 << aom_rb_read_literal(rb, 2);
 #if CONFIG_IBC_SR_EXT
     if (!(frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-          cm->features.global_intrabc_flag))
+          cm->features.allow_global_intrabc))
 #else
     if (!features->allow_intrabc)
 #endif
@@ -5999,7 +5999,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 
 #if CONFIG_IBC_SR_EXT
   if (!tiles->single_tile_decoding &&
-      (!(cm->features.allow_intrabc && cm->features.global_intrabc_flag &&
+      (!(cm->features.allow_intrabc && cm->features.allow_global_intrabc &&
          frame_is_intra_only(cm)))) {
 #else
   if (!cm->features.allow_intrabc && !tiles->single_tile_decoding) {

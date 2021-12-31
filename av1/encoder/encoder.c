@@ -2527,12 +2527,12 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
 
 #if CONFIG_IBC_SR_EXT
   if (cm->features.allow_intrabc) {
-    cm->features.global_intrabc_flag =
+    cm->features.allow_global_intrabc =
         (oxcf->kf_cfg.enable_intrabc_ext != 2) && frame_is_intra_only(cm);
-    cm->features.local_intrabc_flag = !!oxcf->kf_cfg.enable_intrabc_ext;
+    cm->features.allow_local_intrabc = !!oxcf->kf_cfg.enable_intrabc_ext;
   } else {
-    cm->features.global_intrabc_flag = 0;
-    cm->features.local_intrabc_flag = 0;
+    cm->features.allow_global_intrabc = 0;
+    cm->features.allow_local_intrabc = 0;
   }
 #endif
 
@@ -2797,7 +2797,7 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
   // Pick the loop filter level for the frame.
 #if CONFIG_IBC_SR_EXT
   if (!(frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-        cm->features.global_intrabc_flag)) {
+        cm->features.allow_global_intrabc)) {
 #else
   if (!cm->features.allow_intrabc) {
 #endif
@@ -3036,12 +3036,12 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
   av1_set_screen_content_options(cpi, features);
   cpi->is_screen_content_type = features->allow_screen_content_tools;
   if (cm->features.allow_intrabc) {
-    cm->features.global_intrabc_flag =
+    cm->features.allow_global_intrabc =
         (oxcf->kf_cfg.enable_intrabc_ext != 2) && frame_is_intra_only(cm);
-    cm->features.local_intrabc_flag = !!oxcf->kf_cfg.enable_intrabc_ext;
+    cm->features.allow_local_intrabc = !!oxcf->kf_cfg.enable_intrabc_ext;
   } else {
-    cm->features.global_intrabc_flag = 0;
-    cm->features.local_intrabc_flag = 0;
+    cm->features.allow_global_intrabc = 0;
+    cm->features.allow_local_intrabc = 0;
   }
 #else
   if (frame_is_intra_only(cm)) {

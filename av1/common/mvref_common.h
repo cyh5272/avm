@@ -490,7 +490,7 @@ static INLINE int av1_is_dv_valid(const MV dv, const AV1_COMMON *cm,
   }
 
 #if CONFIG_IBC_SR_EXT
-  if (cm->features.local_intrabc_flag) {
+  if (cm->features.allow_local_intrabc) {
     if (bw <= 64 || bh <= 64) {
       int valid = 0;
       int tmp_row = mi_row;
@@ -526,7 +526,7 @@ static INLINE int av1_is_dv_valid(const MV dv, const AV1_COMMON *cm,
   }
   if (!frame_is_intra_only(cm)) return 0;
 
-  if (!cm->features.global_intrabc_flag) return 0;
+  if (!cm->features.allow_global_intrabc) return 0;
 #endif
 
   // Is the bottom right within an already coded SB? Also consider additional

@@ -739,7 +739,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
   if (!costlist_has_sad) {
 #if CONFIG_IBC_SR_EXT
     if (ms_params->is_intra_mode &&
-        ms_params->cm->features.local_intrabc_flag) {
+        ms_params->cm->features.allow_local_intrabc) {
       MV sub_mv = { (int16_t)GET_MV_SUBPEL(best_mv.row),
                     (int16_t)GET_MV_SUBPEL(best_mv.col) };
       int flag = av1_is_dv_valid(sub_mv, ms_params->cm, ms_params->xd,
@@ -766,7 +766,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
                                      bc + neighbors[i].col };
 #if CONFIG_IBC_SR_EXT
         if (ms_params->is_intra_mode &&
-            ms_params->cm->features.local_intrabc_flag) {
+            ms_params->cm->features.allow_local_intrabc) {
           MV sub_mv = { (int16_t)GET_MV_SUBPEL(this_mv.row),
                         (int16_t)GET_MV_SUBPEL(this_mv.col) };
           int flag = av1_is_dv_valid(
@@ -796,7 +796,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
         } else {
 #if CONFIG_IBC_SR_EXT
           if (ms_params->is_intra_mode &&
-              ms_params->cm->features.local_intrabc_flag) {
+              ms_params->cm->features.allow_local_intrabc) {
             MV sub_mv = { (int16_t)GET_MV_SUBPEL(this_mv.row),
                           (int16_t)GET_MV_SUBPEL(this_mv.col) };
             int flag = av1_is_dv_valid(
@@ -1311,7 +1311,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
   // Check the starting position
 
 #if CONFIG_IBC_SR_EXT
-  if (ms_params->is_intra_mode && ms_params->cm->features.local_intrabc_flag) {
+  if (ms_params->is_intra_mode && ms_params->cm->features.allow_local_intrabc) {
     MV sub_mv = { (int16_t)GET_MV_SUBPEL(start_mv.row),
                   (int16_t)GET_MV_SUBPEL(start_mv.col) };
     if (av1_is_dv_valid(sub_mv, ms_params->cm, ms_params->xd, ms_params->mi_row,
@@ -1351,7 +1351,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
 
 #if CONFIG_IBC_SR_EXT
     if (ms_params->is_intra_mode &&
-        ms_params->cm->features.local_intrabc_flag) {
+        ms_params->cm->features.allow_local_intrabc) {
       for (j = 0; j < 4; j++) {
         MV sub_mv = { (int16_t)GET_MV_SUBPEL(best_mv->row + site[1 + j].mv.row),
                       (int16_t)GET_MV_SUBPEL(best_mv->col +
@@ -1374,7 +1374,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
         int valid = 1;
         for (j = 0; j < 4; j++) {
           if (ms_params->is_intra_mode &&
-              ms_params->cm->features.local_intrabc_flag) {
+              ms_params->cm->features.allow_local_intrabc) {
             MV sub_mv = {
               (int16_t)GET_MV_SUBPEL(best_mv->row + site[idx + j].mv.row),
               (int16_t)GET_MV_SUBPEL(best_mv->col + site[idx + j].mv.col)
@@ -1411,7 +1411,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
         if (av1_is_fullmv_in_range(&ms_params->mv_limits, this_mv)) {
 #if CONFIG_IBC_SR_EXT
           if (ms_params->is_intra_mode &&
-              ms_params->cm->features.local_intrabc_flag) {
+              ms_params->cm->features.allow_local_intrabc) {
             MV sub_mv = { (int16_t)GET_MV_SUBPEL(this_mv.row),
                           (int16_t)GET_MV_SUBPEL(this_mv.col) };
             int valid = av1_is_dv_valid(
@@ -1537,7 +1537,7 @@ static int exhaustive_mesh_search(FULLPEL_MV start_mv,
   clamp_fullmv(&start_mv, &ms_params->mv_limits);
   *best_mv = start_mv;
 #if CONFIG_IBC_SR_EXT
-  if (ms_params->is_intra_mode && ms_params->cm->features.local_intrabc_flag) {
+  if (ms_params->is_intra_mode && ms_params->cm->features.allow_local_intrabc) {
     const MV sub_mv = { (int16_t)GET_MV_SUBPEL(start_mv.row),
                         (int16_t)GET_MV_SUBPEL(start_mv.col) };
     if (av1_is_dv_valid(sub_mv, ms_params->cm, ms_params->xd, ms_params->mi_row,
@@ -1565,7 +1565,7 @@ static int exhaustive_mesh_search(FULLPEL_MV start_mv,
   end_col = AOMMIN(range, ms_params->mv_limits.col_max - start_mv.col);
 
 #if CONFIG_IBC_SR_EXT
-  if (ms_params->is_intra_mode && ms_params->cm->features.local_intrabc_flag) {
+  if (ms_params->is_intra_mode && ms_params->cm->features.allow_local_intrabc) {
     int part_size = 65;
     int part_start_row;
     int part_start_col;

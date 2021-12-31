@@ -1217,7 +1217,7 @@ static AOM_INLINE void write_cdef(AV1_COMMON *cm, MACROBLOCKD *const xd,
 #if CONFIG_IBC_SR_EXT
   if (cm->features.coded_lossless ||
       (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.global_intrabc_flag))
+       cm->features.allow_global_intrabc))
     return;
 #else
   if (cm->features.coded_lossless || cm->features.allow_intrabc) return;
@@ -1265,7 +1265,7 @@ static AOM_INLINE void write_ccso(AV1_COMMON *cm, MACROBLOCKD *const xd,
   if (cm->features.coded_lossless) return;
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2495,7 +2495,7 @@ static AOM_INLINE void encode_restoration_mode(
   if (!cm->seq_params.enable_restoration) return;
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2728,7 +2728,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
   assert(!cm->features.coded_lossless);
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2787,7 +2787,7 @@ static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
   if (!cm->seq_params.enable_cdef) return;
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -2810,7 +2810,7 @@ static AOM_INLINE void encode_ccso(const AV1_COMMON *cm,
                                    struct aom_write_bit_buffer *wb) {
 #if CONFIG_IBC_SR_EXT
   if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.global_intrabc_flag)
+      cm->features.allow_global_intrabc)
     return;
 #else
   if (cm->features.allow_intrabc) return;
@@ -3830,9 +3830,9 @@ static AOM_INLINE void write_uncompressed_header_obu(
       aom_wb_write_bit(wb, features->allow_intrabc);
 #if CONFIG_IBC_SR_EXT
     if (features->allow_intrabc) {
-      aom_wb_write_bit(wb, features->global_intrabc_flag);
-      if (features->global_intrabc_flag) {
-        aom_wb_write_bit(wb, features->local_intrabc_flag);
+      aom_wb_write_bit(wb, features->allow_global_intrabc);
+      if (features->allow_global_intrabc) {
+        aom_wb_write_bit(wb, features->allow_local_intrabc);
       }
     }
 #endif
@@ -3844,9 +3844,9 @@ static AOM_INLINE void write_uncompressed_header_obu(
         aom_wb_write_bit(wb, features->allow_intrabc);
 #if CONFIG_IBC_SR_EXT
       if (features->allow_intrabc) {
-        aom_wb_write_bit(wb, features->global_intrabc_flag);
-        if (features->global_intrabc_flag) {
-          aom_wb_write_bit(wb, features->local_intrabc_flag);
+        aom_wb_write_bit(wb, features->allow_global_intrabc);
+        if (features->allow_global_intrabc) {
+          aom_wb_write_bit(wb, features->allow_local_intrabc);
         }
       }
 #endif
@@ -3964,7 +3964,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
       xd->current_base_qindex = quant_params->base_qindex;
 #if CONFIG_IBC_SR_EXT
       if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-          cm->features.global_intrabc_flag)
+          cm->features.allow_global_intrabc)
 #else
       if (features->allow_intrabc)
 #endif

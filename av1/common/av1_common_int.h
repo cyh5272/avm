@@ -430,9 +430,9 @@ typedef struct {
   bool allow_screen_content_tools;
   bool allow_intrabc; /*!< If true, intra block copy tool may be used. */
 #if CONFIG_IBC_SR_EXT
-  bool global_intrabc_flag; /*!< If true, intra block copy tool may use the
+  bool allow_global_intrabc; /*!< If true, intra block copy tool may use the
                                global search range. */
-  bool local_intrabc_flag; /*!< If true, intra block copy tool may use the local
+  bool allow_local_intrabc; /*!< If true, intra block copy tool may use the local
                              search range. */
 #endif
   bool allow_warped_motion; /*!< If true, frame may use warped motion mode. */
