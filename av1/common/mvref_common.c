@@ -154,7 +154,7 @@ static AOM_INLINE void add_ref_mv_candidate(
 #endif  // CONFIG_SMVP_IMPROVEMENT
 #if CONFIG_IBC_SR_EXT
     uint8_t is_intrabc,
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     uint16_t weight) {
 #if CONFIG_SDP
   if (!is_inter_block(candidate, SHARED_PART)) return;
@@ -167,8 +167,8 @@ static AOM_INLINE void add_ref_mv_candidate(
   if (is_intrabc != is_intrabc_block(candidate, SHARED_PART)) return;
 #else
   if (is_intrabc != is_intrabc_block(candidate)) return;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
 
   assert(weight % 2 == 0);
   int index, ref;
@@ -201,7 +201,7 @@ static AOM_INLINE void add_ref_mv_candidate(
       else if (add_more_mvs && candidate->ref_frame[ref] > INTRA_FRAME &&
 #if CONFIG_IBC_SR_EXT
                rf[0] != INTRA_FRAME &&
-#endif
+#endif  // CONFIG_IBC_SR_EXT
                cm->seq_params.order_hint_info.enable_order_hint) {
         const int cur_blk_ref_side = cm->ref_frame_side[rf[0]];
         const int cand_blk_ref_side =
@@ -421,8 +421,8 @@ static AOM_INLINE void scan_row_mbmi(
                          xd->mi[0]->use_intrabc[xd->tree_type == CHROMA_PART],
 #else
                          xd->mi[0]->use_intrabc,
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
                          len * weight);
 
     i += len;
@@ -497,8 +497,8 @@ static AOM_INLINE void scan_col_mbmi(
                          xd->mi[0]->use_intrabc[xd->tree_type == CHROMA_PART],
 #else
                          xd->mi[0]->use_intrabc,
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
                          len * weight);
 
     i += len;
@@ -543,8 +543,8 @@ static AOM_INLINE void scan_blk_mbmi(
                          xd->mi[0]->use_intrabc[xd->tree_type == CHROMA_PART],
 #else
                          xd->mi[0]->use_intrabc,
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
 #if CONFIG_COMPLEXITY_SCALABLE_MVP
                          weight * len);
 #else
@@ -915,10 +915,10 @@ static AOM_INLINE void setup_ref_mv_list(
 #else
   if (cm->features.allow_ref_frame_mvs && !xd->mi[0]->use_intrabc) {
 
-#endif
+#endif  // CONFIG_SDP
 #else
   if (cm->features.allow_ref_frame_mvs) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     int is_available = 0;
     const int voffset = AOMMAX(mi_size_high[BLOCK_8X8], xd->height);
     const int hoffset = AOMMAX(mi_size_wide[BLOCK_8X8], xd->width);
@@ -1183,8 +1183,8 @@ static AOM_INLINE void setup_ref_mv_list(
     if (!xd->mi[0]->use_intrabc[xd->tree_type == CHROMA_PART]) {
 #else
     if (!xd->mi[0]->use_intrabc) {
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
       for (int idx = 0; abs(max_row_offset) >= 1 && idx < mi_size &&
                         *refmv_count < MAX_MV_REF_CANDIDATES;) {
         const MB_MODE_INFO *const candidate = xd->mi[-xd->mi_stride + idx];
@@ -1210,7 +1210,7 @@ static AOM_INLINE void setup_ref_mv_list(
       }
 #if CONFIG_IBC_SR_EXT
     }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
     for (int idx = 0; idx < *refmv_count; ++idx) {
       clamp_mv_ref(&ref_mv_stack[idx].this_mv.as_mv, xd->width << MI_SIZE_LOG2,

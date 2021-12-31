@@ -56,7 +56,7 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
 void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride) {
   av1_zero(xd->is_mi_coded);
   xd->is_mi_coded_stride = stride;
-}
+}  // CONFIG_IBC_SR_EXT
 
 void av1_mark_block_as_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
                              BLOCK_SIZE bsize, BLOCK_SIZE sb_size) {

@@ -802,8 +802,8 @@ int av1_search_palette_mode(IntraModeSearchState *intra_search_state,
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #else
   mbmi->use_intrabc = 0;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
   mbmi->mode = DC_PRED;
   mbmi->uv_mode = UV_DC_PRED;
   mbmi->ref_frame[0] = INTRA_FRAME;

@@ -116,7 +116,7 @@ int parse_cfg(const char *file, cfg_options_t *config) {
     GET_PARAMS(enable_intrabc);
 #if CONFIG_IBC_SR_EXT
     GET_PARAMS(enable_intrabc_ext);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     GET_PARAMS(enable_cfl_intra);
     GET_PARAMS(enable_smooth_intra);
     GET_PARAMS(enable_filter_intra);

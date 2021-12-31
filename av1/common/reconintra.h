@@ -102,7 +102,7 @@ static INLINE int av1_allow_intrabc(const AV1_COMMON *const cm) {
 #else
   return frame_is_intra_only(cm) && cm->features.allow_screen_content_tools &&
          cm->features.allow_intrabc;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 static INLINE int av1_filter_intra_allowed_bsize(const AV1_COMMON *const cm,

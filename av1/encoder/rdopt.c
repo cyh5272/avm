@@ -3509,8 +3509,8 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 1;
 #else
   mbmi->use_intrabc = 1;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
   av1_find_mv_refs(cm, xd, mbmi, ref_frame, mbmi_ext->ref_mv_count,
                    xd->ref_mv_stack, xd->weight, NULL, mbmi_ext->global_mvs,
                    mbmi_ext->mode_context);
@@ -3519,8 +3519,8 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #else
   mbmi->use_intrabc = 0;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
   // TODO(Ravi): Populate mbmi_ext->ref_mv_stack[ref_frame][4] and
   // mbmi_ext->weight[ref_frame][4] inside av1_find_mv_refs.
   av1_copy_usable_ref_mv_stack_and_weight(xd, mbmi_ext, ref_frame);
@@ -3583,13 +3583,13 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   fullms_params.mib_size_log2 = cm->seq_params.mib_size_log2;
   fullms_params.mi_col = mi_col;
   fullms_params.mi_row = mi_row;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   for (enum IntrabcMotionDirection dir = IBC_MOTION_ABOVE;
        dir < IBC_MOTION_DIRECTIONS; ++dir) {
 #if CONFIG_IBC_SR_EXT
     if (frame_is_intra_only(cm) && cm->features.allow_global_intrabc) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       switch (dir) {
         case IBC_MOTION_ABOVE:
           fullms_params.mv_limits.col_min =
@@ -3603,7 +3603,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #else
         fullms_params.mv_limits.row_max =
             (sb_row * cm->seq_params.mib_size - mi_row) * MI_SIZE - h;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
           break;
         case IBC_MOTION_LEFT:
           fullms_params.mv_limits.col_min =
@@ -3613,9 +3613,9 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #else
         fullms_params.mv_limits.col_max =
             (sb_col * cm->seq_params.mib_size - mi_col) * MI_SIZE - w;
-#endif
-          // TODO(aconverse@google.com): Minimize the overlap between above and
-          // left areas.
+#endif  // CONFIG_IBC_SR_EXT
+        // TODO(aconverse@google.com): Minimize the overlap between above and
+        // left areas.
           fullms_params.mv_limits.row_min =
               (tile->mi_row_start - mi_row) * MI_SIZE;
           int bottom_coded_mi_edge =
@@ -3658,7 +3658,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
         default: assert(0);
       }
     }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     assert(fullms_params.mv_limits.col_min >= fullms_params.mv_limits.col_min);
     assert(fullms_params.mv_limits.col_max <= fullms_params.mv_limits.col_max);
     assert(fullms_params.mv_limits.row_min >= fullms_params.mv_limits.row_min);
@@ -3920,8 +3920,8 @@ static AOM_INLINE void rd_pick_skip_mode(
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #else
   mbmi->use_intrabc = 0;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
   const uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
   if (x->mbmi_ext->ref_mv_count[ref_frame_type] == UINT8_MAX) {
     if (x->mbmi_ext->ref_mv_count[ref_frame] == UINT8_MAX ||
@@ -4793,7 +4793,7 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
                              const AV1_COMMON *cm, MACROBLOCKD *const xd) {
 #else
                              const AV1_COMMON *cm) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   PALETTE_MODE_INFO *const pmi = &mbmi->palette_mode_info;
   mbmi->ref_mv_idx = 0;
   mbmi->mode = curr_mode;
@@ -4816,8 +4816,8 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #else
   mbmi->use_intrabc = 0;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 static AOM_INLINE void collect_single_states(const FeatureFlags *const features,
@@ -5641,8 +5641,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #else
   mbmi->use_intrabc = 0;
-#endif
-#endif
+#endif  // CONFIG_SDP
+#endif  // CONFIG_IBC_SR_EXT
 
   InterModeSearchState search_state;
   init_inter_mode_search_state(&search_state, cpi, x, bsize, best_rd_so_far);
@@ -5850,7 +5850,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     init_mbmi(mbmi, this_mode, ref_frames, cm, xd);
 #else
     init_mbmi(mbmi, this_mode, ref_frames, cm);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_OPTFLOW_REFINEMENT
     // Optical flow compound modes are only enabled with enable_order_hint
@@ -6096,7 +6096,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       init_mbmi(mbmi, this_mode, av1_mode_defs[mode_enum].ref_frame, cm, xd);
 #else
     init_mbmi(mbmi, this_mode, av1_mode_defs[mode_enum].ref_frame, cm);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       txfm_info->skip_txfm = 0;
 
       RD_STATS intra_rd_stats, intra_rd_stats_y, intra_rd_stats_uv;
@@ -6216,7 +6216,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       }
     }
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   // Make sure that the ref_mv_idx is only nonzero when we're
   // using a mode which can support ref_mv_idx

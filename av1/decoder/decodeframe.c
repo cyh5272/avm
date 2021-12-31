@@ -1644,7 +1644,7 @@ static AOM_INLINE void parse_decode_block(AV1Decoder *const pbi,
 #endif
 #if CONFIG_IBC_SR_EXT
   av1_mark_block_as_coded(xd, mi_row, mi_col, bsize, cm->seq_params.sb_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 static AOM_INLINE void set_offsets_for_pred_and_recon(AV1Decoder *const pbi,
@@ -1692,7 +1692,7 @@ static AOM_INLINE void decode_block(AV1Decoder *const pbi, ThreadData *const td,
 #if CONFIG_IBC_SR_EXT
   av1_mark_block_as_coded(&td->dcb.xd, mi_row, mi_col, bsize,
                           pbi->common.seq_params.sb_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 #if CONFIG_SDP
@@ -2033,7 +2033,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
     RestorationInfo *rsi = &cm->rst_info[p];
@@ -2237,7 +2237,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
       cm->features.coded_lossless) {
 #else
   if (cm->features.allow_intrabc || cm->features.coded_lossless) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     // write default deltas to frame buffer
     av1_set_default_ref_deltas(cm->cur_frame->ref_deltas);
     av1_set_default_mode_deltas(cm->cur_frame->mode_deltas);
@@ -2296,7 +2296,7 @@ static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   cdef_info->cdef_damping = aom_rb_read_literal(rb, 2) + 3;
   cdef_info->cdef_bits = aom_rb_read_literal(rb, 2);
   cdef_info->nb_cdef_strengths = 1 << cdef_info->cdef_bits;
@@ -2316,7 +2316,7 @@ static AOM_INLINE void setup_ccso(AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const int ccso_offset[8] = { 0, 1, -1, 3, -3, 5, -5, -7 };
   for (int plane = 1; plane < 3; plane++) {
     cm->ccso_info.ccso_enable[plane - 1] = aom_rb_read_literal(rb, 1);
@@ -3189,7 +3189,7 @@ static AOM_INLINE void decode_tile_sb_row(AV1Decoder *pbi, ThreadData *const td,
        mi_col += cm->seq_params.mib_size, sb_col_in_tile++) {
 #if CONFIG_IBC_SR_EXT
     av1_reset_is_mi_coded_map(&td->dcb.xd, cm->seq_params.mib_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     set_cb_buffer(pbi, &td->dcb, pbi->cb_buffer_base, num_planes, mi_row,
                   mi_col);
 
@@ -3289,7 +3289,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
          mi_col += cm->seq_params.mib_size) {
 #if CONFIG_IBC_SR_EXT
       av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       set_cb_buffer(pbi, dcb, &td->cb_buffer_base, num_planes, 0, 0);
 #if CONFIG_REF_MV_BANK
       // td->ref_mv_bank is initialized as xd->ref_mv_bank, and used
@@ -3789,7 +3789,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
          mi_col += cm->seq_params.mib_size) {
 #if CONFIG_IBC_SR_EXT
       av1_reset_is_mi_coded_map(&td->dcb.xd, cm->seq_params.mib_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       set_cb_buffer(pbi, dcb, pbi->cb_buffer_base, num_planes, mi_row, mi_col);
 
 #if CONFIG_REF_MV_BANK
@@ -5293,7 +5293,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #if CONFIG_IBC_SR_EXT
   features->allow_global_intrabc = 0;
   features->allow_local_intrabc = 0;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   features->primary_ref_frame = PRIMARY_REF_NONE;
 
   if (!seq_params->reduced_still_picture_hdr) {
@@ -5478,7 +5478,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       features->allow_local_intrabc =
           features->allow_global_intrabc ? aom_rb_read_bit(rb) : 1;
     }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     features->allow_ref_frame_mvs = 0;
     cm->prev_frame = NULL;
   } else {
@@ -5496,7 +5496,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
         features->allow_local_intrabc =
             features->allow_global_intrabc ? aom_rb_read_bit(rb) : 1;
       }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
     } else if (pbi->need_resync != 1) { /* Skip if need resync */
       int frame_refs_short_signaling = 0;
@@ -5582,7 +5582,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
         features->allow_global_intrabc = 0;
         features->allow_local_intrabc = features->allow_intrabc;
       }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_NEW_INTER_MODES
       features->max_drl_bits =
@@ -5676,7 +5676,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       cm->features.allow_global_intrabc) {
 #else
   if (features->allow_intrabc) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     // Set parameters corresponding to no filtering.
     struct loopfilter *lf = &cm->lf;
     lf->filter_level[0] = 0;
@@ -5734,7 +5734,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
           cm->features.allow_global_intrabc))
 #else
     if (!features->allow_intrabc)
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       cm->delta_q_info.delta_lf_present_flag = aom_rb_read_bit(rb);
     if (cm->delta_q_info.delta_lf_present_flag) {
       cm->delta_q_info.delta_lf_res = 1 << aom_rb_read_literal(rb, 2);
@@ -6003,7 +6003,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
          frame_is_intra_only(cm)))) {
 #else
   if (!cm->features.allow_intrabc && !tiles->single_tile_decoding) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
       if (pbi->num_workers > 1) {
         av1_loop_filter_frame_mt(

@@ -51,7 +51,7 @@ static void read_cdef(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
       cm->features.allow_global_intrabc) {
 #else
   if (cm->features.allow_intrabc) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     assert(cm->cdef_info.cdef_bits == 0);
     return;
   }
@@ -102,7 +102,7 @@ static void read_ccso(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -2055,7 +2055,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
   if (cm->seq_params.enable_refmvbank && !is_intrabc_block(mbmi, xd->tree_type))
 #else
   if (cm->seq_params.enable_refmvbank)
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     av1_update_ref_mv_bank(cm, xd, mbmi);
 #endif  // CONFIG_REF_MV_BANK
 
@@ -2135,7 +2135,7 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
     read_intrabc_info(cm, dcb, r);
     if (is_intrabc_block(mbmi, xd->tree_type)) return;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   if (inter_block)
     read_inter_block_mode_info(pbi, dcb, mbmi, r);
   else

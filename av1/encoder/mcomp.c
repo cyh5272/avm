@@ -758,7 +758,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
 #else
     cost_list[0] = get_mvpred_sad(
         ms_params, src, get_buf_from_fullmv(ref, &best_mv), ref_stride);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
     if (check_bounds(&ms_params->mv_limits, br, bc, 1)) {
       for (int i = 0; i < 4; i++) {
@@ -785,7 +785,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
 #else
         cost_list[i + 1] = get_mvpred_sad(
             ms_params, src, get_buf_from_fullmv(ref, &this_mv), ref_stride);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       }
     } else {
       for (int i = 0; i < 4; i++) {
@@ -816,7 +816,7 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
 #else
           cost_list[i + 1] = get_mvpred_sad(
               ms_params, src, get_buf_from_fullmv(ref, &this_mv), ref_stride);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
         }
       }
     }
@@ -1334,7 +1334,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
   best_address = get_buf_from_fullmv(ref, &start_mv);
   bestsad = get_mvpred_compound_sad(ms_params, src, best_address, ref_stride);
   bestsad += mvsad_err_cost_(best_mv, &ms_params->mv_cost_params);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   int next_step_size = tot_steps > 2 ? cfg->radius[tot_steps - 2] : 1;
   for (int step = tot_steps - 1; step >= 0; --step) {
@@ -1361,7 +1361,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
                                   ms_params->bsize, ms_params->mib_size_log2);
       }
     }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     // TODO(anyone): Implement 4 points search for msdf&sdaf
     if (all_in && !mask && !second_pred) {
       const uint8_t *src_buf = src->buf;
@@ -1385,7 +1385,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
           }
         }
         if (!valid) continue;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
         for (j = 0; j < 4; j++)
           block_offset[j] = site[idx + j].offset + best_address;
 
@@ -1419,7 +1419,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
                 ms_params->mi_col, ms_params->bsize, ms_params->mib_size_log2);
             if (!valid) continue;
           }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
           const uint8_t *const check_here = site[idx].offset + best_address;
           unsigned int thissad;
@@ -1558,7 +1558,7 @@ static int exhaustive_mesh_search(FULLPEL_MV start_mv,
   best_sad = get_mvpred_sad(ms_params, src, get_buf_from_fullmv(ref, &start_mv),
                             ref_stride);
   best_sad += mvsad_err_cost_(&start_mv, mv_cost_params);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   start_row = AOMMAX(-range, ms_params->mv_limits.row_min - start_mv.row);
   start_col = AOMMAX(-range, ms_params->mv_limits.col_min - start_mv.col);
   end_row = AOMMIN(range, ms_params->mv_limits.row_max - start_mv.row);
@@ -1646,7 +1646,7 @@ static int exhaustive_mesh_search(FULLPEL_MV start_mv,
     }
     return best_sad;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   for (r = start_row; r <= end_row; r += step) {
     for (c = start_col; c <= end_col; c += col_step) {

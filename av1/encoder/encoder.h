@@ -455,7 +455,7 @@ typedef struct {
    * local area (default). 2: only use the local search range.
    */
   int enable_intrabc_ext;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 } KeyFrameCfg;
 
@@ -3045,7 +3045,7 @@ static INLINE int av1_use_hash_me(const AV1_COMP *const cpi) {
   return (cpi->common.features.allow_screen_content_tools &&
           cpi->common.features.allow_intrabc &&
           frame_is_intra_only(&cpi->common));
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 static INLINE const YV12_BUFFER_CONFIG *get_ref_frame_yv12_buf(

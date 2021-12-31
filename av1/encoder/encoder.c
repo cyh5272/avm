@@ -2534,7 +2534,7 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
     cm->features.allow_global_intrabc = 0;
     cm->features.allow_local_intrabc = 0;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_USE_VMAF_RC
   if (oxcf->tune_cfg.tuning == AOM_TUNE_VMAF_NEG_MAX_GAIN) {
@@ -2800,7 +2800,7 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
         cm->features.allow_global_intrabc)) {
 #else
   if (!cm->features.allow_intrabc) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     loopfilter_frame(cpi, cm);
   } else {
     cm->lf.filter_level[0] = 0;
@@ -3048,7 +3048,7 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
     av1_set_screen_content_options(cpi, features);
     cpi->is_screen_content_type = features->allow_screen_content_tools;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   // frame type has been decided outside of this function call
   cm->cur_frame->frame_type = current_frame->frame_type;

@@ -727,7 +727,7 @@ void av1_determine_sc_tools_with_encoding(AV1_COMP *cpi, const int q_orig) {
     cm->features.allow_screen_content_tools = cm->features.allow_intrabc = 1;
     return;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   // Turn off the encoding trial for forward key frame and superres.
   if (oxcf->kf_cfg.fwd_kf_enabled || cpi->superres_mode != AOM_SUPERRES_NONE ||

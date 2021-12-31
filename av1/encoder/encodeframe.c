@@ -717,7 +717,7 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
 
 #if CONFIG_IBC_SR_EXT
     av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     if (tile_data->allow_update_cdf && row_mt_enabled &&
         (tile_info->mi_row_start != mi_row)) {
       if ((tile_info->mi_col_start == mi_col)) {
@@ -1309,7 +1309,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
       features->coded_lossless) {
 #else
   if (features->allow_intrabc || features->coded_lossless) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     av1_set_default_ref_deltas(cm->lf.ref_deltas);
     av1_set_default_mode_deltas(cm->lf.mode_deltas);
   } else if (cm->prev_frame) {
@@ -1379,7 +1379,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
        cm->features.allow_global_intrabc)) {
 #else
   if (features->allow_intrabc) {
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     cm->delta_q_info.delta_lf_present_flag = 0;
   }
 

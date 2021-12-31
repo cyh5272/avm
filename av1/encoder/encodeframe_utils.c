@@ -717,12 +717,10 @@ static BLOCK_SIZE len_to_bsize(int length) {
     case 16: return BLOCK_16X16;
     case 8: return BLOCK_8X8;
     case 4: return BLOCK_4X4;
-    default:
-      assert(0 && "Invalid block size");
-      return BLOCK_16X16;
+    default: assert(0 && "Invalid block size"); return BLOCK_16X16;
   }
 }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
                          int mi_row, int mi_col, BLOCK_SIZE bsize,
@@ -772,7 +770,7 @@ void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
 #if CONFIG_IBC_SR_EXT
   av1_mark_block_as_not_coded(xd, mi_row, mi_col, bsize,
                               len_to_bsize(x->e_mbd.is_mi_coded_stride * 4));
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 void av1_save_context(const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx,

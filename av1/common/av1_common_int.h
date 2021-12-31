@@ -432,10 +432,10 @@ typedef struct {
 #if CONFIG_IBC_SR_EXT
   bool allow_global_intrabc; /*!< If true, intra block copy tool may use the
                                global search range. */
-  bool allow_local_intrabc; /*!< If true, intra block copy tool may use the local
-                             search range. */
-#endif
-  bool allow_warped_motion; /*!< If true, frame may use warped motion mode. */
+  bool allow_local_intrabc;  /*!< If true, intra block copy tool may use the
+                              local  search range. */
+#endif                       // CONFIG_IBC_SR_EXT
+  bool allow_warped_motion;  /*!< If true, frame may use warped motion mode. */
   /*!
    * If true, using previous frames' motion vectors for prediction is allowed.
    */

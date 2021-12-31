@@ -73,7 +73,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 static AOM_INLINE void write_intrabc_info(
     MACROBLOCKD *xd, const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
     aom_writer *w);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 #if !CONFIG_AIMC
 static AOM_INLINE void write_intra_y_mode_kf(FRAME_CONTEXT *frame_ctx,
@@ -1221,7 +1221,7 @@ static AOM_INLINE void write_cdef(AV1_COMMON *cm, MACROBLOCKD *const xd,
     return;
 #else
   if (cm->features.coded_lossless || cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   // At the start of a superblock, mark that we haven't yet written CDEF
   // strengths for any of the CDEF units contained in this superblock.
@@ -1269,7 +1269,7 @@ static AOM_INLINE void write_ccso(AV1_COMMON *cm, MACROBLOCKD *const xd,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -1597,14 +1597,14 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
   const int is_inter = is_inter_block(mbmi, xd->tree_type) && !is_intrabc;
 #else
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 #else
 #if CONFIG_IBC_SR_EXT
   const int is_intrabc = is_intrabc_block(mbmi);
   const int is_inter = is_inter_block(mbmi) && !is_intrabc;
 #else
   const int is_inter = is_inter_block(mbmi);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 #endif
   const int is_compound = has_second_ref(mbmi);
   int ref;
@@ -1646,11 +1646,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
   if (!is_inter && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
 #else
   if (!is_inter && av1_allow_intrabc(cm)) {
-#endif
+#endif  // CONFIG_SDP
     write_intrabc_info(xd, mbmi_ext_frame, w);
     if (is_intrabc_block(mbmi, xd->tree_type)) return;
   }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   if (!is_inter) {
 #if CONFIG_AIMC
     write_intra_prediction_modes(cpi, w);
@@ -2246,7 +2246,7 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   }
 #if CONFIG_IBC_SR_EXT
   av1_mark_block_as_coded(xd, mi_row, mi_col, bsize, cm->seq_params.sb_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 
 static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
@@ -2464,7 +2464,7 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
          mi_col += cm->seq_params.mib_size) {
 #if CONFIG_IBC_SR_EXT
       av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
       cpi->td.mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
 #if CONFIG_SDP
       const int total_loop_num =
@@ -2499,7 +2499,7 @@ static AOM_INLINE void encode_restoration_mode(
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const int num_planes = av1_num_planes(cm);
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
@@ -2732,7 +2732,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const int num_planes = av1_num_planes(cm);
   struct loopfilter *lf = &cm->lf;
 
@@ -2791,7 +2791,7 @@ static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const int num_planes = av1_num_planes(cm);
   int i;
   aom_wb_write_literal(wb, cm->cdef_info.cdef_damping - 3, 2);
@@ -2814,7 +2814,7 @@ static AOM_INLINE void encode_ccso(const AV1_COMMON *cm,
     return;
 #else
   if (cm->features.allow_intrabc) return;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   const int ccso_offset[8] = { 0, 1, -1, 3, -3, 5, -5, -7 };
   for (int plane = 0; plane < 2; plane++) {
     aom_wb_write_literal(wb, cm->ccso_info.ccso_enable[plane], 1);
@@ -3835,7 +3835,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
         aom_wb_write_bit(wb, features->allow_local_intrabc);
       }
     }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   } else {
     if (current_frame->frame_type == INTRA_ONLY_FRAME) {
       write_frame_size(cm, frame_size_override_flag, wb);
@@ -3849,7 +3849,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
           aom_wb_write_bit(wb, features->allow_local_intrabc);
         }
       }
-#endif
+#endif  // CONFIG_IBC_SR_EXT
     } else if (current_frame->frame_type == INTER_FRAME ||
                frame_is_sframe(cm)) {
       MV_REFERENCE_FRAME ref_frame;
@@ -3914,7 +3914,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
 #if CONFIG_IBC_SR_EXT
       if (features->allow_screen_content_tools && !av1_superres_scaled(cm))
         aom_wb_write_bit(wb, features->allow_intrabc);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_NEW_INTER_MODES
       aom_wb_write_primitive_quniform(
@@ -3967,7 +3967,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
           cm->features.allow_global_intrabc)
 #else
       if (features->allow_intrabc)
-#endif
+#endif  // CONFIG_IBC_SR_EXT
         assert(delta_q_info->delta_lf_present_flag == 0);
       else
         aom_wb_write_bit(wb, delta_q_info->delta_lf_present_flag);

@@ -171,7 +171,7 @@ typedef struct {
   const AV1_COMMON *cm;
   int mi_row;
   int mi_col;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
   MSBuffers ms_buffers;
 
   // WARNING: search_method should be regarded as a private variable and should

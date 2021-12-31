@@ -743,7 +743,7 @@ typedef struct macroblockd {
   /* An array for recording whether an mi(4x4) is coded. Reset at sb level */
   uint8_t is_mi_coded[1024];
   int is_mi_coded_stride;
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
   /*!
    * Same as cm->mi_params.mi_stride, copied here for convenience.
@@ -1855,7 +1855,7 @@ static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi,
           !is_intrabc_block(mbmi, tree_type));
 #else
   return (is_inter_block(mbmi, tree_type));
-#endif // 
+#endif  // CONFIG_IBC_SR_EXT
 }
 #else
 static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi) {
@@ -1863,7 +1863,7 @@ static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi) {
   return (is_inter_block(mbmi) && !is_intrabc_block(mbmi));
 #else
   return (is_inter_block(mbmi));
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 }
 #endif
 
@@ -1981,7 +1981,7 @@ void av1_mark_block_as_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
                              BLOCK_SIZE bsize, BLOCK_SIZE sb_size);
 void av1_mark_block_as_not_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
                                  BLOCK_SIZE bsize, BLOCK_SIZE sb_size);
-#endif
+#endif  // CONFIG_IBC_SR_EXT
 
 /*!\endcond */
 
