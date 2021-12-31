@@ -718,7 +718,7 @@ static BLOCK_SIZE len_to_bsize(int length) {
     case 8: return BLOCK_8X8;
     case 4: return BLOCK_4X4;
     default:
-      assert(0 && "Invalid block size for tpl model");
+      assert(0 && "Invalid block size");
       return BLOCK_16X16;
   }
 }

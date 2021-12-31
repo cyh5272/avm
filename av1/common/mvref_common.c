@@ -164,17 +164,9 @@ static AOM_INLINE void add_ref_mv_candidate(
 
 #if CONFIG_IBC_SR_EXT
 #if CONFIG_SDP
-  if (is_intrabc) {
-    if (!is_intrabc_block(candidate, SHARED_PART)) return;
-  } else {
-    if (is_intrabc_block(candidate, SHARED_PART)) return;
-  }
+  if (is_intrabc != is_intrabc_block(candidate, SHARED_PART)) return;
 #else
-  if (is_intrabc) {
-    if (!is_intrabc_block(candidate)) return;
-  } else {
-    if (is_intrabc_block(candidate)) return;
-  }
+  if (is_intrabc != is_intrabc_block(candidate)) return;
 #endif
 #endif
 

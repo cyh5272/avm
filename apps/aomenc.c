@@ -1511,17 +1511,17 @@ static void show_stream_config(struct stream_state *stream,
 #endif
           encoder_cfg->enable_restoration);
 
+  fprintf(stdout,
+          "Tool setting (Others)          : Palette (%d), "
 #if CONFIG_IBC_SR_EXT
-  fprintf(stdout,
-          "Tool setting (Others)          : Palette (%d), IntraBC (%d), "
-          "IntraBCExt £¨%d£©\n",
-          encoder_cfg->enable_palette, encoder_cfg->enable_intrabc,
-          encoder_cfg->enable_intrabc_ext);
-#else
-  fprintf(stdout,
-          "Tool setting (Others)          : Palette (%d), IntraBC (%d)\n",
-          encoder_cfg->enable_palette, encoder_cfg->enable_intrabc);
+          "IntraBCExt (%d), "
 #endif
+          "IntraBC (%d)\n",
+          encoder_cfg->enable_palette,
+#if CONFIG_IBC_SR_EXT
+          encoder_cfg->enable_intrabc_ext,
+#endif
+          encoder_cfg->enable_intrabc);
 
   fprintf(stdout, "\n\n");
 }
