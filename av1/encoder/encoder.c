@@ -2795,12 +2795,7 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
   cm->cur_frame->buf.bit_depth = (unsigned int)seq_params->bit_depth;
 
   // Pick the loop filter level for the frame.
-#if CONFIG_IBC_SR_EXT
-  if (!(frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-        cm->features.allow_global_intrabc)) {
-#else
-  if (!cm->features.allow_intrabc) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (!is_global_intrabc_allowed(cm)) {
     loopfilter_frame(cpi, cm);
   } else {
     cm->lf.filter_level[0] = 0;

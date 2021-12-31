@@ -1214,15 +1214,7 @@ static AOM_INLINE void write_cfl_alphas(FRAME_CONTEXT *const ec_ctx,
 
 static AOM_INLINE void write_cdef(AV1_COMMON *cm, MACROBLOCKD *const xd,
                                   aom_writer *w, int skip) {
-#if CONFIG_IBC_SR_EXT
-  if (cm->features.coded_lossless ||
-      (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.allow_global_intrabc))
-    return;
-#else
-  if (cm->features.coded_lossless || cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
-
+  if (cm->features.coded_lossless || is_global_intrabc_allowed(cm)) return;
   // At the start of a superblock, mark that we haven't yet written CDEF
   // strengths for any of the CDEF units contained in this superblock.
   const int sb_mask = (cm->seq_params.mib_size - 1);
@@ -1263,13 +1255,7 @@ static AOM_INLINE void write_cdef(AV1_COMMON *cm, MACROBLOCKD *const xd,
 static AOM_INLINE void write_ccso(AV1_COMMON *cm, MACROBLOCKD *const xd,
                                   aom_writer *w) {
   if (cm->features.coded_lossless) return;
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -2493,13 +2479,7 @@ static AOM_INLINE void encode_restoration_mode(
     AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   assert(!cm->features.all_lossless);
   if (!cm->seq_params.enable_restoration) return;
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const int num_planes = av1_num_planes(cm);
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
@@ -2726,13 +2706,7 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
                                          struct aom_write_bit_buffer *wb) {
   assert(!cm->features.coded_lossless);
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const int num_planes = av1_num_planes(cm);
   struct loopfilter *lf = &cm->lf;
 
@@ -2785,13 +2759,7 @@ static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
                                    struct aom_write_bit_buffer *wb) {
   assert(!cm->features.coded_lossless);
   if (!cm->seq_params.enable_cdef) return;
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const int num_planes = av1_num_planes(cm);
   int i;
   aom_wb_write_literal(wb, cm->cdef_info.cdef_damping - 3, 2);
@@ -2808,13 +2776,7 @@ static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
 #if CONFIG_CCSO
 static AOM_INLINE void encode_ccso(const AV1_COMMON *cm,
                                    struct aom_write_bit_buffer *wb) {
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const int ccso_offset[8] = { 0, 1, -1, 3, -3, 5, -5, -7 };
   for (int plane = 0; plane < 2; plane++) {
     aom_wb_write_literal(wb, cm->ccso_info.ccso_enable[plane], 1);
@@ -3962,12 +3924,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
     if (delta_q_info->delta_q_present_flag) {
       aom_wb_write_literal(wb, get_msb(delta_q_info->delta_q_res), 2);
       xd->current_base_qindex = quant_params->base_qindex;
-#if CONFIG_IBC_SR_EXT
-      if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-          cm->features.allow_global_intrabc)
-#else
-      if (features->allow_intrabc)
-#endif  // CONFIG_IBC_SR_EXT
+      if (is_global_intrabc_allowed(cm))
         assert(delta_q_info->delta_lf_present_flag == 0);
       else
         aom_wb_write_bit(wb, delta_q_info->delta_lf_present_flag);

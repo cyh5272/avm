@@ -2462,6 +2462,15 @@ static INLINE void free_ibp_info(
   }
 }
 #endif
+
+static INLINE int is_global_intrabc_allowed(const AV1_COMMON *const cm) {
+#if CONFIG_IBC_SR_EXT
+  return frame_is_intra_only(cm) && cm->features.allow_intrabc &&
+         cm->features.allow_global_intrabc;
+#else
+  return cm->features.allow_intrabc;
+#endif
+}
 /*!\endcond */
 
 #ifdef __cplusplus

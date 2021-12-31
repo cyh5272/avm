@@ -46,12 +46,7 @@ static void read_cdef(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
   const int skip_txfm = xd->mi[0]->skip_txfm;
 #endif
   if (cm->features.coded_lossless) return;
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc) {
-#else
-  if (cm->features.allow_intrabc) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) {
     assert(cm->cdef_info.cdef_bits == 0);
     return;
   }
@@ -96,13 +91,7 @@ static void read_cdef(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
 #if CONFIG_CCSO
 static void read_ccso(AV1_COMMON *cm, aom_reader *r, MACROBLOCKD *const xd) {
   if (cm->features.coded_lossless) return;
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;

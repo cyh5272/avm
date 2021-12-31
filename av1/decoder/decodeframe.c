@@ -2027,13 +2027,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
                                                struct aom_read_bit_buffer *rb) {
   assert(!cm->features.all_lossless);
   const int num_planes = av1_num_planes(cm);
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   int all_none = 1, chroma_none = 1;
   for (int p = 0; p < num_planes; ++p) {
     RestorationInfo *rsi = &cm->rst_info[p];
@@ -2231,13 +2225,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   const int num_planes = av1_num_planes(cm);
   struct loopfilter *lf = &cm->lf;
 
-#if CONFIG_IBC_SR_EXT
-  if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.allow_global_intrabc) ||
-      cm->features.coded_lossless) {
-#else
-  if (cm->features.allow_intrabc || cm->features.coded_lossless) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm) || cm->features.coded_lossless) {
     // write default deltas to frame buffer
     av1_set_default_ref_deltas(cm->cur_frame->ref_deltas);
     av1_set_default_mode_deltas(cm->cur_frame->mode_deltas);
@@ -2290,13 +2278,7 @@ static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
   const int num_planes = av1_num_planes(cm);
   CdefInfo *const cdef_info = &cm->cdef_info;
 
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   cdef_info->cdef_damping = aom_rb_read_literal(rb, 2) + 3;
   cdef_info->cdef_bits = aom_rb_read_literal(rb, 2);
   cdef_info->nb_cdef_strengths = 1 << cdef_info->cdef_bits;
@@ -2310,13 +2292,7 @@ static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
 #if CONFIG_CCSO
 static AOM_INLINE void setup_ccso(AV1_COMMON *cm,
                                   struct aom_read_bit_buffer *rb) {
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc)
-    return;
-#else
-  if (cm->features.allow_intrabc) return;
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) return;
   const int ccso_offset[8] = { 0, 1, -1, 3, -3, 5, -5, -7 };
   for (int plane = 1; plane < 3; plane++) {
     cm->ccso_info.ccso_enable[plane - 1] = aom_rb_read_literal(rb, 1);
@@ -5671,12 +5647,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
                        " state");
   }
 
-#if CONFIG_IBC_SR_EXT
-  if (frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-      cm->features.allow_global_intrabc) {
-#else
-  if (features->allow_intrabc) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) {
     // Set parameters corresponding to no filtering.
     struct loopfilter *lf = &cm->lf;
     lf->filter_level[0] = 0;
@@ -5729,12 +5700,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   if (cm->delta_q_info.delta_q_present_flag) {
     xd->current_base_qindex = quant_params->base_qindex;
     cm->delta_q_info.delta_q_res = 1 << aom_rb_read_literal(rb, 2);
-#if CONFIG_IBC_SR_EXT
-    if (!(frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-          cm->features.allow_global_intrabc))
-#else
-    if (!features->allow_intrabc)
-#endif  // CONFIG_IBC_SR_EXT
+    if (!is_global_intrabc_allowed(cm))
       cm->delta_q_info.delta_lf_present_flag = aom_rb_read_bit(rb);
     if (cm->delta_q_info.delta_lf_present_flag) {
       cm->delta_q_info.delta_lf_res = 1 << aom_rb_read_literal(rb, 2);
@@ -5997,13 +5963,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
     return;
   }
 
-#if CONFIG_IBC_SR_EXT
-  if (!tiles->single_tile_decoding &&
-      (!(cm->features.allow_intrabc && cm->features.allow_global_intrabc &&
-         frame_is_intra_only(cm)))) {
-#else
-  if (!cm->features.allow_intrabc && !tiles->single_tile_decoding) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (!is_global_intrabc_allowed(cm) && !tiles->single_tile_decoding) {
     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
       if (pbi->num_workers > 1) {
         av1_loop_filter_frame_mt(

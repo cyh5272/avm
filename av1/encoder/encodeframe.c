@@ -1303,13 +1303,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
     cm->last_frame_seg_map = cm->prev_frame->seg_map;
   else
     cm->last_frame_seg_map = NULL;
-#if CONFIG_IBC_SR_EXT
-  if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.allow_global_intrabc) ||
-      features->coded_lossless) {
-#else
-  if (features->allow_intrabc || features->coded_lossless) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm) || features->coded_lossless) {
     av1_set_default_ref_deltas(cm->lf.ref_deltas);
     av1_set_default_mode_deltas(cm->lf.mode_deltas);
   } else if (cm->prev_frame) {
@@ -1374,12 +1368,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
   if (features->allow_intrabc && !cpi->intrabc_used) {
     features->allow_intrabc = 0;
   }
-#if CONFIG_IBC_SR_EXT
-  if ((frame_is_intra_only(cm) && cm->features.allow_intrabc &&
-       cm->features.allow_global_intrabc)) {
-#else
-  if (features->allow_intrabc) {
-#endif  // CONFIG_IBC_SR_EXT
+  if (is_global_intrabc_allowed(cm)) {
     cm->delta_q_info.delta_lf_present_flag = 0;
   }
 
