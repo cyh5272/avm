@@ -4291,9 +4291,17 @@ static AOM_INLINE void refine_winner_mode_tx(
 
       // Select prediction reference frames.
       for (int i = 0; i < num_planes; i++) {
+#if CONFIG_NEW_REF_SIGNALING
+        xd->plane[i].pre[0] =
+            yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[0])][i];
+        if (has_second_ref(mbmi))
+          xd->plane[i].pre[1] =
+              yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[1])][i];
+#else
         xd->plane[i].pre[0] = yv12_mb[mbmi->ref_frame[0]][i];
         if (has_second_ref(mbmi))
           xd->plane[i].pre[1] = yv12_mb[mbmi->ref_frame[1]][i];
+#endif  // CONFIG_NEW_REF_SIGNALING
       }
 
       if (is_inter_mode(mbmi->mode)) {
@@ -5684,8 +5692,15 @@ static AOM_INLINE void evaluate_motion_mode_for_winner_candidates(
     mbmi->motion_mode = 0;
     const int is_comp_pred = is_inter_ref_frame(mbmi->ref_frame[1]);
     for (int i = 0; i < num_planes; i++) {
+#if CONFIG_NEW_REF_SIGNALING
+      xd->plane[i].pre[0] = yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[0])][i];
+      if (is_comp_pred)
+        xd->plane[i].pre[1] =
+            yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[1])][i];
+#else
       xd->plane[i].pre[0] = yv12_mb[mbmi->ref_frame[0]][i];
       if (is_comp_pred) xd->plane[i].pre[1] = yv12_mb[mbmi->ref_frame[1]][i];
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
 
     int64_t skip_rd[2] = { search_state->best_skip_rd[0],
@@ -5918,8 +5933,15 @@ static void tx_search_best_inter_candidates(
     // Select prediction reference frames.
     const int is_comp_pred = is_inter_ref_frame(mbmi->ref_frame[1]);
     for (int i = 0; i < num_planes; i++) {
+#if CONFIG_NEW_REF_SIGNALING
+      xd->plane[i].pre[0] = yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[0])][i];
+      if (is_comp_pred)
+        xd->plane[i].pre[1] =
+            yv12_mb[COMPACT_INDEX0_NRS(mbmi->ref_frame[1])][i];
+#else
       xd->plane[i].pre[0] = yv12_mb[mbmi->ref_frame[0]][i];
       if (is_comp_pred) xd->plane[i].pre[1] = yv12_mb[mbmi->ref_frame[1]][i];
+#endif  // CONFIG_NEW_REF_SIGNALING
     }
 
     // Build the prediction for this mode
@@ -6314,8 +6336,15 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 
         // Select prediction reference frames.
         for (i = 0; i < num_planes; i++) {
-          xd->plane[i].pre[0] = yv12_mb[ref_frame][i];
-          if (comp_pred) xd->plane[i].pre[1] = yv12_mb[second_ref_frame][i];
+#if CONFIG_NEW_REF_SIGNALING
+          xd->plane[i].pre[0] = yv12_mb[COMPACT_INDEX0_NRS(ref_frame)][i];
+          if (comp_pred)
+            xd->plane[i].pre[1] =
+                yv12_mb[COMPACT_INDEX0_NRS(second_ref_frame)][i];
+#else
+      xd->plane[i].pre[0] = yv12_mb[ref_frame][i];
+      if (comp_pred) xd->plane[i].pre[1] = yv12_mb[second_ref_frame][i];
+#endif  // CONFIG_NEW_REF_SIGNALING
         }
 
         mbmi->angle_delta[PLANE_TYPE_Y] = 0;
