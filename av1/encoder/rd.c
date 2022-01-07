@@ -290,19 +290,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
 #endif
 #endif  // CONFIG_SDP
 
-#if CONFIG_RST_MERGECOEFFS
-  // Bit cost for parameter to designate whether unit coeffs are merged.
-  av1_cost_tokens_from_cdf(mode_costs->merged_param_cost, fc->merged_param_cdf,
-                           NULL);
-#endif  // CONFIG_RST_MERGECOEFFS
-#if CONFIG_WIENER_NONSEP
-  av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
-                           fc->wiener_nonsep_restore_cdf, NULL);
-#endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_PC_WIENER
-  av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
-                           fc->pc_wiener_restore_cdf, NULL);
-#endif  // CONFIG_PC_WIENER
   av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
 
 #if CONFIG_IST
@@ -441,6 +428,19 @@ void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc) {
                            fc->wiener_restore_cdf, NULL);
   av1_cost_tokens_from_cdf(mode_costs->sgrproj_restore_cost,
                            fc->sgrproj_restore_cdf, NULL);
+#if CONFIG_WIENER_NONSEP
+  av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
+                           fc->wiener_nonsep_restore_cdf, NULL);
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
+                           fc->pc_wiener_restore_cdf, NULL);
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_RST_MERGECOEFFS
+  // Bit cost for parameter to designate whether unit coeffs are merged.
+  av1_cost_tokens_from_cdf(mode_costs->merged_param_cost, fc->merged_param_cdf,
+                           NULL);
+#endif  // CONFIG_RST_MERGECOEFFS
 }
 
 // Values are now correlated to quantizer.
@@ -544,11 +544,10 @@ int av1_get_deltaq_offset(const AV1_COMP *cpi, int qindex, double beta) {
                            cpi->common.seq_params.bit_depth);
 #if CONFIG_EXTQUANT
     } while (newq > q &&
-             (qindex < (cpi->common.seq_params.bit_depth == AOM_BITS_8
-                            ? MAXQ_8_BITS
-                            : cpi->common.seq_params.bit_depth == AOM_BITS_10
-                                  ? MAXQ_10_BITS
-                                  : MAXQ)));
+             (qindex <
+              (cpi->common.seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+               : cpi->common.seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                                 : MAXQ)));
 #else
     } while (newq > q && qindex < MAXQ);
 #endif
@@ -673,14 +672,14 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd) {
 
   for (segment_id = 0; segment_id < MAX_SEGMENTS; ++segment_id) {
 #if CONFIG_EXTQUANT
-    const int qindex = clamp(
-        av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
-                       cm->seq_params.bit_depth) +
-            cm->quant_params.y_dc_delta_q,
-        0,
-        cm->seq_params.bit_depth == AOM_BITS_8
-            ? MAXQ_8_BITS
-            : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ);
+    const int qindex =
+        clamp(av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
+                             cm->seq_params.bit_depth) +
+                  cm->quant_params.y_dc_delta_q,
+              0,
+              cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+              : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                        : MAXQ);
 #else
     const int qindex = clamp(
         av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex) +
