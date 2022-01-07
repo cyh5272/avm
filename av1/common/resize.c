@@ -1078,14 +1078,31 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
   }
 
   if (is_hbd) {
-    const int16_t *input16 = CONVERT_TO_SHORTPTR(input);
-    int16_t *output16 = CONVERT_TO_SHORTPTR(output);
+    const int16_t *input16 = (int16_t *)CONVERT_TO_SHORTPTR(input);
+    int16_t *output16 = (int16_t *)CONVERT_TO_SHORTPTR(output);
     resample_2d(input16, width, height, in_stride, &horz_rf, &vert_rf,
                 extra_prec_bits, &clip, output16, width2, height2, out_stride);
   } else {
     resample_2d_8b(input, width, height, in_stride, &horz_rf, &vert_rf,
                    extra_prec_bits, &clip, output, width2, height2, out_stride);
   }
+}
+
+void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
+                                         YV12_BUFFER_CONFIG *dst, int bd,
+                                         const int num_planes, const int subx,
+                                         const int suby, const int denom,
+                                         const int num) {
+  const int is_hbd = src->flags & YV12_FLAG_HIGHBITDEPTH;
+  for (int i = 0; i < AOMMIN(num_planes, MAX_MB_PLANE); ++i) {
+    const int is_uv = i > 0;
+    av1_resample_plane_2d_lanczos(
+        src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
+        src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
+        dst->crop_widths[is_uv], dst->strides[is_uv], is_uv ? subx : 0,
+        is_uv ? suby : 0, is_hbd, bd, denom, num);
+  }
+  aom_extend_frame_borders(dst, num_planes);
 }
 #endif  // CONFIG_EXT_SUPERRES
 
@@ -1381,12 +1398,24 @@ YV12_BUFFER_CONFIG *av1_scale_if_required(
 
   if (scaling_required) {
     const int num_planes = av1_num_planes(cm);
-    if (use_optimized_scaler && cm->seq_params.bit_depth == AOM_BITS_8) {
-      av1_resize_and_extend_frame(unscaled, scaled, filter, phase, num_planes);
+#if CONFIG_EXT_SUPERRES
+    if (cm->superres_scale_denominator > cm->superres_scale_numerator) {
+      av1_resize_lanczos_and_extend_frame(
+          unscaled, scaled, (int)cm->seq_params.bit_depth, num_planes,
+          unscaled->subsampling_x, unscaled->subsampling_y,
+          cm->superres_scale_denominator, cm->superres_scale_numerator);
     } else {
-      av1_resize_and_extend_frame_nonnormative(
-          unscaled, scaled, (int)cm->seq_params.bit_depth, num_planes);
+#endif  // CONFIG_EXT_SUPERRES
+      if (use_optimized_scaler && cm->seq_params.bit_depth == AOM_BITS_8) {
+        av1_resize_and_extend_frame(unscaled, scaled, filter, phase,
+                                    num_planes);
+      } else {
+        av1_resize_and_extend_frame_nonnormative(
+            unscaled, scaled, (int)cm->seq_params.bit_depth, num_planes);
+      }
+#if CONFIG_EXT_SUPERRES
     }
+#endif  // CONFIG_EXT_SUPERRES
     return scaled;
   } else {
     return unscaled;
