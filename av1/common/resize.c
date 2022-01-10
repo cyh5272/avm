@@ -1372,6 +1372,29 @@ void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint8_t *src,
   }
 }
 
+#if CONFIG_EXT_SUPERRES
+void av1_upscale_2d_lanczos_and_extend_frame(const AV1_COMMON *cm,
+                                             const YV12_BUFFER_CONFIG *src,
+                                             YV12_BUFFER_CONFIG *dst,
+                                             const int bd, const int subx,
+                                             const int suby, const int sr_denom,
+                                             const int sr_num) {
+  const int num_planes = av1_num_planes(cm);
+  const int is_hbd = src->flags & YV12_FLAG_HIGHBITDEPTH;
+  for (int i = 0; i < num_planes; ++i) {
+    const int is_uv = (i > 0);
+    // The resampler takes sr_num as the scaling denominator and sr_demon as the
+    // numerator because here an upscaler is operated.
+    av1_resample_plane_2d_lanczos(
+        src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
+        src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
+        dst->crop_widths[is_uv], dst->strides[is_uv], is_uv ? subx : 0,
+        is_uv ? suby : 0, is_hbd, bd, sr_num, sr_denom);
+  }
+
+  aom_extend_frame_borders(dst, num_planes);
+}
+#else   // CONFIG_EXT_SUPERRES
 void av1_upscale_normative_and_extend_frame(const AV1_COMMON *cm,
                                             const YV12_BUFFER_CONFIG *src,
                                             YV12_BUFFER_CONFIG *dst) {
@@ -1385,6 +1408,7 @@ void av1_upscale_normative_and_extend_frame(const AV1_COMMON *cm,
 
   aom_extend_frame_borders(dst, num_planes);
 }
+#endif  // CONFIG_EXT_SUPERRES
 
 YV12_BUFFER_CONFIG *av1_scale_if_required(
     AV1_COMMON *cm, YV12_BUFFER_CONFIG *unscaled, YV12_BUFFER_CONFIG *scaled,
@@ -1524,11 +1548,18 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 
   YV12_BUFFER_CONFIG *const frame_to_show = &cm->cur_frame->buf;
 
+#if CONFIG_EXT_SUPERRES
+  if (aom_alloc_frame_buffer(
+          &copy_buffer, cm->width, cm->height, seq_params->subsampling_x,
+          seq_params->subsampling_y, seq_params->use_highbitdepth,
+          AOM_BORDER_IN_PIXELS, byte_alignment))
+#else   // CONFIG_EXT_SUPERRES
   const int aligned_width = ALIGN_POWER_OF_TWO(cm->width, 3);
   if (aom_alloc_frame_buffer(
           &copy_buffer, aligned_width, cm->height, seq_params->subsampling_x,
           seq_params->subsampling_y, seq_params->use_highbitdepth,
           AOM_BORDER_IN_PIXELS, byte_alignment))
+#endif  // CONFIG_EXT_SUPERRES
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate copy buffer for superres upscaling");
 
@@ -1536,7 +1567,11 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
   // Note that it does not copy YV12_BUFFER_CONFIG config data.
   aom_yv12_copy_frame(frame_to_show, &copy_buffer, num_planes);
 
+#if CONFIG_EXT_SUPERRES
+  assert(copy_buffer.y_crop_width == cm->width);
+#else   // CONFIG_EXT_SUPERRES
   assert(copy_buffer.y_crop_width == aligned_width);
+#endif  // CONFIG_EXT_SUPERRES
   assert(copy_buffer.y_crop_height == cm->height);
 
   // Realloc the current frame buffer at a higher resolution in place.
@@ -1594,7 +1629,14 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 
   // Scale up and back into frame_to_show.
   assert(frame_to_show->y_crop_width != cm->width);
+#if CONFIG_EXT_SUPERRES
+  av1_upscale_2d_lanczos_and_extend_frame(
+      cm, &copy_buffer, frame_to_show, (int)seq_params->bit_depth,
+      seq_params->subsampling_x, seq_params->subsampling_y,
+      cm->superres_scale_denominator, cm->superres_scale_numerator);
+#else   // CONFIG_EXT_SUPERRES
   av1_upscale_normative_and_extend_frame(cm, &copy_buffer, frame_to_show);
+#endif  // CONFIG_EXT_SUPERRES
 
   // Free the copy buffer
   aom_free_frame_buffer(&copy_buffer);
