@@ -98,7 +98,8 @@ static INLINE int av1_use_angle_delta(BLOCK_SIZE bsize) {
 
 static INLINE int av1_allow_intrabc(const AV1_COMMON *const cm) {
 #if CONFIG_IBC_SR_EXT
-  return cm->features.allow_screen_content_tools && cm->features.allow_intrabc;
+  return (frame_is_intra_only(cm) || cm->features.allow_local_intrabc) &&
+         cm->features.allow_screen_content_tools && cm->features.allow_intrabc;
 #else
   return frame_is_intra_only(cm) && cm->features.allow_screen_content_tools &&
          cm->features.allow_intrabc;

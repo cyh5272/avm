@@ -3040,7 +3040,9 @@ static INLINE int frame_is_kf_gf_arf(const AV1_COMP *cpi) {
 static INLINE int av1_use_hash_me(const AV1_COMP *const cpi) {
 #if CONFIG_IBC_SR_EXT
   return (cpi->common.features.allow_screen_content_tools &&
-          cpi->common.features.allow_intrabc);
+          cpi->common.features.allow_intrabc) &&
+         (frame_is_intra_only(&cpi->common) ||
+          cpi->common.features.allow_local_intrabc);
 #else
   return (cpi->common.features.allow_screen_content_tools &&
           cpi->common.features.allow_intrabc &&
