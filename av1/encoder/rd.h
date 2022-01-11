@@ -368,7 +368,8 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
 #endif
                          FRAME_CONTEXT *fc);
 
-void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc);
+void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc,
+                       const int qindex);
 
 void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
                           const int num_planes);

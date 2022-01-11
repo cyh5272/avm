@@ -216,6 +216,10 @@ static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
 }
 #endif  // CONFIG_WIENER_NONSEP
 
+#if CONFIG_MULTIQ_LR_SIGNALING
+static INLINE int get_multiq_lr_level(int qindex) { return qindex > 200; }
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
+
 // Max of SGRPROJ_TMPBUF_SIZE, DOMAINTXFMRF_TMPBUF_SIZE, WIENER_TMPBUF_SIZE
 #define RESTORATION_TMPBUF_SIZE (SGRPROJ_TMPBUF_SIZE)
 
