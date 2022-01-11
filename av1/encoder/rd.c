@@ -290,19 +290,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 
 #endif  // !CONFIG_AIMC
 
-#if CONFIG_RST_MERGECOEFFS
-  // Bit cost for parameter to designate whether unit coeffs are merged.
-  av1_cost_tokens_from_cdf(mode_costs->merged_param_cost, fc->merged_param_cdf,
-                           NULL);
-#endif  // CONFIG_RST_MERGECOEFFS
-#if CONFIG_WIENER_NONSEP
-  av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
-                           fc->wiener_nonsep_restore_cdf, NULL);
-#endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_PC_WIENER
-  av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
-                           fc->pc_wiener_restore_cdf, NULL);
-#endif  // CONFIG_PC_WIENER
   av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
 #if CONFIG_BVP_IMPROVEMENT
   av1_cost_tokens_from_cdf(mode_costs->intrabc_mode_cost, fc->intrabc_mode_cdf,
@@ -470,6 +457,19 @@ void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc) {
                            fc->wiener_restore_cdf, NULL);
   av1_cost_tokens_from_cdf(mode_costs->sgrproj_restore_cost,
                            fc->sgrproj_restore_cdf, NULL);
+#if CONFIG_WIENER_NONSEP
+  av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
+                           fc->wiener_nonsep_restore_cdf, NULL);
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+  av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
+                           fc->pc_wiener_restore_cdf, NULL);
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_RST_MERGECOEFFS
+  // Bit cost for parameter to designate whether unit coeffs are merged.
+  av1_cost_tokens_from_cdf(mode_costs->merged_param_cost, fc->merged_param_cdf,
+                           NULL);
+#endif  // CONFIG_RST_MERGECOEFFS
 }
 
 // Values are now correlated to quantizer.
