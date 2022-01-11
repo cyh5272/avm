@@ -1054,9 +1054,15 @@ static const aom_cdf_prob default_filter_intra_cdfs[BLOCK_SIZES_ALL][CDF_SIZE(
             { AOM_CDF2(20229) }, { AOM_CDF2(18101) }, { AOM_CDF2(16384) },
             { AOM_CDF2(16384) } };
 
-#if CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 static const aom_cdf_prob default_switchable_restore_cdf[CDF_SIZE(
-    RESTORE_SWITCHABLE_TYPES)] = { AOM_CDF4(6000, 14000, 22500) };
+    RESTORE_SWITCHABLE_TYPES)] = { AOM_CDF5(6000, 12000, 18000, 24000) };
+#elif !CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+static const aom_cdf_prob default_switchable_restore_cdf[CDF_SIZE(
+    RESTORE_SWITCHABLE_TYPES)] = { AOM_CDF4(6000, 12000, 18000) };
+#elif CONFIG_WIENER_NONSEP && !CONFIG_PC_WIENER
+static const aom_cdf_prob default_switchable_restore_cdf[CDF_SIZE(
+    RESTORE_SWITCHABLE_TYPES)] = { AOM_CDF4(6000, 12000, 18000) };
 #else
 static const aom_cdf_prob default_switchable_restore_cdf[CDF_SIZE(
     RESTORE_SWITCHABLE_TYPES)] = { AOM_CDF3(9413, 22581) };
@@ -1070,18 +1076,18 @@ static const aom_cdf_prob default_sgrproj_restore_cdf[CDF_SIZE(2)] = { AOM_CDF2(
 
 #if CONFIG_WIENER_NONSEP
 static const aom_cdf_prob default_wiener_nonsep_restore_cdf[CDF_SIZE(2)] = {
-  AOM_CDF2(11570)
+  AOM_CDF2(12000)
 };
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER
+static const aom_cdf_prob default_pc_wiener_restore_cdf[CDF_SIZE(2)] = {
+  AOM_CDF2(10000)
+};
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_RST_MERGECOEFFS
 static const aom_cdf_prob default_merged_param_cdf[CDF_SIZE(2)] = { AOM_CDF2(
     16855) };
 #endif  // CONFIG_RST_MERGECOEFFS
-#if CONFIG_PC_WIENER
-static const aom_cdf_prob default_pc_wiener_restore_cdf[CDF_SIZE(2)] = {
-  AOM_CDF2(11570)
-};
-#endif  // CONFIG_PC_WIENER
 
 static const aom_cdf_prob default_delta_q_cdf[CDF_SIZE(DELTA_Q_PROBS + 1)] = {
   AOM_CDF4(28160, 32120, 32677)
