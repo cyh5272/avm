@@ -193,8 +193,8 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
 
   if (comp_pred && ref_frame[0] >= RANKED_REF0_TO_PRUNE) return 1;
 
+  const int n_refs = cm->ref_frames_info.n_total_refs;
   if (x != NULL) {
-    const int n_refs = cm->ref_frames_info.n_total_refs;
     if (sf->inter_sf.selective_ref_frame >= 2 ||
         (sf->inter_sf.selective_ref_frame == 1 && comp_pred)) {
       if ((n_refs - 1) >= 0 && x->tpl_keep_ref_frame[n_refs - 1] &&
@@ -225,14 +225,17 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
   }
   const int one_sided_comp = (d0 == d1);
 
+  // Prune one sided compound mode if both dir ref ranks are above some
+  // thresholds. Pruning conditions are slightly relaxed when all refs are
+  // from the past, which allows more search for low delay configuration.
   switch (sf->inter_sf.selective_ref_frame) {
     case 0: return 0;
     case 1:
       if (comp_pred) {
-        if (one_sided_comp) {
-          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
-        } else {
+        if (one_sided_comp && cm->ref_frames_info.n_past_refs < n_refs) {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;
+        } else {
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 3) return 1;
         }
       } else {
         if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 2) return 1;
@@ -240,10 +243,10 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
       break;
     case 2:
       if (comp_pred) {
-        if (one_sided_comp) {
-          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
-        } else {
+        if (one_sided_comp && cm->ref_frames_info.n_past_refs < n_refs) {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
+        } else {
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;
         }
       } else {
         if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 3) return 1;
@@ -255,7 +258,7 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
         if (one_sided_comp) {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
         } else {
-          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 0) return 1;
+          if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
         }
       } else {
         if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 4) return 1;
@@ -290,6 +293,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
     const MV_REFERENCE_FRAME *const ref_frame,
     const unsigned int *const ref_display_order_hint) {
   const SPEED_FEATURES *const sf = &cpi->sf;
+
   if (!sf->inter_sf.selective_ref_frame) return 0;
 
   const int comp_pred = is_inter_ref_frame(ref_frame[1]);

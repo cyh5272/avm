@@ -4865,8 +4865,10 @@ static AOM_INLINE int prune_ref_frame(const AV1_COMP *cpi, const MACROBLOCK *x,
       if (get_dir_rank(cm, rf[0], NULL) == get_dir_rank(cm, rf[1], NULL))
         return 1;
     } else if (cpi->sf.inter_sf.selective_ref_frame >= 2) {
-      // If both references are on the same side prune
-      if (get_dir_rank(cm, rf[0], NULL) == get_dir_rank(cm, rf[1], NULL))
+      // One sided compound is used only when all reference frames are
+      // one-sided.
+      if (!cpi->all_one_sided_refs &&
+          get_dir_rank(cm, rf[0], NULL) == get_dir_rank(cm, rf[1], NULL))
         return 1;
     }
   }
