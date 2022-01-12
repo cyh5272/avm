@@ -450,20 +450,27 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   }
 }
 
-void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc) {
+void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc,
+                       const int qindex) {
+#if CONFIG_MULTIQ_LR_SIGNALING
+  const int ql = get_multiq_lr_level(qindex);
+#else
+  (void)qindex;
+  const int ql = 0;
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
   av1_cost_tokens_from_cdf(mode_costs->switchable_restore_cost,
-                           fc->switchable_restore_cdf, NULL);
+                           fc->switchable_restore_cdf[ql], NULL);
   av1_cost_tokens_from_cdf(mode_costs->wiener_restore_cost,
-                           fc->wiener_restore_cdf, NULL);
+                           fc->wiener_restore_cdf[ql], NULL);
   av1_cost_tokens_from_cdf(mode_costs->sgrproj_restore_cost,
-                           fc->sgrproj_restore_cdf, NULL);
+                           fc->sgrproj_restore_cdf[ql], NULL);
 #if CONFIG_WIENER_NONSEP
   av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
-                           fc->wiener_nonsep_restore_cdf, NULL);
+                           fc->wiener_nonsep_restore_cdf[ql], NULL);
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
   av1_cost_tokens_from_cdf(mode_costs->pc_wiener_restore_cost,
-                           fc->pc_wiener_restore_cdf, NULL);
+                           fc->pc_wiener_restore_cdf[ql], NULL);
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_RST_MERGECOEFFS
   // Bit cost for parameter to designate whether unit coeffs are merged.
