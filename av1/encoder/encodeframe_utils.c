@@ -1254,13 +1254,13 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->wiener_nonsep_restore_cdf,
               ctx_tr->wiener_nonsep_restore_cdf, 2);
 #endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_RST_MERGECOEFFS
-  AVERAGE_CDF(ctx_left->merged_param_cdf, ctx_tr->merged_param_cdf, 2);
-#endif  // CONFIG_RST_MERGECEOFFS
 #if CONFIG_PC_WIENER
   AVERAGE_CDF(ctx_left->pc_wiener_restore_cdf, ctx_tr->pc_wiener_restore_cdf,
               2);
 #endif  // CONFIG_PC_WIENER
+#if CONFIG_RST_MERGECOEFFS
+  AVERAGE_CDF(ctx_left->merged_param_cdf, ctx_tr->merged_param_cdf, 2);
+#endif  // CONFIG_RST_MERGECEOFFS
 #if CONFIG_FORWARDSKIP
   AVERAGE_CDF(ctx_left->fsc_mode_cdf, ctx_tr->fsc_mode_cdf, FSC_MODES);
 #endif  // CONFIG_FORWARDSKIP
