@@ -861,6 +861,12 @@ typedef enum {
 } RestorationType;
 
 /*!\cond */
+#if CONFIG_MULTIQ_LR_SIGNALING
+#define MULTIQ_LR_LEVELS 2
+#else
+#define MULTIQ_LR_LEVELS 1
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
+
 // Picture prediction structures (0-12 are predefined) in scalability metadata.
 enum {
   SCALABILITY_L1T2 = 0,
