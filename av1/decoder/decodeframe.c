@@ -56,6 +56,7 @@
 #include "av1/common/quant_common.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/reconintra.h"
+#include "av1/common/restoration.h"
 #include "av1/common/resize.h"
 #include "av1/common/seg_common.h"
 #include "av1/common/thread_common.h"
@@ -2249,6 +2250,12 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 
   assert(!cm->features.all_lossless);
 
+#if CONFIG_MULTIQ_LR_SIGNALING
+  const int ql = get_multiq_lr_level(cm->quant_params.base_qindex);
+#else
+  const int ql = 0;
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
+
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
 #if CONFIG_WIENER_NONSEP
   const int is_uv = (plane > 0);
@@ -2261,7 +2268,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
     rui->restoration_type =
-        aom_read_symbol(r, xd->tile_ctx->switchable_restore_cdf,
+        aom_read_symbol(r, xd->tile_ctx->switchable_restore_cdf[ql],
                         RESTORE_SWITCHABLE_TYPES, ACCT_STR);
     switch (rui->restoration_type) {
       case RESTORE_WIENER:
@@ -2284,14 +2291,15 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
       default: assert(rui->restoration_type == RESTORE_NONE); break;
     }
   } else if (rsi->frame_restoration_type == RESTORE_WIENER) {
-    if (aom_read_symbol(r, xd->tile_ctx->wiener_restore_cdf, 2, ACCT_STR)) {
+    if (aom_read_symbol(r, xd->tile_ctx->wiener_restore_cdf[ql], 2, ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER;
       read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
   } else if (rsi->frame_restoration_type == RESTORE_SGRPROJ) {
-    if (aom_read_symbol(r, xd->tile_ctx->sgrproj_restore_cdf, 2, ACCT_STR)) {
+    if (aom_read_symbol(r, xd->tile_ctx->sgrproj_restore_cdf[ql], 2,
+                        ACCT_STR)) {
       rui->restoration_type = RESTORE_SGRPROJ;
       read_sgrproj_filter(xd, &rui->sgrproj_info, sgrproj_info, r);
     } else {
@@ -2299,7 +2307,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     }
 #if CONFIG_WIENER_NONSEP
   } else if (rsi->frame_restoration_type == RESTORE_WIENER_NONSEP) {
-    if (aom_read_symbol(r, xd->tile_ctx->wiener_nonsep_restore_cdf, 2,
+    if (aom_read_symbol(r, xd->tile_ctx->wiener_nonsep_restore_cdf[ql], 2,
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
       read_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
@@ -2310,7 +2318,8 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
   } else if (rsi->frame_restoration_type == RESTORE_PC_WIENER) {
-    if (aom_read_symbol(r, xd->tile_ctx->pc_wiener_restore_cdf, 2, ACCT_STR)) {
+    if (aom_read_symbol(r, xd->tile_ctx->pc_wiener_restore_cdf[ql], 2,
+                        ACCT_STR)) {
       rui->restoration_type = RESTORE_PC_WIENER;
       // No side-information for now.
     } else {
