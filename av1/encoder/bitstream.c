@@ -2697,9 +2697,14 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #endif  // CONFIG_WIENER_NONSEP
 
   RestorationType unit_rtype = rui->restoration_type;
+#if CONFIG_MULTIQ_LR_SIGNALING
+  const int ql = get_multiq_lr_level(cm->quant_params.base_qindex);
+#else
+  const int ql = 0;
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
 
   if (frame_rtype == RESTORE_SWITCHABLE) {
-    aom_write_symbol(w, unit_rtype, xd->tile_ctx->switchable_restore_cdf,
+    aom_write_symbol(w, unit_rtype, xd->tile_ctx->switchable_restore_cdf[ql],
                      RESTORE_SWITCHABLE_TYPES);
 #if CONFIG_ENTROPY_STATS
     ++counts->switchable_restore[unit_rtype];
@@ -2728,7 +2733,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     }
   } else if (frame_rtype == RESTORE_WIENER) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
-                     xd->tile_ctx->wiener_restore_cdf, 2);
+                     xd->tile_ctx->wiener_restore_cdf[ql], 2);
 #if CONFIG_ENTROPY_STATS
     ++counts->wiener_restore[unit_rtype != RESTORE_NONE];
 #endif
@@ -2738,7 +2743,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     }
   } else if (frame_rtype == RESTORE_SGRPROJ) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
-                     xd->tile_ctx->sgrproj_restore_cdf, 2);
+                     xd->tile_ctx->sgrproj_restore_cdf[ql], 2);
 #if CONFIG_ENTROPY_STATS
     ++counts->sgrproj_restore[unit_rtype != RESTORE_NONE];
 #endif
@@ -2748,7 +2753,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
   } else if (frame_rtype == RESTORE_WIENER_NONSEP) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
-                     xd->tile_ctx->wiener_nonsep_restore_cdf, 2);
+                     xd->tile_ctx->wiener_nonsep_restore_cdf[ql], 2);
 #if CONFIG_ENTROPY_STATS
     ++counts->wiener_nonsep_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS
@@ -2760,7 +2765,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #if CONFIG_PC_WIENER
   } else if (frame_rtype == RESTORE_PC_WIENER) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
-                     xd->tile_ctx->pc_wiener_restore_cdf, 2);
+                     xd->tile_ctx->pc_wiener_restore_cdf[ql], 2);
 #if CONFIG_ENTROPY_STATS
     ++counts->pc_wiener_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS

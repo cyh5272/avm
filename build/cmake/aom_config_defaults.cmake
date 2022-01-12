@@ -220,6 +220,7 @@ set_aom_config_var(CONFIG_TIP 1 "Enable temporal interpolated prediction (TIP)")
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 0
                    "Enable a sufficient MV search range.")
+set_aom_config_var(CONFIG_MULTIQ_LR_SIGNALING 0 "Enable Multi-Q LR Signaling")
 
 #
 # Variables in this section control optional features of the build system.
