@@ -150,13 +150,19 @@ void av1_make_inter_predictor(const uint8_t *src, int src_stride, uint8_t *dst,
   }
 }
 
-static const uint8_t wedge_master_oblique_odd[MASK_MASTER_SIZE] = {
+static const uint8_t wedge_master_oblique63_odd[MASK_MASTER_SIZE] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  6,  18,
   37, 53, 60, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
   64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
 };
-static const uint8_t wedge_master_oblique_even[MASK_MASTER_SIZE] = {
+static const uint8_t wedge_master_oblique63_even[MASK_MASTER_SIZE] = {
+  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  4,  11, 27,
+  46, 58, 62, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+  64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+};
+static const uint8_t wedge_master_oblique45[MASK_MASTER_SIZE] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  4,  11, 27,
   46, 58, 62, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
@@ -184,28 +190,28 @@ static AOM_INLINE void shift_copy(const uint8_t *src, uint8_t *dst, int shift,
 /* clang-format off */
 DECLARE_ALIGNED(16, static uint8_t,
                 wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES]) = {
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, },
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, },
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
 };
 /* clang-format on */
 
@@ -225,7 +231,8 @@ DECLARE_ALIGNED(16, static uint8_t,
 
 static wedge_masks_type wedge_masks[BLOCK_SIZES_ALL][2];
 
-static const wedge_code_type wedge_codebook_16_hgtw[16] = {
+// TODO(now): Increase codebook size by 2 * 3 = 6 instead of by 2?
+static const wedge_code_type wedge_codebook_16_hgtw[MAX_WEDGE_TYPES] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_HORIZONTAL, 4, 2 }, { WEDGE_HORIZONTAL, 4, 4 },
@@ -234,9 +241,10 @@ static const wedge_code_type wedge_codebook_16_hgtw[16] = {
   { WEDGE_OBLIQUE153, 4, 2 }, { WEDGE_OBLIQUE153, 4, 6 },
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
+  { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
 };
 
-static const wedge_code_type wedge_codebook_16_hltw[16] = {
+static const wedge_code_type wedge_codebook_16_hltw[MAX_WEDGE_TYPES] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_VERTICAL, 2, 4 },   { WEDGE_VERTICAL, 4, 4 },
@@ -245,9 +253,10 @@ static const wedge_code_type wedge_codebook_16_hltw[16] = {
   { WEDGE_OBLIQUE153, 4, 2 }, { WEDGE_OBLIQUE153, 4, 6 },
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
+  { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
 };
 
-static const wedge_code_type wedge_codebook_16_heqw[16] = {
+static const wedge_code_type wedge_codebook_16_heqw[MAX_WEDGE_TYPES] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_HORIZONTAL, 4, 2 }, { WEDGE_HORIZONTAL, 4, 6 },
@@ -256,6 +265,7 @@ static const wedge_code_type wedge_codebook_16_heqw[16] = {
   { WEDGE_OBLIQUE153, 4, 2 }, { WEDGE_OBLIQUE153, 4, 6 },
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
+  { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
 };
 
 const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
@@ -479,12 +489,18 @@ static AOM_INLINE void init_wedge_master_masks() {
   // Generate prototype by shifting the masters
   int shift = h / 4;
   for (i = 0; i < h; i += 2) {
-    shift_copy(wedge_master_oblique_even,
+    shift_copy(wedge_master_oblique63_even,
                &wedge_mask_obl[0][WEDGE_OBLIQUE63][i * stride], shift,
                MASK_MASTER_SIZE);
+    shift_copy(wedge_master_oblique45,
+               &wedge_mask_obl[0][WEDGE_OBLIQUE45][i * stride], shift,
+               MASK_MASTER_SIZE);
     shift--;
-    shift_copy(wedge_master_oblique_odd,
+    shift_copy(wedge_master_oblique63_odd,
                &wedge_mask_obl[0][WEDGE_OBLIQUE63][(i + 1) * stride], shift,
+               MASK_MASTER_SIZE);
+    shift_copy(wedge_master_oblique45,
+               &wedge_mask_obl[0][WEDGE_OBLIQUE45][(i + 1) * stride], shift,
                MASK_MASTER_SIZE);
     memcpy(&wedge_mask_obl[0][WEDGE_VERTICAL][i * stride],
            wedge_master_vertical,
@@ -496,21 +512,34 @@ static AOM_INLINE void init_wedge_master_masks() {
 
   for (i = 0; i < h; ++i) {
     for (j = 0; j < w; ++j) {
-      const int msk = wedge_mask_obl[0][WEDGE_OBLIQUE63][i * stride + j];
-      wedge_mask_obl[0][WEDGE_OBLIQUE27][j * stride + i] = msk;
-      wedge_mask_obl[0][WEDGE_OBLIQUE117][i * stride + w - 1 - j] =
-          wedge_mask_obl[0][WEDGE_OBLIQUE153][(w - 1 - j) * stride + i] =
-              (1 << WEDGE_WEIGHT_BITS) - msk;
-      wedge_mask_obl[1][WEDGE_OBLIQUE63][i * stride + j] =
-          wedge_mask_obl[1][WEDGE_OBLIQUE27][j * stride + i] =
-              (1 << WEDGE_WEIGHT_BITS) - msk;
-      wedge_mask_obl[1][WEDGE_OBLIQUE117][i * stride + w - 1 - j] =
-          wedge_mask_obl[1][WEDGE_OBLIQUE153][(w - 1 - j) * stride + i] = msk;
-      const int mskx = wedge_mask_obl[0][WEDGE_VERTICAL][i * stride + j];
-      wedge_mask_obl[0][WEDGE_HORIZONTAL][j * stride + i] = mskx;
-      wedge_mask_obl[1][WEDGE_VERTICAL][i * stride + j] =
-          wedge_mask_obl[1][WEDGE_HORIZONTAL][j * stride + i] =
-              (1 << WEDGE_WEIGHT_BITS) - mskx;
+      {
+        const int msk63 = wedge_mask_obl[0][WEDGE_OBLIQUE63][i * stride + j];
+        wedge_mask_obl[0][WEDGE_OBLIQUE27][j * stride + i] = msk63;
+        wedge_mask_obl[0][WEDGE_OBLIQUE117][i * stride + w - 1 - j] =
+            wedge_mask_obl[0][WEDGE_OBLIQUE153][(w - 1 - j) * stride + i] =
+                (1 << WEDGE_WEIGHT_BITS) - msk63;
+        wedge_mask_obl[1][WEDGE_OBLIQUE63][i * stride + j] =
+            wedge_mask_obl[1][WEDGE_OBLIQUE27][j * stride + i] =
+                (1 << WEDGE_WEIGHT_BITS) - msk63;
+        wedge_mask_obl[1][WEDGE_OBLIQUE117][i * stride + w - 1 - j] =
+            wedge_mask_obl[1][WEDGE_OBLIQUE153][(w - 1 - j) * stride + i] =
+                msk63;
+      }
+      {
+        const int msk45 = wedge_mask_obl[0][WEDGE_OBLIQUE45][i * stride + j];
+        wedge_mask_obl[0][WEDGE_OBLIQUE135][i * stride + w - 1 - j] =
+            (1 << WEDGE_WEIGHT_BITS) - msk45;
+        wedge_mask_obl[1][WEDGE_OBLIQUE45][i * stride + j] =
+            (1 << WEDGE_WEIGHT_BITS) - msk45;
+        wedge_mask_obl[1][WEDGE_OBLIQUE135][i * stride + w - 1 - j] = msk45;
+      }
+      {
+        const int msk_vert = wedge_mask_obl[0][WEDGE_VERTICAL][i * stride + j];
+        wedge_mask_obl[0][WEDGE_HORIZONTAL][j * stride + i] = msk_vert;
+        wedge_mask_obl[1][WEDGE_VERTICAL][i * stride + j] =
+            wedge_mask_obl[1][WEDGE_HORIZONTAL][j * stride + i] =
+                (1 << WEDGE_WEIGHT_BITS) - msk_vert;
+      }
     }
   }
 }
