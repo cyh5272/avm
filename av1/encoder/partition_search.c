@@ -1254,7 +1254,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               counts->wedge_idx[bsize][mbmi->interintra_wedge_index]++;
 #endif
               update_cdf(fc->wedge_idx_cdf[bsize], mbmi->interintra_wedge_index,
-                         16);
+                         MAX_WEDGE_TYPES);
             }
           }
         } else {
@@ -1324,7 +1324,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           counts->wedge_idx[bsize][mbmi->interinter_comp.wedge_index]++;
 #endif
           update_cdf(fc->wedge_idx_cdf[bsize],
-                     mbmi->interinter_comp.wedge_index, 16);
+                     mbmi->interinter_comp.wedge_index, MAX_WEDGE_TYPES);
         }
       }
     }
