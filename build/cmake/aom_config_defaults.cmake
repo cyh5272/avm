@@ -141,6 +141,8 @@ set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
                    "AV2 experiment flag to remove dual filter.")
 set_aom_config_var(CONFIG_CNN_RESTORATION 0 NUMBER
                    "AV2 CNN Restoration experiment flag")
+set_aom_config_var(CONFIG_SAVE_CNN_RESTORATION_DATA 0 NUMBER
+                   "AV2 flag to save training data for CNN restoration tool")
 set_aom_config_var(CONFIG_WIENER_NONSEP 0 NUMBER
                    "AV2 nonsep Wiener filter experiment flag")
 set_aom_config_var(CONFIG_WIENER_NONSEP_CROSS_FILT 0 NUMBER
