@@ -652,9 +652,10 @@ static INLINE void update_cdf(aom_cdf_prob *cdf, int8_t val, int nsymbs) {
   int rate;
   int i, tmp;
 
-  static const int nsymbs2speed[17] = { 0, 0, 1, 1, 2, 2, 2, 2, 2,
-                                        2, 2, 2, 2, 2, 2, 2, 2 };
-  assert(nsymbs < 17);
+  // TODO(now): Correct or 3 for last two?
+  static const int nsymbs2speed[19] = { 0, 0, 1, 1, 2, 2, 2, 2, 2, 2,
+                                        2, 2, 2, 2, 2, 2, 2, 2, 2 };
+  assert(nsymbs < 19);
   rate = 3 + (cdf[nsymbs] > 15) + (cdf[nsymbs] > 31) +
          nsymbs2speed[nsymbs];  // + get_msb(nsymbs);
   tmp = AOM_ICDF(0);
