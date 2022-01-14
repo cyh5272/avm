@@ -762,7 +762,7 @@ typedef struct {
   //! compound_type_cost
   int compound_type_cost[BLOCK_SIZES_ALL][MASKED_COMPOUND_TYPES];
   //! wedge_idx_cost
-  int wedge_idx_cost[BLOCK_SIZES_ALL][16];
+  int wedge_idx_cost[BLOCK_SIZES_ALL][18];  // MAX_WEDGE_TYPES = 18
   //! interintra_cost
   int interintra_cost[BLOCK_SIZE_GROUPS][2];
   //! wedge_interintra_cost
