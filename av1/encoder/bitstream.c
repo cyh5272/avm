@@ -345,6 +345,60 @@ static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
 #endif  // !CONFIG_NEW_REF_SIGNALING
 }
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
+                                         const MB_MODE_INFO *mbmi,
+                                         aom_writer *w) {
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+  assert((allowed_motion_modes & (1 << mbmi->motion_mode)) != 0);
+
+  MOTION_MODE motion_mode = mbmi->motion_mode;
+
+  // Note(rachelbarker): Both of the conditions in brackets here are used in
+  // various places to mean "is this block interintra?". This assertion is a
+  // quick check to ensure these conditions can't get out of sync.
+  assert((mbmi->ref_frame[1] == INTRA_FRAME) == (motion_mode == INTERINTRA));
+
+  if (allowed_motion_modes & (1 << INTERINTRA)) {
+    const int bsize_group = size_group_lookup[bsize];
+    aom_write_symbol(w, motion_mode == INTERINTRA,
+                     xd->tile_ctx->interintra_cdf[bsize_group], 2);
+    if (motion_mode == INTERINTRA) {
+      aom_write_symbol(w, mbmi->interintra_mode,
+                       xd->tile_ctx->interintra_mode_cdf[bsize_group],
+                       INTERINTRA_MODES);
+      if (av1_is_wedge_used(bsize)) {
+        aom_write_symbol(w, mbmi->use_wedge_interintra,
+                         xd->tile_ctx->wedge_interintra_cdf[bsize], 2);
+        if (mbmi->use_wedge_interintra) {
+          aom_write_symbol(w, mbmi->interintra_wedge_index,
+                           xd->tile_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+        }
+      }
+      return;
+    }
+  }
+
+  if (allowed_motion_modes & (1 << OBMC_CAUSAL)) {
+    aom_write_symbol(w, motion_mode == OBMC_CAUSAL,
+                     xd->tile_ctx->obmc_cdf[bsize], 2);
+
+    if (motion_mode == OBMC_CAUSAL) {
+      return;
+    }
+  }
+
+  if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+    aom_write_symbol(w, motion_mode == WARPED_CAUSAL,
+                     xd->tile_ctx->warped_causal_cdf[bsize], 2);
+
+    if (motion_mode == WARPED_CAUSAL) {
+      return;
+    }
+  }
+}
+#else
 static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                          const MB_MODE_INFO *mbmi,
                                          aom_writer *w) {
@@ -363,6 +417,7 @@ static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
           MOTION_MODES);
   }
 }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 static AOM_INLINE void write_delta_qindex(const MACROBLOCKD *xd,
                                           int delta_qindex, aom_writer *w) {
@@ -1823,6 +1878,9 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif
     }
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+    write_motion_mode(cm, xd, mbmi, w);
+#else
     if (cpi->common.current_frame.reference_mode != COMPOUND_REFERENCE &&
         cpi->common.seq_params.enable_interintra_compound &&
         is_interintra_allowed(mbmi)) {
@@ -1845,6 +1903,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     }
 
     if (mbmi->ref_frame[1] != INTRA_FRAME) write_motion_mode(cm, xd, mbmi, w);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
     // First write idx to indicate current compound inter prediction mode
     // group Group A (0): dist_wtd_comp, compound_average Group B (1):

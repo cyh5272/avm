@@ -498,6 +498,18 @@ int main(int argc, const char **argv) {
                      "default_wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(16)]");
 
   /* motion_var and warped_motion experiments */
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  cts_each_dim[0] = BLOCK_SIZES_ALL;
+  cts_each_dim[1] = 2;
+  optimize_cdf_table(&fc.obmc[0][0], probsfile, 2, cts_each_dim,
+                     "static const aom_cdf_prob "
+                     "default_obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+  cts_each_dim[0] = BLOCK_SIZES_ALL;
+  cts_each_dim[1] = 2;
+  optimize_cdf_table(&fc.warped_causal[0][0], probsfile, 2, cts_each_dim,
+                     "static const aom_cdf_prob "
+                     "default_warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+#else
   cts_each_dim[0] = BLOCK_SIZES_ALL;
   cts_each_dim[1] = MOTION_MODES;
   optimize_cdf_table(
@@ -509,6 +521,7 @@ int main(int argc, const char **argv) {
   optimize_cdf_table(&fc.obmc[0][0], probsfile, 2, cts_each_dim,
                      "static const aom_cdf_prob "
                      "default_obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
   /* Intra/inter flag */
 #if CONFIG_CONTEXT_DERIVATION

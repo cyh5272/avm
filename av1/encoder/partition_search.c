@@ -1214,6 +1214,66 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_NEW_REF_SIGNALING
       }
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+      const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+      MOTION_MODE motion_mode = mbmi->motion_mode;
+      bool continue_motion_mode_signaling = true;
+
+      if (allowed_motion_modes & (1 << INTERINTRA)) {
+        const int bsize_group = size_group_lookup[bsize];
+#if CONFIG_ENTROPY_STATS
+        counts->interintra[bsize_group][motion_mode == INTERINTRA]++;
+#endif
+        update_cdf(fc->interintra_cdf[bsize_group], motion_mode == INTERINTRA,
+                   2);
+
+        if (motion_mode == INTERINTRA) {
+#if CONFIG_ENTROPY_STATS
+          counts->interintra_mode[bsize_group][mbmi->interintra_mode]++;
+#endif
+          update_cdf(fc->interintra_mode_cdf[bsize_group],
+                     mbmi->interintra_mode, INTERINTRA_MODES);
+          if (av1_is_wedge_used(bsize)) {
+#if CONFIG_ENTROPY_STATS
+            counts->wedge_interintra[bsize][mbmi->use_wedge_interintra]++;
+#endif
+            update_cdf(fc->wedge_interintra_cdf[bsize],
+                       mbmi->use_wedge_interintra, 2);
+            if (mbmi->use_wedge_interintra) {
+#if CONFIG_ENTROPY_STATS
+              counts->wedge_idx[bsize][mbmi->interintra_wedge_index]++;
+#endif
+              update_cdf(fc->wedge_idx_cdf[bsize], mbmi->interintra_wedge_index,
+                         16);
+            }
+          }
+          continue_motion_mode_signaling = false;
+        }
+      }
+
+      if (continue_motion_mode_signaling &&
+          allowed_motion_modes & (1 << OBMC_CAUSAL)) {
+#if CONFIG_ENTROPY_STATS
+        counts->obmc[bsize][motion_mode == OBMC_CAUSAL]++;
+#endif
+        update_cdf(fc->obmc_cdf[bsize], motion_mode == OBMC_CAUSAL, 2);
+        if (motion_mode == OBMC_CAUSAL) {
+          continue_motion_mode_signaling = false;
+        }
+      }
+
+      if (continue_motion_mode_signaling &&
+          allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+#if CONFIG_ENTROPY_STATS
+        counts->warped_causal[bsize][motion_mode == WARPED_CAUSAL]++;
+#endif
+        update_cdf(fc->warped_causal_cdf[bsize], motion_mode == WARPED_CAUSAL,
+                   2);
+        if (motion_mode == WARPED_CAUSAL) {
+          continue_motion_mode_signaling = false;
+        }
+      }
+#else
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
         const int bsize_group = size_group_lookup[bsize];
@@ -1264,6 +1324,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           update_cdf(fc->obmc_cdf[bsize], mbmi->motion_mode == OBMC_CAUSAL, 2);
         }
       }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
       if (has_second_ref(mbmi)
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1597,6 +1658,17 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
 #endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
+#if CONFIG_EXTENDED_WARP_PREDICTION
+        const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+        if (mbmi->motion_mode != INTERINTRA) {
+          if (allowed_motion_modes & (1 << OBMC_CAUSAL)) {
+            td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
+          }
+          if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+            td->rd_counts.warped_used[mbmi->motion_mode == WARPED_CAUSAL]++;
+          }
+        }
+#else
         const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);
 
         if (mbmi->ref_frame[1] != INTRA_FRAME) {
@@ -1607,6 +1679,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
             td->rd_counts.warped_used[mbmi->motion_mode == WARPED_CAUSAL]++;
           }
         }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
       }
     }
   }

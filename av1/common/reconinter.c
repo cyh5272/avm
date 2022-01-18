@@ -33,6 +33,9 @@
 int av1_allow_warp(const MB_MODE_INFO *const mbmi,
                    const WarpTypesAllowed *const warp_types,
                    const WarpedMotionParams *const gm_params,
+#if CONFIG_EXTENDED_WARP_PREDICTION
+                   int ref,
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
                    int build_for_obmc, const struct scale_factors *const sf,
                    WarpedMotionParams *final_warp_params) {
   // Note: As per the spec, we must test the fixed point scales here, which are
@@ -44,10 +47,18 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
 
   if (build_for_obmc) return 0;
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  if (warp_types->local_warp_allowed && !mbmi->wm_params[ref].invalid) {
+    if (final_warp_params != NULL)
+      memcpy(final_warp_params, &mbmi->wm_params[ref],
+             sizeof(*final_warp_params));
+    return 1;
+#else
   if (warp_types->local_warp_allowed && !mbmi->wm_params.invalid) {
     if (final_warp_params != NULL)
       memcpy(final_warp_params, &mbmi->wm_params, sizeof(*final_warp_params));
     return 1;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
   } else if (warp_types->global_warp_allowed && !gm_params->invalid) {
     if (final_warp_params != NULL)
       memcpy(final_warp_params, gm_params, sizeof(*final_warp_params));
@@ -109,8 +120,11 @@ void av1_init_warp_params(InterPredParams *inter_pred_params,
 
   if (xd->cur_frame_force_integer_mv) return;
 
-  if (av1_allow_warp(mi, warp_types, &xd->global_motion[mi->ref_frame[ref]], 0,
-                     inter_pred_params->scale_factors,
+  if (av1_allow_warp(mi, warp_types, &xd->global_motion[mi->ref_frame[ref]],
+#if CONFIG_EXTENDED_WARP_PREDICTION
+                     ref,
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+                     0, inter_pred_params->scale_factors,
                      &inter_pred_params->warp_params))
     inter_pred_params->mode = WARP_PRED;
 }

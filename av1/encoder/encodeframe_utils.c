@@ -1188,8 +1188,13 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->wedge_interintra_cdf, ctx_tr->wedge_interintra_cdf, 2);
   AVERAGE_CDF(ctx_left->interintra_mode_cdf, ctx_tr->interintra_mode_cdf,
               INTERINTRA_MODES);
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  AVERAGE_CDF(ctx_left->obmc_cdf, ctx_tr->obmc_cdf, 2);
+  AVERAGE_CDF(ctx_left->warped_causal_cdf, ctx_tr->warped_causal_cdf, 2);
+#else
   AVERAGE_CDF(ctx_left->motion_mode_cdf, ctx_tr->motion_mode_cdf, MOTION_MODES);
   AVERAGE_CDF(ctx_left->obmc_cdf, ctx_tr->obmc_cdf, 2);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
   AVERAGE_CDF(ctx_left->palette_y_size_cdf, ctx_tr->palette_y_size_cdf,
               PALETTE_SIZES);
   AVERAGE_CDF(ctx_left->palette_uv_size_cdf, ctx_tr->palette_uv_size_cdf,

@@ -1936,6 +1936,32 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
   return 0;
 }
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+static INLINE int select_modes_to_search(const AV1_COMP *const cpi,
+                                         int allowed_motion_modes,
+                                         int eval_motion_mode,
+                                         int skip_motion_mode) {
+  int modes_to_search = allowed_motion_modes;
+
+  // Modify the set of motion modes to consider according to speed features.
+  // For example, if SIMPLE_TRANSLATION has already been searched according to
+  // the motion_mode_for_winner_cand speed feature, avoid searching it again.
+  if (cpi->sf.winner_mode_sf.motion_mode_for_winner_cand) {
+    if (!eval_motion_mode) {
+      modes_to_search = (1 << SIMPLE_TRANSLATION);
+    } else {
+      // Skip translation, as will have already been evaluated
+      modes_to_search &= ~(1 << SIMPLE_TRANSLATION);
+    }
+  }
+
+  if (skip_motion_mode) {
+    modes_to_search &= (1 << SIMPLE_TRANSLATION);
+  }
+
+  return modes_to_search;
+}
+#else
 static INLINE void update_mode_start_end_index(const AV1_COMP *const cpi,
                                                int *mode_index_start,
                                                int *mode_index_end,
@@ -1954,6 +1980,7 @@ static INLINE void update_mode_start_end_index(const AV1_COMP *const cpi,
     }
   }
 }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 /*!\brief AV1 motion mode search
  *
@@ -2042,8 +2069,10 @@ static int64_t motion_mode_rd(
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   const int rate_mv0 = *rate_mv;
+#if !CONFIG_EXTENDED_WARP_PREDICTION
   const int interintra_allowed =
       cm->seq_params.enable_interintra_compound && is_interintra_allowed(mbmi);
+#endif  // !CONFIG_EXTENDED_WARP_PREDICTION
   int pts0[SAMPLES_ARRAY_SIZE], pts_inref0[SAMPLES_ARRAY_SIZE];
 
   assert(mbmi->ref_frame[1] != INTRA_FRAME);
@@ -2052,8 +2081,22 @@ static int64_t motion_mode_rd(
   av1_invalid_rd_stats(&best_rd_stats);
   aom_clear_system_state();
   mbmi->num_proj_ref = 1;  // assume num_proj_ref >=1
-  MOTION_MODE last_motion_mode_allowed = motion_mode_allowed(cm, xd, mbmi);
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+  if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+    // Collect projection samples used in least squares approximation of
+    // the warped motion parameters if WARPED_CAUSAL is going to be searched.
+    mbmi->num_proj_ref = av1_findSamples(cm, xd, pts0, pts_inref0);
+  }
+  const int total_samples = mbmi->num_proj_ref;
+  if (total_samples == 0) {
+    // Do not search WARPED_CAUSAL if there are no samples to use to determine
+    // warped parameters.
+    allowed_motion_modes &= ~(1 << WARPED_CAUSAL);
+  }
+#else
+  MOTION_MODE last_motion_mode_allowed = motion_mode_allowed(cm, xd, mbmi);
   if (last_motion_mode_allowed == WARPED_CAUSAL) {
     // Collect projection samples used in least squares approximation of
     // the warped motion parameters if WARPED_CAUSAL is going to be searched.
@@ -2065,6 +2108,7 @@ static int64_t motion_mode_rd(
     // warped parameters.
     last_motion_mode_allowed = OBMC_CAUSAL;
   }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
   const MB_MODE_INFO base_mbmi = *mbmi;
   MB_MODE_INFO best_mbmi;
@@ -2077,6 +2121,10 @@ static int64_t motion_mode_rd(
   int best_rate_mv = rate_mv0;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  int modes_to_search = select_modes_to_search(
+      cpi, allowed_motion_modes, eval_motion_mode, args->skip_motion_mode);
+#else
   int mode_index_start, mode_index_end;
   // Modify the start and end index according to speed features. For example,
   // if SIMPLE_TRANSLATION has already been searched according to
@@ -2085,18 +2133,31 @@ static int64_t motion_mode_rd(
   update_mode_start_end_index(cpi, &mode_index_start, &mode_index_end,
                               last_motion_mode_allowed, interintra_allowed,
                               eval_motion_mode);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
   // Main function loop. This loops over all of the possible motion modes and
   // computes RD to determine the best one. This process includes computing
   // any necessary side information for the motion mode and performing the
   // transform search.
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  for (int mode_index = SIMPLE_TRANSLATION; mode_index < MOTION_MODES;
+       mode_index++) {
+    if ((modes_to_search & (1 << mode_index)) == 0) continue;
+#else
   for (int mode_index = mode_index_start; mode_index <= mode_index_end;
        mode_index++) {
     if (args->skip_motion_mode && mode_index) continue;
-    int tmp_rate2 = rate2_nocoeff;
     const int is_interintra_mode = mode_index > (int)last_motion_mode_allowed;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+    int tmp_rate2 = rate2_nocoeff;
     int tmp_rate_mv = rate_mv0;
 
     *mbmi = base_mbmi;
+#if CONFIG_EXTENDED_WARP_PREDICTION
+    mbmi->motion_mode = (MOTION_MODE)mode_index;
+    if (mbmi->motion_mode != INTERINTRA) {
+      assert(mbmi->ref_frame[1] != INTRA_FRAME);
+    }
+#else
     if (is_interintra_mode) {
       // Only use SIMPLE_TRANSLATION for interintra
       mbmi->motion_mode = SIMPLE_TRANSLATION;
@@ -2104,6 +2165,7 @@ static int64_t motion_mode_rd(
       mbmi->motion_mode = (MOTION_MODE)mode_index;
       assert(mbmi->ref_frame[1] != INTRA_FRAME);
     }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
     // Do not search OBMC if the probability of selecting it is below a
     // predetermined threshold for this update_type and block size.
@@ -2115,12 +2177,15 @@ static int64_t motion_mode_rd(
         mbmi->motion_mode == OBMC_CAUSAL)
       continue;
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+    if (mbmi->motion_mode == SIMPLE_TRANSLATION) {
+#else
     if (mbmi->motion_mode == SIMPLE_TRANSLATION && !is_interintra_mode) {
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
       // SIMPLE_TRANSLATION mode: no need to recalculate.
       // The prediction is calculated before motion_mode_rd() is called in
       // handle_inter_mode()
     } else if (mbmi->motion_mode == OBMC_CAUSAL) {
-      const uint32_t cur_mv = mbmi->mv[0].as_int;
       // OBMC_CAUSAL not allowed for compound prediction
       assert(!is_comp_pred);
       if (this_mode == NEWMV) {
@@ -2128,20 +2193,20 @@ static int64_t motion_mode_rd(
                                  &mbmi->mv[0]);
         tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
       }
-      if ((mbmi->mv[0].as_int != cur_mv) || eval_motion_mode) {
-        // Build the predictor according to the current motion vector if it has
-        // not already been built
-        av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, orig_dst, bsize,
-                                      0, av1_num_planes(cm) - 1);
-      }
       // Build the inter predictor by blending the predictor corresponding to
       // this MV, and the neighboring blocks using the OBMC model
+      av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, orig_dst, bsize, 0,
+                                    av1_num_planes(cm) - 1);
       av1_build_obmc_inter_prediction(
           cm, xd, args->above_pred_buf, args->above_pred_stride,
           args->left_pred_buf, args->left_pred_stride);
     } else if (mbmi->motion_mode == WARPED_CAUSAL) {
       int pts[SAMPLES_ARRAY_SIZE], pts_inref[SAMPLES_ARRAY_SIZE];
+#if CONFIG_EXTENDED_WARP_PREDICTION
+      mbmi->wm_params[0].wmtype = DEFAULT_WMTYPE;
+#else
       mbmi->wm_params.wmtype = DEFAULT_WMTYPE;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
       mbmi->interp_fltr = av1_unswitchable_filter(interp_filter);
 
       memcpy(pts, pts0, total_samples * 2 * sizeof(*pts0));
@@ -2154,9 +2219,16 @@ static int64_t motion_mode_rd(
 
       // Compute the warped motion parameters with a least squares fit
       //  using the collected samples
+#if CONFIG_EXTENDED_WARP_PREDICTION
+      if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
+                               mbmi->mv[0].as_mv, &mbmi->wm_params[0], mi_row,
+                               mi_col)) {
+#else
       if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
                                mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
                                mi_col)) {
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+
         assert(!is_comp_pred);
         if (this_mode == NEWMV
 #if CONFIG_FLEX_MVRES
@@ -2208,7 +2280,11 @@ static int64_t motion_mode_rd(
       } else {
         continue;
       }
+#if CONFIG_EXTENDED_WARP_PREDICTION
+    } else if (mbmi->motion_mode == INTERINTRA) {
+#else
     } else if (is_interintra_mode) {
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
       const int ret =
           av1_handle_inter_intra_mode(cpi, x, bsize, mbmi, args, ref_best_rd,
                                       &tmp_rate_mv, &tmp_rate2, orig_dst);
@@ -2227,6 +2303,39 @@ static int64_t motion_mode_rd(
     rd_stats->rate = tmp_rate2;
     const ModeCosts *mode_costs = &x->mode_costs;
     if (mbmi->motion_mode != WARPED_CAUSAL) rd_stats->rate += switchable_rate;
+
+#if CONFIG_EXTENDED_WARP_PREDICTION
+    MOTION_MODE motion_mode = mbmi->motion_mode;
+    bool continue_motion_mode_signaling = true;
+
+    if (allowed_motion_modes & (1 << INTERINTRA)) {
+      rd_stats->rate += mode_costs->interintra_cost[size_group_lookup[bsize]]
+                                                   [motion_mode == INTERINTRA];
+      if (motion_mode == INTERINTRA) {
+        // Note(rachelbarker): Costs for other interintra-related signaling are
+        // already accounted for by `av1_handle_inter_intra_mode`
+        continue_motion_mode_signaling = false;
+      }
+    }
+
+    if (continue_motion_mode_signaling &&
+        allowed_motion_modes & (1 << OBMC_CAUSAL)) {
+      rd_stats->rate +=
+          mode_costs->obmc_cost[bsize][motion_mode == OBMC_CAUSAL];
+      if (motion_mode == OBMC_CAUSAL) {
+        continue_motion_mode_signaling = false;
+      }
+    }
+
+    if (continue_motion_mode_signaling &&
+        allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+      rd_stats->rate +=
+          mode_costs->warped_causal_cost[bsize][motion_mode == WARPED_CAUSAL];
+      if (motion_mode == WARPED_CAUSAL) {
+        continue_motion_mode_signaling = false;
+      }
+    }
+#else
     if (interintra_allowed) {
       rd_stats->rate +=
           mode_costs->interintra_cost[size_group_lookup[bsize]]
@@ -2242,6 +2351,7 @@ static int64_t motion_mode_rd(
             mode_costs->motion_mode_cost1[bsize][mbmi->motion_mode];
       }
     }
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
     if (!do_tx_search) {
       // Avoid doing a transform search here to speed up the overall mode

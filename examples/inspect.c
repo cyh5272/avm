@@ -243,6 +243,9 @@ const map_entry prediction_mode_map[] = { ENUM(DC_PRED),
                                           LAST_ENUM };
 
 const map_entry motion_mode_map[] = { ENUM(SIMPLE_TRANSLATION),
+#if CONFIG_EXTENDED_WARP_PREDICTION
+                                      ENUM(INTERINTRA),
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
                                       ENUM(OBMC_CAUSAL),    // 2-sided OBMC
                                       ENUM(WARPED_CAUSAL),  // 2-sided WARPED
                                       LAST_ENUM };

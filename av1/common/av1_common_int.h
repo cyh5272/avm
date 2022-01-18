@@ -2934,6 +2934,80 @@ static inline int is_this_mv_precision_compliant(
 }
 #endif  // CONFIG_FLEX_MVRES
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+/* Evaluate which motion modes are allowed for the current block
+ * Returns a bit field, where motion mode `i` is allowed if and only if
+ * the i'th bit is set.
+ *
+ * That is, to check if a given motion mode is allowed, do the following:
+ *   int allowed_motion_modes = motion_mode_allowed([...]);
+ *   if (allowed_motion_modes & (1 << i)) {
+ *     [...]
+ *   }
+ */
+static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
+                                      const MACROBLOCKD *xd,
+                                      const MB_MODE_INFO *mbmi) {
+  int allowed_motion_modes = (1 << SIMPLE_TRANSLATION);
+
+  if (mbmi->skip_mode) {
+    return allowed_motion_modes;
+  }
+
+  bool interintra_allowed =
+      cm->current_frame.reference_mode != COMPOUND_REFERENCE &&
+      cm->seq_params.enable_interintra_compound && is_interintra_allowed(mbmi);
+
+  if (interintra_allowed) {
+    allowed_motion_modes |= (1 << INTERINTRA);
+  }
+
+  if (!cm->features.switchable_motion_mode) {
+    return allowed_motion_modes;
+  }
+
+#if CONFIG_TIP
+  if (is_tip_ref_frame(mbmi->ref_frame[0])) {
+    return allowed_motion_modes;
+  }
+#endif  // CONFIG_TIP
+
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  if (mbmi->ref_frame[0] == mbmi->ref_frame[1]) {
+    return allowed_motion_modes;
+  }
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
+
+  if (xd->cur_frame_force_integer_mv == 0) {
+    const TransformationType gm_type =
+        cm->global_motion[mbmi->ref_frame[0]].wmtype;
+    if (is_global_mv_block(mbmi, gm_type)) {
+      return allowed_motion_modes;
+    }
+  }
+
+  bool motion_variation_allowed =
+      is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
+      is_inter_mode(mbmi->mode) && is_motion_variation_allowed_compound(mbmi);
+
+  bool obmc_allowed =
+      motion_variation_allowed && check_num_overlappable_neighbors(mbmi);
+
+  if (obmc_allowed) {
+    allowed_motion_modes |= (1 << OBMC_CAUSAL);
+  }
+
+  const int allow_warped_motion = cm->features.allow_warped_motion;
+
+  if (obmc_allowed && mbmi->num_proj_ref >= 1 && allow_warped_motion &&
+      !av1_is_scaled(xd->block_ref_scale_factors[0]) &&
+      !xd->cur_frame_force_integer_mv) {
+    allowed_motion_modes |= (1 << WARPED_CAUSAL);
+  }
+
+  return allowed_motion_modes;
+}
+#else
 static INLINE MOTION_MODE motion_mode_allowed(const AV1_COMMON *cm,
                                               const MACROBLOCKD *xd,
                                               const MB_MODE_INFO *mbmi) {
@@ -2974,6 +3048,7 @@ static INLINE MOTION_MODE motion_mode_allowed(const AV1_COMMON *cm,
     return SIMPLE_TRANSLATION;
   }
 }
+#endif
 #ifdef __cplusplus
 }  // extern "C"
 #endif

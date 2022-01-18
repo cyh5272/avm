@@ -141,8 +141,13 @@ typedef struct frame_contexts {
   aom_cdf_prob wedge_interintra_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob interintra_mode_cdf[BLOCK_SIZE_GROUPS]
                                   [CDF_SIZE(INTERINTRA_MODES)];
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
+  aom_cdf_prob warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
+#else
   aom_cdf_prob motion_mode_cdf[BLOCK_SIZES_ALL][CDF_SIZE(MOTION_MODES)];
   aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
+#endif
 #if CONFIG_TIP
   aom_cdf_prob tip_cdf[TIP_CONTEXTS][CDF_SIZE(2)];
 #endif  // CONFIG_TIP

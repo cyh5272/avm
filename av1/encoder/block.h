@@ -810,10 +810,17 @@ typedef struct {
    * \name Inter Costs: Motion Modes/Filters
    ****************************************************************************/
   /**@{*/
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  //! obmc_cost
+  int obmc_cost[BLOCK_SIZES_ALL][2];
+  //! warped_causal_cost
+  int warped_causal_cost[BLOCK_SIZES_ALL][2];
+#else
   //! motion_mode_cost
   int motion_mode_cost[BLOCK_SIZES_ALL][MOTION_MODES];
   //! motion_mode_cost1
   int motion_mode_cost1[BLOCK_SIZES_ALL][2];
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
   //! switchable_interp_costs
   int switchable_interp_costs[SWITCHABLE_FILTER_CONTEXTS][SWITCHABLE_FILTERS];
   /**@}*/

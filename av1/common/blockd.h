@@ -398,7 +398,11 @@ typedef struct MB_MODE_INFO {
    * mode. */
   uint8_t overlappable_neighbors[2];
   /*! \brief The parameters used in warp motion mode. */
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  WarpedMotionParams wm_params[2];
+#else
   WarpedMotionParams wm_params;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
   /*! \brief The type of intra mode used by inter-intra */
   INTERINTRA_MODE interintra_mode;
   /*! \brief The type of wedge used in interintra mode. */
