@@ -1337,7 +1337,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
         if (is_interinter_compound_used(COMPOUND_WEDGE, bsize)) {
           const int8_t category =
-              mbmi->interinter_comp.wedge_index > MAX_WEDGE_TYPES;
+              mbmi->interinter_comp.wedge_index >= MAX_WEDGE_TYPES;
 #if CONFIG_ENTROPY_STATS
           counts->wedge_category[bsize][category]++;
 #endif

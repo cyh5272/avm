@@ -1761,7 +1761,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
           assert(is_interinter_compound_used(COMPOUND_WEDGE, bsize));
           const int wedge_category =
-              (mbmi->interinter_comp.wedge_index > MAX_WEDGE_TYPES);
+              (mbmi->interinter_comp.wedge_index >= MAX_WEDGE_TYPES);
           aom_write_symbol(w, wedge_category, ec_ctx->wedge_category_cdf[bsize],
                            2);
           if (wedge_category == 0) {

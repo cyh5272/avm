@@ -761,8 +761,12 @@ typedef struct {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   //! compound_type_cost
   int compound_type_cost[BLOCK_SIZES_ALL][MASKED_COMPOUND_TYPES];
+  //! wedge_category_cost
+  int wedge_category_cost[BLOCK_SIZES_ALL][2];
   //! wedge_idx_cost
   int wedge_idx_cost[BLOCK_SIZES_ALL][16];  // MAX_WEDGE_TYPES = 16
+  //! wedge_idx2_cost
+  int wedge_idx2_cost[BLOCK_SIZES_ALL][2];  // MAX_WEDGE_TYPES2 = 2
   //! interintra_cost
   int interintra_cost[BLOCK_SIZE_GROUPS][2];
   //! wedge_interintra_cost

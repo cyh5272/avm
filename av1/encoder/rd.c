@@ -403,7 +403,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->compound_type_cdf[i], NULL);
     for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
       if (av1_is_wedge_used(i)) {
-        // TODO(now): Add two new arrays.
         av1_cost_tokens_from_cdf(mode_costs->wedge_category_cost[i],
                                  fc->wedge_category_cdf[i], NULL);
         av1_cost_tokens_from_cdf(mode_costs->wedge_idx_cost[i],
