@@ -1253,7 +1253,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               const int8_t category =
                   mbmi->interintra_wedge_index > MAX_WEDGE_TYPES;
 #if CONFIG_ENTROPY_STATS
-              // TODO(now): add two new counts.
               counts->wedge_category[bsize][category]++;
 #endif
               update_cdf(fc->wedge_category_cdf[bsize], category, 2);
