@@ -37,7 +37,6 @@ extern "C" {
 #endif
 
 #define MAX_WEDGE_TYPES 16
-// TODO(now): default cdf, cdf and cost tables for 1 vs 2 and for 2.
 #define MAX_WEDGE_TYPES2 2
 #define MAX_WEDGE_TYPES_TOTAL (MAX_WEDGE_TYPES + MAX_WEDGE_TYPES2)
 

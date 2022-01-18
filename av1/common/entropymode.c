@@ -1458,7 +1458,10 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   av1_copy(fc->inter_compound_mode_cdf, default_inter_compound_mode_cdf);
   av1_copy(fc->compound_type_cdf, default_compound_type_cdf);
+  // TODO(now): Two new default tables.
+  av1_copy(fc->wedge_category_cdf, default_wedge_category_cdf);
   av1_copy(fc->wedge_idx_cdf, default_wedge_idx_cdf);
+  av1_copy(fc->wedge_idx2_cdf, default_wedge_idx2_cdf);
   av1_copy(fc->interintra_cdf, default_interintra_cdf);
   av1_copy(fc->wedge_interintra_cdf, default_wedge_interintra_cdf);
   av1_copy(fc->interintra_mode_cdf, default_interintra_mode_cdf);

@@ -131,7 +131,9 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->inter_compound_mode_cdf, INTER_COMPOUND_MODES);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   RESET_CDF_COUNTER(fc->compound_type_cdf, MASKED_COMPOUND_TYPES);
+  RESET_CDF_COUNTER(fc->wedge_category_cdf, 2);
   RESET_CDF_COUNTER(fc->wedge_idx_cdf, MAX_WEDGE_TYPES);
+  RESET_CDF_COUNTER(fc->wedge_idx2_cdf, MAX_WEDGE_TYPES2);
   RESET_CDF_COUNTER(fc->interintra_cdf, 2);
   RESET_CDF_COUNTER(fc->wedge_interintra_cdf, 2);
   RESET_CDF_COUNTER(fc->interintra_mode_cdf, INTERINTRA_MODES);
