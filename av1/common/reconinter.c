@@ -189,7 +189,7 @@ static AOM_INLINE void shift_copy(const uint8_t *src, uint8_t *dst, int shift,
 
 /* clang-format off */
 DECLARE_ALIGNED(16, static uint8_t,
-                wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES_ALL]) = {
+                wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES_TOTAL]) = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
