@@ -36,7 +36,10 @@
 extern "C" {
 #endif
 
-#define MAX_WEDGE_TYPES 18
+#define MAX_WEDGE_TYPES 16
+// TODO(now): default cdf, cdf and cost tables for 1 vs 2 and for 2.
+#define MAX_WEDGE_TYPES2 2
+#define MAX_WEDGE_TYPES_TOTAL (MAX_WEDGE_TYPES + MAX_WEDGE_TYPES2)
 
 #define MAX_WEDGE_SIZE_LOG2 5  // 32x32
 #define MAX_WEDGE_SIZE (1 << MAX_WEDGE_SIZE_LOG2)
@@ -66,7 +69,7 @@ typedef struct {
   int y_offset;
 } wedge_code_type;
 
-typedef uint8_t *wedge_masks_type[MAX_WEDGE_TYPES];
+typedef uint8_t *wedge_masks_type[MAX_WEDGE_TYPES_TOTAL];
 
 typedef struct {
   int wedge_types;

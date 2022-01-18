@@ -101,13 +101,6 @@ typedef uint16_t aom_cdf_prob;
       AOM_ICDF(a6), AOM_ICDF(a7), AOM_ICDF(a8), AOM_ICDF(a9), AOM_ICDF(a10),  \
       AOM_ICDF(a11), AOM_ICDF(a12), AOM_ICDF(a13), AOM_ICDF(a14),             \
       AOM_ICDF(CDF_PROB_TOP), 0
-#define AOM_CDF18(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, \
-                  a14, a15, a16)                                              \
-  AOM_ICDF(a0)                                                                \
-  , AOM_ICDF(a1), AOM_ICDF(a2), AOM_ICDF(a3), AOM_ICDF(a4), AOM_ICDF(a5),     \
-      AOM_ICDF(a6), AOM_ICDF(a7), AOM_ICDF(a8), AOM_ICDF(a9), AOM_ICDF(a10),  \
-      AOM_ICDF(a11), AOM_ICDF(a12), AOM_ICDF(a13), AOM_ICDF(a14),             \
-      AOM_ICDF(a15), AOM_ICDF(a16), AOM_ICDF(CDF_PROB_TOP), 0
 
 #else
 #define AOM_CDF2(a0)                                       \
@@ -652,10 +645,9 @@ static INLINE void update_cdf(aom_cdf_prob *cdf, int8_t val, int nsymbs) {
   int rate;
   int i, tmp;
 
-  // TODO(now): Correct or 3 for last two?
-  static const int nsymbs2speed[19] = { 0, 0, 1, 1, 2, 2, 2, 2, 2, 2,
-                                        2, 2, 2, 2, 2, 2, 2, 2, 2 };
-  assert(nsymbs < 19);
+  static const int nsymbs2speed[17] = { 0, 0, 1, 1, 2, 2, 2, 2, 2,
+                                        2, 2, 2, 2, 2, 2, 2, 2 };
+  assert(nsymbs < 17);
   rate = 3 + (cdf[nsymbs] > 15) + (cdf[nsymbs] > 31) +
          nsymbs2speed[nsymbs];  // + get_msb(nsymbs);
   tmp = AOM_ICDF(0);

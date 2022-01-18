@@ -189,7 +189,7 @@ static AOM_INLINE void shift_copy(const uint8_t *src, uint8_t *dst, int shift,
 
 /* clang-format off */
 DECLARE_ALIGNED(16, static uint8_t,
-                wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES]) = {
+                wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES_ALL]) = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
@@ -223,7 +223,7 @@ DECLARE_ALIGNED(
 // 4 * MAX_WEDGE_SQUARE is an easy to compute and fairly tight upper bound
 // on the sum of all mask sizes up to an including MAX_WEDGE_SQUARE.
 DECLARE_ALIGNED(16, static uint8_t,
-                wedge_mask_buf[2 * MAX_WEDGE_TYPES * 4 * MAX_WEDGE_SQUARE]);
+                wedge_mask_buf[2 * MAX_WEDGE_TYPES_TOTAL * 4 * MAX_WEDGE_SQUARE]);
 
 DECLARE_ALIGNED(16, static uint8_t,
                 smooth_interintra_mask_buf[INTERINTRA_MODES][BLOCK_SIZES_ALL]
@@ -232,7 +232,7 @@ DECLARE_ALIGNED(16, static uint8_t,
 static wedge_masks_type wedge_masks[BLOCK_SIZES_ALL][2];
 
 // TODO(now): Increase codebook size by 2 * 3 = 6 instead of by 2?
-static const wedge_code_type wedge_codebook_16_hgtw[MAX_WEDGE_TYPES] = {
+static const wedge_code_type wedge_codebook_16_hgtw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_HORIZONTAL, 4, 2 }, { WEDGE_HORIZONTAL, 4, 4 },
@@ -244,7 +244,7 @@ static const wedge_code_type wedge_codebook_16_hgtw[MAX_WEDGE_TYPES] = {
   { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
 };
 
-static const wedge_code_type wedge_codebook_16_hltw[MAX_WEDGE_TYPES] = {
+static const wedge_code_type wedge_codebook_16_hltw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_VERTICAL, 2, 4 },   { WEDGE_VERTICAL, 4, 4 },
@@ -256,7 +256,7 @@ static const wedge_code_type wedge_codebook_16_hltw[MAX_WEDGE_TYPES] = {
   { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
 };
 
-static const wedge_code_type wedge_codebook_16_heqw[MAX_WEDGE_TYPES] = {
+static const wedge_code_type wedge_codebook_16_heqw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
   { WEDGE_HORIZONTAL, 4, 2 }, { WEDGE_HORIZONTAL, 4, 6 },
@@ -272,19 +272,19 @@ const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_8X8],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_8X8],
     wedge_masks[BLOCK_8X8] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_8X16],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_8X16],
     wedge_masks[BLOCK_8X16] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_16X8],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_16X8],
     wedge_masks[BLOCK_16X8] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_16X16],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_16X16],
     wedge_masks[BLOCK_16X16] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_16X32],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_16X32],
     wedge_masks[BLOCK_16X32] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_32X16],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_32X16],
     wedge_masks[BLOCK_32X16] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_32X32],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_heqw, wedge_signflip_lookup[BLOCK_32X32],
     wedge_masks[BLOCK_32X32] },
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
@@ -294,9 +294,9 @@ const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_8X32],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hgtw, wedge_signflip_lookup[BLOCK_8X32],
     wedge_masks[BLOCK_8X32] },
-  { MAX_WEDGE_TYPES, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_32X8],
+  { MAX_WEDGE_TYPES_TOTAL, wedge_codebook_16_hltw, wedge_signflip_lookup[BLOCK_32X8],
     wedge_masks[BLOCK_32X8] },
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
