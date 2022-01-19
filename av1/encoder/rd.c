@@ -115,9 +115,12 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
 #endif
 
 #if CONFIG_EXT_RECUR_PARTITIONS
-  for (i = 0; i < PARTITION_CONTEXTS_REC; ++i)
+  for (i = 0; i < PARTITION_CONTEXTS_REC; ++i) {
     av1_cost_tokens_from_cdf(mode_costs->partition_rec_cost[i],
                              fc->partition_rec_cdf[i], NULL);
+    av1_cost_tokens_from_cdf(mode_costs->partition_middle_rec_cost[i],
+                             fc->partition_middle_rec_cdf[i], NULL);
+  }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
   if (cm->current_frame.skip_mode_info.skip_mode_flag) {

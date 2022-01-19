@@ -1352,7 +1352,10 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int i = 0; i < PARTITION_CONTEXTS_REC; ++i) {
     AVERAGE_CDF(ctx_left->partition_rec_cdf[i], ctx_tr->partition_rec_cdf[i],
-                4);
+                PARTITION_CONTEXTS_REC);
+    AVERAGE_CDF(ctx_left->partition_middle_rec_cdf[i],
+                ctx_tr->partition_middle_rec_cdf[i],
+                PARTITION_TYPES_MIDDLE_REC);
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   AVERAGE_CDF(ctx_left->switchable_interp_cdf, ctx_tr->switchable_interp_cdf,

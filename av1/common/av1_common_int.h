@@ -1784,6 +1784,20 @@ static INLINE int partition_rec_cdf_length(BLOCK_SIZE bsize) {
       return PARTITION_INVALID_REC;
   }
 }
+
+static INLINE int is_1_to_2_block(BLOCK_SIZE bsize) {
+  return 2 * block_size_high[bsize] == block_size_wide[bsize] ||
+         block_size_high[bsize] == 2 * block_size_wide[bsize];
+}
+// Return the number of partition types for the middle block of PARTITION_3.
+static INLINE int partition_middle_rec_cdf_length(BLOCK_SIZE bsize) {
+  // For some bock sizes, HORZ|VERT is already unavailable, so we shouldn't call
+  // this function.
+  assert(is_bsize_geq(bsize, BLOCK_8X8));
+  assert(is_bsize_geq(BLOCK_64X64, bsize));
+  assert(is_1_to_2_block(bsize));
+  return partition_rec_cdf_length(bsize) - 1;
+}
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 static INLINE int max_block_wide(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
