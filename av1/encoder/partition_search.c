@@ -1740,6 +1740,14 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
     const int plane_index = xd->tree_type == CHROMA_PART;
 #endif  // CONFIG_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
+    const PARTITION_TYPE parent_partition =
+        ptree->parent ? ptree->parent->partition : PARTITION_INVALID;
+    const bool is_middle_block = (parent_partition == PARTITION_HORZ_3 ||
+                                  parent_partition == PARTITION_VERT_3) &&
+                                 ptree->index == 1;
+    const bool limit_rect_split = is_middle_block &&
+                                  is_bsize_geq(bsize, BLOCK_8X8) &&
+                                  is_bsize_geq(BLOCK_64X64, bsize);
     if (is_square_block(bsize)) {
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
       if (has_rows && has_cols) {
@@ -1804,14 +1812,26 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 #endif
         const PARTITION_TYPE_REC p_rec =
             get_symbol_from_partition_rec_block(bsize, partition);
+        if (limit_rect_split) {
 #if CONFIG_ENTROPY_STATS
-        td->counts->partition_rec[ctx][p_rec]++;
+          td->counts->partition_middle_rec[ctx][p_rec]++;
 #endif  // CONFIG_ENTROPY_STATS
 
-        if (tile_data->allow_update_cdf) {
-          FRAME_CONTEXT *fc = xd->tile_ctx;
-          update_cdf(fc->partition_rec_cdf[ctx], p_rec,
-                     partition_rec_cdf_length(bsize));
+          if (tile_data->allow_update_cdf) {
+            FRAME_CONTEXT *fc = xd->tile_ctx;
+            update_cdf(fc->partition_middle_rec_cdf[ctx], p_rec,
+                       partition_middle_rec_cdf_length(bsize));
+          }
+        } else {
+#if CONFIG_ENTROPY_STATS
+          td->counts->partition_rec[ctx][p_rec]++;
+#endif  // CONFIG_ENTROPY_STATS
+
+          if (tile_data->allow_update_cdf) {
+            FRAME_CONTEXT *fc = xd->tile_ctx;
+            update_cdf(fc->partition_rec_cdf[ctx], p_rec,
+                       partition_rec_cdf_length(bsize));
+          }
         }
 #if CONFIG_SDP
       }
@@ -2618,14 +2638,34 @@ static void init_partition_search_state_params(
     part_search_state->partition_cost = mode_costs->partition_cost[pl];
 #endif  // CONFIG_SDP
   } else {
+    const bool is_middle_block =
+        pc_tree->parent && (pc_tree->parent->horizontal3[1] == pc_tree ||
+                            pc_tree->parent->vertical3[1] == pc_tree);
+    const bool limit_rect_split = is_middle_block &&
+                                  is_bsize_geq(bsize, BLOCK_8X8) &&
+                                  is_bsize_geq(BLOCK_64X64, bsize);
+
     for (PARTITION_TYPE p = PARTITION_NONE; p < EXT_PARTITION_TYPES; ++p) {
       PARTITION_TYPE_REC p_rec = get_symbol_from_partition_rec_block(bsize, p);
+      if (limit_rect_split) {
+        if ((pc_tree->parent->horizontal3[1] == pc_tree &&
+             p == PARTITION_HORZ) ||
+            (pc_tree->parent->vertical3[1] == pc_tree && p == PARTITION_VERT)) {
+          p_rec = PARTITION_INVALID_REC;
+        }
+      }
 
-      if (p_rec != PARTITION_INVALID_REC)
-        part_search_state->partition_cost_table[p] =
-            mode_costs->partition_rec_cost[pl][p_rec];
-      else
+      if (p_rec != PARTITION_INVALID_REC) {
+        if (limit_rect_split) {
+          part_search_state->partition_cost_table[p] =
+              mode_costs->partition_middle_rec_cost[pl][p_rec];
+        } else {
+          part_search_state->partition_cost_table[p] =
+              mode_costs->partition_rec_cost[pl][p_rec];
+        }
+      } else {
         part_search_state->partition_cost_table[p] = INT_MAX;
+      }
     }
     part_search_state->partition_cost = part_search_state->partition_cost_table;
   }
@@ -3199,14 +3239,11 @@ static void rectangular_partition_search(
     if (!is_rect_part_allowed(cpi, part_search_state, active_edge_type, i,
                               mi_pos_rect[i][0][i]))
       continue;
+
 #if CONFIG_EXT_RECUR_PARTITIONS
-    const BLOCK_SIZE bsize = blk_params.bsize;
-    if (block_size_wide[bsize] == 2 * block_size_high[bsize]) {
-      if (pc_tree->parent->horizontal3[1] == pc_tree && i == HORZ) {
-        continue;
-      }
-    } else if (2 * block_size_wide[bsize] == block_size_high[bsize]) {
-      if (pc_tree->parent->vertical3[1] == pc_tree && i == VERT) {
+    if (pc_tree->parent) {
+      if ((pc_tree->parent->horizontal3[1] == pc_tree && i == HORZ) ||
+          (pc_tree->parent->vertical3[1] == pc_tree && i == VERT)) {
         continue;
       }
     }

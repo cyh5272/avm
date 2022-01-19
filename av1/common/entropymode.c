@@ -419,6 +419,36 @@ static const aom_cdf_prob
                                { AOM_CDF3(9068, 21038) },
                                { AOM_CDF3(10923, 21845) },
                              };
+// TODO(chiyotsai@google.com): Retune the cdf here
+static const aom_cdf_prob
+    default_partition_middle_rec_cdf[PARTITION_CONTEXTS_REC]
+                                    [CDF_SIZE(PARTITION_TYPES_MIDDLE_REC)] = {
+                                      // 8x4, 4x8
+                                      { AOM_CDF2(30462) },  // Not used
+                                      { AOM_CDF2(25506) },  // Not used
+                                      { AOM_CDF2(27632) },  // Not used
+                                      { AOM_CDF2(19443) },  // Not used
+                                      // 16x8, 8x16
+                                      { AOM_CDF3(20645, 30994) },
+                                      { AOM_CDF3(13282, 26216) },
+                                      { AOM_CDF3(17766, 31839) },
+                                      { AOM_CDF3(13067, 27065) },
+                                      // 32x16, 16x32
+                                      { AOM_CDF3(14234, 25470) },
+                                      { AOM_CDF3(7421, 19783) },
+                                      { AOM_CDF3(8692, 21169) },
+                                      { AOM_CDF3(5458, 18812) },
+                                      // 64x32, 32x64
+                                      { AOM_CDF3(14706, 25018) },
+                                      { AOM_CDF3(6131, 19651) },
+                                      { AOM_CDF3(6588, 20073) },
+                                      { AOM_CDF3(8175, 21020) },
+                                      // 128x64, 64x128
+                                      { AOM_CDF3(15208, 24398) },  // Not used
+                                      { AOM_CDF3(6597, 18232) },   // Not used
+                                      { AOM_CDF3(9068, 21038) },   // Not used
+                                      { AOM_CDF3(10923, 21845) },  // Not used
+                                    };
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 static const aom_cdf_prob default_intra_ext_tx_cdf
@@ -1519,6 +1549,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
   av1_copy(fc->partition_cdf, default_partition_cdf);
 #if CONFIG_EXT_RECUR_PARTITIONS
   av1_copy(fc->partition_rec_cdf, default_partition_rec_cdf);
+  av1_copy(fc->partition_middle_rec_cdf, default_partition_middle_rec_cdf);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   av1_copy(fc->intra_ext_tx_cdf, default_intra_ext_tx_cdf);
   av1_copy(fc->inter_ext_tx_cdf, default_inter_ext_tx_cdf);

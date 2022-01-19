@@ -509,6 +509,7 @@ static INLINE PARTITION_TYPE_REC get_symbol_from_partition_rec_block(
   else
     return PARTITION_INVALID_REC;
 }
+
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 static INLINE int has_second_ref(const MB_MODE_INFO *mbmi) {
