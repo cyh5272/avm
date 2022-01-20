@@ -2752,9 +2752,12 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 
 #if CONFIG_CNN_RESTORATION
 static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
-  if (av1_use_cnn(cm)) {
+  if (av1_allow_cnn(cm)) {
     for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
-      aom_wb_write_bit(wb, cm->use_cnn[plane]);
+      if (av1_allow_cnn_for_plane(cm, plane))
+        aom_wb_write_bit(wb, cm->use_cnn[plane]);
+      else
+        assert(!cm->use_cnn[plane]);
     }
   } else {
     for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
