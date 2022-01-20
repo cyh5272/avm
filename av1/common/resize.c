@@ -1078,8 +1078,8 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
   }
 
   if (is_hbd) {
-    const int16_t *input16 = CONVERT_TO_SHORTPTR(input);
-    int16_t *output16 = CONVERT_TO_SHORTPTR(output);
+    const int16_t *input16 = (int16_t *)CONVERT_TO_SHORTPTR(input);
+    int16_t *output16 = (int16_t *)CONVERT_TO_SHORTPTR(output);
     av1_resample_2d(input16, width, height, in_stride, &horz_rf, &vert_rf,
                     extra_prec_bits, &clip, output16, width2, height2,
                     out_stride);
