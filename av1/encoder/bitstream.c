@@ -3113,9 +3113,9 @@ static AOM_INLINE void write_superres_scale(const AV1_COMMON *const cm,
     assert(cm->superres_scale_index >= 0);
     assert(cm->superres_scale_index < SUPERRES_SCALES);
     assert(cm->superres_scale_denominator ==
-           superres_scale_denominators[cm->superres_scale_index]);
+           superres_scales[cm->superres_scale_index].scale_denom);
     assert(cm->superres_scale_numerator ==
-           superres_scale_numerators[cm->superres_scale_index]);
+           superres_scales[cm->superres_scale_index].scale_num);
     aom_wb_write_literal(wb, cm->superres_scale_index, SUPERRES_SCALE_BITS);
 #else   // CONFIG_EXT_SUPERRES
     assert(cm->superres_scale_denominator >= SUPERRES_SCALE_DENOMINATOR_MIN);
