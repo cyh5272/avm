@@ -2227,6 +2227,7 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #endif  // CONFIG_SDP
 
+#if CONFIG_EXT_RECUR_PARTITIONS
   const PARTITION_TYPE parent_partition =
       ptree->parent ? ptree->parent->partition : PARTITION_INVALID;
   const bool is_middle_block = (parent_partition == PARTITION_HORZ_3 ||
@@ -2235,6 +2236,7 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
   const bool limit_rect_split = is_middle_block &&
                                 is_bsize_geq(bsize, BLOCK_8X8) &&
                                 is_bsize_geq(BLOCK_64X64, bsize);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   const int ctx = partition_plane_context(xd, mi_row, mi_col, bsize);
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -2252,7 +2254,20 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
 #else
       aom_cdf_prob *partition_cdf = ec_ctx->partition_cdf[ctx];
 #endif  // CONFIG_SDP
-      aom_write_symbol(w, p, partition_cdf, partition_cdf_length(bsize));
+      if (limit_rect_split) {
+        const int dir_index = parent_partition == PARTITION_HORZ_3 ? 0 : 1;
+#if CONFIG_SDP
+        partition_cdf = ec_ctx->limited_partition_cdf[plane][dir_index][ctx];
+#else
+        partition_cdf = ec_ctx->limited_partition_cdf[dir_index][ctx];
+#endif  // CONFIG_SDP
+        const int symbol =
+            get_symbol_from_limited_partition(p, parent_partition);
+        aom_write_symbol(w, symbol, partition_cdf,
+                         limited_partition_cdf_length(bsize));
+      } else {
+        aom_write_symbol(w, p, partition_cdf, partition_cdf_length(bsize));
+      }
     } else if (!has_rows && has_cols) {
       assert(p == PARTITION_HORZ);
     } else if (has_rows && !has_cols) {
@@ -2268,10 +2283,10 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
                      block_size_wide[bsize] == 2 * block_size_high[bsize]));
       assert(IMPLIES(parent_partition == PARTITION_VERT_3,
                      2 * block_size_wide[bsize] == block_size_high[bsize]));
-      assert(IMPLIES(parent_partition == PARTITION_HORZ_3,
-                     partition != PARTITION_HORZ));
-      assert(IMPLIES(parent_partition == PARTITION_VERT_3,
-                     partition != PARTITION_VERT));
+      assert(
+          IMPLIES(parent_partition == PARTITION_HORZ_3, p != PARTITION_HORZ));
+      assert(
+          IMPLIES(parent_partition == PARTITION_VERT_3, p != PARTITION_VERT));
       const PARTITION_TYPE_REC symbol =
           get_symbol_from_partition_rec_block(bsize, p);
       aom_write_symbol(w, symbol, ec_ctx->partition_middle_rec_cdf[ctx],

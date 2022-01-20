@@ -212,6 +212,7 @@ enum {
   PARTITION_HORZ_3,  // 3 horizontal sub-partitions with ratios 4:1, 2:1 and 4:1
   PARTITION_VERT_3,  // 3 vertical sub-partitions with ratios 4:1, 2:1 and 4:1
   EXT_PARTITION_TYPES,
+  LIMITED_EXT_PARTITION_TYPES = EXT_PARTITION_TYPES - 1,
   PARTITION_SPLIT = EXT_PARTITION_TYPES,
   PARTITION_TYPES = PARTITION_VERT + 1,
   PARTITION_INVALID = 255
@@ -240,6 +241,9 @@ typedef char PARTITION_CONTEXT;
 #define PARTITION_CONTEXTS (PARTITION_BLOCK_SIZES * PARTITION_PLOFFSET)
 
 #if CONFIG_EXT_RECUR_PARTITIONS
+// If the parent block is PARTITION_3, then we might have a smaller set of
+// partitions
+#define NUM_LIMITED_PARTITION_PARENTS (2)
 enum {
   PARTITION_NONE_REC,
   PARTITION_LONG_SIDE_2_REC,
