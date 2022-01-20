@@ -117,6 +117,14 @@ void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores) {
 }
 
 #define DIST_WEIGHT_BITS 6
+#define USE_DECAYING_WEIGHTS_ONESIDED 1
+#define USE_CAPPED_DIST_ONESIDED 1
+#define TEMPORAL_DIST_CAP 3
+#define DECAY_DIST_CAP 6
+static const int temp_dist_score_lookup[7] = {
+  0, 64, 96, 112, 120, 124, 126,
+};
+
 void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
                         RefFrameMapPair *ref_frame_map_pairs) {
   RefScoreData scores[REF_FRAMES];
@@ -126,6 +134,15 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
     cm->remapped_ref_idx[i] = INVALID_IDX;
   }
   int n_ranked = 0;
+
+  // Give more weight to base_qindex if all references are from the past
+  int max_disp = 0;
+  for (int i = 0; i < REF_FRAMES; i++) {
+    RefFrameMapPair cur_ref = ref_frame_map_pairs[i];
+    if (cur_ref.disp_order == -1) continue;
+    max_disp = AOMMAX(max_disp, cur_ref.disp_order);
+  }
+
   // Compute a score for each reference buffer
   for (int i = 0; i < REF_FRAMES; i++) {
     // Get reference frame buffer
@@ -134,7 +151,22 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
     const int ref_disp = cur_ref.disp_order;
     const int ref_base_qindex = cur_ref.base_qindex;
     const int disp_diff = cur_frame_disp - ref_disp;
+#if USE_DECAYING_WEIGHTS_ONESIDED
+    int tdist = abs(disp_diff);
+    const int score =
+        max_disp > cur_frame_disp
+            ? ((tdist << DIST_WEIGHT_BITS) + ref_base_qindex)
+            : temp_dist_score_lookup[AOMMIN(tdist, DECAY_DIST_CAP)] +
+                  AOMMAX(tdist - DECAY_DIST_CAP, 0) + ref_base_qindex;
+#elif USE_CAPPED_DIST_ONESIDED
+    const int score =
+        max_disp > cur_frame_disp
+            ? ((abs(disp_diff) << DIST_WEIGHT_BITS) + ref_base_qindex)
+            : ((AOMMIN(TEMPORAL_DIST_CAP, abs(disp_diff)) << DIST_WEIGHT_BITS) +
+               AOMMAX(abs(disp_diff) - TEMPORAL_DIST_CAP, 0) + ref_base_qindex);
+#else
     const int score = (abs(disp_diff) << DIST_WEIGHT_BITS) + ref_base_qindex;
+#endif
     if (is_in_ref_score(scores, ref_disp, score, n_ranked)) continue;
 
     scores[n_ranked].index = i;
