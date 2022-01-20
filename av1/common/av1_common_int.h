@@ -1760,6 +1760,13 @@ static INLINE int partition_cdf_length(BLOCK_SIZE bsize) {
     return EXT_PARTITION_TYPES;
 }
 
+static INLINE int limited_partition_cdf_length(BLOCK_SIZE bsize) {
+  assert(block_size_wide[bsize] == block_size_high[bsize]);
+  assert(is_bsize_geq(bsize, BLOCK_8X8));
+  assert(is_bsize_geq(BLOCK_64X64, bsize));
+  return partition_cdf_length(bsize) - 1;
+}
+
 #if CONFIG_EXT_RECUR_PARTITIONS
 static INLINE int partition_rec_cdf_length(BLOCK_SIZE bsize) {
   assert(block_size_wide[bsize] != block_size_high[bsize]);

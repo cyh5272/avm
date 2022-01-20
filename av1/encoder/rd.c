@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include "av1/common/enums.h"
 #include "config/av1_rtcd.h"
 
 #include "aom_dsp/aom_dsp_common.h"
@@ -104,15 +105,34 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
 #if CONFIG_SDP
   for (int plane_index = (xd->tree_type == CHROMA_PART);
        plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
-    for (i = 0; i < PARTITION_CONTEXTS; ++i)
+    for (i = 0; i < PARTITION_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->partition_cost[plane_index][i],
                                fc->partition_cdf[plane_index][i], NULL);
+    }
+#if CONFIG_EXT_RECUR_PARTITIONS
+    for (i = 0; i < PARTITION_CONTEXTS; ++i) {
+      for (int dir = 0; dir < NUM_LIMITED_PARTITION_PARENTS; dir++) {
+        av1_cost_tokens_from_cdf(
+            mode_costs->limited_partition_cost[plane_index][dir][i],
+            fc->limited_partition_cdf[plane_index][dir][i], NULL);
+      }
+    }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   }
 #else
-  for (i = 0; i < PARTITION_CONTEXTS; ++i)
+  for (i = 0; i < PARTITION_CONTEXTS; ++i) {
     av1_cost_tokens_from_cdf(mode_costs->partition_cost[i],
                              fc->partition_cdf[i], NULL);
-#endif
+  }
+#if CONFIG_EXT_RECUR_PARTITIONS
+  for (int dir = 0; dir < NUM_LIMITED_PARTITION_PARENTS; dir++) {
+    for (i = 0; i < PARTITION_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->limited_partition_cost[dir][i],
+                               fc->limited_partition_cdf[dir][i], NULL);
+    }
+  }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+#endif  // CONFIG_SDP
 
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (i = 0; i < PARTITION_CONTEXTS_REC; ++i) {

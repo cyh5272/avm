@@ -1769,6 +1769,12 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
                 bsize, ptree_luma->partition, ss_x, ss_y);
             if (partition != derived_partition_mode)
               assert(0 && "Chroma partition does not match the derived mode.");
+          } else if (limit_rect_split) {
+            const int dir_idx = (parent_partition == PARTITION_HORZ_3) ? 0 : 1;
+            const int symbol =
+                get_symbol_from_limited_partition(partition, parent_partition);
+            update_cdf(fc->limited_partition_cdf[plane_index][dir_idx][ctx],
+                       symbol, limited_partition_cdf_length(bsize));
           } else {
             update_cdf(fc->partition_cdf[plane_index][ctx], partition,
                        partition_cdf_length(bsize));
@@ -1789,8 +1795,20 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
           }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #else
-        update_cdf(fc->partition_cdf[ctx], partition,
-                   partition_cdf_length(bsize));
+#if CONFIG_EXT_RECUR_PARTITIONS
+        if (limit_rect_split) {
+          const int dir_idx = (parent_partition == PARTITION_HORZ_3) ? 0 : 1;
+          const int symbol =
+              get_symbol_from_limited_partition(partition, parent_partition);
+          update_cdf(fc->limited_partition_cdf[dir_idx][ctx], symbol,
+                     limited_partition_cdf_length(bsize));
+        } else {
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+          update_cdf(fc->partition_cdf[ctx], partition,
+                     partition_cdf_length(bsize));
+#if CONFIG_EXT_RECUR_PARTITIONS
+        }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 #endif  // CONFIG_SDP
         }
       }
@@ -2635,22 +2653,44 @@ static void init_partition_search_state_params(
   // Partition cost buffer update
   ModeCosts *mode_costs = &x->mode_costs;
 #if CONFIG_EXT_RECUR_PARTITIONS
+  const bool is_middle_block =
+      pc_tree->parent && (pc_tree->parent->horizontal3[1] == pc_tree ||
+                          pc_tree->parent->vertical3[1] == pc_tree);
+  const bool limit_rect_split = is_middle_block &&
+                                is_bsize_geq(bsize, BLOCK_8X8) &&
+                                is_bsize_geq(BLOCK_64X64, bsize);
   const int pl = part_search_state->pl_ctx_idx;
   if (is_square_block(bsize)) {
+    if (limit_rect_split) {
+      const PARTITION_TYPE parent_part =
+          (pc_tree->parent->horizontal3[1] == pc_tree) ? PARTITION_HORZ_3
+                                                       : PARTITION_VERT_3;
+      const int dir = (parent_part == PARTITION_HORZ_3) ? 0 : 1;
+      for (PARTITION_TYPE p = PARTITION_NONE; p < EXT_PARTITION_TYPES; ++p) {
+        const int symbol = get_symbol_from_limited_partition(p, parent_part);
+        if (symbol == PARTITION_INVALID_REC) {
+          part_search_state->partition_cost_table[p] = INT_MAX;
+        } else {
+          part_search_state->partition_cost_table[p] =
 #if CONFIG_SDP
-    part_search_state->partition_cost =
-        mode_costs->partition_cost[xd->tree_type == CHROMA_PART][pl];
+              mode_costs->limited_partition_cost[xd->tree_type == CHROMA_PART]
+                                                [dir][pl][symbol];
 #else
-    part_search_state->partition_cost = mode_costs->partition_cost[pl];
+              mode_costs->limited_partition_cost[dir][pl][symbol];
 #endif  // CONFIG_SDP
+        }
+        part_search_state->partition_cost =
+            part_search_state->partition_cost_table;
+      }
+    } else {
+#if CONFIG_SDP
+      part_search_state->partition_cost =
+          mode_costs->partition_cost[xd->tree_type == CHROMA_PART][pl];
+#else
+      part_search_state->partition_cost = mode_costs->partition_cost[pl];
+#endif  // CONFIG_SDP
+    }
   } else {
-    const bool is_middle_block =
-        pc_tree->parent && (pc_tree->parent->horizontal3[1] == pc_tree ||
-                            pc_tree->parent->vertical3[1] == pc_tree);
-    const bool limit_rect_split = is_middle_block &&
-                                  is_bsize_geq(bsize, BLOCK_8X8) &&
-                                  is_bsize_geq(BLOCK_64X64, bsize);
-
     for (PARTITION_TYPE p = PARTITION_NONE; p < EXT_PARTITION_TYPES; ++p) {
       PARTITION_TYPE_REC p_rec = get_symbol_from_partition_rec_block(bsize, p);
       if (limit_rect_split) {

@@ -11,6 +11,7 @@
 
 #include "aom_ports/system_state.h"
 
+#include "av1/common/enums.h"
 #include "av1/common/reconintra.h"
 
 #include "av1/encoder/encoder.h"
@@ -1335,6 +1336,25 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                        ctx_tr->partition_cdf[plane_index][i], 8, CDF_SIZE(10));
       }
     }
+#if CONFIG_EXT_RECUR_PARTITIONS
+    for (int dir = 0; dir < NUM_LIMITED_PARTITION_PARENTS; dir++) {
+      for (int i = 0; i < PARTITION_CONTEXTS; i++) {
+        if (i < 4) {
+          AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                         ctx_tr->limited_partition_cdf[plane_index][dir][i], 2,
+                         CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+        } else if (i < 16) {
+          AVERAGE_CDF(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                      ctx_tr->limited_partition_cdf[plane_index][dir][i],
+                      LIMITED_EXT_PARTITION_TYPES);
+        } else {
+          AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                         ctx_tr->limited_partition_cdf[plane_index][dir][i], 2,
+                         CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+        }
+      }
+    }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   }
 #else
   for (int i = 0; i < PARTITION_CONTEXTS; i++) {
@@ -1348,6 +1368,25 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                      CDF_SIZE(10));
     }
   }
+#if CONFIG_EXT_RECUR_PARTITIONS
+  for (int dir = 0; dir < NUM_LIMITED_PARTITION_PARENTS; dir++) {
+    for (int i = 0; i < PARTITION_CONTEXTS; i++) {
+      if (i < 4) {
+        AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[dir][i],
+                       ctx_tr->limited_partition_cdf[dir][i], 2,
+                       CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+      } else if (i < 16) {
+        AVERAGE_CDF(ctx_left->limited_partition_cdf[dir][i],
+                    ctx_tr->limited_partition_cdf[dir][i],
+                    LIMITED_EXT_PARTITION_TYPES);
+      } else {
+        AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[dir][i],
+                       ctx_tr->limited_partition_cdf[dir][i], 2,
+                       CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+      }
+    }
+  }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 #endif  // CONFIG_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int i = 0; i < PARTITION_CONTEXTS_REC; ++i) {

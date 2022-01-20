@@ -14,6 +14,7 @@
 
 #include "av1/common/entropy.h"
 #include "av1/common/entropymv.h"
+#include "av1/common/enums.h"
 #include "av1/common/filter.h"
 #include "av1/common/seg_common.h"
 #include "aom_dsp/aom_filter.h"
@@ -159,8 +160,19 @@ typedef struct frame_contexts {
 #if CONFIG_SDP
   aom_cdf_prob partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                             [CDF_SIZE(EXT_PARTITION_TYPES)];
+#if CONFIG_EXT_RECUR_PARTITIONS
+  aom_cdf_prob limited_partition_cdf[PARTITION_STRUCTURE_NUM]
+                                    [NUM_LIMITED_PARTITION_PARENTS]
+                                    [PARTITION_CONTEXTS]
+                                    [CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)];
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 #else
   aom_cdf_prob partition_cdf[PARTITION_CONTEXTS][CDF_SIZE(EXT_PARTITION_TYPES)];
+#if CONFIG_EXT_RECUR_PARTITIONS
+  aom_cdf_prob limited_partition_cdf[NUM_LIMITED_PARTITION_PARENTS]
+                                    [PARTITION_CONTEXTS]
+                                    [CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)];
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 #endif  // CONFIG_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
   aom_cdf_prob partition_rec_cdf[PARTITION_CONTEXTS_REC]

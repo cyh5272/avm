@@ -1722,8 +1722,20 @@ static PARTITION_TYPE read_partition(MACROBLOCKD *xd, int mi_row, int mi_col,
       aom_cdf_prob *partition_cdf = ec_ctx->partition_cdf[ctx];
 #endif  // CONFIG_SDP
 
-      return (PARTITION_TYPE)aom_read_symbol(
-          r, partition_cdf, partition_cdf_length(bsize), ACCT_STR);
+      if (limit_rect_split) {
+        const int dir_index = parent_partition == PARTITION_HORZ_3 ? 0 : 1;
+#if CONFIG_SDP
+        partition_cdf = ec_ctx->limited_partition_cdf[plane][dir_index][ctx];
+#else
+        partition_cdf = ec_ctx->limited_partition_cdf[dir_index][ctx];
+#endif  // CONFIG_SDP
+        const int symbol = aom_read_symbol(
+            r, partition_cdf, limited_partition_cdf_length(bsize), ACCT_STR);
+        return get_limited_partition_from_symbol(symbol, parent_partition);
+      } else {
+        return (PARTITION_TYPE)aom_read_symbol(
+            r, partition_cdf, partition_cdf_length(bsize), ACCT_STR);
+      }
     } else {  // !has_rows && !has_cols
       aom_cdf_prob cdf[2] = { 16384, AOM_ICDF(CDF_PROB_TOP) };
       return aom_read_cdf(r, cdf, 2, ACCT_STR) ? PARTITION_VERT

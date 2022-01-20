@@ -12,6 +12,7 @@
 #include "aom_mem/aom_mem.h"
 
 #include "av1/common/av1_common_int.h"
+#include "av1/common/enums.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/scan.h"
 #include "av1/common/seg_common.h"
@@ -320,6 +321,128 @@ static const aom_cdf_prob
                                       { AOM_CDF3(1736, 12989) },
                                   } };
 #endif  // ERP_LIMIT_PARTITION3_128
+static const aom_cdf_prob default_limited_partition_cdf
+    [PARTITION_STRUCTURE_NUM][NUM_LIMITED_PARTITION_PARENTS][PARTITION_CONTEXTS]
+    [CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)] = {
+      // Luma/Shared
+      { // HORZ_3
+        {
+            // 8x8
+            { AOM_CDF2(25550) },
+            { AOM_CDF2(21449) },
+            { AOM_CDF2(22555) },
+            { AOM_CDF2(21203) },
+            // 16x16
+            { AOM_CDF4(16588, 25114, 28722) },
+            { AOM_CDF4(9278, 24469, 27548) },
+            { AOM_CDF4(11426, 20208, 26964) },
+            { AOM_CDF4(7824, 19743, 25593) },
+            // 32x32
+            { AOM_CDF4(13817, 23073, 27376) },
+            { AOM_CDF4(7015, 22595, 26496) },
+            { AOM_CDF4(9045, 20272, 27145) },
+            { AOM_CDF4(5801, 19459, 26140) },
+            // 64x64
+            { AOM_CDF4(22701, 28594, 30572) },
+            { AOM_CDF4(7745, 23851, 27711) },
+            { AOM_CDF4(9203, 21547, 28271) },
+            { AOM_CDF4(5150, 21852, 28083) },
+            // 128x128
+            { AOM_CDF2(27175) },  // Unused
+            { AOM_CDF2(11141) },  // Unused
+            { AOM_CDF2(15312) },  // Unused
+            { AOM_CDF2(7362) },   // Unused
+        },
+        // VERT_3
+        {
+
+            // 8x8
+            { AOM_CDF2(24114) },
+            { AOM_CDF2(20966) },
+            { AOM_CDF2(18259) },
+            { AOM_CDF2(17964) },
+            // 16x16
+            { AOM_CDF4(16315, 25657, 28992) },
+            { AOM_CDF4(11233, 20561, 25595) },
+            { AOM_CDF4(8724, 25612, 29666) },
+            { AOM_CDF4(7346, 20698, 26070) },
+            // 32x32
+            { AOM_CDF4(13603, 23502, 27591) },
+            { AOM_CDF4(8550, 19528, 24964) },
+            { AOM_CDF4(7448, 23466, 28742) },
+            { AOM_CDF4(6276, 18508, 25664) },
+            // 64x64
+            { AOM_CDF4(22750, 28494, 30521) },
+            { AOM_CDF4(8951, 21439, 26505) },
+            { AOM_CDF4(8126, 23701, 29348) },
+            { AOM_CDF4(4980, 22191, 28252) },
+            // 128x128
+            { AOM_CDF2(27774) },
+            { AOM_CDF2(16584) },
+            { AOM_CDF2(15476) },
+            { AOM_CDF2(11625) },
+
+        } },
+      // Chroma
+      { // HORZ_3
+        {
+            // 8x8
+            { AOM_CDF2(25550) },
+            { AOM_CDF2(21449) },
+            { AOM_CDF2(22555) },
+            { AOM_CDF2(21203) },
+            // 16x16
+            { AOM_CDF4(16588, 25114, 28722) },
+            { AOM_CDF4(9278, 24469, 27548) },
+            { AOM_CDF4(11426, 20208, 26964) },
+            { AOM_CDF4(7824, 19743, 25593) },
+            // 32x32
+            { AOM_CDF4(13817, 23073, 27376) },
+            { AOM_CDF4(7015, 22595, 26496) },
+            { AOM_CDF4(9045, 20272, 27145) },
+            { AOM_CDF4(5801, 19459, 26140) },
+            // 64x64
+            { AOM_CDF4(22701, 28594, 30572) },
+            { AOM_CDF4(7745, 23851, 27711) },
+            { AOM_CDF4(9203, 21547, 28271) },
+            { AOM_CDF4(5150, 21852, 28083) },
+            // 128x128
+            { AOM_CDF2(27175) },  // Unused
+            { AOM_CDF2(11141) },  // Unused
+            { AOM_CDF2(15312) },  // Unused
+            { AOM_CDF2(7362) },   // Unused
+        },
+        // VERT_3
+        {
+
+            // 8x8
+            { AOM_CDF2(24114) },
+            { AOM_CDF2(20966) },
+            { AOM_CDF2(18259) },
+            { AOM_CDF2(17964) },
+            // 16x16
+            { AOM_CDF4(16315, 25657, 28992) },
+            { AOM_CDF4(11233, 20561, 25595) },
+            { AOM_CDF4(8724, 25612, 29666) },
+            { AOM_CDF4(7346, 20698, 26070) },
+            // 32x32
+            { AOM_CDF4(13603, 23502, 27591) },
+            { AOM_CDF4(8550, 19528, 24964) },
+            { AOM_CDF4(7448, 23466, 28742) },
+            { AOM_CDF4(6276, 18508, 25664) },
+            // 64x64
+            { AOM_CDF4(22750, 28494, 30521) },
+            { AOM_CDF4(8951, 21439, 26505) },
+            { AOM_CDF4(8126, 23701, 29348) },
+            { AOM_CDF4(4980, 22191, 28252) },
+            // 128x128
+            { AOM_CDF2(27774) },
+            { AOM_CDF2(16584) },
+            { AOM_CDF2(15476) },
+            { AOM_CDF2(11625) },
+
+        } }
+    };
 #elif CONFIG_SDP
 static const aom_cdf_prob
     default_partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS][CDF_SIZE(
@@ -422,6 +545,69 @@ static const aom_cdf_prob
       { AOM_CDF3(9603, 21021) },
       { AOM_CDF3(1736, 12989) },
     };
+static const aom_cdf_prob
+    default_limited_partition_cdf[NUM_LIMITED_PARTITION_PARENTS]
+                                 [PARTITION_CONTEXTS]
+                                 [CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)] = {
+                                   // HORZ_3
+                                   {
+                                       // 8x8
+                                       { AOM_CDF2(25550) },
+                                       { AOM_CDF2(21449) },
+                                       { AOM_CDF2(22555) },
+                                       { AOM_CDF2(21203) },
+                                       // 16x16
+                                       { AOM_CDF4(16588, 25114, 28722) },
+                                       { AOM_CDF4(9278, 24469, 27548) },
+                                       { AOM_CDF4(11426, 20208, 26964) },
+                                       { AOM_CDF4(7824, 19743, 25593) },
+                                       // 32x32
+                                       { AOM_CDF4(13817, 23073, 27376) },
+                                       { AOM_CDF4(7015, 22595, 26496) },
+                                       { AOM_CDF4(9045, 20272, 27145) },
+                                       { AOM_CDF4(5801, 19459, 26140) },
+                                       // 64x64
+                                       { AOM_CDF4(22701, 28594, 30572) },
+                                       { AOM_CDF4(7745, 23851, 27711) },
+                                       { AOM_CDF4(9203, 21547, 28271) },
+                                       { AOM_CDF4(5150, 21852, 28083) },
+                                       // 128x128
+                                       { AOM_CDF2(27175) },  // Unused
+                                       { AOM_CDF2(11141) },  // Unused
+                                       { AOM_CDF2(15312) },  // Unused
+                                       { AOM_CDF2(7362) },   // Unused
+                                   },
+                                   // VERT_3
+                                   {
+
+                                       // 8x8
+                                       { AOM_CDF2(24114) },
+                                       { AOM_CDF2(20966) },
+                                       { AOM_CDF2(18259) },
+                                       { AOM_CDF2(17964) },
+                                       // 16x16
+                                       { AOM_CDF4(16315, 25657, 28992) },
+                                       { AOM_CDF4(11233, 20561, 25595) },
+                                       { AOM_CDF4(8724, 25612, 29666) },
+                                       { AOM_CDF4(7346, 20698, 26070) },
+                                       // 32x32
+                                       { AOM_CDF4(13603, 23502, 27591) },
+                                       { AOM_CDF4(8550, 19528, 24964) },
+                                       { AOM_CDF4(7448, 23466, 28742) },
+                                       { AOM_CDF4(6276, 18508, 25664) },
+                                       // 64x64
+                                       { AOM_CDF4(22750, 28494, 30521) },
+                                       { AOM_CDF4(8951, 21439, 26505) },
+                                       { AOM_CDF4(8126, 23701, 29348) },
+                                       { AOM_CDF4(4980, 22191, 28252) },
+                                       // 128x128
+                                       { AOM_CDF2(27774) },
+                                       { AOM_CDF2(16584) },
+                                       { AOM_CDF2(15476) },
+                                       { AOM_CDF2(11625) },
+
+                                   },
+                                 };
 #else  // !CONFIG_EXT_RECUR_PARTITIONS && !CONFIG_SDP
 static const aom_cdf_prob default_partition_cdf[PARTITION_CONTEXTS][CDF_SIZE(
     EXT_PARTITION_TYPES)] = {
@@ -1639,6 +1825,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
   av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
   av1_copy(fc->partition_cdf, default_partition_cdf);
 #if CONFIG_EXT_RECUR_PARTITIONS
+  av1_copy(fc->limited_partition_cdf, default_limited_partition_cdf);
   av1_copy(fc->partition_rec_cdf, default_partition_rec_cdf);
   av1_copy(fc->partition_middle_rec_cdf, default_partition_middle_rec_cdf);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
