@@ -188,7 +188,7 @@ static int wedge_index_cost(const ModeCosts *mode_costs, BLOCK_SIZE bsize,
   if (category == 0) {
     cost += mode_costs->wedge_idx_cost[bsize][wedge_index];
   } else {
-    cost += mode_costs->wedge_idx_cost[bsize][wedge_index - MAX_WEDGE_TYPES];
+    cost += mode_costs->wedge_idx2_cost[bsize][wedge_index - MAX_WEDGE_TYPES];
   }
   return cost;
 }

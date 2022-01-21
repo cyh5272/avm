@@ -1705,7 +1705,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                            ec_ctx->wedge_interintra_cdf[bsize], 2);
           if (mbmi->use_wedge_interintra) {
             const int wedge_category =
-                (mbmi->interintra_wedge_index > MAX_WEDGE_TYPES);
+                (mbmi->interintra_wedge_index >= MAX_WEDGE_TYPES);
             aom_write_symbol(w, wedge_category,
                              ec_ctx->wedge_category_cdf[bsize], 2);
             if (wedge_category == 0) {

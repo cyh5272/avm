@@ -1251,7 +1251,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                        mbmi->use_wedge_interintra, 2);
             if (mbmi->use_wedge_interintra) {
               const int8_t category =
-                  mbmi->interintra_wedge_index > MAX_WEDGE_TYPES;
+                  mbmi->interintra_wedge_index >= MAX_WEDGE_TYPES;
 #if CONFIG_ENTROPY_STATS
               counts->wedge_category[bsize][category]++;
 #endif
