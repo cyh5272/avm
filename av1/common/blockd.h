@@ -12,7 +12,6 @@
 #ifndef AOM_AV1_COMMON_BLOCKD_H_
 #define AOM_AV1_COMMON_BLOCKD_H_
 
-#include "av1/common/enums.h"
 #include "config/aom_config.h"
 
 #include "aom_dsp/aom_dsp_common.h"

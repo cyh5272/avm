@@ -13,7 +13,6 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "av1/common/enums.h"
 #include "config/av1_rtcd.h"
 
 #include "aom_dsp/aom_dsp_common.h"

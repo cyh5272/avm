@@ -12,7 +12,6 @@
 #include "aom_mem/aom_mem.h"
 
 #include "av1/common/av1_common_int.h"
-#include "av1/common/enums.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/scan.h"
 #include "av1/common/seg_common.h"

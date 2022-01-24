@@ -9,7 +9,6 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include "av1/common/enums.h"
 #include "config/aom_config.h"
 
 #include "aom/aom_integer.h"

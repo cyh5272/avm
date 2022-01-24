@@ -14,7 +14,6 @@
 
 #include "av1/common/entropy.h"
 #include "av1/common/entropymv.h"
-#include "av1/common/enums.h"
 #include "av1/common/filter.h"
 #include "av1/common/seg_common.h"
 #include "aom_dsp/aom_filter.h"
