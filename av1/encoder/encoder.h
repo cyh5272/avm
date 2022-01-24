@@ -1210,8 +1210,8 @@ typedef struct FRAME_COUNTS {
                                   [INTER_COMPOUND_MODES];
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   unsigned int wedge_category[BLOCK_SIZES_ALL][2];
-  unsigned int wedge_idx[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES];
-  unsigned int wedge_idx2[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES2];
+  unsigned int wedge_idx[BLOCK_SIZES_ALL][16];  // MAX_WEDGE_TYPES
+  unsigned int wedge_idx2[BLOCK_SIZES_ALL][2];  // MAX_WEDGE_TYPES2
   unsigned int interintra[BLOCK_SIZE_GROUPS][2];
   unsigned int interintra_mode[BLOCK_SIZE_GROUPS][INTERINTRA_MODES];
   unsigned int wedge_interintra[BLOCK_SIZES_ALL][2];
