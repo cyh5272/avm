@@ -2095,9 +2095,12 @@ static AOM_INLINE void setup_segmentation(AV1_COMMON *const cm,
 
 #if CONFIG_CNN_RESTORATION
 static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
-  if (av1_use_cnn(cm)) {
+  if (av1_allow_cnn(cm)) {
     for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
-      cm->use_cnn[plane] = aom_rb_read_bit(rb);
+      if (av1_allow_cnn_for_plane(cm, plane))
+        cm->use_cnn[plane] = aom_rb_read_bit(rb);
+      else
+        cm->use_cnn[plane] = 0;
     }
   } else {
     memset(cm->use_cnn, 0, sizeof(cm->use_cnn));
