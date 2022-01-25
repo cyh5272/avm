@@ -677,7 +677,7 @@ static const aom_cdf_prob
 #else
 static const aom_cdf_prob
     default_inter_compound_mode_cdf[INTER_COMPOUND_MODE_CONTEXTS]
-                                   [CDF_SIZE(INTER_COMPOUND_REF_TYPES)] = {
+                                   [CDF_SIZE(INTER_COMPOUND_MODES)] = {
 #endif
                                      { AOM_CDF5(10510, 17103, 22330, 24536) },
                                      { AOM_CDF5(14805, 20117, 24655, 25891) },

@@ -3198,7 +3198,7 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   // How many steps to take. A round of 0 means fullpel search only, 1 means
   // half-pel, and so on.
-  int round = AOMMIN(FULL_PEL - forced_stop, 3 - !allow_hp);
+  int round = AOMMIN(FULL_PEL - forced_stop, FULL_PEL - !allow_hp);
   if (cm->features.cur_frame_force_integer_mv) round = 0;
   int hstep = 8 >> round;  // Step size, initialized to 4/8=1/2 pel
 
@@ -3222,9 +3222,10 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     { +1, 0 }   // down
   };
 
-  for (int iter = hstep; iter <= 8 * 32;) {
+  for (int iter = hstep; iter <= 256;) {
     int dummy = 0;
     MV candidate_mv[2];
+    // loop 4 directions, left, right, above, and right
     for (int i = 0; i < 4; ++i) {
       const MV cur_mvd = { cand_pos[i][0] * iter, cand_pos[i][1] * iter };
       candidate_mv[0].row = iter_center_mv.row + cur_mvd.row;
@@ -3245,20 +3246,20 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     // allow integer and fractional MVD in (0,1]
     if (iter < 8) iter += hstep;
     // only allow integer MVD in (1,2]
-    else if (iter < 2 * 8)
+    else if (iter < 16)
       iter += 8;
     // only allow 4 integer MVD in (2,4]
-    else if (iter < 4 * 8)
-      iter += 8 * 2;
+    else if (iter < 32)
+      iter += 16;
     // only allow 8 sample integer MVD in (4,8]
-    else if (iter < 8 * 8)
-      iter += 8 * 4;
+    else if (iter < 64)
+      iter += 32;
     // only allow 16 sample integer MVD in (8,16]
-    else if (iter < 8 * 16)
-      iter += 8 * 8;
+    else if (iter < 128)
+      iter += 64;
     // only allow 32 sample integer MVD in (16,32]
     else
-      iter += 8 * 16;
+      iter += 128;
   }
   return besterr;
 }

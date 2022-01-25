@@ -820,15 +820,15 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
   mv_costs->nmv_cost_hp[0] = &mv_costs->nmv_cost_hp_alloc[0][MV_MAX];
   mv_costs->nmv_cost_hp[1] = &mv_costs->nmv_cost_hp_alloc[1][MV_MAX];
 #if CONFIG_ADAPTIVE_MVD
-  mv_costs->res_nmv_cost[0] = &mv_costs->amvd_nmv_cost_alloc[0][MV_MAX];
-  mv_costs->res_nmv_cost[1] = &mv_costs->amvd_nmv_cost_alloc[1][MV_MAX];
-  mv_costs->res_nmv_cost_hp[0] = &mv_costs->amvd_nmv_cost_hp_alloc[0][MV_MAX];
-  mv_costs->res_nmv_cost_hp[1] = &mv_costs->amvd_nmv_cost_hp_alloc[1][MV_MAX];
+  mv_costs->amvd_nmv_cost[0] = &mv_costs->amvd_nmv_cost_alloc[0][MV_MAX];
+  mv_costs->amvd_nmv_cost[1] = &mv_costs->amvd_nmv_cost_alloc[1][MV_MAX];
+  mv_costs->amvd_nmv_cost_hp[0] = &mv_costs->amvd_nmv_cost_hp_alloc[0][MV_MAX];
+  mv_costs->amvd_nmv_cost_hp[1] = &mv_costs->amvd_nmv_cost_hp_alloc[1][MV_MAX];
 #endif  // CONFIG_ADAPTIVE_MVD
   if (integer_mv) {
     mv_costs->mv_cost_stack = (int **)&mv_costs->nmv_cost;
 #if CONFIG_ADAPTIVE_MVD
-    mv_costs->amvd_mv_cost_stack = (int **)&mv_costs->res_nmv_cost;
+    mv_costs->amvd_mv_cost_stack = (int **)&mv_costs->amvd_nmv_cost;
 #endif  // CONFIG_ADAPTIVE_MVD
     av1_build_nmv_cost_table(
         mv_costs->nmv_joint_cost,
@@ -841,7 +841,7 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
         usehp ? mv_costs->nmv_cost_hp : mv_costs->nmv_cost;
 #if CONFIG_ADAPTIVE_MVD
     mv_costs->amvd_mv_cost_stack =
-        usehp ? mv_costs->res_nmv_cost_hp : mv_costs->res_nmv_cost;
+        usehp ? mv_costs->amvd_nmv_cost_hp : mv_costs->amvd_nmv_cost;
 #endif  // CONFIG_ADAPTIVE_MVD
     av1_build_nmv_cost_table(mv_costs->nmv_joint_cost,
 #if CONFIG_ADAPTIVE_MVD
@@ -1349,11 +1349,7 @@ int av1_get_switchable_rate(const MACROBLOCK *x, const MACROBLOCKD *xd,
   if (interp_filter == SWITCHABLE) {
     const MB_MODE_INFO *const mbmi = xd->mi[0];
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-    assert(mbmi->mode <= JOINT_NEWMV);
-#else
-    assert(mbmi->mode <= NEW_NEWMV);
-#endif  // CONFIG_JOINT_MVD
+    assert(mbmi->mode < NEAR_NEARMV_OPTFLOW);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     const int ctx = av1_get_pred_context_switchable_interp(xd, 0);
     const int inter_filter_cost =

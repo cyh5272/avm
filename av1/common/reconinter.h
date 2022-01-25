@@ -580,12 +580,8 @@ static INLINE void set_default_interp_filters(
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     InterpFilter frame_interp_filter) {
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
   mbmi->interp_fltr =
-      (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi))
-#else
-  mbmi->interp_fltr = (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
-#endif  // CONFIG_JOINT_MVD
+      (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))
           ? MULTITAP_SHARP
           : av1_unswitchable_filter(frame_interp_filter);
 #else
@@ -599,12 +595,9 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   if (mbmi->skip_mode) return 0;
 #if CONFIG_OPTFLOW_REFINEMENT
-    // No interpolation filter search when optical flow MV refinement is used.
-#if CONFIG_JOINT_MVD
-  if (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi)) return 0;
-#else
-  if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) return 0;
-#endif  // CONFIG_JOINT_MVD
+  // No interpolation filter search when optical flow MV refinement is used.
+  if (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))
+    return 0;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   if (mbmi->motion_mode == WARPED_CAUSAL) return 0;
   if (is_nontrans_global_motion(xd, xd->mi[0])) return 0;

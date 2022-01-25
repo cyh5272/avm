@@ -185,11 +185,7 @@ static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
 #if CONFIG_OPTFLOW_REFINEMENT
   if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
       is_opfl_refine_allowed(cm, mbmi)) {
-#if CONFIG_JOINT_MVD
-    const int use_optical_flow = mode > JOINT_NEWMV;
-#else
-    const int use_optical_flow = mode > NEW_NEWMV;
-#endif  // CONFIG_JOINT_MVD
+    const int use_optical_flow = mode >= NEAR_NEARMV_OPTFLOW;
     aom_write_symbol(w, use_optical_flow,
                      xd->tile_ctx->use_optflow_cdf[mode_ctx], 2);
   }
@@ -893,18 +889,10 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
   }
   if (cm->features.interp_filter == SWITCHABLE) {
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-    if (mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi)) {
-#else
-    if (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi)) {
-#endif  // CONFIG_JOINT_MVD
-#if CONFIG_JOINT_MVD
-      assert(IMPLIES(mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi),
-                     mbmi->interp_fltr == MULTITAP_SHARP));
-#else
-      assert(IMPLIES(mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi),
-                     mbmi->interp_fltr == MULTITAP_SHARP));
-#endif  // CONFIG_JOINT_MVD
+    if (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi)) {
+      assert(IMPLIES(
+          mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi),
+          mbmi->interp_fltr == MULTITAP_SHARP));
       return;
     }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1792,11 +1780,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       // group Group A (0): dist_wtd_comp, compound_average Group B (1):
       // interintra, compound_diffwtd, wedge
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-    if (has_second_ref(mbmi) && mbmi->mode <= JOINT_NEWMV) {
-#else
-    if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
-#endif  // CONFIG_JOINT_MVD
+    if (has_second_ref(mbmi) && mbmi->mode < NEAR_NEARMV_OPTFLOW) {
 #else
     if (has_second_ref(mbmi)) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT

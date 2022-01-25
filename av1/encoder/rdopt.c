@@ -1024,11 +1024,7 @@ static int cost_mv_ref(const ModeCosts *const mode_costs, PREDICTION_MODE mode,
     int use_optical_flow_cost = 0;
     if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
         is_opfl_refine_allowed(cm, mbmi)) {
-#if CONFIG_JOINT_MVD
-      const int use_optical_flow = mode > JOINT_NEWMV;
-#else
-      const int use_optical_flow = mode > NEW_NEWMV;
-#endif  // CONFIG_JOINT_MVD
+      const int use_optical_flow = mode >= NEAR_NEARMV_OPTFLOW;
       use_optical_flow_cost =
           mode_costs->use_optflow_cost[mode_context][use_optical_flow];
     }
@@ -3528,11 +3524,7 @@ static int64_t handle_inter_mode(
     // Compute modelled RD if enabled
     if (args->modelled_rd != NULL) {
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-      if (is_comp_pred && this_mode <= JOINT_NEWMV) {
-#else
-      if (is_comp_pred && this_mode <= NEW_NEWMV) {
-#endif  // CONFIG_JOINT_MVD
+      if (is_comp_pred && this_mode < NEAR_NEARMV_OPTFLOW) {
 #else
       if (is_comp_pred) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -5546,11 +5538,7 @@ static int skip_inter_mode(AV1_COMP *cpi, MACROBLOCK *x, const BLOCK_SIZE bsize,
   // modes
   if (sf->inter_sf.prune_comp_search_by_single_result > 0 &&
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-      this_mode <= JOINT_NEWMV &&
-#else
-      this_mode <= NEW_NEWMV &&
-#endif  // CONFIG_JOINT_MVD
+      this_mode < NEAR_NEARMV_OPTFLOW &&
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       comp_pred) {
     if (compound_skip_by_single_states(cpi, args->search_state, this_mode,
@@ -6023,22 +6011,14 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_OPTFLOW_REFINEMENT
     // Optical flow compound modes are only enabled with enable_order_hint
     // and when prediction is bi-directional
-#if CONFIG_JOINT_MVD
-    if (this_mode > JOINT_NEWMV &&
-#else
-    if (this_mode > NEW_NEWMV &&
-#endif  // CONFIG_JOINT_MVD
+    if (this_mode >= NEAR_NEARMV_OPTFLOW &&
         (!cm->seq_params.order_hint_info.enable_order_hint ||
          !has_second_ref(mbmi) || !is_opfl_refine_allowed(cm, mbmi)))
       continue;
     // In REFINE_ALL, optical flow refinement has been applied to regular
     // compound modes.
     if (cm->features.opfl_refine_type == REFINE_ALL &&
-#if CONFIG_JOINT_MVD
-        (this_mode > JOINT_NEWMV || this_mode == GLOBAL_GLOBALMV))
-#else
-        (this_mode > NEW_NEWMV || this_mode == GLOBAL_GLOBALMV))
-#endif  // CONFIG_JOINT_MVD
+        (this_mode >= NEAR_NEARMV_OPTFLOW || this_mode == GLOBAL_GLOBALMV))
       continue;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 

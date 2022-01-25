@@ -35,6 +35,7 @@ macro(fix_experiment_configs)
   # off CONFIG_IST_FIX_B076.
   if(NOT CONFIG_IST AND CONFIG_IST_FIX_B076)
     change_config_and_warn(CONFIG_IST_FIX_B076 0 !CONFIG_IST)
+  endif()
   # CONFIG_ADAPTIVE_MVD requires CONFIG_NEW_INTER_MODES. If
   # CONFIG_NEW_INTER_MODES is off, we also turn off CONFIG_ADAPTIVE_MVD.
   if(NOT CONFIG_NEW_INTER_MODES AND CONFIG_ADAPTIVE_MVD)

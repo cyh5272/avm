@@ -123,11 +123,7 @@ static INLINE int get_switchable_rate(MACROBLOCK *const x,
 #if CONFIG_OPTFLOW_REFINEMENT
   // When optical flow refinement is used, interp filter type is always set
   // to MULTITAP_SHARP, and thus is not switchable.
-#if CONFIG_JOINT_MVD
-  assert(x->e_mbd.mi[0]->mode <= JOINT_NEWMV);
-#else
-  assert(x->e_mbd.mi[0]->mode <= NEW_NEWMV);
-#endif  // CONFIG_JOINT_MVD
+  assert(x->e_mbd.mi[0]->mode < NEAR_NEARMV_OPTFLOW);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   const int inter_filter_cost =
       x->mode_costs.switchable_interp_costs[ctx[0]][interp_fltr];
@@ -470,17 +466,10 @@ int64_t av1_interpolation_filter_search(
   }
   if (!need_search) {
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
     assert(mbmi->interp_fltr ==
-           ((mbmi->mode > JOINT_NEWMV || use_opfl_refine_all(cm, mbmi))
+           ((mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))
                 ? MULTITAP_SHARP
                 : EIGHTTAP_REGULAR));
-#else
-    assert(mbmi->interp_fltr ==
-           ((mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
-                ? MULTITAP_SHARP
-                : EIGHTTAP_REGULAR));
-#endif  // CONFIG_JOINT_MVD
 #else
     assert(mbmi->interp_fltr == EIGHTTAP_REGULAR);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -488,11 +477,7 @@ int64_t av1_interpolation_filter_search(
   }
   if (args->modelled_rd != NULL) {
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-    if (has_second_ref(mbmi) && mbmi->mode <= JOINT_NEWMV &&
-#else
-    if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV &&
-#endif  // CONFIG_JOINT_MVD
+    if (has_second_ref(mbmi) && mbmi->mode < NEAR_NEARMV_OPTFLOW &&
         !use_opfl_refine_all(cm, mbmi)) {
 #else
     if (has_second_ref(mbmi)) {

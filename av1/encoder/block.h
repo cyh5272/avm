@@ -887,10 +887,10 @@ typedef struct {
   //! Points to the middle of \ref nmv_cost_hp_alloc
   int *nmv_cost_hp[2];
 #if CONFIG_ADAPTIVE_MVD
-  //! Points to the middle of \ref nmv_cost_alloc
-  int *res_nmv_cost[2];
-  //! Points to the middle of \ref nmv_cost_hp_alloc
-  int *res_nmv_cost_hp[2];
+  //! Points to the middle of \ref amvd_nmv_cost_alloc
+  int *amvd_nmv_cost[2];
+  //! Points to the middle of \ref amvd_nmv_cost_hp_alloc
+  int *amvd_nmv_cost_hp[2];
 #endif  // CONFIG_ADAPTIVE_MVD
   //! Points to the nmv_cost_hp in use.
   int **mv_cost_stack;

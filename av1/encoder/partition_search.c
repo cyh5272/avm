@@ -1297,11 +1297,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-      if (has_second_ref(mbmi) && mbmi->mode <= JOINT_NEWMV) {
-#else
-      if (has_second_ref(mbmi) && mbmi->mode <= NEW_NEWMV) {
-#endif  // CONFIG_JOINT_MVD
+      if (has_second_ref(mbmi) && mbmi->mode < NEAR_NEARMV_OPTFLOW) {
 #else
       if (has_second_ref(mbmi)) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1359,11 +1355,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_OPTFLOW_REFINEMENT
       if (cm->features.opfl_refine_type == REFINE_SWITCHABLE &&
           is_opfl_refine_allowed(cm, mbmi)) {
-#if CONFIG_JOINT_MVD
-        const int use_optical_flow = mode > JOINT_NEWMV;
-#else
-        const int use_optical_flow = mode > NEW_NEWMV;
-#endif  // CONFIG_JOINT_MVD
+        const int use_optical_flow = mode >= NEAR_NEARMV_OPTFLOW;
 #if CONFIG_ENTROPY_STATS
         ++counts->use_optflow[mode_ctx][use_optical_flow];
 #endif

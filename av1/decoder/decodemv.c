@@ -2126,11 +2126,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 
   if (has_second_ref(mbmi) &&
 #if CONFIG_OPTFLOW_REFINEMENT
-#if CONFIG_JOINT_MVD
-      mbmi->mode <= JOINT_NEWMV &&
-#else
-      mbmi->mode <= NEW_NEWMV &&
-#endif  // CONFIG_JOINT_MVD
+      mbmi->mode < NEAR_NEARMV_OPTFLOW &&
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       !mbmi->skip_mode) {
     // Read idx to indicate current compound inter prediction mode group
