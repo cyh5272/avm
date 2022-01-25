@@ -2130,6 +2130,7 @@ static void pick_and_apply_loop_restoration(AV1_COMP *cpi, AV1_COMMON *cm) {
 static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
                                    MACROBLOCKD *xd, bool use_restoration,
                                    bool use_cdef) {
+  const int num_planes = av1_num_planes(cm);
 #if CONFIG_CCSO
   uint16_t *rec_uv[2];
   uint16_t *org_uv[2];
@@ -2139,7 +2140,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
   int ref_stride;
   const int use_ccso = !cm->features.coded_lossless && !cm->tiles.large_scale &&
                        cm->seq_params.enable_ccso;
-  const int num_planes = av1_num_planes(cm);
   av1_setup_dst_planes(xd->plane, cm->seq_params.sb_size, &cm->cur_frame->buf,
                        0, 0, 0, num_planes);
   const int ccso_stride = xd->plane[0].dst.width;
@@ -2265,7 +2265,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 #if CONFIG_CNN_RESTORATION
     if (av1_use_cnn_encode(cm,
                            cpi->gf_group.update_type[cpi->gf_group.index])) {
-      const int num_planes = av1_num_planes(cm);
       // Save unfiltered frame.
       yv12_copy_all_planes(&cm->cur_frame->buf, &cpi->last_frame_uf,
                            num_planes);
@@ -2276,7 +2275,11 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
                      cm->seq_params.use_highbitdepth, dgd_errors, num_planes);
 
       // Try CNN restoration on all planes.
-      const int apply_cnn[MAX_MB_PLANE] = { 1, 1, 1 };
+      const int apply_cnn[MAX_MB_PLANE] = {
+        av1_allow_cnn_for_plane(cm, AOM_PLANE_Y),
+        av1_allow_cnn_for_plane(cm, AOM_PLANE_U),
+        av1_allow_cnn_for_plane(cm, AOM_PLANE_V)
+      };
       av1_restore_cnn_tflite(cm, cpi->mt_info.num_workers, apply_cnn);
 
       // Calculate errors after applying cnn from source.
@@ -2285,13 +2288,16 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
                      cm->seq_params.use_highbitdepth, cnn_errors, num_planes);
 
       // Save CNN restored frame.
-      if (cnn_errors[0] <= dgd_errors[0]) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
+          cnn_errors[0] <= dgd_errors[0]) {
         aom_yv12_copy_y(&cm->cur_frame->buf, &cpi->cnn_buffer);
       }
-      if (cnn_errors[1] <= dgd_errors[1] && num_planes > 1) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) && num_planes > 1 &&
+          cnn_errors[1] <= dgd_errors[1]) {
         aom_yv12_copy_u(&cm->cur_frame->buf, &cpi->cnn_buffer);
       }
-      if (cnn_errors[2] <= dgd_errors[2] && num_planes > 2) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_V) && num_planes > 2 &&
+          cnn_errors[2] <= dgd_errors[2]) {
         aom_yv12_copy_v(&cm->cur_frame->buf, &cpi->cnn_buffer);
       }
 
@@ -2308,14 +2314,16 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
                      cm->seq_params.use_highbitdepth, res_errors, num_planes);
 
       // For each plane, pick either CNN or LR (mutually exclusive).
-      if (cnn_errors[0] <= res_errors[0] && cnn_errors[0] <= dgd_errors[0]) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
+          cnn_errors[0] <= res_errors[0] && cnn_errors[0] <= dgd_errors[0]) {
         // Enable CNN for Y and copy CNN restored Y plane.
         cm->use_cnn[0] = 1;
         aom_yv12_copy_y(&cpi->cnn_buffer, &cm->cur_frame->buf);
       } else {
         aom_yv12_copy_y(&cpi->last_frame_uf, &cm->cur_frame->buf);
       }
-      if (cnn_errors[1] <= res_errors[1] && cnn_errors[1] <= dgd_errors[1] &&
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) &&
+          cnn_errors[1] <= res_errors[1] && cnn_errors[1] <= dgd_errors[1] &&
           num_planes > 1) {
         // Enable CNN for U and copy CNN restored U plane.
         cm->use_cnn[1] = 1;
@@ -2323,7 +2331,8 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
       } else {
         aom_yv12_copy_u(&cpi->last_frame_uf, &cm->cur_frame->buf);
       }
-      if (cnn_errors[2] <= res_errors[2] && cnn_errors[2] <= dgd_errors[2] &&
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_V) &&
+          cnn_errors[2] <= res_errors[2] && cnn_errors[2] <= dgd_errors[2] &&
           num_planes > 2) {
         // Enable CNN for V and copy CNN restored V plane.
         cm->use_cnn[2] = 1;
