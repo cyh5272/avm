@@ -23,34 +23,54 @@ extern "C" {
 // Minimum base_qindex needed to run cnn.
 #define MIN_CNN_Q_INDEX 0
 
-// Returns true if we are allowed to use CNN for restoration.
-static INLINE int av1_use_cnn(const AV1_COMMON *cm) {
-  return (cm->quant_params.base_qindex > MIN_CNN_Q_INDEX) &&
-         !av1_superres_scaled(cm);
+// Returns true if we are allowed to use CNN for restoration for the frame.
+static INLINE bool av1_allow_cnn(const AV1_COMMON *cm) {
+  return (cm->quant_params.base_qindex > MIN_CNN_Q_INDEX)
+#if !CONFIG_EXT_SUPERRES
+         && !av1_superres_scaled(cm)
+#endif  // !CONFIG_EXT_SUPERRES
+      ;
+}
+
+// Returns true if we are allowed to use CNN for restoration for the plane.
+static INLINE bool av1_allow_cnn_for_plane(const AV1_COMMON *cm, int plane) {
+  (void)plane;
+  if (!av1_allow_cnn(cm)) return false;
+  if (plane >= av1_num_planes(cm)) return false;
+  if (av1_superres_scaled(cm)) {
+#if CONFIG_EXT_SUPERRES
+    return (plane == 0);
+#else
+    return false;
+#endif  // CONFIG_EXT_SUPERRES
+  } else {
+    return true;
+  }
 }
 
 // Returns true if we are allowed to use CNN for restoration.
-static INLINE int av1_use_cnn_encode(const AV1_COMMON *cm,
-                                     FRAME_UPDATE_TYPE update_type) {
+static INLINE bool av1_use_cnn_encode(const AV1_COMMON *cm,
+                                      FRAME_UPDATE_TYPE update_type) {
   const bool is_overlay_update =
       (update_type == OVERLAY_UPDATE || update_type == INTNL_OVERLAY_UPDATE);
 
-  return av1_use_cnn(cm) && !is_overlay_update;
+  return av1_allow_cnn(cm) && !is_overlay_update;
 }
 
 // Restores image in 'dgd' with a CNN model using TFlite and stores output in
 // 'rst'. Returns true on success.
-int av1_restore_cnn_img_tflite(int qindex, const uint8_t *dgd, int width,
-                               int height, int dgd_stride, uint8_t *rst,
-                               int rst_stride, int num_threads,
-                               int is_intra_only, int is_luma);
+int av1_restore_cnn_img_tflite(int qindex, int superres_denom,
+                               const uint8_t *dgd, int width, int height,
+                               int dgd_stride, uint8_t *rst, int rst_stride,
+                               int num_threads, int is_intra_only, int is_luma);
 
 // Same as 'av1_restore_cnn_img_tflite' for highbd.
-int av1_restore_cnn_img_tflite_highbd(int qindex, const uint16_t *dgd,
-                                      int width, int height, int dgd_stride,
-                                      uint16_t *rst, int rst_stride,
-                                      int num_threads, int bit_depth,
-                                      int is_intra_only, int is_luma);
+int av1_restore_cnn_img_tflite_highbd(int qindex, int superres_denom,
+                                      const uint16_t *dgd, int width,
+                                      int height, int dgd_stride, uint16_t *rst,
+                                      int rst_stride, int num_threads,
+                                      int bit_depth, int is_intra_only,
+                                      int is_luma);
 
 struct AV1Common;
 
