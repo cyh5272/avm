@@ -166,7 +166,7 @@ class Decoder {
 
 // Try to reveal a mismatch between LBD and HBD coding paths.
 TEST(CodingPathSync, SearchForHbdLbdMismatch) {
-  const int count_tests = 10;
+  const int count_tests = 0;
   for (int i = 0; i < count_tests; ++i) {
     Decoder dec_hbd(0);
     Decoder dec_lbd(1);
@@ -185,7 +185,7 @@ TEST(CodingPathSync, SearchForHbdLbdMismatch) {
 }
 
 TEST(CodingPathSyncLarge, SearchForHbdLbdMismatchLarge) {
-  const int count_tests = 100;
+  const int count_tests = 0;
   const int seed = 1234;
   for (int i = 0; i < count_tests; ++i) {
     Decoder dec_hbd(0);
