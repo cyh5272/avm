@@ -642,6 +642,17 @@ static void read_palette_colors_y(MACROBLOCKD *const xd, int bit_depth,
   } else {
     memcpy(pmi->palette_colors, cached_colors, n * sizeof(cached_colors[0]));
   }
+#if CONFIG_INDEP_PALETTE_PARSING  // Sort final palette - Y
+  for (int i = 0; i < n; i++) {
+    for (int j = 1; j < n - i; j++) {
+      if (pmi->palette_colors[j - 1] > pmi->palette_colors[j]) {
+        uint16_t tmp = pmi->palette_colors[j - 1];
+        pmi->palette_colors[j - 1] = pmi->palette_colors[j];
+        pmi->palette_colors[j] = tmp;
+      }
+    }
+  }
+#endif
 }
 
 static void read_palette_colors_uv(MACROBLOCKD *const xd, int bit_depth,
@@ -679,6 +690,19 @@ static void read_palette_colors_uv(MACROBLOCKD *const xd, int bit_depth,
            n * sizeof(cached_colors[0]));
   }
 
+#if CONFIG_INDEP_PALETTE_PARSING  // Sort final palette - U
+  for (int i = 0; i < n; i++) {
+    for (int j = 1; j < n - i; j++) {
+      if (pmi->palette_colors[PALETTE_MAX_SIZE + j - 1] >
+          pmi->palette_colors[PALETTE_MAX_SIZE + j]) {
+        uint16_t tmp = pmi->palette_colors[PALETTE_MAX_SIZE + j - 1];
+        pmi->palette_colors[PALETTE_MAX_SIZE + j - 1] =
+            pmi->palette_colors[PALETTE_MAX_SIZE + j];
+        pmi->palette_colors[PALETTE_MAX_SIZE + j] = tmp;
+      }
+    }
+  }
+#endif
   // V channel colors.
   if (aom_read_bit(r, ACCT_STR)) {  // Delta encoding.
     const int min_bits_v = bit_depth - 4;
