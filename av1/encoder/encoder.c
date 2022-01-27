@@ -2265,11 +2265,11 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 #if CONFIG_CNN_RESTORATION
     if (av1_use_cnn_encode(cm,
                            cpi->gf_group.update_type[cpi->gf_group.index])) {
-      // Save unfiltered frame.
-      yv12_copy_all_planes(&cm->cur_frame->buf, &cpi->last_frame_uf,
+      // Save unrestored frame.
+      yv12_copy_all_planes(&cm->cur_frame->buf, &cpi->precnn_buffer,
                            num_planes);
 
-      // Calculate errors for unfiltered planes from source.
+      // Calculate errors for unrestored planes from source.
       int64_t dgd_errors[MAX_MB_PLANE];
       get_sse_planes(cpi->source, &cm->cur_frame->buf,
                      cm->seq_params.use_highbitdepth, dgd_errors, num_planes);
@@ -2289,20 +2289,20 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 
       // Save CNN restored frame.
       if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
-          cnn_errors[0] <= dgd_errors[0]) {
-        aom_yv12_copy_y(&cm->cur_frame->buf, &cpi->cnn_buffer);
+          cnn_errors[0] < dgd_errors[0]) {
+        aom_yv12_copy_y(&cm->cur_frame->buf, &cpi->postcnn_buffer);
       }
       if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) && num_planes > 1 &&
-          cnn_errors[1] <= dgd_errors[1]) {
-        aom_yv12_copy_u(&cm->cur_frame->buf, &cpi->cnn_buffer);
+          cnn_errors[1] < dgd_errors[1]) {
+        aom_yv12_copy_u(&cm->cur_frame->buf, &cpi->postcnn_buffer);
       }
       if (av1_allow_cnn_for_plane(cm, AOM_PLANE_V) && num_planes > 2 &&
-          cnn_errors[2] <= dgd_errors[2]) {
-        aom_yv12_copy_v(&cm->cur_frame->buf, &cpi->cnn_buffer);
+          cnn_errors[2] < dgd_errors[2]) {
+        aom_yv12_copy_v(&cm->cur_frame->buf, &cpi->postcnn_buffer);
       }
 
-      // Restore unfiltered frame.
-      yv12_copy_all_planes(&cpi->last_frame_uf, &cm->cur_frame->buf,
+      // Restore unrestored frame.
+      yv12_copy_all_planes(&cpi->precnn_buffer, &cm->cur_frame->buf,
                            num_planes);
 
       // Try LR on all planes.
@@ -2315,30 +2315,28 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 
       // For each plane, pick either CNN or LR (mutually exclusive).
       if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
-          cnn_errors[0] <= res_errors[0] && cnn_errors[0] <= dgd_errors[0]) {
+          cnn_errors[0] < res_errors[0] && cnn_errors[0] < dgd_errors[0]) {
         // Enable CNN for Y and copy CNN restored Y plane.
         cm->use_cnn[0] = 1;
-        aom_yv12_copy_y(&cpi->cnn_buffer, &cm->cur_frame->buf);
+        aom_yv12_copy_y(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
-        aom_yv12_copy_y(&cpi->last_frame_uf, &cm->cur_frame->buf);
+        aom_yv12_copy_y(&cpi->precnn_buffer, &cm->cur_frame->buf);
       }
-      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) &&
-          cnn_errors[1] <= res_errors[1] && cnn_errors[1] <= dgd_errors[1] &&
-          num_planes > 1) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) && num_planes > 1 &&
+          cnn_errors[1] < res_errors[1] && cnn_errors[1] < dgd_errors[1]) {
         // Enable CNN for U and copy CNN restored U plane.
         cm->use_cnn[1] = 1;
-        aom_yv12_copy_u(&cpi->cnn_buffer, &cm->cur_frame->buf);
+        aom_yv12_copy_u(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
-        aom_yv12_copy_u(&cpi->last_frame_uf, &cm->cur_frame->buf);
+        aom_yv12_copy_u(&cpi->precnn_buffer, &cm->cur_frame->buf);
       }
-      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_V) &&
-          cnn_errors[2] <= res_errors[2] && cnn_errors[2] <= dgd_errors[2] &&
-          num_planes > 2) {
+      if (av1_allow_cnn_for_plane(cm, AOM_PLANE_V) && num_planes > 2 &&
+          cnn_errors[2] < res_errors[2] && cnn_errors[2] < dgd_errors[2]) {
         // Enable CNN for V and copy CNN restored V plane.
         cm->use_cnn[2] = 1;
-        aom_yv12_copy_v(&cpi->cnn_buffer, &cm->cur_frame->buf);
+        aom_yv12_copy_v(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
-        aom_yv12_copy_v(&cpi->last_frame_uf, &cm->cur_frame->buf);
+        aom_yv12_copy_v(&cpi->precnn_buffer, &cm->cur_frame->buf);
       }
 
       // Disable LR for planes where CNN is used, and reapply LR for other
