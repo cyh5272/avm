@@ -80,6 +80,7 @@ extern "C" {
 #if CONFIG_NEW_REF_SIGNALING
 #define COMPREF_BIT_TYPES 2
 #define RANKED_REF0_TO_PRUNE 3
+#define MAX_REFS_ARF 4
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 struct AV1Common;

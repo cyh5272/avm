@@ -178,6 +178,7 @@ static INLINE void av1_copy_usable_ref_mv_stack_and_weight(
 }
 
 #if CONFIG_NEW_REF_SIGNALING
+#define PRUNE_SINGLE_REFS 0
 static INLINE int prune_ref_by_selective_ref_frame_nrs(
     const AV1_COMP *const cpi, const MACROBLOCK *const x,
     const MV_REFERENCE_FRAME *const ref_frame) {
@@ -193,7 +194,17 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
 
   if (comp_pred && ref_frame[0] >= RANKED_REF0_TO_PRUNE) return 1;
 
+  // Prune refs 5-7 if all refs are distant past (distance > 4). This
+  // typically happens when the current frame is altref.
   const int n_refs = cm->ref_frames_info.n_total_refs;
+
+  const int closest_past_idx = get_closest_past_ref_index(cm);
+  const int closest_past_dist =
+      cm->ref_frames_info.ref_frame_distance[closest_past_idx];
+  if (cm->ref_frames_info.n_past_refs == n_refs && closest_past_dist > 4 &&
+      (ref_frame[0] >= MAX_REFS_ARF || ref_frame[1] >= MAX_REFS_ARF))
+    return 1;
+
   if (x != NULL) {
     if (sf->inter_sf.selective_ref_frame >= 2 ||
         (sf->inter_sf.selective_ref_frame == 1 && comp_pred)) {
@@ -238,7 +249,8 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 3) return 1;
         }
       } else {
-        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 2) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - PRUNE_SINGLE_REFS - 1)
+          return 1;
       }
       break;
     case 2:
@@ -249,7 +261,8 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;
         }
       } else {
-        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 3) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - PRUNE_SINGLE_REFS - 2)
+          return 1;
       }
       break;
     case 3:
@@ -261,7 +274,8 @@ static INLINE int prune_ref_by_selective_ref_frame_nrs(
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
         }
       } else {
-        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - 4) return 1;
+        if (dir_refrank0[d0] > INTER_REFS_PER_FRAME - PRUNE_SINGLE_REFS - 3)
+          return 1;
       }
       break;
   }
