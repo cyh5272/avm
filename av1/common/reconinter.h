@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 #define MAX_WEDGE_TYPES 16
-#define MAX_WEDGE_TYPES2 2
+#define MAX_WEDGE_TYPES2 6
 #define MAX_WEDGE_TYPES_TOTAL (MAX_WEDGE_TYPES + MAX_WEDGE_TYPES2)
 
 #define MAX_WEDGE_SIZE_LOG2 5  // 32x32

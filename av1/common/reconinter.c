@@ -187,31 +187,54 @@ static AOM_INLINE void shift_copy(const uint8_t *src, uint8_t *dst, int shift,
   }
 }
 
+// TODO(now): Turn on.
 /* clang-format off */
 DECLARE_ALIGNED(16, static uint8_t,
                 wedge_signflip_lookup[BLOCK_SIZES_ALL][MAX_WEDGE_TYPES_TOTAL]) = {
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, },
-  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, },
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},  // not used
+  //  BLOCK_4X4 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_4X8 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_8X4 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_8X8
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1 },
+  //  BLOCK_8X16
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 },
+  //  BLOCK_16X8
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1  },
+  //  BLOCK_16X16
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1 },
+  //  BLOCK_16X32
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 },
+  //  BLOCK_32X16
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1  },
+  //  BLOCK_32X32
+  { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1 },
+  //  BLOCK_32X64 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_64X32 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_64X64 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_64X128 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_128X64 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_128X128 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_4X16 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_16X4 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_8X32
+  { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0 },
+  //  BLOCK_32X8
+  { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0 },
+  //  BLOCK_16X64 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  //  BLOCK_64X16 (not used)
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 /* clang-format on */
 
@@ -232,7 +255,6 @@ DECLARE_ALIGNED(16, static uint8_t,
 
 static wedge_masks_type wedge_masks[BLOCK_SIZES_ALL][2];
 
-// TODO(now): Increase codebook size by 2 * 3 = 6 instead of by 2?
 static const wedge_code_type wedge_codebook_hgtw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE27, 4, 4 },  { WEDGE_OBLIQUE63, 4, 4 },
   { WEDGE_OBLIQUE117, 4, 4 }, { WEDGE_OBLIQUE153, 4, 4 },
@@ -243,6 +265,8 @@ static const wedge_code_type wedge_codebook_hgtw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
   { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
+  { WEDGE_OBLIQUE45, 4, 2 },  { WEDGE_OBLIQUE45, 4, 6 },
+  { WEDGE_OBLIQUE135, 2, 4 }, { WEDGE_OBLIQUE135, 6, 4 },
 };
 
 static const wedge_code_type wedge_codebook_hltw[MAX_WEDGE_TYPES_TOTAL] = {
@@ -255,6 +279,8 @@ static const wedge_code_type wedge_codebook_hltw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
   { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
+  { WEDGE_OBLIQUE45, 4, 2 },  { WEDGE_OBLIQUE45, 4, 6 },
+  { WEDGE_OBLIQUE135, 2, 4 }, { WEDGE_OBLIQUE135, 6, 4 },
 };
 
 static const wedge_code_type wedge_codebook_heqw[MAX_WEDGE_TYPES_TOTAL] = {
@@ -267,6 +293,8 @@ static const wedge_code_type wedge_codebook_heqw[MAX_WEDGE_TYPES_TOTAL] = {
   { WEDGE_OBLIQUE63, 2, 4 },  { WEDGE_OBLIQUE63, 6, 4 },
   { WEDGE_OBLIQUE117, 2, 4 }, { WEDGE_OBLIQUE117, 6, 4 },
   { WEDGE_OBLIQUE45, 4, 4 },  { WEDGE_OBLIQUE135, 4, 4 },
+  { WEDGE_OBLIQUE45, 4, 2 },  { WEDGE_OBLIQUE45, 4, 6 },
+  { WEDGE_OBLIQUE135, 2, 4 }, { WEDGE_OBLIQUE135, 6, 4 },
 };
 
 const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
