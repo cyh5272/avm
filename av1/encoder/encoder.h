@@ -2361,10 +2361,17 @@ typedef struct AV1_COMP {
 
 #if CONFIG_CNN_RESTORATION
   /*!
-   * Temprorary frame buffer used to store CNN filtered frame during RDO, to
-   * compare it against traditionally filtered frame.
+   * Temprorary frame buffer used to store pre CNN filtered frame during RDO, to
+   * compare it against traditionally filtered frame. Note that this is not the
+   * same as last_frame_uf which needs to be at the coded resolution. But this
+   * buffer is at full-resolution when in-loop super-resolution is used.
    */
-  YV12_BUFFER_CONFIG cnn_buffer;
+  YV12_BUFFER_CONFIG precnn_buffer;
+  /*!
+   * Temprorary frame buffer used to store post CNN filtered frame at full
+   * resolution during RDO, to compare against traditionally filtered frame.
+   */
+  YV12_BUFFER_CONFIG postcnn_buffer;
 #endif  // CONFIG_CNN_RESTORATION
 
   /*!
