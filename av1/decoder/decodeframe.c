@@ -2794,6 +2794,11 @@ static AOM_INLINE void setup_superres(AV1_COMMON *const cm,
                                       int *width, int *height) {
   cm->superres_upscaled_width = *width;
   cm->superres_upscaled_height = *height;
+  // Set default to 1:1 scaling - ie. no scaling, scale not provided
+  cm->superres_scale_denominator = SCALE_NUMERATOR;
+#if CONFIG_EXT_SUPERRES
+  cm->superres_scale_numerator = SCALE_NUMERATOR;
+#endif  // CONFIG_EXT_SUPERRES
 
   const SequenceHeader *const seq_params = &cm->seq_params;
   if (!seq_params->enable_superres) return;
@@ -2817,12 +2822,6 @@ static AOM_INLINE void setup_superres(AV1_COMMON *const cm,
     // resized correctly
     av1_calculate_scaled_superres_size(width, height,
                                        cm->superres_scale_denominator);
-#endif  // CONFIG_EXT_SUPERRES
-  } else {
-    // 1:1 scaling - ie. no scaling, scale not provided
-    cm->superres_scale_denominator = SCALE_NUMERATOR;
-#if CONFIG_EXT_SUPERRES
-    cm->superres_scale_numerator = SCALE_NUMERATOR;
 #endif  // CONFIG_EXT_SUPERRES
   }
 }
