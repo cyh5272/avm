@@ -202,11 +202,11 @@ extern const WienernsFilterConfigPairType wienerns_filters_lowqp;
 extern const WienernsFilterConfigPairType wienerns_filters_midqp;
 extern const WienernsFilterConfigPairType wienerns_filters_highqp;
 
-#define USE_QBASED_WIENER_NONSEP 1
+#define USE_QBASED_WIENER_NONSEP 0
 static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
     int qindex) {
 #if USE_QBASED_WIENER_NONSEP
-  if (qindex <= 128)
+  if (qindex <= 32)
     return &wienerns_filters_lowqp;
   else if (qindex <= 224)
     return &wienerns_filters_midqp;
@@ -447,12 +447,14 @@ static INLINE void set_default_wiener_nonsep(WienerNonsepInfo *wienerns_info,
                                              int qindex) {
   const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(qindex);
   for (int i = 0; i < wnsf->y->ncoeffs; ++i) {
-    wienerns_info->nsfilter[i] = wnsf->y->coeffs[i][WIENERNS_MIN_ID];
+    wienerns_info->nsfilter[i] = wnsf->y->coeffs[i][WIENERNS_MIN_ID] +
+                                 (1 << wnsf->y->coeffs[i][WIENERNS_BIT_ID]) / 2;
   }
   for (int i = wnsf->y->ncoeffs; i < wnsf->y->ncoeffs + wnsf->uv->ncoeffs;
        ++i) {
     wienerns_info->nsfilter[i] =
-        wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_MIN_ID];
+        wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_MIN_ID] +
+        (1 << wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_BIT_ID]) / 2;
   }
 }
 
