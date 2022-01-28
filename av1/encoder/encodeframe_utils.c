@@ -614,20 +614,6 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
   }
 }
 
-#if CONFIG_IBC_SR_EXT
-static BLOCK_SIZE len_to_bsize(int length) {
-  switch (length) {
-    case 128: return BLOCK_128X128;
-    case 64: return BLOCK_64X64;
-    case 32: return BLOCK_32X32;
-    case 16: return BLOCK_16X16;
-    case 8: return BLOCK_8X8;
-    case 4: return BLOCK_4X4;
-    default: assert(0 && "Invalid block size"); return BLOCK_16X16;
-  }
-}
-#endif  // CONFIG_IBC_SR_EXT
-
 void av1_restore_context(const AV1_COMMON *cm, MACROBLOCK *x,
                          const RD_SEARCH_MACROBLOCK_CONTEXT *ctx, int mi_row,
                          int mi_col, BLOCK_SIZE bsize, const int num_planes) {
@@ -1283,11 +1269,33 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                        ctx_tr->partition_cdf[plane_index][i], 8, CDF_SIZE(10));
       }
     }
+#if CONFIG_EXT_RECUR_PARTITIONS
+    for (int dir = 0; dir < NUM_LIMITED_PARTITION_PARENTS; dir++) {
+      for (int i = 0; i < PARTITION_CONTEXTS; i++) {
+        if (i < 4) {
+          AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                         ctx_tr->limited_partition_cdf[plane_index][dir][i], 2,
+                         CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+        } else if (i < 16) {
+          AVERAGE_CDF(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                      ctx_tr->limited_partition_cdf[plane_index][dir][i],
+                      LIMITED_EXT_PARTITION_TYPES);
+        } else {
+          AVG_CDF_STRIDE(ctx_left->limited_partition_cdf[plane_index][dir][i],
+                         ctx_tr->limited_partition_cdf[plane_index][dir][i], 2,
+                         CDF_SIZE(LIMITED_EXT_PARTITION_TYPES));
+        }
+      }
+    }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   }
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int i = 0; i < PARTITION_CONTEXTS_REC; ++i) {
     AVERAGE_CDF(ctx_left->partition_rec_cdf[i], ctx_tr->partition_rec_cdf[i],
-                4);
+                PARTITION_CONTEXTS_REC);
+    AVERAGE_CDF(ctx_left->partition_middle_rec_cdf[i],
+                ctx_tr->partition_middle_rec_cdf[i],
+                PARTITION_TYPES_MIDDLE_REC);
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   AVERAGE_CDF(ctx_left->switchable_interp_cdf, ctx_tr->switchable_interp_cdf,
