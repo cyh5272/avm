@@ -766,7 +766,7 @@ typedef struct {
   //! wedge_idx_cost
   int wedge_idx_cost[BLOCK_SIZES_ALL][16];  // MAX_WEDGE_TYPES = 16
   //! wedge_idx2_cost
-  int wedge_idx2_cost[BLOCK_SIZES_ALL][2];  // MAX_WEDGE_TYPES2 = 2
+  int wedge_idx2_cost[BLOCK_SIZES_ALL][6];  // MAX_WEDGE_TYPES2 = 6
   //! interintra_cost
   int interintra_cost[BLOCK_SIZE_GROUPS][2];
   //! wedge_interintra_cost
