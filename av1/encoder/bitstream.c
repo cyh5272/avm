@@ -2607,7 +2607,10 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
+  // printf("%s ", is_uv ? "UV:" : "Y: ");
   for (int i = beg_feat; i < end_feat; ++i) {
+    // printf("(%d/%d), ", wienerns_info->nsfilter[i],
+    // ref_wienerns_info->nsfilter[i]);
     aom_write_primitive_refsubexpfin(
         wb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
         wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
@@ -2616,6 +2619,7 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
         wienerns_info->nsfilter[i] -
             wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID]);
   }
+  // printf("\n");
   memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
 }
 #endif  // CONFIG_WIENER_NONSEP
