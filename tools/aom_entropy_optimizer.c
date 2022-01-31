@@ -29,6 +29,7 @@
 
 #include "config/aom_config.h"
 
+#include "av1/common/reconinter.h"
 #include "av1/encoder/encoder.h"
 
 #define SPACES_PER_TAB 2
@@ -502,10 +503,25 @@ int main(int argc, const char **argv) {
                      "[BLOCK_SIZES_ALL][CDF_SIZE(COMPOUND_TYPES - 1)]");
 
   cts_each_dim[0] = BLOCK_SIZES_ALL;
-  cts_each_dim[1] = 16;
-  optimize_cdf_table(&fc.wedge_idx[0][0], probsfile, 2, cts_each_dim,
-                     "static const aom_cdf_prob "
-                     "default_wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(16)]");
+  cts_each_dim[1] = 2;
+  optimize_cdf_table(
+      &fc.wedge_category[0][0], probsfile, 2, cts_each_dim,
+      "static const aom_cdf_prob "
+      "default_wedge_category_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+
+  cts_each_dim[0] = BLOCK_SIZES_ALL;
+  cts_each_dim[1] = MAX_WEDGE_TYPES;
+  optimize_cdf_table(
+      &fc.wedge_idx[0][0], probsfile, 2, cts_each_dim,
+      "static const aom_cdf_prob "
+      "default_wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(MAX_WEDGE_TYPES)]");
+
+  cts_each_dim[0] = BLOCK_SIZES_ALL;
+  cts_each_dim[1] = MAX_WEDGE_TYPES2;
+  optimize_cdf_table(
+      &fc.wedge_idx2[0][0], probsfile, 2, cts_each_dim,
+      "static const aom_cdf_prob "
+      "default_wedge_idx2_cdf[BLOCK_SIZES_ALL][CDF_SIZE(MAX_WEDGE_TYPES2)]");
 
   /* motion_var and warped_motion experiments */
   cts_each_dim[0] = BLOCK_SIZES_ALL;
