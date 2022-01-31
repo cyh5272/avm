@@ -1164,6 +1164,8 @@ typedef struct FRAME_COUNTS {
 #endif  // CONFIG_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
   unsigned int partition_rec[PARTITION_CONTEXTS_REC][PARTITION_TYPES_REC];
+  unsigned int partition_middle_rec[PARTITION_CONTEXTS_REC]
+                                   [PARTITION_TYPES_MIDDLE_REC];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   unsigned int txb_skip[TOKEN_CDF_Q_CTXS][TX_SIZES][TXB_SKIP_CONTEXTS][2];
   unsigned int eob_extra[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]

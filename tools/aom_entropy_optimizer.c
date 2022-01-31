@@ -371,6 +371,18 @@ int main(int argc, const char **argv) {
       "static const aom_cdf_prob "
       "default_partition_rec_cdf[PARTITION_CONTEXTS_REC]"
       "[CDF_SIZE(PARTITION_TYPES_REC)]");
+
+  cts_each_dim[0] = PARTITION_CONTEXTS_REC;
+  cts_each_dim[1] = PARTITION_TYPES_MIDDLE_REC;
+  int part_types_each_ctx_middle_rec[PARTITION_CONTEXTS_REC] = {
+    2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+  };
+  optimize_cdf_table_var_modes_2d(
+      &fc.partition_middle_rec[0][0], probsfile, 2, cts_each_dim,
+      part_types_each_ctx_middle_rec,
+      "static const aom_cdf_prob "
+      "default_partition_middle_rec_cdf[PARTITION_CONTEXTS_REC]"
+      "[CDF_SIZE(PARTITION_TYPES_MIDDLE_REC)]");
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
   /* tx type */
