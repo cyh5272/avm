@@ -2301,14 +2301,15 @@ static void read_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  set_default_wiener_nonsep(wienerns_info, xd->base_qindex);
   for (int i = beg_feat; i < end_feat; ++i) {
-    wienerns_info->nsfilter[i] += aom_read_primitive_refsubexpfin(
-        rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-        wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
-        ref_wienerns_info->nsfilter[i] -
-            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-        ACCT_STR);
+    wienerns_info->nsfilter[i] =
+        aom_read_primitive_refsubexpfin(
+            rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+            wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+            ref_wienerns_info->nsfilter[i] -
+                wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+            ACCT_STR) +
+        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
   }
   memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
 }
