@@ -2210,7 +2210,7 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
 }
 
 #if CONFIG_WIENER_NONSEP
-static void read_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
+static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
                                  WienerNonsepInfo *wienerns_info,
                                  WienerNonsepInfo *ref_wienerns_info,
                                  aom_reader *rb) {
@@ -2229,18 +2229,35 @@ static void read_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
   int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
   int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
-  const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
+      is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
+  // printf("Dec %s ", is_uv ? "UV:" : "Y: ");
   for (int i = beg_feat; i < end_feat; ++i) {
+#if CONFIG_LR_4PART_CODE
+    wienerns_info->nsfilter[i] =
+        aom_read_4part_wref(
+            rb,
+            ref_wienerns_info->nsfilter[i] -
+                wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+            xd->tile_ctx->wiener_nonsep_4part_cdf
+                [wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID]],
+            wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID], ACCT_STR) +
+        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
+#else
     wienerns_info->nsfilter[i] =
         aom_read_primitive_refsubexpfin(
             rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-            wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+            wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID],
             ref_wienerns_info->nsfilter[i] -
                 wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
             ACCT_STR) +
         wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
+#endif  // CONFIG_LR_4PART_CODE
+    // printf("(%d/%d), ", wienerns_info->nsfilter[i],
+    // ref_wienerns_info->nsfilter[i]);
   }
+  // printf("\n");
   memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
 }
 #endif  // CONFIG_WIENER_NONSEP
@@ -2283,7 +2300,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        read_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+        read_wienerns_filter(xd, is_uv, &rui->wiener_nonsep_info,
                              wiener_nonsep_info, r);
         break;
 #endif  // CONFIG_WIENER_NONSEP
@@ -2314,7 +2331,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     if (aom_read_symbol(r, xd->tile_ctx->wiener_nonsep_restore_cdf[ql], 2,
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
-      read_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+      read_wienerns_filter(xd, is_uv, &rui->wiener_nonsep_info,
                            wiener_nonsep_info, r);
     } else {
       rui->restoration_type = RESTORE_NONE;

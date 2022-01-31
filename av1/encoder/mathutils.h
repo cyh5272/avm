@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-static const double TINY_NEAR_ZERO = 1.0E-16;
+static const double TINY_NEAR_ZERO = 1.0E-8;
 
 // Solves Ax = b, where x and b are column vectors of size nx1 and A is nxn
 static INLINE int linsolve(int n, double *A, int stride, double *b, double *x) {
@@ -55,6 +55,20 @@ static INLINE int linsolve(int n, double *A, int stride, double *b, double *x) {
   }
 
   return 1;
+}
+
+static INLINE int linsolve_const(int n, const double *A, int stride,
+                                 const double *b, double *x) {
+  double *A_ = (double *)malloc(sizeof(*A_) * n * n);
+  double *b_ = (double *)malloc(sizeof(*b_) * n);
+  for (int i = 0; i < n; ++i) {
+    memcpy(A_ + i * n, A + i * stride, sizeof(*A_) * n);
+  }
+  memcpy(b_, b, sizeof(*b_) * n);
+  int ret = linsolve(n, A_, n, b_, x);
+  free(A_);
+  free(b_);
+  return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -62,6 +62,12 @@ extern "C" {
 
 #define KF_MODE_CONTEXTS 5
 
+#if CONFIG_WIENER_NONSEP
+#if CONFIG_LR_4PART_CODE
+#define WIENERNS_4PART_CTX_MAX 4
+#endif  // CONFIG_LR_4PART_CODE
+#endif  // CONFIG_WIENER_NONSEP
+
 struct AV1Common;
 
 typedef struct {
@@ -153,6 +159,9 @@ typedef struct frame_contexts {
   aom_cdf_prob sgrproj_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)];
 #if CONFIG_WIENER_NONSEP
   aom_cdf_prob wiener_nonsep_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)];
+#if CONFIG_LR_4PART_CODE
+  aom_cdf_prob wiener_nonsep_4part_cdf[WIENERNS_4PART_CTX_MAX][CDF_SIZE(4)];
+#endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
   aom_cdf_prob pc_wiener_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)];

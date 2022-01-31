@@ -1109,6 +1109,15 @@ static const aom_cdf_prob default_sgrproj_restore_cdf[MULTIQ_LR_LEVELS]
                                                      };
 
 #if CONFIG_WIENER_NONSEP
+#if CONFIG_LR_4PART_CODE
+static const aom_cdf_prob
+    default_wiener_nonsep_4part_cdf[WIENERNS_4PART_CTX_MAX][CDF_SIZE(4)] = {
+      { AOM_CDF4(16384, 24576, 28672) },
+      { AOM_CDF4(16384, 24576, 28672) },
+      { AOM_CDF4(12288, 24576, 28672) },
+      { AOM_CDF4(8192, 16384, 24576) },
+    };
+#endif  // CONFIG_LR_4PART_CODE
 static const aom_cdf_prob
     default_wiener_nonsep_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)] = {
       { AOM_CDF2(12000) },
@@ -1463,6 +1472,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
   av1_copy(fc->sgrproj_restore_cdf, default_sgrproj_restore_cdf);
 #if CONFIG_WIENER_NONSEP
   av1_copy(fc->wiener_nonsep_restore_cdf, default_wiener_nonsep_restore_cdf);
+#if CONFIG_LR_4PART_CODE
+  av1_copy(fc->wiener_nonsep_4part_cdf, default_wiener_nonsep_4part_cdf);
+#endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_RST_MERGECOEFFS
   av1_copy(fc->merged_param_cdf, default_merged_param_cdf);

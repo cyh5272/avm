@@ -826,6 +826,12 @@ typedef struct {
    * wiener_nonsep_restore_cost
    */
   int wiener_nonsep_restore_cost[2];
+#if CONFIG_LR_4PART_CODE
+  /*!
+   * wiener_nonsep_4part_cost
+   */
+  int wiener_nonsep_4part_cost[WIENERNS_4PART_CTX_MAX][4];
+#endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
   /*!

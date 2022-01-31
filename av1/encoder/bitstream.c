@@ -2605,19 +2605,32 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
   int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
   int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
-  const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
+      is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  // printf("%s ", is_uv ? "UV:" : "Y: ");
+  // printf("Enc %s ", is_uv ? "UV:" : "Y: ");
   for (int i = beg_feat; i < end_feat; ++i) {
     // printf("(%d/%d), ", wienerns_info->nsfilter[i],
-    // ref_wienerns_info->nsfilter[i]);
+    //        ref_wienerns_info->nsfilter[i]);
+#if CONFIG_LR_4PART_CODE
+    aom_write_4part_wref(
+        wb,
+        ref_wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        xd->tile_ctx->wiener_nonsep_4part_cdf[wienerns_coeffs[i - beg_feat]
+                                                             [WIENERNS_PAR_ID]],
+        wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]);
+#else
     aom_write_primitive_refsubexpfin(
         wb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-        wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+        wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID],
         ref_wienerns_info->nsfilter[i] -
             wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
         wienerns_info->nsfilter[i] -
             wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID]);
+#endif  // CONFIG_LR_4PART_CODE
   }
   // printf("\n");
   memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));

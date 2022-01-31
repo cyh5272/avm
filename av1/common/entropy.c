@@ -166,6 +166,9 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->sgrproj_restore_cdf, 2);
 #if CONFIG_WIENER_NONSEP
   RESET_CDF_COUNTER(fc->wiener_nonsep_restore_cdf, 2);
+#if CONFIG_LR_4PART_CODE
+  RESET_CDF_COUNTER(fc->wiener_nonsep_4part_cdf, 4);
+#endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
   RESET_CDF_COUNTER(fc->pc_wiener_restore_cdf, 2);
