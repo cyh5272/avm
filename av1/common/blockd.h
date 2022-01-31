@@ -697,7 +697,7 @@ typedef struct {
 } SgrprojInfo;
 
 #if CONFIG_WIENER_NONSEP
-#define WIENERNS_YUV_MAX 24
+#define WIENERNS_YUV_MAX 32
 /*!
  * Nonseparable Wiener filter parameters.
  */
