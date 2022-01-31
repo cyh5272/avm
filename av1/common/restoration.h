@@ -202,11 +202,11 @@ extern const WienernsFilterConfigPairType wienerns_filters_lowqp;
 extern const WienernsFilterConfigPairType wienerns_filters_midqp;
 extern const WienernsFilterConfigPairType wienerns_filters_highqp;
 
-#define USE_QBASED_WIENER_NONSEP 0
+#define USE_QBASED_WIENER_NONSEP 1
 static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
     int qindex) {
 #if USE_QBASED_WIENER_NONSEP
-  if (qindex <= 32)
+  if (qindex <= 96)
     return &wienerns_filters_lowqp;
   else if (qindex <= 224)
     return &wienerns_filters_midqp;
