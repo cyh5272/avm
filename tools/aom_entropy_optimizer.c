@@ -355,6 +355,35 @@ int main(int argc, const char **argv) {
 #endif  // CONFIG_SDP
 
 #if CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_SDP
+  cts_each_dim[0] = PARTITION_STRUCTURE_NUM;
+  cts_each_dim[1] = NUM_LIMITED_PARTITION_PARENTS;
+  cts_each_dim[2] = PARTITION_CONTEXTS;
+  cts_each_dim[3] = LIMITED_EXT_PARTITION_TYPES;
+#else   // CONFIG_SDP
+  cts_each_dim[0] = NUM_LIMITED_PARTITION_PARENTS;
+  cts_each_dim[1] = PARTITION_CONTEXTS;
+  cts_each_dim[2] = LIMITED_EXT_PARTITION_TYPES;
+#endif  // CONFIG_SDP
+  int part_types_each_ctx_limited_part[PARTITION_CONTEXTS] = {
+    2, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2
+  };
+#if CONFIG_SDP
+  optimize_cdf_table_var_modes_4d(
+      &fc.limited_partition[0][0][0][0], probsfile, 4, cts_each_dim,
+      part_types_each_ctx_limited_part,
+      "static const aom_cdf_prob default_limited_partition_cdf "
+      "[PARTITION_STRUCTURE_NUM][NUM_LIMITED_PARTITION_PARENTS]"
+      "[PARTITION_CONTEXTS][CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)]");
+#else   // CONFIG_SDP
+  optimize_cdf_table_var_modes_3d(
+      &fc.limited_partition[0][0][0], probsfile, 3, cts_each_dim,
+      part_types_each_ctx_limited_part,
+      "static const aom_cdf_prob default_limited_partition_cdf "
+      "[NUM_LIMITED_PARTITION_PARENTS][PARTITION_CONTEXTS]"
+      "[CDF_SIZE(LIMITED_EXT_PARTITION_TYPES)]");
+#endif  // CONFIG_SDP
+
   cts_each_dim[0] = PARTITION_CONTEXTS_REC;
   cts_each_dim[1] = PARTITION_TYPES_REC;
   int part_types_each_ctx_rec[PARTITION_CONTEXTS_REC] = { 2, 2, 2, 2, 4, 4, 4,
