@@ -37,7 +37,13 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
 #endif
   return above_mi->mode;
 }
-
+#if CONFIG_FLEX_MVRES
+// This function is placeholder at this moment.
+void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride) {
+  (void)xd;
+  (void)stride;
+}
+#endif
 void av1_set_entropy_contexts(const MACROBLOCKD *xd,
                               struct macroblockd_plane *pd, int plane,
                               BLOCK_SIZE plane_bsize, TX_SIZE tx_size,

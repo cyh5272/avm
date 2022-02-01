@@ -371,7 +371,11 @@ static void set_good_speed_features_framesize_independent(
 
     sf->mv_sf.exhaustive_searches_thresh <<= 1;
     sf->mv_sf.obmc_full_pixel_search_level = 1;
+#if CONFIG_FLEX_MVRES
+    sf->mv_sf.subpel_search_type = USE_4_TAPS;
+#else
     sf->mv_sf.use_accurate_subpel_search = USE_4_TAPS;
+#endif
 
     sf->inter_sf.disable_interinter_wedge_newmv_search = boosted ? 0 : 1;
     sf->inter_sf.prune_comp_search_by_single_result = boosted ? 2 : 1;
@@ -513,10 +517,9 @@ static void set_good_speed_features_framesize_independent(
         frame_is_intra_only(&cpi->common) ? 0 : 1;
     sf->winner_mode_sf.enable_winner_mode_for_use_tx_domain_dist = 1;
     sf->winner_mode_sf.motion_mode_for_winner_cand =
-        boosted
-            ? 0
-            : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
-                                                                         : 2;
+        boosted                                                      ? 0
+        : gf_group->update_type[gf_group->index] == INTNL_ARF_UPDATE ? 1
+                                                                     : 2;
 
     // TODO(any): evaluate if these lpf features can be moved to speed 2.
     // For screen content, "prune_sgr_based_on_wiener = 2" cause large quality
@@ -719,7 +722,11 @@ static AOM_INLINE void init_mv_sf(MV_SPEED_FEATURES *mv_sf) {
   mv_sf->subpel_force_stop = EIGHTH_PEL;
   mv_sf->subpel_iters_per_step = 2;
   mv_sf->subpel_search_method = SUBPEL_TREE;
+#if CONFIG_FLEX_MVRES
+  mv_sf->subpel_search_type = USE_8_TAPS;
+#else
   mv_sf->use_accurate_subpel_search = USE_8_TAPS;
+#endif
   mv_sf->use_bsize_dependent_search_method = 0;
   mv_sf->use_fullpel_costlist = 0;
   mv_sf->use_downsampled_sad = 0;

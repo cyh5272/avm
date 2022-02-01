@@ -28,6 +28,23 @@ extern "C" {
 
 #undef MAX_SB_SIZE
 
+#if CONFIG_FLEX_MVRES
+#define DEBUG_FLEX_MV 1
+#define ADAPTIVE_PRECISION_SETS 0
+
+#if ADAPTIVE_PRECISION_SETS
+#define NUM_PRECISION_SETS 3
+#endif
+
+#if DEBUG_FLEX_MV
+#define CHECK_FLEX_MV(c, err)                                            \
+  if (c) {                                                               \
+    printf("The assertion failed on line %d, in file %s %s\n", __LINE__, \
+           __FILE__, err);                                               \
+  }
+#endif
+#endif  // CONFIG_FLEX_MVRES
+
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
 #define CCSO_BLK_SIZE 7

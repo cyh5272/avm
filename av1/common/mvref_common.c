@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 
+#include "av1/common/mv.h"
 #include "av1/common/mvref_common.h"
 #include "av1/common/warped_motion.h"
 
@@ -151,7 +152,12 @@ static AOM_INLINE void add_ref_mv_candidate(
     uint8_t *single_mv_count, CANDIDATE_MV *derived_mv_stack,
     uint16_t *derived_mv_weight, uint8_t *derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-    uint16_t weight) {
+    uint16_t weight
+#if CONFIG_FLEX_MVRES
+    ,
+    const MvSubpelPrecision precision
+#endif
+) {
 #if CONFIG_SDP
   if (!is_inter_block(candidate, SHARED_PART)) return;
 #else
@@ -203,14 +209,19 @@ static AOM_INLINE void add_ref_mv_candidate(
               candidate, gm_params[candidate->ref_frame[ref]].wmtype);
           const int_mv cand_refmv =
               is_gm_block ? gm_mv_candidates[0] : get_block_mv(candidate, ref);
-
+#if !CONFIG_FLEX_MVRES
           const int allow_hp_mv = cm->features.allow_high_precision_mv;
           const int force_integer_mv = cm->features.cur_frame_force_integer_mv;
+#endif
 
           int_mv this_refmv;
           get_mv_projection(&this_refmv.as_mv, cand_refmv.as_mv,
                             cur_to_ref_dist, cand_to_ref_dist);
+#if CONFIG_FLEX_MVRES
+          lower_mv_precision(&this_refmv.as_mv, precision);
+#else
           lower_mv_precision(&this_refmv.as_mv, allow_hp_mv, force_integer_mv);
+#endif
 
           for (index = 0; index < *derived_mv_count; ++index) {
             if (derived_mv_stack[index].this_mv.as_int == this_refmv.as_int) {
@@ -351,6 +362,9 @@ static AOM_INLINE void scan_row_mbmi(
   end_mi = AOMMIN(end_mi, mi_size_wide[BLOCK_64X64]);
   const int width_8x8 = mi_size_wide[BLOCK_8X8];
   const int width_16x16 = mi_size_wide[BLOCK_16X16];
+#if CONFIG_FLEX_MVRES
+  MvSubpelPrecision precision = cm->features.fr_mv_precision;
+#endif
   int col_offset = 0;
   // TODO(jingning): Revisit this part after cb4x4 is stable.
   if (abs(row_offset) > 1) {
@@ -393,7 +407,12 @@ static AOM_INLINE void scan_row_mbmi(
                          cm, add_more_mvs, single_mv, single_mv_count,
                          derived_mv_stack, derived_mv_weight, derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-                         len * weight);
+                         len * weight
+#if CONFIG_FLEX_MVRES
+                         ,
+                         precision
+#endif
+    );
 
     i += len;
   }
@@ -415,6 +434,9 @@ static AOM_INLINE void scan_col_mbmi(
   const int n8_h_8 = mi_size_high[BLOCK_8X8];
   const int n8_h_16 = mi_size_high[BLOCK_16X16];
   int i;
+#if CONFIG_FLEX_MVRES
+  MvSubpelPrecision precision = cm->features.fr_mv_precision;
+#endif
   int row_offset = 0;
   if (abs(col_offset) > 1) {
     row_offset = 1;
@@ -455,7 +477,12 @@ static AOM_INLINE void scan_col_mbmi(
                          cm, add_more_mvs, single_mv, single_mv_count,
                          derived_mv_stack, derived_mv_weight, derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-                         len * weight);
+                         len * weight
+#if CONFIG_FLEX_MVRES
+                         ,
+                         precision
+#endif
+    );
 
     i += len;
   }
@@ -477,6 +504,9 @@ static AOM_INLINE void scan_blk_mbmi(
 
   mi_pos.row = row_offset;
   mi_pos.col = col_offset;
+#if CONFIG_FLEX_MVRES
+  MvSubpelPrecision precision = cm->features.fr_mv_precision;
+#endif
 
   if (is_inside(tile, mi_col, mi_row, &mi_pos)) {
     const MB_MODE_INFO *const candidate =
@@ -490,7 +520,12 @@ static AOM_INLINE void scan_blk_mbmi(
                          cm, add_more_mvs, single_mv, single_mv_count,
                          derived_mv_stack, derived_mv_weight, derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-                         2 * len);
+                         2 * len
+#if CONFIG_FLEX_MVRES
+                         ,
+                         precision
+#endif
+    );
   }  // Analyze a single 8x8 block motion information.
 }
 
@@ -588,14 +623,22 @@ static int add_tpl_ref_mv(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   const int cur_offset_0 = get_relative_dist(&cm->seq_params.order_hint_info,
                                              cur_frame_index, frame0_index);
   int idx;
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision fr_mv_precision = cm->features.fr_mv_precision;
+#else
   const int allow_high_precision_mv = cm->features.allow_high_precision_mv;
   const int force_integer_mv = cm->features.cur_frame_force_integer_mv;
+#endif
 
   int_mv this_refmv;
   get_mv_projection(&this_refmv.as_mv, prev_frame_mvs->mfmv0.as_mv,
                     cur_offset_0, prev_frame_mvs->ref_frame_offset);
+#if CONFIG_FLEX_MVRES
+  lower_mv_precision(&this_refmv.as_mv, fr_mv_precision);
+#else
   lower_mv_precision(&this_refmv.as_mv, allow_high_precision_mv,
                      force_integer_mv);
+#endif
 
   if (rf[1] == NONE_FRAME) {
     if (blk_row == 0 && blk_col == 0) {
@@ -623,8 +666,12 @@ static int add_tpl_ref_mv(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     int_mv comp_refmv;
     get_mv_projection(&comp_refmv.as_mv, prev_frame_mvs->mfmv0.as_mv,
                       cur_offset_1, prev_frame_mvs->ref_frame_offset);
+#if CONFIG_FLEX_MVRES
+    lower_mv_precision(&comp_refmv.as_mv, fr_mv_precision);
+#else
     lower_mv_precision(&comp_refmv.as_mv, allow_high_precision_mv,
                        force_integer_mv);
+#endif
 
     if (blk_row == 0 && blk_col == 0) {
       if (abs(this_refmv.as_mv.row - gm_mv_candidates[0].as_mv.row) >= 16 ||
@@ -1143,23 +1190,40 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #else
     const BLOCK_SIZE bsize = mi->sb_type;
 #endif
+#if CONFIG_FLEX_MVRES
+    const int fr_mv_precision = cm->features.fr_mv_precision;
+#else
     const int allow_high_precision_mv = cm->features.allow_high_precision_mv;
     const int force_integer_mv = cm->features.cur_frame_force_integer_mv;
+#endif
     if (ref_frame < REF_FRAMES) {
+#if CONFIG_FLEX_MVRES
+      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[ref_frame],
+                                      fr_mv_precision, bsize, mi_col, mi_row);
+#else
       gm_mv[0] = gm_get_motion_vector(&cm->global_motion[ref_frame],
                                       allow_high_precision_mv, bsize, mi_col,
                                       mi_row, force_integer_mv);
+#endif
+
       gm_mv[1].as_int = 0;
       if (global_mvs != NULL) global_mvs[ref_frame] = gm_mv[0];
     } else {
       MV_REFERENCE_FRAME rf[2];
       av1_set_ref_frame(rf, ref_frame);
+#if CONFIG_FLEX_MVRES
+      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[rf[0]],
+                                      fr_mv_precision, bsize, mi_col, mi_row);
+      gm_mv[1] = gm_get_motion_vector(&cm->global_motion[rf[1]],
+                                      fr_mv_precision, bsize, mi_col, mi_row);
+#else
       gm_mv[0] = gm_get_motion_vector(&cm->global_motion[rf[0]],
                                       allow_high_precision_mv, bsize, mi_col,
                                       mi_row, force_integer_mv);
       gm_mv[1] = gm_get_motion_vector(&cm->global_motion[rf[1]],
                                       allow_high_precision_mv, bsize, mi_col,
                                       mi_row, force_integer_mv);
+#endif
     }
   }
 
@@ -1169,12 +1233,21 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                     mi_col, mode_context);
 }
 
+#if CONFIG_FLEX_MVRES
+void av1_find_best_ref_mvs(int_mv *mvlist, int_mv *nearest_mv, int_mv *near_mv,
+                           MvSubpelPrecision precision) {
+#else
 void av1_find_best_ref_mvs(int allow_hp, int_mv *mvlist, int_mv *nearest_mv,
                            int_mv *near_mv, int is_integer) {
+#endif
   int i;
   // Make sure all the candidates are properly clamped etc
   for (i = 0; i < MAX_MV_REF_CANDIDATES; ++i) {
+#if CONFIG_FLEX_MVRES
+    lower_mv_precision(&mvlist[i].as_mv, precision);
+#else
     lower_mv_precision(&mvlist[i].as_mv, allow_hp, is_integer);
+#endif
   }
   *nearest_mv = mvlist[0];
   *near_mv = mvlist[1];

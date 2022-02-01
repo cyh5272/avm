@@ -28,6 +28,17 @@ static AOM_INLINE int av1_frame_allows_smart_mv(const AV1_COMP *cpi) {
            gf_update_type == OVERLAY_UPDATE);
 }
 
+#if CONFIG_FLEX_MVRES
+static AOM_INLINE void av1_set_high_precision_mv(AV1_COMP *cpi,
+                                                 MvSubpelPrecision precision) {
+  FeatureFlags *features = &cpi->common.features;
+  features->fr_mv_precision = precision;
+#if CONFIG_FLEX_MVRES
+  features->use_sb_mv_precision = 0;
+  features->use_pb_mv_precision = 0;
+#endif  // CONFIG_FLEX_MVRES
+}
+#else
 static AOM_INLINE void av1_set_high_precision_mv(
     AV1_COMP *cpi, int allow_high_precision_mv,
     int cur_frame_force_integer_mv) {
@@ -42,6 +53,7 @@ static AOM_INLINE void av1_set_high_precision_mv(
   mv_costs->mv_cost_stack =
       copy_hp ? mv_costs->nmv_cost_hp : mv_costs->nmv_cost;
 }
+#endif
 
 void av1_pick_and_set_high_precision_mv(AV1_COMP *cpi, int qindex);
 

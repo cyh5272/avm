@@ -283,6 +283,14 @@ typedef struct MB_MODE_INFO {
 #else
   int_interpfilters interp_filters;
 #endif  // CONFIG_REMOVE_DUAL_FILTER
+#if CONFIG_FLEX_MVRES
+  /*! The maximum mv_precision allowed for the given partition block. */
+  MvSubpelPrecision max_mv_precision;
+  /*! The mv_precision used by the given partition block. */
+  MvSubpelPrecision pb_mv_precision;
+  /*! \brief The index of the precision set used for this MB */
+  uint8_t pb_mv_precision_set_idx;
+#endif
   /*! \brief The motion mode used by the inter prediction. */
   MOTION_MODE motion_mode;
   /*! \brief Number of samples used by warp causal */
@@ -410,7 +418,13 @@ static INLINE int is_intrabc_block(const MB_MODE_INFO *mbmi) {
   return mbmi->use_intrabc;
 }
 #endif
-
+#if CONFIG_FLEX_MVRES
+typedef struct SB_INFO {
+  int mi_row;
+  int mi_col;
+  MvSubpelPrecision sb_mv_precision;
+} SB_INFO;
+#endif
 static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
   assert(mode < UV_INTRA_MODES);
   static const PREDICTION_MODE uv2y[] = {
@@ -744,6 +758,12 @@ typedef struct macroblockd {
    */
   MB_MODE_INFO *chroma_above_mbmi;
 
+#if CONFIG_FLEX_MVRES
+  /*!
+   * SB_INFO for the superblock that the current coding block is located in
+   */
+  SB_INFO *sbi;
+#endif
   /*!
    * Appropriate offset based on current 'mi_row' and 'mi_col', inside
    * 'tx_type_map' in one of 'CommonModeInfoParams', 'PICK_MODE_CONTEXT' or
@@ -1617,6 +1637,8 @@ typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   int blk_row, int blk_col,
                                                   BLOCK_SIZE plane_bsize,
                                                   TX_SIZE tx_size, void *arg);
+
+void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride);
 
 void av1_set_entropy_contexts(const MACROBLOCKD *xd,
                               struct macroblockd_plane *pd, int plane,

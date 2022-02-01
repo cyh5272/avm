@@ -531,11 +531,10 @@ int av1_get_deltaq_offset(const AV1_COMP *cpi, int qindex, double beta) {
                            cpi->common.seq_params.bit_depth);
 #if CONFIG_EXTQUANT
     } while (newq > q &&
-             (qindex < (cpi->common.seq_params.bit_depth == AOM_BITS_8
-                            ? MAXQ_8_BITS
-                            : cpi->common.seq_params.bit_depth == AOM_BITS_10
-                                  ? MAXQ_10_BITS
-                                  : MAXQ)));
+             (qindex <
+              (cpi->common.seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+               : cpi->common.seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                                 : MAXQ)));
 #else
     } while (newq > q && qindex < MAXQ);
 #endif
@@ -660,14 +659,14 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd) {
 
   for (segment_id = 0; segment_id < MAX_SEGMENTS; ++segment_id) {
 #if CONFIG_EXTQUANT
-    const int qindex = clamp(
-        av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
-                       cm->seq_params.bit_depth) +
-            cm->quant_params.y_dc_delta_q,
-        0,
-        cm->seq_params.bit_depth == AOM_BITS_8
-            ? MAXQ_8_BITS
-            : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS : MAXQ);
+    const int qindex =
+        clamp(av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex,
+                             cm->seq_params.bit_depth) +
+                  cm->quant_params.y_dc_delta_q,
+              0,
+              cm->seq_params.bit_depth == AOM_BITS_8    ? MAXQ_8_BITS
+              : cm->seq_params.bit_depth == AOM_BITS_10 ? MAXQ_10_BITS
+                                                        : MAXQ);
 #else
     const int qindex = clamp(
         av1_get_qindex(&cm->seg, segment_id, cm->quant_params.base_qindex) +
@@ -788,6 +787,58 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
   }
 }
 
+#if CONFIG_FLEX_MVRES
+void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv,
+                       MvSubpelPrecision fr_mv_precision, MvCosts *mv_costs) {
+  for (MvSubpelPrecision pb_mv_prec = MV_PRECISION_FOUR_PEL;
+       pb_mv_prec < NUM_MV_PRECISIONS; pb_mv_prec++) {
+    mv_costs->nmv_costs[pb_mv_prec][0] =
+        &mv_costs->nmv_costs_alloc[pb_mv_prec][0][MV_MAX];
+    mv_costs->nmv_costs[pb_mv_prec][1] =
+        &mv_costs->nmv_costs_alloc[pb_mv_prec][1][MV_MAX];
+
+#if CONFIG_FLEX_MVRES
+    av1_build_nmv_cost_table(mv_costs->nmv_joint_cost,
+                             mv_costs->nmv_costs[pb_mv_prec], &fc->nmvc,
+                             pb_mv_prec);
+    (void)integer_mv;
+    (void)fr_mv_precision;
+#endif  // CONFIG_FLEX_MVRES
+  }
+
+#if CONFIG_FLEX_MVRES
+  int i, j;
+
+#if ADAPTIVE_PRECISION_SETS
+  for (i = 0; i < NUM_PRECISION_SETS; ++i) {
+    for (j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j)
+      av1_cost_tokens_from_cdf(mv_costs->pb_mv_precision_costs[j][i],
+                               fc->pb_mv_precision_cdf[j][i], NULL);
+  }
+#else
+  for (i = MV_PRECISION_HALF_PEL; i < NUM_MV_PRECISIONS; ++i) {
+    for (j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j)
+      av1_cost_tokens_from_cdf(
+          mv_costs->pb_mv_precision_costs[j][i - MV_PRECISION_HALF_PEL],
+          fc->pb_mv_precision_cdf[j][i - MV_PRECISION_HALF_PEL], NULL);
+  }
+#endif
+
+#endif  // CONFIG_FLEX_MVRES
+
+#if !CONFIG_FLEX_MVRES
+  if (integer_mv) {
+    av1_build_nmv_cost_table(mv_costs->nmv_joint_cost,
+                             mv_costs->nmv_costs[MV_SUBPEL_NONE], &fc->nmvc,
+                             MV_SUBPEL_NONE);
+  } else {
+    av1_build_nmv_cost_table(mv_costs->nmv_joint_cost,
+                             mv_costs->nmv_costs[precision], &fc->nmvc,
+                             precision);
+  }
+#endif
+}
+#else
 void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
                        MvCosts *mv_costs) {
   mv_costs->nmv_cost[0] = &mv_costs->nmv_cost_alloc[0][MV_MAX];
@@ -805,6 +856,17 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
                              &fc->nmvc, usehp);
   }
 }
+#endif
+
+#if CONFIG_FLEX_MVRES
+static INLINE void fill_dv_costs(IntraBCMvCosts *dv_costs,
+                                 const FRAME_CONTEXT *fc) {
+  dv_costs->dv_costs[0] = &dv_costs->dv_costs_alloc[0][MV_MAX];
+  dv_costs->dv_costs[1] = &dv_costs->dv_costs_alloc[1][MV_MAX];
+  av1_build_nmv_cost_table(dv_costs->joint_mv, dv_costs->dv_costs, &fc->ndvc,
+                           MV_PRECISION_ONE_PEL);
+}
+#endif
 
 void av1_initialize_rd_consts(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
@@ -824,15 +886,23 @@ void av1_initialize_rd_consts(AV1_COMP *cpi) {
   if ((cpi->oxcf.cost_upd_freq.mv != COST_UPD_OFF) || frame_is_intra_only(cm) ||
       (cm->current_frame.frame_number & 0x07) == 1)
     av1_fill_mv_costs(cm->fc, cm->features.cur_frame_force_integer_mv,
+#if CONFIG_FLEX_MVRES
+                      cm->features.fr_mv_precision, mv_costs);
+#else
                       cm->features.allow_high_precision_mv, mv_costs);
+#endif
 
   if (frame_is_intra_only(cm) && cm->features.allow_screen_content_tools &&
       !is_stat_generation_stage(cpi)) {
+#if CONFIG_FLEX_MVRES
+    fill_dv_costs(&cpi->dv_costs, cm->fc);
+#else
     IntraBCMVCosts *const dv_costs = &cpi->dv_costs;
     int *dvcost[2] = { &dv_costs->mv_component[0][MV_MAX],
                        &dv_costs->mv_component[1][MV_MAX] };
     av1_build_nmv_cost_table(dv_costs->joint_mv, dvcost, &cm->fc->ndvc,
                              MV_SUBPEL_NONE);
+#endif
   }
 
   if (!is_stat_generation_stage(cpi)) {

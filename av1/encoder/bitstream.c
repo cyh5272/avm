@@ -1509,6 +1509,68 @@ static INLINE int_mv get_ref_mv(const MACROBLOCK *x, int ref_idx) {
                                x->mbmi_ext_frame);
 }
 
+#if CONFIG_FLEX_MVRES
+static void write_pb_mv_precision(const AV1_COMMON *const cm,
+                                  MACROBLOCKD *const xd, aom_writer *w) {
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  assert(mbmi->pb_mv_precision <= mbmi->max_mv_precision);
+  assert(mbmi->max_mv_precision == xd->sbi->sb_mv_precision);
+
+#if DEBUG_FLEX_MV
+  error_check_flexmv(xd->sbi->sb_mv_precision != cm->features.fr_mv_precision,
+                     &cm->error, " incorrect value of sb_mv_precision");
+  assert(av1_get_mbmi_max_mv_precision(cm, xd->sbi, mbmi) ==
+         mbmi->max_mv_precision);
+
+  CHECK_FLEX_MV(
+      check_mv_precision(mbmi) == 0,
+      " precision and MV mismatch in the function write_pb_mv_precision");
+
+#endif
+
+  const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
+
+#if ADAPTIVE_PRECISION_SETS
+  int nsymbs = 0;
+  int down = av1_get_index_from_precision(mbmi->pb_mv_precision_set_idx,
+                                          mbmi->pb_mv_precision,
+                                          mbmi->max_mv_precision, &nsymbs);
+  assert(down < nsymbs);
+#else
+  int down = mbmi->max_mv_precision - mbmi->pb_mv_precision;
+  int nsymbs = mbmi->max_mv_precision + 1;
+#endif
+#if ADAPTIVE_PRECISION_SETS && DEBUG_FLEX_MV
+  error_check_flexmv(mbmi->pb_mv_precision_set_idx !=
+                         (mbmi->max_mv_precision - MV_PRECISION_HALF_PEL),
+                     &cm->error,
+                     "The precision set idx is higher than allowed value");
+  error_check_flexmv(
+      !allow_this_mv_precision[mbmi->pb_mv_precision_set_idx]
+                              [mbmi->pb_mv_precision],
+      &cm->error, "This mb precison is not allowed in write_pb_mv_precision");
+// error_check_flexmv(nsymbs != (3 + (mbmi->max_mv_precision ==
+// MV_PRECISION_ONE_EIGHTH_PEL)), &cm->error, "nsymbs is not equal to 3/4 in
+// write_pb_mv_precision");
+#endif
+
+#if ADAPTIVE_PRECISION_SETS
+  aom_write_symbol(
+      w, down,
+      xd->tile_ctx
+          ->pb_mv_precision_cdf[down_ctx][mbmi->pb_mv_precision_set_idx],
+      nsymbs);
+#else
+  aom_write_symbol(
+      w, down,
+      xd->tile_ctx->pb_mv_precision_cdf[down_ctx][mbmi->max_mv_precision -
+                                                  MV_PRECISION_HALF_PEL],
+      nsymbs);
+
+#endif
+}
+#endif
+
 static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &cpi->td.mb;
@@ -1525,7 +1587,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #else
   const BLOCK_SIZE bsize = mbmi->sb_type;
 #endif
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#else
   const int allow_hp = cm->features.allow_high_precision_mv;
+#endif
 #if CONFIG_SDP
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
 #else
@@ -1579,6 +1645,30 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       else if (is_inter_singleref_mode(mode))
         write_inter_mode(w, mode, ec_ctx, mode_ctx);
 
+#if CONFIG_FLEX_MVRES
+      if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
+#if DEBUG_FLEX_MV
+        error_check_flexmv(
+            mbmi->pb_mv_precision > mbmi->max_mv_precision ||
+                mbmi->pb_mv_precision < MV_PRECISION_FOUR_PEL,
+            &cm->error, " The value of mbmi->pb_mv_precision is out of bound");
+        error_check_flexmv(mbmi->max_mv_precision != xd->sbi->sb_mv_precision,
+                           &cm->error, " Error in max_mv_precision");
+#endif
+        write_pb_mv_precision(cm, xd, w);
+      }
+#if DEBUG_FLEX_MV
+      else {
+        error_check_flexmv(mbmi->pb_mv_precision != mbmi->max_mv_precision,
+                           &cm->error,
+                           " The value of mbmi->pb_mv_precision is invalid");
+      }
+      error_check_flexmv(
+          check_mv_precision(mbmi) == 0, &cm->error,
+          " incorrect mv precision in the function pack_inter_mode_mvs");
+#endif
+#endif  // CONFIG_FLEX_MVRES
+
       if (have_drl_index(mode))
         write_drl_idx(
 #if CONFIG_NEW_INTER_MODES
@@ -1593,28 +1683,58 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       for (ref = 0; ref < 1 + is_compound; ++ref) {
         nmv_context *nmvc = &ec_ctx->nmvc;
         const int_mv ref_mv = get_ref_mv(x, ref);
+
+#if CONFIG_FLEX_MVRES
+        av1_encode_mv(cpi, w, mbmi->mv[ref].as_mv, ref_mv.as_mv, nmvc,
+                      pb_mv_precision, mbmi->max_mv_precision);
+#else
         av1_encode_mv(cpi, w, &mbmi->mv[ref].as_mv, &ref_mv.as_mv, nmvc,
                       allow_hp);
+#endif
       }
 #if CONFIG_NEW_INTER_MODES
     } else if (mode == NEAR_NEWMV) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
+
+#if CONFIG_FLEX_MVRES
+      av1_encode_mv(cpi, w, mbmi->mv[1].as_mv, ref_mv.as_mv, nmvc,
+                    pb_mv_precision, mbmi->max_mv_precision);
+#else
       av1_encode_mv(cpi, w, &mbmi->mv[1].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+#endif
     } else if (mode == NEW_NEARMV) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
+
+#if CONFIG_FLEX_MVRES
+      av1_encode_mv(cpi, w, mbmi->mv[0].as_mv, ref_mv.as_mv, nmvc,
+                    pb_mv_precision, mbmi->max_mv_precision);
+#else
       av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+#endif
     }
 #else
     } else if (mode == NEAREST_NEWMV || mode == NEAR_NEWMV) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
+
+#if CONFIG_FLEX_MVRES
+      av1_encode_mv(cpi, w, mbmi->mv[1].as_mv, ref_mv.as_mv, nmvc,
+                    pb_mv_precision, mbmi->max_mv_precision);
+#else
       av1_encode_mv(cpi, w, &mbmi->mv[1].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+#endif
     } else if (mode == NEW_NEARESTMV || mode == NEW_NEARMV) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
+
+#if CONFIG_FLEX_MVRES
+      av1_encode_mv(cpi, w, mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc,
+                    pb_mv_precision, mbmi->max_mv_precision);
+#else
       av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+#endif
     }
 #endif  // CONFIG_NEW_INTER_MODES
 
@@ -1719,6 +1839,14 @@ static AOM_INLINE void write_intrabc_info(
     assert(mbmi->uv_mode == UV_DC_PRED);
 #endif
     assert(mbmi->motion_mode == SIMPLE_TRANSLATION);
+
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+    CHECK_FLEX_MV(
+        mbmi->pb_mv_precision != MV_PRECISION_ONE_PEL,
+        " pb_mv_precision is not same as MV_PRECISION_ONE_PEL for intra-bc "
+        "blocks");
+#endif
+
     int_mv dv_ref = mbmi_ext_frame->ref_mv_stack[0].this_mv;
     av1_encode_dv(w, &mbmi->mv[0].as_mv, &dv_ref.as_mv, &ec_ctx->ndvc);
   }
@@ -2208,6 +2336,24 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
   }
 }
 
+#if CONFIG_FLEX_MVRES
+static void write_sb_mv_precision(const AV1_COMMON *const cm,
+                                  MACROBLOCKD *const xd, aom_writer *w) {
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const MvSubpelPrecision max_precision = cm->features.fr_mv_precision;
+  //  assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
+  assert(mbmi->max_mv_precision == xd->sbi->sb_mv_precision);
+  assert(xd->sbi->sb_mv_precision <= max_precision);
+  aom_write_symbol(
+      w, max_precision - xd->sbi->sb_mv_precision,
+      xd->tile_ctx->sb_mv_precision_cdf[max_precision - MV_PRECISION_HALF_PEL],
+      max_precision + 1);
+  // printf(" Encoder: sbi->sb_mv_precision = %5d \n",
+  // xd->sbi->sb_mv_precision);
+  (void)mbmi;
+}
+#endif  // CONFIG_FLEX_MVRES
+
 static AOM_INLINE void write_modes_sb(
     AV1_COMP *const cpi, const TileInfo *const tile, aom_writer *const w,
     const TokenExtra **tok, const TokenExtra *const tok_end, int mi_row,
@@ -2228,6 +2374,15 @@ static AOM_INLINE void write_modes_sb(
   const BLOCK_SIZE subsize = get_partition_subsize(bsize, partition);
 
   if (mi_row >= mi_params->mi_rows || mi_col >= mi_params->mi_cols) return;
+
+#if CONFIG_FLEX_MVRES
+  if (bsize == cm->seq_params.sb_size && !frame_is_intra_only(cm) &&
+      cm->features.use_sb_mv_precision) {
+    const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
+    xd->mi = &mi_params->mi_grid_base[grid_idx];
+    write_sb_mv_precision(cm, xd, w);
+  }
+#endif  // CONFIG_FLEX_MVRES
 
   const int num_planes = av1_num_planes(cm);
 #if CONFIG_SDP
@@ -2353,6 +2508,10 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
 
     for (int mi_col = mi_col_start; mi_col < mi_col_end;
          mi_col += cm->seq_params.mib_size) {
+#if CONFIG_FLEX_MVRES
+      av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
+      xd->sbi = av1_get_sb_info(cm, mi_row, mi_col);
+#endif
       cpi->td.mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
 #if CONFIG_SDP
       const int total_loop_num =
@@ -2361,6 +2520,13 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
               ? 2
               : 1;
       xd->tree_type = (total_loop_num == 1 ? SHARED_PART : LUMA_PART);
+#endif
+
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+      if (frame_is_intra_only(cm) || !cm->features.use_sb_mv_precision)
+        error_check_flexmv(
+            xd->sbi->sb_mv_precision != cm->features.fr_mv_precision,
+            &cm->error, " Incorrect value of xd->sbi->sb_mv_precision");
 #endif
       write_modes_sb(cpi, tile, w, &tok, tok_end, mi_row, mi_col,
                      cm->seq_params.sb_size);
@@ -3377,7 +3543,12 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 
 static AOM_INLINE void write_global_motion_params(
     const WarpedMotionParams *params, const WarpedMotionParams *ref_params,
+#if !CONFIG_FLEX_MVRES
     struct aom_write_bit_buffer *wb, int allow_hp) {
+#else
+    struct aom_write_bit_buffer *wb, MvSubpelPrecision precision) {
+  const int precision_loss = get_gm_precision_loss(precision);
+#endif
   const TransformationType type = params->wmtype;
 
   aom_wb_write_bit(wb, type != IDENTITY);
@@ -3411,12 +3582,22 @@ static AOM_INLINE void write_global_motion_params(
   }
 
   if (type >= TRANSLATION) {
+#if CONFIG_FLEX_MVRES
+    const int trans_bits = (type == TRANSLATION)
+                               ? GM_ABS_TRANS_ONLY_BITS - precision_loss
+                               : GM_ABS_TRANS_BITS;
+    const int trans_prec_diff = (type == TRANSLATION)
+                                    ? GM_TRANS_ONLY_PREC_DIFF + precision_loss
+                                    : GM_TRANS_PREC_DIFF;
+#else
     const int trans_bits = (type == TRANSLATION)
                                ? GM_ABS_TRANS_ONLY_BITS - !allow_hp
                                : GM_ABS_TRANS_BITS;
     const int trans_prec_diff = (type == TRANSLATION)
                                     ? GM_TRANS_ONLY_PREC_DIFF + !allow_hp
                                     : GM_TRANS_PREC_DIFF;
+#endif
+
     aom_wb_write_signed_primitive_refsubexpfin(
         wb, (1 << trans_bits) + 1, SUBEXPFIN_K,
         (ref_params->wmmat[0] >> trans_prec_diff),
@@ -3437,7 +3618,11 @@ static AOM_INLINE void write_global_motion(AV1_COMP *cpi,
         cm->prev_frame ? &cm->prev_frame->global_motion[frame]
                        : &default_warp_params;
     write_global_motion_params(&cm->global_motion[frame], ref_params, wb,
+#if !CONFIG_FLEX_MVRES
                                cm->features.allow_high_precision_mv);
+#else
+                               cm->features.fr_mv_precision);
+#endif
     // TODO(sarahparker, debargha): The logic in the commented out code below
     // does not work currently and causes mismatches when resize is on.
     // Fix it before turning the optimization back on.
@@ -3761,9 +3946,32 @@ static AOM_INLINE void write_uncompressed_header_obu(
           wb, MAX_MAX_DRL_BITS - MIN_MAX_DRL_BITS + 1,
           features->max_drl_bits - MIN_MAX_DRL_BITS);
 #endif  // CONFIG_NEW_INTER_MODES
+#if CONFIG_FLEX_MVRES
+      if (!features->cur_frame_force_integer_mv) {
+        aom_wb_write_bit(wb, features->fr_mv_precision > MV_PRECISION_QTR_PEL);
+      }
+#if DEBUG_FLEX_MV
+      else {
+        CHECK_FLEX_MV(features->fr_mv_precision != MV_PRECISION_ONE_PEL,
+                      " frame level precision value should be integer pel");
+      }
+      if (features->fr_mv_precision > MV_PRECISION_ONE_PEL) {
+        error_check_flexmv(features->use_pb_mv_precision != 1, &cm->error,
+                           " Error in use_pb_level_signaling");
+        error_check_flexmv(features->use_sb_mv_precision != 0, &cm->error,
+                           " Error in use_pb_level_signaling");
+      } else {
+        assert(!features->use_sb_mv_precision);
+        assert(!features->use_pb_mv_precision);
+      }
+      assert(IMPLIES(features->cur_frame_force_integer_mv,
+                     features->fr_mv_precision == MV_PRECISION_ONE_PEL));
+#endif
+#else
       if (!features->cur_frame_force_integer_mv) {
         aom_wb_write_bit(wb, features->allow_high_precision_mv);
       }
+#endif
       write_frame_interp_filter(features->interp_filter, wb);
       aom_wb_write_bit(wb, features->switchable_motion_mode);
       if (frame_might_allow_ref_frame_mvs(cm)) {

@@ -65,6 +65,40 @@ static const uint8_t num_pels_log2_lookup[BLOCK_SIZES_ALL] = {
   4, 5, 5, 6, 7, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 6, 6, 8, 8, 10, 10
 };
 
+#if CONFIG_FLEX_MVRES && ADAPTIVE_PRECISION_SETS
+static const uint8_t allow_this_mv_precision[NUM_PRECISION_SETS][6] = {
+  // max MV precision == MV_PRECISION_HALF_PEL
+  {
+      1,  // MV_PRECISION_FOUR_PEL
+      1,  // MV_PRECISION_TWO_PEL
+      1,  // MV_PRECISION_ONE_PEL
+      1,  // MV_PRECISION_HALF_PEL
+      0,  // MV_PRECISION_QTR_PEL
+      0   // MV_PRECISION_ONE_EIGHTH_PEL
+  },
+
+  // max MV precision == MV_PRECISION_QTR_PEL
+  {
+      1,  // MV_PRECISION_FOUR_PEL
+      1,  // MV_PRECISION_TWO_PEL
+      1,  // MV_PRECISION_ONE_PEL
+      1,  // MV_PRECISION_HALF_PEL
+      1,  // MV_PRECISION_QTR_PEL
+      0   // MV_PRECISION_ONE_EIGHTH_PEL
+  },
+
+  // max MV precision == MV_PRECISION_ONE_EIGHTH_PEL
+  {
+      1,  // MV_PRECISION_FOUR_PEL
+      1,  // MV_PRECISION_TWO_PEL
+      1,  // MV_PRECISION_ONE_PEL
+      1,  // MV_PRECISION_HALF_PEL
+      1,  // MV_PRECISION_QTR_PEL
+      1   // MV_PRECISION_ONE_EIGHTH_PEL
+  },
+};
+#endif
+
 // A compressed version of the Partition_Subsize table in the spec (9.3.
 // Conversion tables), for square block sizes only.
 /* clang-format off */

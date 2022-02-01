@@ -1263,7 +1263,11 @@ typedef struct {
 } RdIdxPair;
 // TODO(angiebird): This is an estimated size. We still need to figure what is
 // the maximum number of modes.
+#if CONFIG_FLEX_MVRES
+#define MAX_INTER_MODES (1024 * 6)
+#else
 #define MAX_INTER_MODES 1024
+#endif
 // TODO(any): rename this struct to something else. There is already another
 // struct called inter_mode_info, which makes this terribly confusing.
 /*!\endcond */
@@ -2574,7 +2578,11 @@ typedef struct AV1_COMP {
   /*!
    * Tables to calculate IntraBC MV cost.
    */
+#if CONFIG_FLEX_MVRES
+  IntraBCMvCosts dv_costs;
+#else
   IntraBCMVCosts dv_costs;
+#endif
 
   /*!
    * Mark which ref frames can be skipped for encoding current frame during RDO.

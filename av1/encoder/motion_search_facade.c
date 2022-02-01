@@ -89,12 +89,25 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     step_param = mv_search_params->mv_step_param;
   }
 
+#if CONFIG_FLEX_MVRES
+  MV ref_mv_low_prec = av1_get_ref_mv(x, ref_idx).as_mv;
+  lower_mv_precision(&ref_mv_low_prec, mbmi->pb_mv_precision);
+  const MV ref_mv = ref_mv_low_prec;
+#else
   const MV ref_mv = av1_get_ref_mv(x, ref_idx).as_mv;
+#endif
+
   FULLPEL_MV start_mv;
-  if (mbmi->motion_mode != SIMPLE_TRANSLATION)
+  if (mbmi->motion_mode != SIMPLE_TRANSLATION) {
     start_mv = get_fullmv_from_mv(&mbmi->mv[0].as_mv);
-  else
-    start_mv = get_fullmv_from_mv(&ref_mv);
+  } else {
+    start_mv = get_fullmv_from_mv(
+        &ref_mv);  // ref_mv is already converted to low precision
+  }
+
+#if CONFIG_FLEX_MVRES
+  full_pel_lower_mv_precision(&start_mv, mbmi->pb_mv_precision);
+#endif
 
   // cand stores start_mv and all possible MVs in a SB.
   cand_mv_t cand[MAX_TPL_BLK_IN_SB * MAX_TPL_BLK_IN_SB + 1] = { { { 0, 0 },
@@ -127,15 +140,25 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
           for (int l = 0; l < nw; l++) {
             const int_mv mv = sb_enc->tpl_mv[start + k * sb_enc->tpl_stride + l]
                                             [ref - LAST_FRAME];
+
             if (mv.as_int == INVALID_MV) {
               valid = 0;
               break;
             }
 
+#if CONFIG_FLEX_MVRES
+            FULLPEL_MV fmv = { GET_MV_RAWPEL(mv.as_mv.row),
+                               GET_MV_RAWPEL(mv.as_mv.col) };
+            full_pel_lower_mv_precision(&fmv, mbmi->pb_mv_precision);
+#else
             const FULLPEL_MV fmv = { GET_MV_RAWPEL(mv.as_mv.row),
                                      GET_MV_RAWPEL(mv.as_mv.col) };
+#endif
+
             int unique = 1;
             for (int m = 0; m < cnt; m++) {
+              // TODO (Mohammed): fmv is already in full pel, do we need right
+              // shift here?
               if (RIGHT_SHIFT_MV(fmv.row) == RIGHT_SHIFT_MV(cand[m].fmv.row) &&
                   RIGHT_SHIFT_MV(fmv.col) == RIGHT_SHIFT_MV(cand[m].fmv.col)) {
                 unique = 0;
@@ -185,9 +208,26 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int fine_search_interval = use_fine_search_interval(cpi);
   const search_site_config *src_search_sites =
       mv_search_params->search_site_cfg[SS_CFG_SRC];
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision max_mv_precision = mbmi->max_mv_precision;
+  const int allow_pb_mv_precision = is_pb_mv_precision_active(cm, mbmi, bsize);
+  const int pb_mv_precision_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
+  const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#endif
+
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
+#if CONFIG_FLEX_MVRES
+  av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
+                                     max_mv_precision, allow_pb_mv_precision,
+                                     pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                     mbmi->pb_mv_precision_set_idx,
+#endif
+                                     src_search_sites, fine_search_interval);
+#else
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
                                      src_search_sites, fine_search_interval);
+#endif
 
   switch (mbmi->motion_mode) {
     case SIMPLE_TRANSLATION: {
@@ -200,6 +240,24 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
         int thissme = av1_full_pixel_search(
             smv, &full_ms_params, step_param, cond_cost_list(cpi, cost_list),
             &this_best_mv, &this_second_best_mv);
+
+#if CONFIG_FLEX_MVRES
+        full_pel_lower_mv_precision(&this_second_best_mv,
+                                    mbmi->pb_mv_precision);
+#if DEBUG_FLEX_MV
+
+        CHECK_FLEX_MV(
+            !is_this_mv_precision_compliant(get_mv_from_fullmv(&this_best_mv),
+                                            pb_mv_precision),
+            " this_best_mv precision is not compaitable in the loop of   "
+            "av1_full_pixel_search");
+        CHECK_FLEX_MV(
+            !is_this_mv_precision_compliant(
+                get_mv_from_fullmv(&this_second_best_mv), pb_mv_precision),
+            " this_second_best_mv precision is not compaitable in the loop "
+            "of   av1_full_pixel_search");
+#endif
+#endif
 
         if (thissme < bestsme) {
           bestsme = thissme;
@@ -225,6 +283,13 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
 
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  CHECK_FLEX_MV(
+      !is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
+                                      mbmi->pb_mv_precision),
+      " Error in MV precision value after integer search 1");
+#endif
+
   // Terminate search with the current ref_idx if we have already encountered
   // another ref_mv in the drl such that:
   //  1. The other drl has the same fullpel_mv during the SIMPLE_TRANSLATION
@@ -237,9 +302,19 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     int_mv this_mv;
     this_mv.as_mv = get_mv_from_fullmv(&best_mv->as_fullmv);
     const int ref_mv_idx = mbmi->ref_mv_idx;
+#if CONFIG_FLEX_MVRES
+    const int this_mv_rate = av1_mv_bit_cost(
+        &this_mv.as_mv, &ref_mv, max_mv_precision, allow_pb_mv_precision,
+        pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+        mbmi->pb_mv_precision_set_idx,
+#endif
+        mv_costs, MV_COST_WEIGHT);
+#else
     const int this_mv_rate =
         av1_mv_bit_cost(&this_mv.as_mv, &ref_mv, mv_costs->nmv_joint_cost,
                         mv_costs->mv_cost_stack, MV_COST_WEIGHT);
+#endif
     mode_info[ref_mv_idx].full_search_mv.as_int = this_mv.as_int;
     mode_info[ref_mv_idx].full_mv_rate = this_mv_rate;
 
@@ -265,6 +340,13 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
 
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  CHECK_FLEX_MV(
+      !is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
+                                      mbmi->pb_mv_precision),
+      " Error in MV precision value after integer search 2");
+#endif
+
   if (cpi->common.features.cur_frame_force_integer_mv) {
     convert_fullmv_to_mv(best_mv);
   }
@@ -278,12 +360,23 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
     av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv,
+#if CONFIG_FLEX_MVRES
+                                      max_mv_precision, allow_pb_mv_precision,
+                                      pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                      mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
                                       cost_list);
     MV subpel_start_mv = get_mv_from_fullmv(&best_mv->as_fullmv);
 
     switch (mbmi->motion_mode) {
       case SIMPLE_TRANSLATION:
+#if CONFIG_FLEX_MVRES
+        if (cpi->sf.mv_sf.subpel_search_type) {
+#else
         if (cpi->sf.mv_sf.use_accurate_subpel_search) {
+#endif
           const int try_second = second_best_mv.as_int != INVALID_MV &&
                                  second_best_mv.as_int != best_mv->as_int;
           const int best_mv_var = mv_search_params->find_fractional_mv_step(
@@ -315,8 +408,24 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
       default: assert(0 && "Invalid motion mode!\n");
     }
   }
+#if CONFIG_FLEX_MVRES
+  *rate_mv = av1_mv_bit_cost(&best_mv->as_mv, &ref_mv, max_mv_precision,
+                             allow_pb_mv_precision, pb_mv_precision_ctx,
+                             pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                             mbmi->pb_mv_precision_set_idx,
+#endif
+                             mv_costs, MV_COST_WEIGHT);
+#else
   *rate_mv = av1_mv_bit_cost(&best_mv->as_mv, &ref_mv, mv_costs->nmv_joint_cost,
                              mv_costs->mv_cost_stack, MV_COST_WEIGHT);
+#endif
+
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  CHECK_FLEX_MV(
+      !is_this_mv_precision_compliant(best_mv->as_mv, mbmi->pb_mv_precision),
+      " Error in MV precision value in av1_single_motion_search");
+#endif
 }
 
 void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
@@ -332,8 +441,27 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   MB_MODE_INFO *mbmi = xd->mi[0];
   // This function should only ever be called for compound modes
   assert(has_second_ref(mbmi));
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision max_mv_precision = mbmi->max_mv_precision;
+  const int allow_pb_mv_precision = is_pb_mv_precision_active(cm, mbmi, bsize);
+  const int pb_mv_precision_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
+  const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#if DEBUG_FLEX_MV
+  error_check_flexmv(
+      !allow_pb_mv_precision && (pb_mv_precision != max_mv_precision),
+      &cm->error, " pb and mx mv_precision should be same");
+#endif
+#endif
+
+#if CONFIG_FLEX_MVRES
+  // TODO(Mohammed): May not necessary, need to double check
+  lower_mv_precision(&cur_mv[0].as_mv, pb_mv_precision);
+  lower_mv_precision(&cur_mv[1].as_mv, pb_mv_precision);
+#endif  // CONFIG_FLEX_MVRES
+
   const int_mv init_mv[2] = { cur_mv[0], cur_mv[1] };
   const int refs[2] = { mbmi->ref_frame[0], mbmi->ref_frame[1] };
+
   const MvCosts *mv_costs = &x->mv_costs;
   int_mv ref_mv[2];
   int ite, ref;
@@ -416,14 +544,21 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     // current frame we must use a unit scaling factor during mode selection.
     av1_enc_build_one_inter_predictor(second_pred, pw, &cur_mv[!id].as_mv,
                                       &inter_pred_params);
-
     // Do full-pixel compound motion search on the current reference frame.
     if (id) xd->plane[plane].pre[0] = ref_yv12[id];
 
     // Make motion search params
     FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
     av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize,
-                                       &ref_mv[id].as_mv, NULL,
+                                       &ref_mv[id].as_mv,
+#if CONFIG_FLEX_MVRES
+                                       max_mv_precision, allow_pb_mv_precision,
+                                       pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                       mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
+                                       NULL,
                                        /*fine_search_interval=*/0);
 
     av1_set_ms_compound_refs(&full_ms_params.ms_buffers, second_pred, mask,
@@ -433,8 +568,14 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     const FULLPEL_MV start_fullmv = get_fullmv_from_mv(&cur_mv[id].as_mv);
 
     // Small-range full-pixel motion search.
-    bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                       &best_mv.as_fullmv);
+#if CONFIG_FLEX_MVRES
+    if (pb_mv_precision < MV_PRECISION_ONE_PEL)
+      bestsme = av1_refining_search_8p_c_low_precision(
+          &full_ms_params, start_fullmv, &best_mv.as_fullmv);
+    else
+#endif
+      bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
+                                         &best_mv.as_fullmv);
 
     // Restore the pointer to the first (possibly scaled) prediction buffer.
     if (id) xd->plane[plane].pre[0] = ref_yv12[0];
@@ -462,7 +603,15 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
       unsigned int sse;
       SUBPEL_MOTION_SEARCH_PARAMS ms_params;
       av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
-                                        &ref_mv[id].as_mv, NULL);
+                                        &ref_mv[id].as_mv,
+#if CONFIG_FLEX_MVRES
+                                        max_mv_precision, allow_pb_mv_precision,
+                                        pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                        mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
+                                        NULL);
       av1_set_ms_compound_refs(&ms_params.var_params.ms_buffers, second_pred,
                                mask, mask_stride, id);
       ms_params.forced_stop = EIGHTH_PEL;
@@ -482,12 +631,21 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   }
 
   *rate_mv = 0;
-
   for (ref = 0; ref < 2; ++ref) {
     const int_mv curr_ref_mv = av1_get_ref_mv(x, ref);
+#if CONFIG_FLEX_MVRES
+    *rate_mv += av1_mv_bit_cost(&cur_mv[ref].as_mv, &curr_ref_mv.as_mv,
+                                max_mv_precision, allow_pb_mv_precision,
+                                pb_mv_precision_ctx, mbmi->pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                mbmi->pb_mv_precision_set_idx,
+#endif
+                                mv_costs, MV_COST_WEIGHT);
+#else
     *rate_mv += av1_mv_bit_cost(&cur_mv[ref].as_mv, &curr_ref_mv.as_mv,
                                 mv_costs->nmv_joint_cost,
                                 mv_costs->mv_cost_stack, MV_COST_WEIGHT);
+#endif
   }
 }
 
@@ -539,20 +697,48 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   int_mv best_mv;
 
   // Make motion search params
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision max_mv_precision = mbmi->max_mv_precision;
+  const int allow_pb_mv_precision = is_pb_mv_precision_active(cm, mbmi, bsize);
+  const int pb_mv_precision_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
+  const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#if DEBUG_FLEX_MV
+  error_check_flexmv(
+      !allow_pb_mv_precision && (pb_mv_precision != max_mv_precision),
+      &cm->error, " pb and max mv precision should be same");
+#endif
+#endif
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize,
-                                     &ref_mv.as_mv, NULL,
+                                     &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                     max_mv_precision, allow_pb_mv_precision,
+                                     pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                     mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
+                                     NULL,
                                      /*fine_search_interval=*/0);
 
   av1_set_ms_compound_refs(&full_ms_params.ms_buffers, second_pred, mask,
                            mask_stride, ref_idx);
 
+#if CONFIG_FLEX_MVRES
+  lower_mv_precision(this_mv, pb_mv_precision);
+#endif
   // Use the mv result from the single mode as mv predictor.
   const FULLPEL_MV start_fullmv = get_fullmv_from_mv(this_mv);
 
-  // Small-range full-pixel motion search.
-  bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                     &best_mv.as_fullmv);
+// Small-range full-pixel motion search.
+#if CONFIG_FLEX_MVRES
+  if (pb_mv_precision < MV_PRECISION_ONE_PEL)
+    bestsme = av1_refining_search_8p_c_low_precision(
+        &full_ms_params, start_fullmv, &best_mv.as_fullmv);
+  else
+#endif
+    bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
+                                       &best_mv.as_fullmv);
 
   if (scaled_ref_frame) {
     // Swap back the original buffers for subpel motion search.
@@ -571,6 +757,13 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     unsigned int sse;
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
     av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                      max_mv_precision, allow_pb_mv_precision,
+                                      pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                      mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
                                       NULL);
     av1_set_ms_compound_refs(&ms_params.var_params.ms_buffers, second_pred,
                              mask, mask_stride, ref_idx);
@@ -586,9 +779,18 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   if (bestsme < INT_MAX) *this_mv = best_mv.as_mv;
 
   *rate_mv = 0;
-
+#if CONFIG_FLEX_MVRES
+  *rate_mv += av1_mv_bit_cost(this_mv, &ref_mv.as_mv, max_mv_precision,
+                              allow_pb_mv_precision, pb_mv_precision_ctx,
+                              pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                              mbmi->pb_mv_precision_set_idx,
+#endif
+                              mv_costs, MV_COST_WEIGHT);
+#else
   *rate_mv += av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->nmv_joint_cost,
                               mv_costs->mv_cost_stack, MV_COST_WEIGHT);
+#endif
 }
 
 static AOM_INLINE void build_second_inter_pred(const AV1_COMP *cpi,
@@ -745,6 +947,13 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
 #else
   mbmi->interp_filters = av1_broadcast_interp_filter(EIGHTTAP_REGULAR);
 #endif  // CONFIG_REMOVE_DUAL_FILTER
+#if CONFIG_FLEX_MVRES
+  set_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+  set_mv_precision(mbmi, mbmi->max_mv_precision);
+#if ADAPTIVE_PRECISION_SETS
+  set_default_mv_precision_set(mbmi);
+#endif
+#endif
 
   const YV12_BUFFER_CONFIG *yv12 = get_ref_frame_yv12_buf(cm, ref);
   const YV12_BUFFER_CONFIG *scaled_ref_frame =
@@ -774,9 +983,26 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
 
   // Allow more mesh searches for screen content type on the ARF.
   const int fine_search_interval = use_fine_search_interval(cpi);
+#if CONFIG_FLEX_MVRES
+  const MvSubpelPrecision max_mv_precision = mbmi->max_mv_precision;
+  const int allow_pb_mv_precision = is_pb_mv_precision_active(cm, mbmi, bsize);
+  const int pb_mv_precision_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
+  const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#endif
+
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
+#if CONFIG_FLEX_MVRES
+                                     max_mv_precision, allow_pb_mv_precision,
+                                     pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                     mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
                                      src_search_sites, fine_search_interval);
+#if CONFIG_FLEX_MVRES
+  full_pel_lower_mv_precision(&start_mv, pb_mv_precision);
+#endif
 
   var = av1_full_pixel_search(start_mv, &full_ms_params, step_param,
                               cond_cost_list(cpi, cost_list),
@@ -793,6 +1019,13 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
 
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
     av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv,
+#if CONFIG_FLEX_MVRES
+                                      max_mv_precision, allow_pb_mv_precision,
+                                      pb_mv_precision_ctx, pb_mv_precision,
+#if ADAPTIVE_PRECISION_SETS
+                                      mbmi->pb_mv_precision_set_idx,
+#endif
+#endif
                                       cost_list);
     // TODO(yunqing): integrate this into av1_make_default_subpel_ms_params().
     ms_params.forced_stop = cpi->sf.mv_sf.simple_motion_subpel_force_stop;
