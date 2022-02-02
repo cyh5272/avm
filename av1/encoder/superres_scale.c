@@ -420,6 +420,20 @@ static void setup_frame_size_from_params(AV1_COMP *cpi,
   av1_set_frame_size(cpi, encode_width, encode_height);
 }
 
+#if CONFIG_EXT_SUPERRES
+static uint8_t get_superres_scale_index(const size_params_type *rsz) {
+  const int denom = rsz->superres_denom;
+  const int num = rsz->superres_num;
+
+  for (int i = 0; i < SUPERRES_SCALES; i++) {
+    if (denom == superres_scales[i].scale_denom &&
+        num == superres_scales[i].scale_num)
+      return i;
+  }
+  return SUPERRES_SCALES;
+}
+#endif  // CONFIG_EXT_SUPERRES
+
 void av1_setup_frame_size(AV1_COMP *cpi) {
   AV1_COMMON *cm = &cpi->common;
   // Reset superres params from previous frame.
@@ -429,13 +443,17 @@ void av1_setup_frame_size(AV1_COMP *cpi) {
 #endif  // CONFIG_EXT_SUPERRES
   const size_params_type rsz = calculate_next_size_params(cpi);
 #if CONFIG_EXT_SUPERRES
-  // TODO(yuec): get the index from the decision made above once the new
-  // algorithm for selecting the scaling factor is completed.
-  cm->superres_scale_index = 0;
-  cm->superres_scale_denominator =
-      superres_scales[cm->superres_scale_index].scale_denom;
-  cm->superres_scale_numerator =
-      superres_scales[cm->superres_scale_index].scale_num;
+  cm->superres_scale_index = get_superres_scale_index(&rsz);
+  if (cm->superres_scale_index < SUPERRES_SCALES) {
+    cm->superres_scale_denominator =
+        superres_scales[cm->superres_scale_index].scale_denom;
+    cm->superres_scale_numerator =
+        superres_scales[cm->superres_scale_index].scale_num;
+  } else {
+    assert(rsz->superres_denom == SCALE_NUMERATOR &&
+           rsz->superres_num == SCALE_NUMERATOR &&
+           "The encoder-decided superres scale is not supported.");
+  }
 #endif  // CONFIG_EXT_SUPERRES
   setup_frame_size_from_params(cpi, &rsz);
 
