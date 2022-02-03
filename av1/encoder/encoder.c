@@ -2123,6 +2123,84 @@ static void pick_and_apply_loop_restoration(AV1_COMP *cpi, AV1_COMMON *cm) {
   apply_loop_restoration(cpi, cm);
 }
 
+#if CONFIG_SAVE_CNN_RESTORATION_DATA
+#define IS_SAVED_BUFFER_SIZE 500
+typedef struct {
+  // Filename for saving the data.
+  char filename[80];
+  // is_saved[i] is true if frame #i has already been saved.
+  bool is_saved[IS_SAVED_BUFFER_SIZE];
+  // Only save a frame if absolute_poc % every_nth == 0.
+  int every_nth;
+  // True if this struct instance has been initialized.
+  bool is_initialized;
+} CnnDatasetInfo;
+
+static CnnDatasetInfo cnn_dataset_info = {
+  "cnn_data.bin", { false }, 4, false
+};
+
+// Initialize the dataset for saving, and save frame width and height.
+static bool cnn_dataset_init(int width, int height) {
+  assert(!cnn_dataset_info.is_initialized);
+  FILE *out = fopen(cnn_dataset_info.filename, "wb");
+  if (out == NULL) {
+    fprintf(stderr, "ERROR: Could NOT initialize cnn_dataset_info!");
+    return false;
+  }
+  fwrite(&width, sizeof(width), 1, out);
+  fwrite(&height, sizeof(height), 1, out);
+  fclose(out);
+
+  for (int i = 0; i < IS_SAVED_BUFFER_SIZE; ++i) {
+    cnn_dataset_info.is_saved[i] = false;
+  }
+  cnn_dataset_info.is_initialized = true;
+  return true;
+}
+
+// Save frame pixels as floats normalized in [0, 1] range.
+static bool cnn_dataset_save_frame(const uint8_t *frame, int width, int height,
+                                   int stride, bool use_highbd, int bitdepth) {
+  assert(cnn_dataset_info.is_initialized);
+
+  const uint8_t *frame_8bit = (uint8_t *)frame;
+  const uint16_t *frame_16bit = CONVERT_TO_SHORTPTR(frame);
+  const float normalizer = (1 << bitdepth) - 1;
+
+  FILE *out = fopen(cnn_dataset_info.filename, "ab");
+  if (out == NULL) return false;
+  for (int r = 0; r < height; ++r) {
+    for (int c = 0; c < width; ++c) {
+      const float pixel_value =
+          (float)(use_highbd ? frame_16bit[r * stride + c]
+                             : frame_8bit[r * stride + c]);
+      const float pixel_value_normalized = pixel_value / normalizer;
+      fwrite(&pixel_value_normalized, sizeof(pixel_value_normalized), 1, out);
+    }
+  }
+  fclose(out);
+  return true;
+}
+
+// Save frame's qindex.
+// Note: This is repeatedly written to create a fake image.
+// This makes it straightforward to read all frame data using tf.io.decode_raw.
+static bool cnn_dataset_save_qindex(int qindex, int width, int height) {
+  assert(cnn_dataset_info.is_initialized);
+  FILE *out = fopen(cnn_dataset_info.filename, "ab");
+  if (out == NULL) return false;
+  const float pixel_value = qindex;
+  for (int r = 0; r < height; ++r) {
+    for (int c = 0; c < width; ++c) {
+      fwrite(&pixel_value, sizeof(pixel_value), 1, out);
+    }
+  }
+  fclose(out);
+  return true;
+}
+#endif  // CONFIG_SAVE_CNN_RESTORATION_DATA
+
 /*!\brief Select and apply cdef filters and switchable restoration filters
  *
  * \ingroup high_level_algo
@@ -2250,6 +2328,44 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 #endif
 
   av1_superres_post_encode(cpi);
+
+#if CONFIG_SAVE_CNN_RESTORATION_DATA
+  // Data saved in following format:
+  // width,height
+  // frame0_src, frame0_dgd, frame0_qindex
+  // ...
+  // Note:
+  // - width, height, frame*_qindex are integers
+  // - frame*_src, frame*_dgd are normalized pixels values
+  if (!cnn_dataset_info.is_initialized) {
+    if (!cnn_dataset_init(cm->cur_frame->width, cm->cur_frame->height)) {
+      fprintf(stderr, "ERROR in cnn_dataset_init()");
+    };
+  }
+
+  if (!cnn_dataset_info.is_saved[cm->cur_frame->absolute_poc] &&
+      cm->cur_frame->absolute_poc % cnn_dataset_info.every_nth == 0) {
+    // Save source frame.
+    const YV12_BUFFER_CONFIG *src = cpi->source;
+    cnn_dataset_save_frame(src->buffers[AOM_PLANE_Y], src->y_crop_width,
+                           src->y_crop_height, src->y_stride,
+                           cm->seq_params.use_highbitdepth,
+                           cm->seq_params.bit_depth);
+    // Save frame before CNN/LR.
+    const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
+    assert(src->y_crop_width == dgd->y_crop_width);
+    assert(src->y_crop_height == dgd->y_crop_height);
+    cnn_dataset_save_frame(dgd->buffers[AOM_PLANE_Y], dgd->y_crop_width,
+                           dgd->y_crop_height, dgd->y_stride,
+                           cm->seq_params.use_highbitdepth,
+                           cm->seq_params.bit_depth);
+    // Save qindex used by this frame.
+    cnn_dataset_save_qindex(cm->quant_params.base_qindex, dgd->y_crop_width,
+                            dgd->y_crop_height);
+    // Mark as saved.
+    cnn_dataset_info.is_saved[cm->cur_frame->absolute_poc] = true;
+  }
+#endif  // CONFIG_SAVE_CNN_RESTORATION_DATA
 
 #if CONFIG_COLLECT_COMPONENT_TIMING
   start_timing(cpi, loop_restoration_time);
