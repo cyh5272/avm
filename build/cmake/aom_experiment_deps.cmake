@@ -31,12 +31,15 @@ macro(fix_experiment_configs)
   endif()
 
   if(CONFIG_COMBINE_PC_NS_WIENER)
-    change_config_and_warn(CONFIG_WIENER_NONSEP 1
-                           CONFIG_COMBINE_PC_NS_WIENER)
+    change_config_and_warn(CONFIG_WIENER_NONSEP 1 CONFIG_COMBINE_PC_NS_WIENER)
   endif()
   if(CONFIG_COMBINE_PC_NS_WIENER)
-    change_config_and_warn(CONFIG_PC_WIENER 1
-                           CONFIG_COMBINE_PC_NS_WIENER)
+    change_config_and_warn(CONFIG_PC_WIENER 1 CONFIG_COMBINE_PC_NS_WIENER)
+  endif()
+
+  if(CONFIG_SAVE_CNN_RESTORATION_DATA)
+    change_config_and_warn(CONFIG_CNN_RESTORATION 1
+                           CONFIG_SAVE_CNN_RESTORATION_DATA)
   endif()
 
   if(CONFIG_CNN_RESTORATION)
