@@ -4582,12 +4582,6 @@ static INLINE int skip_inter_mode_with_cached_mode(
   const MV_REFERENCE_FRAME *cached_frame = cached_mi->ref_frame;
   const int cached_mode_is_single = cached_frame[1] <= INTRA_FRAME;
 
-  // If the cached mode is intra, then we just need to match the mode.
-  if (should_reuse_mode(x, REUSE_INTRA_MODE_IN_INTERFRAME_FLAG) &&
-      is_mode_intra(cached_mode) && mode != cached_mode) {
-    return 1;
-  }
-
   // Returns 0 here if we are not reusing inter_modes
   if (!should_reuse_mode(x, REUSE_INTER_MODE_IN_INTERFRAME_FLAG) ||
       !cached_mi) {
@@ -5979,6 +5973,20 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         continue;
       }
 #endif
+#if CONFIG_EXT_RECUR_PARTITIONS
+      const MB_MODE_INFO *cached_mi = x->inter_mode_cache;
+      if (cached_mi) {
+        const PREDICTION_MODE cached_mode = cached_mi->mode;
+        if (should_reuse_mode(x, REUSE_INTRA_MODE_IN_INTERFRAME_FLAG) &&
+            is_mode_intra(cached_mode) && mbmi->mode != cached_mode) {
+          continue;
+        }
+        if (should_reuse_mode(x, REUSE_INTER_MODE_IN_INTERFRAME_FLAG) &&
+            !is_mode_intra(cached_mode)) {
+          continue;
+        }
+      }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_ORIP
       int signal_intra_filter = av1_signal_orip_for_horver_modes(
