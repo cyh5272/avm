@@ -42,6 +42,10 @@ extern "C" {
 #endif
 #endif
 
+#define AMVD_EXTENSION 1
+#define AMVD_NO_HP 1
+#define JOINT_AMVD 1
+
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
 #define MAX_SB_SIZE (1 << MAX_SB_SIZE_LOG2)
@@ -528,6 +532,9 @@ enum {
   NEARMV,
   GLOBALMV,
   NEWMV,
+#if AMVD_EXTENSION
+  AMVDNEWMV,
+#endif
 // Compound ref compound modes
 #if !CONFIG_NEW_INTER_MODES
   NEAREST_NEARESTMV,

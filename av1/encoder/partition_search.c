@@ -839,6 +839,9 @@ static void update_drl_index_stats(int max_drl_bits, const int16_t mode_ctx,
   (void)counts;
 #endif  // !CONFIG_ENTROPY_STATS
   assert(have_drl_index(mbmi->mode));
+#if AMVD_EXTENSION
+  if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
+#endif
   uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
   assert(mbmi->ref_mv_idx < max_drl_bits + 1);
   for (int idx = 0; idx < max_drl_bits; ++idx) {
@@ -1155,11 +1158,14 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
       }
 
+      if (has_second_ref(mbmi)
 #if CONFIG_OPTFLOW_REFINEMENT
-      if (has_second_ref(mbmi) && mbmi->mode < NEAR_NEARMV_OPTFLOW) {
-#else
-      if (has_second_ref(mbmi)) {
+          && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if JOINT_AMVD
+          && mbmi->adaptive_mvd_flag == 0
+#endif
+      ) {
         assert(current_frame->reference_mode != SINGLE_REFERENCE &&
                is_inter_compound_mode(mbmi->mode) &&
                mbmi->motion_mode == SIMPLE_TRANSLATION);
@@ -1233,11 +1239,18 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       update_cdf(fc->inter_compound_mode_cdf[mode_ctx],
                  INTER_COMPOUND_OFFSET(mode), INTER_COMPOUND_MODES);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if JOINT_AMVD
+      if (mode == JOINT_NEWMV || mode == JOINT_NEWMV_OPTFLOW)
+        update_cdf(fc->adaptive_mvd_cdf, mbmi->adaptive_mvd_flag, 2);
+#endif
     } else {
       av1_update_inter_mode_stats(fc, counts, mode, mode_ctx);
     }
 
     const int new_mv = mbmi->mode == NEWMV ||
+#if AMVD_EXTENSION
+                       mbmi->mode == AMVDNEWMV ||
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT
                        mbmi->mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1246,7 +1259,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
     const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
-    const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
+    const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_NEW_INTER_MODES
     if (have_drl_index(mbmi->mode)) {

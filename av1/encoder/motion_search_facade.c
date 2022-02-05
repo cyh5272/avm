@@ -487,6 +487,76 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   }
 }
 
+#if AMVD_EXTENSION
+void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
+                                   BLOCK_SIZE bsize, MV *this_mv, int *rate_mv,
+                                   int ref_idx) {
+  const AV1_COMMON *const cm = &cpi->common;
+  const int num_planes = av1_num_planes(cm);
+  MACROBLOCKD *xd = &x->e_mbd;
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  const int ref = mbmi->ref_frame[ref_idx];
+  const int_mv ref_mv = av1_get_ref_mv(x, ref_idx);
+  struct macroblockd_plane *const pd = &xd->plane[0];
+  const MvCosts *mv_costs = &x->mv_costs;
+
+  struct buf_2d backup_yv12[MAX_MB_PLANE];
+  const YV12_BUFFER_CONFIG *const scaled_ref_frame =
+      av1_get_scaled_ref_frame(cpi, ref);
+
+  // Store the first prediction buffer.
+  struct buf_2d orig_yv12;
+  if (ref_idx) {
+    orig_yv12 = pd->pre[0];
+    pd->pre[0] = pd->pre[ref_idx];
+  }
+
+  if (scaled_ref_frame) {
+    // Swap out the reference frame for a version that's been scaled to
+    // match the resolution of the current frame, allowing the existing
+    // full-pixel motion search code to be used without additional
+    // modifications.
+    for (int i = 0; i < num_planes; i++) {
+      backup_yv12[i] = xd->plane[i].pre[ref_idx];
+    }
+    const int mi_row = xd->mi_row;
+    const int mi_col = xd->mi_col;
+    av1_setup_pre_planes(xd, ref_idx, scaled_ref_frame, mi_row, mi_col, NULL,
+                         num_planes);
+  }
+
+  int bestsme = INT_MAX;
+  int_mv best_mv;
+
+  int dis; /* TODO: use dis in distortion calculation later. */
+  unsigned int sse;
+  SUBPEL_MOTION_SEARCH_PARAMS ms_params;
+  av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv.as_mv,
+                                    NULL);
+  ms_params.forced_stop = EIGHTH_PEL;
+  bestsme = adaptive_mvd_search(cm, xd, &ms_params, ref_mv.as_mv,
+                                &best_mv.as_mv, &dis, &sse);
+
+  // Restore the pointer to the first unscaled prediction buffer.
+  if (ref_idx) pd->pre[0] = orig_yv12;
+
+  if (bestsme < INT_MAX) {
+    *this_mv = best_mv.as_mv;
+    const MV diff = { best_mv.as_mv.row - ref_mv.as_mv.row,
+                      best_mv.as_mv.col - ref_mv.as_mv.col };
+    if (diff.row != 0 && diff.col != 0) {
+      printf("assertion failure error!\n");
+    }
+    assert(diff.row == 0 || diff.col == 0);
+  }
+
+  *rate_mv = 0;
+  *rate_mv +=
+      av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->amvd_nmv_joint_cost,
+                      mv_costs->amvd_mv_cost_stack, MV_COST_WEIGHT);
+}
+#endif
+
 // Search for the best mv for one component of a compound,
 // given that the other component is fixed.
 void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
@@ -562,8 +632,12 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   int_mv best_other_mv;
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
-  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi->mode);
-  if (is_adaptive_mvd) {
+  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+  if (is_adaptive_mvd
+#if JOINT_AMVD
+      && mbmi->adaptive_mvd_flag == 0
+#endif
+  ) {
     int dis; /* TODO: use dis in distortion calculation later. */
     unsigned int sse;
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
@@ -590,10 +664,18 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     av1_set_ms_compound_refs(&ms_params.var_params.ms_buffers, second_pred,
                              mask, mask_stride, ref_idx);
     ms_params.forced_stop = EIGHTH_PEL;
-    bestsme = joint_mvd_search(cm, xd, &ms_params, ref_mv.as_mv, this_mv,
-                               &best_mv.as_mv, &dis, &sse, ref_idx, other_mv,
-                               &best_other_mv.as_mv, second_pred,
-                               &inter_pred_params, NULL);
+#if JOINT_AMVD
+    if (mbmi->adaptive_mvd_flag == 1)
+      bestsme = av1_joint_amvd_motion_search(
+          cm, xd, &ms_params, ref_mv.as_mv, this_mv, &best_mv.as_mv, &dis, &sse,
+          ref_idx, other_mv, &best_other_mv.as_mv, second_pred,
+          &inter_pred_params, NULL);
+    else
+#endif
+      bestsme = joint_mvd_search(cm, xd, &ms_params, ref_mv.as_mv, this_mv,
+                                 &best_mv.as_mv, &dis, &sse, ref_idx, other_mv,
+                                 &best_other_mv.as_mv, second_pred,
+                                 &inter_pred_params, NULL);
   } else
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
