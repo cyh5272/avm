@@ -20,6 +20,17 @@
 
 static const double TINY_NEAR_ZERO = 1.0E-8;
 
+// Evaluates quadratic for x'Ax
+static INLINE double eval_quadratic(int n, double *A, int stride, double *x) {
+  double q = 0;
+  for (int i = 0; i < n; ++i) {
+    double u = 0;
+    for (int j = 0; j < n; ++j) u += A[i * stride + j] * x[j];
+    q += x[i] * u;
+  }
+  return q;
+}
+
 // Solves Ax = b, where x and b are column vectors of size nx1 and A is nxn
 static INLINE int linsolve(int n, double *A, int stride, double *b, double *x) {
   int i, j, k;

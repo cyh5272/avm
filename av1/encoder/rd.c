@@ -438,6 +438,9 @@ void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc,
 #if CONFIG_WIENER_NONSEP
   av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_restore_cost,
                            fc->wiener_nonsep_restore_cdf[ql], NULL);
+  for (int c = 0; c < WIENERNS_REDUCE_STEPS; ++c)
+    av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_reduce_cost[c],
+                             fc->wiener_nonsep_reduce_cdf[ql][c], NULL);
 #if CONFIG_LR_4PART_CODE
   for (int c = 0; c < WIENERNS_4PART_CTX_MAX; ++c)
     av1_cost_tokens_from_cdf(mode_costs->wiener_nonsep_4part_cost[c],

@@ -103,7 +103,7 @@ static INLINE void aom_write_symbol(aom_writer *w, int symb, aom_cdf_prob *cdf,
 #if CONFIG_WIENER_NONSEP
 // Implements a code where a symbol with an alphabet size a power of 2 with
 // nsymb_bits bits (with nsymb_bits >= 3), is coded by decomposing the symbol
-// into 4 parts convering 1/8, 1/8, 1/4, 1/2 of the total number of symbols.
+// into 4 parts covering 1/8, 1/8, 1/4, 1/2 of the total number of symbols.
 // The part is arithmetically coded using the provided cdf of size 4. The
 // offset within each part is coded using fixed length binary codes with
 // (nsymb_bits - 3), (nsymb_bits - 3), (nsymb_bits - 2) or (nsymb_bits - 1)
