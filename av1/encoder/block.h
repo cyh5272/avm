@@ -821,6 +821,10 @@ typedef struct {
   //! warp_delta_param_cost
   int warp_delta_param_cost[2][WARP_DELTA_NUM_SYMBOLS];
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  //! warp_extend_cost
+  int warp_extend_cost[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2][2];
+#endif  // CONFIG_WARP_EXTEND
 #else
   //! motion_mode_cost
   int motion_mode_cost[BLOCK_SIZES_ALL][MOTION_MODES];

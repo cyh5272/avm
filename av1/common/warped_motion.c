@@ -15,6 +15,7 @@
 #include <memory.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "config/av1_rtcd.h"
 
@@ -821,3 +822,105 @@ int av1_find_projection(int np, const int *pts1, const int *pts2,
 
   return 0;
 }
+
+#if CONFIG_WARP_EXTEND
+/* Given a neighboring block's warp model and the motion vector at the center
+   of the current block, construct a new warp model which is continuous with
+   the neighbor at the common edge but which has the given motion vector at
+   the center of the block.
+
+    The `neighbor_is_above` parameter should be true if the neighboring block
+    is above the current block, or false if it is to the left of the current
+    block.
+
+    Returns 0 if the resulting model can be used with the warp filter,
+    1 if not.
+*/
+int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
+                          const MV *center_mv, const int mi_row,
+                          const int mi_col,
+                          const WarpedMotionParams *neighbor_wm,
+                          WarpedMotionParams *wm_params) {
+  const int half_width_log2 = mi_size_wide_log2[bsize] + MI_SIZE_LOG2 - 1;
+  const int half_height_log2 = mi_size_high_log2[bsize] + MI_SIZE_LOG2 - 1;
+  const int center_x = (mi_col * MI_SIZE) + (1 << half_width_log2) - 1;
+  const int center_y = (mi_row * MI_SIZE) + (1 << half_height_log2) - 1;
+  // Calculate the point (at warp model precision) where the center of the
+  // current block should be mapped to
+  int proj_center_x = (center_x * (1 << WARPEDMODEL_PREC_BITS)) +
+                      (center_mv->col * (1 << (WARPEDMODEL_PREC_BITS - 3)));
+  int proj_center_y = (center_y * (1 << WARPEDMODEL_PREC_BITS)) +
+                      (center_mv->row * (1 << (WARPEDMODEL_PREC_BITS - 3)));
+
+  *wm_params = default_warp_params;
+  wm_params->wmtype = AFFINE;
+
+  if (neighbor_is_above) {
+    // We want to construct a model which will project the block center
+    // according to the signaled motion vector, and which matches the
+    // neighbor's warp model along the top edge of the block.
+    //
+    // We do this in three steps:
+    // 1) Since the models should match along the whole top edge of the block,
+    //    the coefficients of x in the warp model must be the same as for the
+    //    neighboring block
+    //
+    // 2) The coefficients of y in the warp model can then be determined from
+    //    the difference in projected positions between a point on the edge
+    //    and the block center
+    //
+    // 3) The translational part can be derived (outside of this `if`)
+    //    by subtracting the linear part of the model from the signaled MV.
+
+    wm_params->wmmat[2] = neighbor_wm->wmmat[2];
+    wm_params->wmmat[4] = neighbor_wm->wmmat[4];
+
+    // Project above point
+    int above_x = center_x;
+    int above_y = center_y - (1 << half_height_log2);
+    int proj_above_x = neighbor_wm->wmmat[2] * above_x +
+                       neighbor_wm->wmmat[3] * above_y + neighbor_wm->wmmat[0];
+    int proj_above_y = neighbor_wm->wmmat[4] * above_x +
+                       neighbor_wm->wmmat[5] * above_y + neighbor_wm->wmmat[1];
+
+    // y coefficients are (project(center) - project(above)) / (center.y -
+    // above.y), which simplifies to (project(center) - project(above)) /
+    // 2^(half_height_log2)
+    wm_params->wmmat[3] =
+        ROUND_POWER_OF_TWO(proj_center_x - proj_above_x, half_height_log2);
+    wm_params->wmmat[5] =
+        ROUND_POWER_OF_TWO(proj_center_y - proj_above_y, half_height_log2);
+  } else {
+    // If the neighboring block is to the left of the current block, we do the
+    // same thing as for the above case, but with x and y axes interchanged
+
+    wm_params->wmmat[3] = neighbor_wm->wmmat[3];
+    wm_params->wmmat[5] = neighbor_wm->wmmat[5];
+
+    // Project left point
+    int left_x = center_x - (1 << half_width_log2);
+    int left_y = center_y;
+    int proj_left_x = neighbor_wm->wmmat[2] * left_x +
+                      neighbor_wm->wmmat[3] * left_y + neighbor_wm->wmmat[0];
+    int proj_left_y = neighbor_wm->wmmat[4] * left_x +
+                      neighbor_wm->wmmat[5] * left_y + neighbor_wm->wmmat[1];
+
+    // y coefficients are
+    //    (project(center) - project(left)) / (center.y - left.y)
+    // which simplifies to
+    //    (project(center) - project(left)) / 2^(half_width_log2)
+    wm_params->wmmat[2] =
+        ROUND_POWER_OF_TWO(proj_center_x - proj_left_x, half_width_log2);
+    wm_params->wmmat[4] =
+        ROUND_POWER_OF_TWO(proj_center_y - proj_left_y, half_width_log2);
+  }
+
+  // Derive translational part from signaled MV
+  av1_set_warp_translation(mi_row, mi_col, bsize, *center_mv, wm_params);
+
+  // check compatibility with the fast warp filter
+  if (!av1_get_shear_params(wm_params)) return 1;
+
+  return 0;
+}
+#endif  // CONFIG_WARP_EXTEND

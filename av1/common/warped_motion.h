@@ -18,6 +18,7 @@
 #include <memory.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "config/aom_config.h"
 
@@ -284,5 +285,13 @@ int av1_find_projection(int np, const int *pts1, const int *pts2,
                         int mi_row, int mi_col);
 
 int av1_get_shear_params(WarpedMotionParams *wm);
+
+#if CONFIG_WARP_EXTEND
+int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
+                          const MV *center_mv, const int mi_row,
+                          const int mi_col,
+                          const WarpedMotionParams *neighbor_wm,
+                          WarpedMotionParams *wm_params);
+#endif  // CONFIG_WARP_EXTEND
 
 #endif  // AOM_AV1_COMMON_WARPED_MOTION_H_

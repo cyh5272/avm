@@ -5477,6 +5477,69 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 }
 #endif  // CONFIG_WARP_DELTA
 
+#if CONFIG_WARP_EXTEND
+// Try to improve the motion vector over the one determined by NEWMV search,
+// by running the full WARP_EXTEND prediction pipeline.
+// For now, this uses the same method as av1_refine_warped_mv()
+// TODO(rachelbarker): See if we can improve this and av1_refine_warped_mv().
+void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
+                                   const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
+                                   bool neighbor_is_above, BLOCK_SIZE bsize,
+                                   const WarpedMotionParams *neighbor_params) {
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
+                                   { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
+  MV *best_mv = &mbmi->mv[0].as_mv;
+
+  WarpedMotionParams best_wm_params = mbmi->wm_params[0];
+  unsigned int bestmse;
+  const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
+
+  const int start = ms_params->allow_hp ? 0 : 4;
+
+  // Before this function is called, motion_mode_rd will have selected a valid
+  // warp model, and stored it into mbmi->wm_params, but we have not yet
+  // actually built and evaluated the resulting prediction
+  assert(av1_is_subpelmv_in_range(mv_limits, *best_mv));
+  bestmse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
+
+  const int mi_row = xd->mi_row;
+  const int mi_col = xd->mi_col;
+  for (int ite = 0; ite < 2; ++ite) {
+    int best_idx = -1;
+
+    for (int idx = start; idx < start + 4; ++idx) {
+      unsigned int thismse;
+
+      MV this_mv = { best_mv->row + neighbors[idx].row,
+                     best_mv->col + neighbors[idx].col };
+      if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
+        if (!av1_extend_warp_model(neighbor_is_above, bsize, &this_mv, mi_row,
+                                   mi_col, neighbor_params,
+                                   &mbmi->wm_params[0])) {
+          thismse = compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
+
+          if (thismse < bestmse) {
+            best_idx = idx;
+            best_wm_params = mbmi->wm_params[0];
+            bestmse = thismse;
+          }
+        }
+      }
+    }
+
+    if (best_idx == -1) break;
+
+    if (best_idx >= 0) {
+      best_mv->row += neighbors[best_idx].row;
+      best_mv->col += neighbors[best_idx].col;
+    }
+  }
+
+  mbmi->wm_params[0] = best_wm_params;
+}
+#endif  // CONFIG_WARP_EXTEND
+
 // =============================================================================
 //  Subpixel Motion Search: OBMC
 // =============================================================================

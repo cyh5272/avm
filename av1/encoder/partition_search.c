@@ -1262,7 +1262,12 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-      const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+      const int allowed_motion_modes =
+          motion_mode_allowed(cm, xd,
+#if CONFIG_WARP_EXTEND
+                              mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                              mbmi);
       MOTION_MODE motion_mode = mbmi->motion_mode;
       bool continue_motion_mode_signaling = true;
 
@@ -1308,6 +1313,24 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           continue_motion_mode_signaling = false;
         }
       }
+
+#if CONFIG_WARP_EXTEND
+      if (continue_motion_mode_signaling &&
+          allowed_motion_modes & (1 << WARP_EXTEND)) {
+        int ctx1 = av1_get_warp_extend_ctx1(
+            xd, mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
+        int ctx2 = av1_get_warp_extend_ctx2(
+            xd, mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
+#if CONFIG_ENTROPY_STATS
+        counts->warp_extend[ctx1][ctx2][mbmi->motion_mode == WARP_EXTEND]++;
+#endif
+        update_cdf(fc->warp_extend_cdf[ctx1][ctx2],
+                   mbmi->motion_mode == WARP_EXTEND, 2);
+        if (motion_mode == WARP_EXTEND) {
+          continue_motion_mode_signaling = false;
+        }
+      }
+#endif  // CONFIG_WARP_EXTEND
 
       if (continue_motion_mode_signaling &&
           allowed_motion_modes & (1 << WARPED_CAUSAL)) {
@@ -1724,7 +1747,12 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
-        const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+        const int allowed_motion_modes =
+            motion_mode_allowed(cm, xd,
+#if CONFIG_WARP_EXTEND
+                                x->mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                                mbmi);
         if (mbmi->motion_mode != INTERINTRA) {
           if (allowed_motion_modes & (1 << OBMC_CAUSAL)) {
             td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
@@ -1735,6 +1763,9 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #if CONFIG_WARP_DELTA
           // TODO(rachelbarker): Add counts and pruning for WARP_DELTA
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+          // TODO(rachelbarker): Add counts and pruning for WARP_EXTEND
+#endif  // CONFIG_WARP_EXTEND
         }
 #else
         const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);

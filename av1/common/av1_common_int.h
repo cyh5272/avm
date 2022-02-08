@@ -2959,6 +2959,9 @@ static INLINE bool is_warp_mode(MOTION_MODE motion_mode) {
  */
 static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd,
+#if CONFIG_WARP_EXTEND
+                                      const CANDIDATE_MV *ref_mv_stack,
+#endif  // CONFIG_WARP_EXTEND
                                       const MB_MODE_INFO *mbmi) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int allowed_motion_modes = (1 << SIMPLE_TRANSLATION);
@@ -3019,6 +3022,36 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   if (obmc_allowed && allow_warped_motion && mbmi->num_proj_ref >= 1) {
     allowed_motion_modes |= (1 << WARPED_CAUSAL);
   }
+
+#if CONFIG_WARP_EXTEND
+  bool warp_extend_allowed = false;
+  PREDICTION_MODE mode = mbmi->mode;
+
+  if (allow_warped_motion && (mode == NEARMV || mode == NEWMV)) {
+    const CANDIDATE_MV *neighbor = &ref_mv_stack[mbmi->ref_mv_idx];
+
+    bool neighbor_is_above = xd->up_available && (neighbor->row_offset == -1 &&
+                                                  neighbor->col_offset >= 0);
+    bool neighbor_is_left = xd->left_available && (neighbor->col_offset == -1 &&
+                                                   neighbor->row_offset >= 0);
+    bool neighbor_is_adjacent = neighbor_is_above || neighbor_is_left;
+
+    if (neighbor_is_adjacent) {
+      const MB_MODE_INFO *neighbor_mi =
+          xd->mi[neighbor->row_offset * xd->mi_stride + neighbor->col_offset];
+
+      bool neighbor_is_warped = is_warp_mode(neighbor_mi->motion_mode);
+
+      if ((mode == NEARMV && neighbor_is_warped) || mode == NEWMV) {
+        warp_extend_allowed = true;
+      }
+    }
+  }
+
+  if (warp_extend_allowed) {
+    allowed_motion_modes |= (1 << WARP_EXTEND);
+  }
+#endif  // CONFIG_WARP_EXTEND
 
 #if CONFIG_WARP_DELTA
   bool warp_delta_allowed =

@@ -1254,6 +1254,9 @@ typedef struct FRAME_COUNTS {
   unsigned int warp_delta[BLOCK_SIZES_ALL][2];
   unsigned int warp_delta_param[2][WARP_DELTA_NUM_SYMBOLS];
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  unsigned int warp_extend[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2][2];
+#endif  // CONFIG_WARP_EXTEND
 #else
   unsigned int motion_mode[BLOCK_SIZES_ALL][MOTION_MODES];
   unsigned int obmc[BLOCK_SIZES_ALL][2];

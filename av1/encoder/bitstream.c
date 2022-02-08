@@ -376,11 +376,19 @@ static void write_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
 }
 #endif  // CONFIG_WARP_DELTA
 
-static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
-                                         const MB_MODE_INFO *mbmi,
-                                         aom_writer *w) {
+static AOM_INLINE void write_motion_mode(
+    const AV1_COMMON *cm, MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+    const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
+#endif  // CONFIG_WARP_EXTEND
+    aom_writer *w) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
-  const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+  const int allowed_motion_modes =
+      motion_mode_allowed(cm, xd,
+#if CONFIG_WARP_EXTEND
+                          mbmi_ext_frame->ref_mv_stack,
+#endif  // CONFIG_WARP_EXTEND
+                          mbmi);
   assert((allowed_motion_modes & (1 << mbmi->motion_mode)) != 0);
 
   MOTION_MODE motion_mode = mbmi->motion_mode;
@@ -418,6 +426,18 @@ static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
       return;
     }
   }
+
+#if CONFIG_WARP_EXTEND
+  if (allowed_motion_modes & (1 << WARP_EXTEND)) {
+    int ctx1 = av1_get_warp_extend_ctx1(xd, mbmi_ext_frame->ref_mv_stack, mbmi);
+    int ctx2 = av1_get_warp_extend_ctx2(xd, mbmi_ext_frame->ref_mv_stack, mbmi);
+    aom_write_symbol(w, motion_mode == WARP_EXTEND,
+                     xd->tile_ctx->warp_extend_cdf[ctx1][ctx2], 2);
+    if (motion_mode == WARP_EXTEND) {
+      return;
+    }
+  }
+#endif  // CONFIG_WARP_EXTEND
 
   if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
     aom_write_symbol(w, motion_mode == WARPED_CAUSAL,
@@ -1921,7 +1941,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-    write_motion_mode(cm, xd, mbmi, w);
+    write_motion_mode(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                      mbmi_ext_frame,
+#endif  // CONFIG_WARP_EXTEND
+                      w);
 #else
     if (cpi->common.current_frame.reference_mode != COMPOUND_REFERENCE &&
         cpi->common.seq_params.enable_interintra_compound &&

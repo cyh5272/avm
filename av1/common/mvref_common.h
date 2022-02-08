@@ -736,6 +736,80 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi);
 #endif  // CONFIG_REF_MV_BANK
 
+#if CONFIG_WARP_EXTEND
+static INLINE void av1_get_neighbor_warp_model(const AV1_COMMON *cm,
+                                               const MB_MODE_INFO *neighbor_mi,
+                                               WarpedMotionParams *wm_params) {
+  const WarpedMotionParams *gm_params =
+      &cm->global_motion[neighbor_mi->ref_frame[0]];
+
+  if (is_warp_mode(neighbor_mi->motion_mode)) {
+    *wm_params = neighbor_mi->wm_params[0];
+  } else if (is_global_mv_block(neighbor_mi, gm_params->wmtype)) {
+    *wm_params = *gm_params;
+  } else {
+    // Neighbor block is translation-only, so doesn't have
+    // a warp model. So we need to synthesize one
+    *wm_params = default_warp_params;
+    wm_params->wmtype = TRANSLATION;
+    wm_params->wmmat[0] = neighbor_mi->mv[0].as_mv.col
+                          << (WARPEDMODEL_PREC_BITS - 3);
+    wm_params->wmmat[1] = neighbor_mi->mv[0].as_mv.row
+                          << (WARPEDMODEL_PREC_BITS - 3);
+  }
+}
+
+// The use_warp_extend symbol has two components to its context:
+// First context is the extension type (copy, extend from warp model, etc.)
+// Second context is log2(number of MI units along common edge)
+static INLINE int av1_get_warp_extend_ctx1(const MACROBLOCKD *xd,
+                                           const CANDIDATE_MV *ref_mv_stack,
+                                           const MB_MODE_INFO *mbmi) {
+  const CANDIDATE_MV *neighbor = &ref_mv_stack[mbmi->ref_mv_idx];
+  const MB_MODE_INFO *neighbor_mi =
+      xd->mi[neighbor->row_offset * xd->mi_stride + neighbor->col_offset];
+  const WarpedMotionParams *gm_params =
+      &xd->global_motion[neighbor_mi->ref_frame[0]];
+
+  if (mbmi->mode == NEARMV) {
+    return 0;
+  } else {
+    assert(mbmi->mode == NEWMV);
+    if (is_warp_mode(neighbor_mi->motion_mode)) {
+      return 1;
+    } else if (is_global_mv_block(neighbor_mi, gm_params->wmtype)) {
+      return 2;
+    } else {
+      // Neighbor block is translation-only
+      return 3;
+    }
+  }
+}
+
+static INLINE int av1_get_warp_extend_ctx2(const MACROBLOCKD *xd,
+                                           const CANDIDATE_MV *ref_mv_stack,
+                                           const MB_MODE_INFO *mbmi) {
+  (void)xd;
+
+  const CANDIDATE_MV *neighbor = &ref_mv_stack[mbmi->ref_mv_idx];
+  bool neighbor_is_above = xd->up_available && (neighbor->row_offset == -1 &&
+                                                neighbor->col_offset >= 0);
+
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  int common_length_log2;
+  if (neighbor_is_above) {
+    common_length_log2 = mi_size_wide_log2[bsize];
+  } else {
+    common_length_log2 = mi_size_high_log2[bsize];
+  }
+
+  // There are currently 6 contexts, corresponding to edge lengths
+  // 4, 8, 16, 32, 64, 128
+  assert(common_length_log2 < WARP_EXTEND_CTXS2);
+  return common_length_log2;
+}
+#endif
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

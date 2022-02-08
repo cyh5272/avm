@@ -956,6 +956,39 @@ static const aom_cdf_prob
                   21845, 24030, 26214, 28399, 30583) }
     };
 #endif  // CONFIG_WARP_DELTA
+
+#if CONFIG_WARP_EXTEND
+static const aom_cdf_prob
+    default_warp_extend_cdf[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2][CDF_SIZE(
+        2)] = { { // NEARMV from warped neighbor
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) } },
+                { // NEWMV from warped neighbor
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) } },
+                { // NEWMV from global warp neighbor
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) } },
+                { // NEWMV from translational neighbor
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) },
+                  { AOM_CDF2(16384) } } };
+#endif  // CONFIG_WARP_EXTEND
 #else
 static const aom_cdf_prob default_motion_mode_cdf[BLOCK_SIZES_ALL][CDF_SIZE(
     MOTION_MODES)] = { { AOM_CDF3(10923, 21845) }, { AOM_CDF3(10923, 21845) },
@@ -1939,6 +1972,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warp_delta_cdf, default_warp_delta_cdf);
   av1_copy(fc->warp_delta_param_cdf, default_warp_delta_param_cdf);
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  av1_copy(fc->warp_extend_cdf, default_warp_extend_cdf);
+#endif  // CONFIG_WARP_EXTEND
 #else
   av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
   av1_copy(fc->obmc_cdf, default_obmc_cdf);

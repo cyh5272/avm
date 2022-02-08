@@ -501,6 +501,13 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         const ModeCosts *mode_costs);
 #endif  // CONFIG_WARP_DELTA
 
+#if CONFIG_WARP_EXTEND
+void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
+                                   const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
+                                   bool neighbor_is_above, BLOCK_SIZE bsize,
+                                   const WarpedMotionParams *neighbor_params);
+#endif  // CONFIG_WARP_EXTEND
+
 static INLINE void av1_set_fractional_mv(int_mv *fractional_best_mv) {
   for (int z = 0; z < 3; z++) {
     fractional_best_mv[z].as_int = INVALID_MV;

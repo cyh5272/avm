@@ -340,7 +340,12 @@ static void read_warp_delta(const MACROBLOCKD *xd, MB_MODE_INFO *mbmi,
 static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
                                     MB_MODE_INFO *mbmi, aom_reader *r) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
-  const int allowed_motion_modes = motion_mode_allowed(cm, xd, mbmi);
+  const int allowed_motion_modes =
+      motion_mode_allowed(cm, xd,
+#if CONFIG_WARP_EXTEND
+                          xd->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                          mbmi);
 
   mbmi->use_wedge_interintra = 0;
   if (allowed_motion_modes & (1 << INTERINTRA)) {
@@ -375,6 +380,20 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
       return OBMC_CAUSAL;
     }
   }
+
+#if CONFIG_WARP_EXTEND
+  if (allowed_motion_modes & (1 << WARP_EXTEND)) {
+    int ctx1 = av1_get_warp_extend_ctx1(
+        xd, xd->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
+    int ctx2 = av1_get_warp_extend_ctx2(
+        xd, xd->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
+    int use_warp_extend = aom_read_symbol(
+        r, xd->tile_ctx->warp_extend_cdf[ctx1][ctx2], 2, ACCT_STR);
+    if (use_warp_extend) {
+      return WARP_EXTEND;
+    }
+  }
+#endif  // CONFIG_WARP_EXTEND
 
   if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
     int use_warped_causal =
@@ -1108,6 +1127,10 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     for (int i = 0; i < MAX_REF_BV_STACK_SIZE; ++i) {
       xd->ref_mv_stack[INTRA_FRAME][i].this_mv.as_int = 0;
       xd->ref_mv_stack[INTRA_FRAME][i].comp_mv.as_int = 0;
+#if CONFIG_WARP_EXTEND
+      xd->ref_mv_stack[INTRA_FRAME][i].row_offset = OFFSET_NONSPATIAL;
+      xd->ref_mv_stack[INTRA_FRAME][i].col_offset = OFFSET_NONSPATIAL;
+#endif  // CONFIG_WARP_EXTEND
     }
 #endif  // CONFIG_BVP_IMPROVEMENT
     av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME, dcb->ref_mv_count,
@@ -2622,6 +2645,36 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       mbmi->wm_params[0].invalid = 1;
     }
   }
+#if CONFIG_WARP_EXTEND
+  if (mbmi->motion_mode == WARP_EXTEND) {
+    CANDIDATE_MV *neighbor = &xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx];
+    assert(neighbor->row_offset == -1 || neighbor->col_offset == -1);
+    const MB_MODE_INFO *neighbor_mi =
+        xd->mi[neighbor->row_offset * xd->mi_stride + neighbor->col_offset];
+
+    if (mbmi->mode == NEARMV) {
+      assert(is_warp_mode(neighbor_mi->motion_mode));
+      mbmi->wm_params[0] = neighbor_mi->wm_params[0];
+    } else {
+      assert(mbmi->mode == NEWMV);
+
+      bool neighbor_is_above =
+          xd->up_available &&
+          (neighbor->row_offset == -1 && neighbor->col_offset >= 0);
+
+      WarpedMotionParams neighbor_params;
+      av1_get_neighbor_warp_model(cm, neighbor_mi, &neighbor_params);
+      if (av1_extend_warp_model(neighbor_is_above, bsize, &mbmi->mv[0].as_mv,
+                                mi_row, mi_col, &neighbor_params,
+                                &mbmi->wm_params[0])) {
+#if WARPED_MOTION_DEBUG
+        printf("Warning: unexpected warped model from aomenc\n");
+#endif
+        mbmi->wm_params[0].invalid = 1;
+      }
+    }
+  }
+#endif  // CONFIG_WARP_EXTEND
 #else
   if (mbmi->motion_mode == WARPED_CAUSAL) {
     mbmi->wm_params.wmtype = DEFAULT_WMTYPE;

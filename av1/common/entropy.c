@@ -157,6 +157,9 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->warp_delta_cdf, 2);
   RESET_CDF_COUNTER(fc->warp_delta_param_cdf, WARP_DELTA_NUM_SYMBOLS);
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  RESET_CDF_COUNTER(fc->warp_extend_cdf, 2);
+#endif  // CONFIG_WARP_EXTEND
 #else
   RESET_CDF_COUNTER(fc->motion_mode_cdf, MOTION_MODES);
   RESET_CDF_COUNTER(fc->obmc_cdf, 2);

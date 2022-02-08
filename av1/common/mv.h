@@ -494,9 +494,32 @@ static INLINE TransformationType get_wmtype(const WarpedMotionParams *model) {
     return AFFINE;
 }
 
+#if CONFIG_WARP_EXTEND
+// Special value for row_offset and col_offset in the `CANDIDATE_MV` struct,
+// to indicate that this motion vector did not come from spatial prediction
+// (eg, temporal prediction, or a scaled MV from a nearby block which used
+// a different ref frame)
+//
+// The special value is 0 because the spatial scan area consists of blocks
+// both above and left of the current block. Thus valid offsets will always
+// have at least one of row_offset and col_offset negative.
+#define OFFSET_NONSPATIAL 0
+#endif  // CONFIG_WARP_EXTEND
+
 typedef struct candidate_mv {
   int_mv this_mv;
   int_mv comp_mv;
+#if CONFIG_WARP_EXTEND
+  // Position of the candidate block relative to the current block.
+  // This is used to decide whether to signal the WARP_EXTEND mode,
+  // and to fetch the corresponding warp model if that is used
+  //
+  // Note(rachelbarker):
+  // If these are both set to OFFSET_NONSPATIAL, then this is a non-spatial
+  // candidate, and so does not allow WARP_EXTEND
+  int row_offset;
+  int col_offset;
+#endif  // CONFIG_WARP_EXTEND
 } CANDIDATE_MV;
 
 static INLINE int is_zero_mv(const MV *mv) {

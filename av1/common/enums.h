@@ -623,6 +623,9 @@ enum {
 #if CONFIG_WARP_DELTA
   WARP_DELTA,  // Directly-signaled warp model
 #endif         // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  WARP_EXTEND,  // Extension of an existing warp model into another block
+#endif
   MOTION_MODES
 } UENUM1BYTE(MOTION_MODE);
 

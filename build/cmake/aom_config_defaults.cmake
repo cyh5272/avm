@@ -181,6 +181,9 @@ set_aom_config_var(CONFIG_EXTENDED_WARP_PREDICTION 0
                    "AV2 experiment flag to add rework motion modes")
 set_aom_config_var(CONFIG_WARP_DELTA 0
                    "AV2 experiment flag to add directly-signaled warp models")
+set_aom_config_var(
+  CONFIG_WARP_EXTEND 0
+  "AV2 experiment flag to allow extending local warp into adjacent blocks")
 # Source of throughput analysis : CWG-B065
 set_aom_config_var(CONFIG_THROUGHPUT_ANALYSIS 0
                    "AV2 experiment flag to measure throughput.")

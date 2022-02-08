@@ -521,6 +521,16 @@ int main(int argc, const char **argv) {
                      "static const aom_cdf_prob default_warp_delta_param_cdf"
                      "[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)]");
 #endif  // CONFIG_WARP_DELTA
+#if CONFIG_WARP_EXTEND
+  cts_each_dim[0] = WARP_EXTEND_CTXS1;
+  cts_each_dim[1] = WARP_EXTEND_CTXS2;
+  cts_each_dim[2] = 2;
+  optimize_cdf_table(
+      &fc.warp_extend[0][0][0], probsfile, 3, cts_each_dim,
+      "static const aom_cdf_prob "
+      "default_warp_extend_cdf[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2]"
+      "[CDF_SIZE(2)]");
+#endif  // CONFIG_WARP_EXTEND
 #else
   cts_each_dim[0] = BLOCK_SIZES_ALL;
   cts_each_dim[1] = MOTION_MODES;
