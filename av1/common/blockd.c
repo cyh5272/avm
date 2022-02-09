@@ -156,9 +156,16 @@ void av1_reset_txk_skip_array(AV1_COMMON *cm) {
   }
 }
 
+void av1_reset_txk_skip_array_using_mi_params(
+    CommonModeInfoParams *mi_params) {
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+    memset(mi_params->tx_skip[plane], 0, mi_params->tx_skip_buf_size[plane]);
+  }
+}
+
 void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                              int mi_row, int mi_col, BLOCK_SIZE bsize,
-                             uint8_t value, FILE *fLog) {
+                             uint8_t value, bool is_chroma_ref, FILE *fLog) {
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
     int w = ((cm->width + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2)
             << MAX_SB_SIZE_LOG2;
@@ -176,6 +183,11 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                 ((plane == 0) ? 0 : cm->seq_params.subsampling_y);
     blk_w >>= MIN_TX_SIZE_LOG2;
     blk_h >>= MIN_TX_SIZE_LOG2;
+
+    if(plane && (blk_w ==0 || blk_h ==0) && is_chroma_ref) {
+      blk_w =  blk_w == 0 ? 1 : blk_w;
+      blk_h =  blk_h == 0 ? 1 : blk_h;
+    }
 
     for (int r = 0; r < blk_h; r++) {
       for (int c = 0; c < blk_w; c++) {

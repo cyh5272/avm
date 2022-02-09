@@ -1058,9 +1058,9 @@ static const aom_cdf_prob default_filter_intra_cdfs[BLOCK_SIZES_ALL][CDF_SIZE(
 static const aom_cdf_prob
     default_switchable_restore_cdf[MULTIQ_LR_LEVELS]
                                   [CDF_SIZE(RESTORE_SWITCHABLE_TYPES)] = {
-                                    { AOM_CDF5(6000, 12000, 18000, 28000) },
+                                    { AOM_CDF5(6000, 12000, 18000, 24000) },
 #if CONFIG_MULTIQ_LR_SIGNALING
-                                    { AOM_CDF5(6000, 12000, 18000, 20000) },
+                                    { AOM_CDF5(6000, 12000, 18000, 30000) },
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
                                   };
 #elif !CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
