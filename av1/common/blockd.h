@@ -98,7 +98,7 @@ static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
     NEARMV,     // NEARMV
     GLOBALMV,   // GLOBALMV
     NEWMV,      // NEWMV
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
     NEWMV,  // AMVDNEWMV
 #endif
 #if !CONFIG_NEW_INTER_MODES
@@ -152,7 +152,7 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
     MB_MODE_COUNT,  // NEARMV
     MB_MODE_COUNT,  // GLOBALMV
     MB_MODE_COUNT,  // NEWMV
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
     MB_MODE_COUNT,  // AMVDNEWMV
 #endif
 #if !CONFIG_NEW_INTER_MODES
@@ -211,7 +211,7 @@ static INLINE int have_nearmv_newmv_in_inter_mode(PREDICTION_MODE mode) {
 #if CONFIG_NEW_INTER_MODES
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
           mode == AMVDNEWMV ||
 #endif
 #if CONFIG_JOINT_MVD
@@ -371,7 +371,7 @@ typedef struct MB_MODE_INFO {
   int8_t interintra_wedge_index;
   /*! \brief Struct that stores the data used in interinter compound mode. */
   INTERINTER_COMPOUND_DATA interinter_comp;
-#if JOINT_AMVD
+#if IMPROVED_AMVD
   /*! \brief The adaptive MVD resolution flag for JOINT_NEWMV mode. */
   int adaptive_mvd_flag;
 #endif

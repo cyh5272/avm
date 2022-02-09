@@ -839,7 +839,7 @@ static void update_drl_index_stats(int max_drl_bits, const int16_t mode_ctx,
   (void)counts;
 #endif  // !CONFIG_ENTROPY_STATS
   assert(have_drl_index(mbmi->mode));
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
 #endif
   uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
@@ -1162,7 +1162,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_OPTFLOW_REFINEMENT
           && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if JOINT_AMVD
+#if IMPROVED_AMVD
           && mbmi->adaptive_mvd_flag == 0
 #endif
       ) {
@@ -1239,8 +1239,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       update_cdf(fc->inter_compound_mode_cdf[mode_ctx],
                  INTER_COMPOUND_OFFSET(mode), INTER_COMPOUND_MODES);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if JOINT_AMVD
-      if (mode == JOINT_NEWMV || mode == JOINT_NEWMV_OPTFLOW)
+#if IMPROVED_AMVD
+      if ((mode == JOINT_NEWMV || mode == JOINT_NEWMV_OPTFLOW) &&
+          enable_adaptive_mvd_resolution(cm, mbmi))
         update_cdf(fc->adaptive_mvd_cdf, mbmi->adaptive_mvd_flag, 2);
 #endif
     } else {
@@ -1248,7 +1249,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
     }
 
     const int new_mv = mbmi->mode == NEWMV ||
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
                        mbmi->mode == AMVDNEWMV ||
 #endif
 #if CONFIG_OPTFLOW_REFINEMENT

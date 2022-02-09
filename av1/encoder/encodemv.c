@@ -91,7 +91,7 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 
 #if CONFIG_ADAPTIVE_MVD
   if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
-#if AMVD_NO_HP
+#if IMPROVED_AMVD
   if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
     precision = MV_SUBPEL_LOW_PRECISION;
 #endif
@@ -243,7 +243,7 @@ static void build_nmv_component_cost_table(int *mvcost,
       if (c == MV_CLASS_0 && d == 0) {
         amvd_cost += class0_fp_cost[d][f];
       }
-#if !AMVD_NO_HP
+#if !IMPROVED_AMVD
       if (precision > MV_SUBPEL_LOW_PRECISION) {
         if (c == MV_CLASS_0 && d == 0) {
           amvd_cost += class0_hp_cost[e];
@@ -294,7 +294,7 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
 #if CONFIG_ADAPTIVE_MVD
   if (is_adaptive_mvd) {
     assert(j < MV_JOINTS - 1);
-#if AMVD_NO_HP
+#if IMPROVED_AMVD
     if (usehp > MV_SUBPEL_NONE) usehp = MV_SUBPEL_LOW_PRECISION;
 #endif
   }

@@ -41,10 +41,9 @@ extern "C" {
 #define CCSO_NUM_COMPONENTS 2
 #endif
 #endif
-
-#define AMVD_EXTENSION 1
-#define AMVD_NO_HP 1
-#define JOINT_AMVD 1
+#if CONFIG_ADAPTIVE_MVD
+#define IMPROVED_AMVD 1
+#endif
 
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
@@ -532,7 +531,7 @@ enum {
   NEARMV,
   GLOBALMV,
   NEWMV,
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   AMVDNEWMV,
 #endif
 // Compound ref compound modes

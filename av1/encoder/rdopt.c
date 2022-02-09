@@ -129,7 +129,7 @@ static const THR_MODES av1_default_mode_order[MAX_MODES] = {
   THR_GLOBALG,
   THR_GLOBALA,
 
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   THR_AMVDNEWMV,
   THR_AMVDNEWL2,
   THR_AMVDNEWL3,
@@ -1573,7 +1573,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       const int first_ref_dist =
           cm->ref_frame_relative_dist[mbmi->ref_frame[0]];
       const int sec_ref_dist = cm->ref_frame_relative_dist[mbmi->ref_frame[1]];
-#if JOINT_AMVD
+#if IMPROVED_AMVD
       if (first_ref_dist != sec_ref_dist) return INT64_MAX;
 #else
       if (first_ref_dist > 2 * sec_ref_dist) return INT64_MAX;
@@ -1584,7 +1584,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       const int valid_mv_base = (!jmvd_base_ref_list && valid_mv0) ||
                                 (jmvd_base_ref_list && valid_mv1);
       if (valid_mv_base
-#if JOINT_AMVD
+#if IMPROVED_AMVD
           && mbmi->adaptive_mvd_flag == 0
 #endif
       ) {
@@ -1636,7 +1636,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #endif  // CONFIG_ADAPTIVE_MVD
     }
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   } else if (this_mode == AMVDNEWMV) {
     const int ref_idx = 0;
     int_mv best_mv;
@@ -1892,7 +1892,7 @@ static int64_t motion_mode_rd(
       // OBMC_CAUSAL not allowed for compound prediction
       assert(!is_comp_pred);
       if (have_newmv_in_inter_mode(this_mode)
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
           && this_mode != AMVDNEWMV
 #endif
       ) {
@@ -1932,7 +1932,7 @@ static int64_t motion_mode_rd(
                                &mbmi->wm_params, mi_row, mi_col)) {
         assert(!is_comp_pred);
         if (have_newmv_in_inter_mode(this_mode)
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
             && this_mode != AMVDNEWMV
 #endif
         ) {
@@ -2338,7 +2338,7 @@ static INLINE int build_cur_mv(int_mv *cur_mv, PREDICTION_MODE this_mode,
 static INLINE int get_drl_cost(int max_drl_bits, const MB_MODE_INFO *mbmi,
                                const MB_MODE_INFO_EXT *mbmi_ext,
                                const MACROBLOCK *x) {
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
 #endif
   assert(mbmi->ref_mv_idx < max_drl_bits + 1);
@@ -2429,7 +2429,7 @@ static int get_drl_refmv_count(const MACROBLOCK *const x,
   }
   const int8_t ref_frame_type = av1_ref_frame_type(ref_frame);
   int ref_mv_count = mbmi_ext->ref_mv_count[ref_frame_type];
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
   if (mode == AMVDNEWMV) ref_mv_count = AOMMIN(ref_mv_count, 2);
 #endif
   return AOMMIN(max_drl_bits + 1, ref_mv_count);
@@ -2576,8 +2576,9 @@ static int64_t simple_translation_pred_rd(
                                       mode_ctx);
   rd_stats->rate += ref_mv_cost;
 
-#if JOINT_AMVD
-  if (mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW)
+#if IMPROVED_AMVD
+  if ((mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) &&
+      enable_adaptive_mvd_resolution(cm, mbmi))
     rd_stats->rate += mode_costs->adaptive_mvd_cost[mbmi->adaptive_mvd_flag];
 #endif
 
@@ -3368,12 +3369,12 @@ static int64_t handle_inter_mode(
   //    5.) Pick the motion mode (SIMPLE_TRANSLATION, OBMC_CAUSAL,
   //        WARPED_CAUSAL)
   //    6.) Update stats if best so far
-#if JOINT_AMVD
-  const int is_amvd_new_newmv_allowed =
-      (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW);
-  for (int amvd_index = 0; amvd_index <= is_amvd_new_newmv_allowed;
-       ++amvd_index) {
-    mbmi->adaptive_mvd_flag = amvd_index;
+#if IMPROVED_AMVD
+  const int is_joint_amvd_allowed =
+      (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) &&
+      cm->seq_params.enable_adaptive_mvd;
+  for (int amvd_idx = 0; amvd_idx <= is_joint_amvd_allowed; ++amvd_idx) {
+    mbmi->adaptive_mvd_flag = amvd_idx;
 #endif
     for (int ref_mv_idx = 0; ref_mv_idx < ref_set; ++ref_mv_idx) {
       mode_info[ref_mv_idx].full_search_mv.as_int = INVALID_MV;
@@ -3416,9 +3417,9 @@ static int64_t handle_inter_mode(
       rd_stats->rate += drl_cost;
       mode_info[ref_mv_idx].drl_cost = drl_cost;
 
-#if JOINT_AMVD
-      if (is_amvd_new_newmv_allowed)
-        rd_stats->rate += mode_costs->adaptive_mvd_cost[amvd_index];
+#if IMPROVED_AMVD
+      if (is_joint_amvd_allowed)
+        rd_stats->rate += mode_costs->adaptive_mvd_cost[amvd_idx];
 #endif
 
       int rs = 0;
@@ -3500,7 +3501,7 @@ static int64_t handle_inter_mode(
       // Handle a compound predictor, continue if it is determined this
       // cannot be the best compound mode
       if (is_comp_pred
-#if JOINT_AMVD
+#if IMPROVED_AMVD
           && mbmi->adaptive_mvd_flag == 0
 #endif
       ) {
@@ -3616,7 +3617,7 @@ static int64_t handle_inter_mode(
       }
       restore_dst_buf(xd, orig_dst, num_planes);
     }
-#if JOINT_AMVD
+#if IMPROVED_AMVD
   }
 #endif
 
@@ -6331,7 +6332,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   // using a mode which can support ref_mv_idx
   if (search_state.best_mbmode.ref_mv_idx != 0 &&
       !(search_state.best_mbmode.mode == NEWMV ||
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
         search_state.best_mbmode.mode == AMVDNEWMV ||
 #endif
         search_state.best_mbmode.mode == NEW_NEWMV ||

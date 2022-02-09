@@ -48,7 +48,7 @@ int av1_interinter_compound_motion_search(const AV1_COMP *const cpi,
                                           const BLOCK_SIZE bsize,
                                           const PREDICTION_MODE this_mode);
 
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
 void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
                                    BLOCK_SIZE bsize, MV *this_mv, int *rate_mv,
                                    int ref_idx);

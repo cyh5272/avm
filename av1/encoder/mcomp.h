@@ -370,15 +370,13 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         SUBPEL_MOTION_SEARCH_PARAMS *ms_params, MV start_mv,
                         MV *bestmv, int *distortion, unsigned int *sse1);
 #endif  // CONFIG_ADAPTIVE_MVD
-#if JOINT_AMVD
+#if IMPROVED_AMVD
 int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                                  SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
-                                 MV ref_mv, MV *start_mv, MV *bestmv,
-                                 int *distortion, unsigned int *sse1,
-                                 int ref_idx, MV *other_mv, MV *best_other_mv,
-                                 uint8_t *second_pred,
-                                 InterPredParams *inter_pred_params,
-                                 int_mv *last_mv_search_list);
+                                 MV *start_mv, MV *bestmv, int *distortion,
+                                 unsigned int *sse1, int ref_idx, MV *other_mv,
+                                 MV *best_other_mv, uint8_t *second_pred,
+                                 InterPredParams *inter_pred_params);
 #endif
 
 void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,

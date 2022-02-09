@@ -71,7 +71,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   const int int_part = offset >> 3;         // int mv data
   const int frac_part = (offset >> 1) & 3;  // fractional mv data
   const int high_part = offset & 1;         // high precision mv data
-#if CONFIG_ADAPTIVE_MVD && AMVD_NO_HP
+#if CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
   const int use_hp =
       (cpi->common.features.allow_high_precision_mv && !is_adaptive_mvd) ? 1
                                                                          : 0;
@@ -262,7 +262,7 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
   const int is_compound = has_second_ref(mbmi);
 
   if (mode == NEWMV ||
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
       mode == AMVDNEWMV ||
 #endif
 #if CONFIG_OPTFLOW_REFINEMENT

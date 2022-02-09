@@ -211,10 +211,10 @@ static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
 #if CONFIG_OPTFLOW_REFINEMENT
           || mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW
 #endif
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
           || mode == AMVDNEWMV
 #endif
-#if JOINT_AMVD
+#if IMPROVED_AMVD
           || mbmi->adaptive_mvd_flag
 #endif
           ) &&

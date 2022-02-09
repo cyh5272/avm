@@ -689,7 +689,7 @@ static const aom_cdf_prob
       { AOM_CDF3(601, 943) },     { AOM_CDF3(14969, 21398) }
     };
 #if CONFIG_NEW_INTER_MODES
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
 static const aom_cdf_prob
     default_inter_single_mode_cdf[INTER_SINGLE_MODE_CONTEXTS][CDF_SIZE(
         INTER_SINGLE_MODES)] = {
@@ -771,8 +771,9 @@ static const aom_cdf_prob default_drl2_cdf[DRL_MODE_CONTEXTS][CDF_SIZE(2)] = {
   { AOM_CDF2(16777) }, { AOM_CDF2(16998) }, { AOM_CDF2(14311) },
   { AOM_CDF2(16618) }, { AOM_CDF2(14980) }, { AOM_CDF2(15963) }
 };
-#if JOINT_AMVD
-static const aom_cdf_prob default_amvd_cdf[CDF_SIZE(2)] = { AOM_CDF2(25384) };
+#if IMPROVED_AMVD
+static const aom_cdf_prob default_adaptive_mvd_cdf[CDF_SIZE(2)] = { AOM_CDF2(
+    25384) };
 #endif
 #if CONFIG_OPTFLOW_REFINEMENT
 static const aom_cdf_prob
@@ -1609,8 +1610,8 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #if CONFIG_OPTFLOW_REFINEMENT
   av1_copy(fc->use_optflow_cdf, default_use_optflow_cdf);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if JOINT_AMVD
-  av1_copy(fc->adaptive_mvd_cdf, default_amvd_cdf);
+#if IMPROVED_AMVD
+  av1_copy(fc->adaptive_mvd_cdf, default_adaptive_mvd_cdf);
 #endif
   av1_copy(fc->inter_compound_mode_cdf, default_inter_compound_mode_cdf);
   av1_copy(fc->compound_type_cdf, default_compound_type_cdf);

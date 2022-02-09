@@ -391,7 +391,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       av1_cost_tokens_from_cdf(mode_costs->use_optflow_cost[i],
                                fc->use_optflow_cdf[i], NULL);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if JOINT_AMVD
+#if IMPROVED_AMVD
     av1_cost_tokens_from_cdf(mode_costs->adaptive_mvd_cost,
                              fc->adaptive_mvd_cdf, NULL);
 #endif

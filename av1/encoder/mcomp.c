@@ -3187,7 +3187,7 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         SUBPEL_MOTION_SEARCH_PARAMS *ms_params, MV start_mv,
                         MV *bestmv, int *distortion, unsigned int *sse1) {
-#if AMVD_NO_HP
+#if IMPROVED_AMVD
   const int allow_hp = 0;
 #else
   const int allow_hp = ms_params->allow_hp;
@@ -3270,18 +3270,14 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 }
 #endif  // CONFIG_ADAPTIVE_MVD
 
-#if JOINT_AMVD
+#if IMPROVED_AMVD
 int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                                  SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
-                                 MV ref_mv, MV *start_mv, MV *bestmv,
-                                 int *distortion, unsigned int *sse1,
-                                 int ref_idx, MV *other_mv, MV *best_other_mv,
-                                 uint8_t *second_pred,
-                                 InterPredParams *inter_pred_params,
-                                 int_mv *last_mv_search_list) {
-#if AMVD_NO_HP
+                                 MV *start_mv, MV *bestmv, int *distortion,
+                                 unsigned int *sse1, int ref_idx, MV *other_mv,
+                                 MV *best_other_mv, uint8_t *second_pred,
+                                 InterPredParams *inter_pred_params) {
   const int allow_hp_mvd = 0;
-#endif
   const int allow_hp = ms_params->allow_hp;
   const int forced_stop = ms_params->forced_stop;
   // const int iters_per_step = ms_params->iters_per_step;
@@ -3292,7 +3288,6 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
   MB_MODE_INFO *const mbmi = xd->mi[0];
-  const PREDICTION_MODE this_mode = mbmi->mode;
   // perform prediction for second MV
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
 
@@ -3301,11 +3296,7 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   // How many steps to take. A round of 0 means fullpel search only, 1 means
   // half-pel, and so on.
-#if AMVD_NO_HP
   int round = AOMMIN(FULL_PEL - forced_stop, 3 - !allow_hp_mvd);
-#else
-  int round = AOMMIN(FULL_PEL - forced_stop, 3 - !allow_hp);
-#endif
   if (cm->features.cur_frame_force_integer_mv) round = 0;
   int hstep = 8 >> round;  // Step size, initialized to 4/8=1/2 pel
 
@@ -3313,15 +3304,6 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   *bestmv = *start_mv;
   *best_other_mv = *other_mv;
-#if CONFIG_SDP
-  const struct scale_factors *const sf =
-      is_intrabc_block(xd->mi[0], xd->tree_type)
-#else
-  const struct scale_factors *const sf = is_intrabc_block(xd->mi[0])
-#endif
-          ? &cm->sf_identity
-          : xd->block_ref_scale_factors[0];
-  const int is_scaled = av1_is_scaled(sf);
 
   if (subpel_search_type != USE_2_TAPS_ORIG) {
     besterr = upsampled_setup_center_error(xd, cm, bestmv, var_params,
@@ -3358,13 +3340,8 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       candidate_mv[0].col = iter_center_mv.col + cur_mvd.col;
 
       get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
-#if AMVD_NO_HP
       lower_mv_precision(&other_mvd, allow_hp_mvd,
                          cm->features.cur_frame_force_integer_mv);
-#else
-      lower_mv_precision(&other_mvd, allow_hp,
-                         cm->features.cur_frame_force_integer_mv);
-#endif
       candidate_mv[1].row = (int)(other_mv->row + other_mvd.row);
       candidate_mv[1].col = (int)(other_mv->col + other_mvd.col);
       if (av1_is_subpelmv_in_range(mv_limits, candidate_mv[1]) == 0) continue;

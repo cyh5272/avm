@@ -136,7 +136,7 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
       return 0;
     }
   } else if (this_mode == NEWMV
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
              || this_mode == AMVDNEWMV
 #endif
   ) {

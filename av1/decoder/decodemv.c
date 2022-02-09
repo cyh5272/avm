@@ -351,7 +351,7 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
   }
 }
 
-#if JOINT_AMVD
+#if IMPROVED_AMVD
 static PREDICTION_MODE read_adaptive_mvd_flag(MACROBLOCKD *xd, aom_reader *r,
                                               MB_MODE_INFO *const mbmi) {
   if (mbmi->mode != JOINT_NEWMV && mbmi->mode != JOINT_NEWMV_OPTFLOW) return 0;
@@ -1251,7 +1251,7 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
 #endif  // CONFIG_ADAPTIVE_MVD
                            nmv_context *ctx, MvSubpelPrecision precision) {
   MV diff = kZeroMv;
-#if CONFIG_ADAPTIVE_MVD && AMVD_NO_HP
+#if CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
   if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
     precision = MV_SUBPEL_LOW_PRECISION;
 #endif
@@ -1581,7 +1581,7 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
 #endif  // CONFIG_ADAPTIVE_MVD
   switch (mode) {
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
     case AMVDNEWMV:
 #endif
     case NEWMV: {
@@ -1729,7 +1729,7 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
                  ref_mv[jmvd_base_ref_list].as_mv.col;
       get_mv_projection(&other_mvd, diff, sec_ref_dist, first_ref_dist);
       lower_mv_precision(&other_mvd,
-#if AMVD_NO_HP
+#if IMPROVED_AMVD
                          allow_hp & !is_adaptive_mvd,
 #else
                          allow_hp,
@@ -1870,17 +1870,20 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       else
         mbmi->mode = read_inter_mode(ec_ctx, r, mode_ctx);
-#if JOINT_AMVD
-      mbmi->adaptive_mvd_flag = read_adaptive_mvd_flag(xd, r, mbmi);
+#if IMPROVED_AMVD
+      if (enable_adaptive_mvd_resolution(cm, mbmi))
+        mbmi->adaptive_mvd_flag = read_adaptive_mvd_flag(xd, r, mbmi);
+      else
+        mbmi->adaptive_mvd_flag = 0;
 #endif
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
       int max_drl_bits = cm->features.max_drl_bits;
       if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
 #endif
       if (have_drl_index(mbmi->mode))
         read_drl_idx(
 #if CONFIG_NEW_INTER_MODES
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
             max_drl_bits,
 #else
             cm->features.max_drl_bits,
@@ -1957,7 +1960,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       ref_mv[1] = xd->ref_mv_stack[ref_frame][ref_mv_idx].comp_mv;
   } else {
     if (mbmi->mode == NEWMV
-#if AMVD_EXTENSION
+#if IMPROVED_AMVD
         || mbmi->mode == AMVDNEWMV
 #endif
     ) {
@@ -2028,7 +2031,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if CONFIG_OPTFLOW_REFINEMENT
       mbmi->mode < NEAR_NEARMV_OPTFLOW &&
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if JOINT_AMVD
+#if IMPROVED_AMVD
       mbmi->adaptive_mvd_flag == 0 &&
 #endif
       !mbmi->skip_mode) {
