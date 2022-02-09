@@ -35,12 +35,22 @@ static void decode_color_map_tokens(Av1ColorMapParam *param, aom_reader *r) {
 
 #if CONFIG_NEW_COLOR_MAP_CODING
   IdentityRowCdf identity_row_cdf = param->identity_row_cdf;
-  int prev_identity_row_flag = 0;
-  for (int y = 0; y < rows; y++) {
-    int ctx = y == 0 ? 2 : prev_identity_row_flag;
-    int identity_row_flag =
-        aom_read_symbol(r, identity_row_cdf[ctx], 2, ACCT_STR);
-    for (int x = 0; x < cols; x++) {
+  int row_flag_array[64];
+  int identity_row_flag;
+  int prev_identity_row_flag;
+  for (int i = 0; i < rows + cols - 1; ++i) {
+    for (int j = AOMMAX(0, i - rows + 1); j <= AOMMIN(i, cols - 1); j++) {
+      int y = i - j;
+      int x = j;
+      prev_identity_row_flag = y > 0 ? row_flag_array[y - 1] : 0;
+      if (x == 0) {
+        int ctx = y == 0 ? 2 : prev_identity_row_flag;
+        identity_row_flag =
+            aom_read_symbol(r, identity_row_cdf[ctx], 2, ACCT_STR);
+        row_flag_array[y] = identity_row_flag;
+      } else {
+        identity_row_flag = row_flag_array[y];
+      }
       if (identity_row_flag && x > 0) {
         color_map[y * plane_block_width + x] =
             color_map[y * plane_block_width + x - 1];
@@ -56,7 +66,6 @@ static void decode_color_map_tokens(Av1ColorMapParam *param, aom_reader *r) {
         color_map[y * plane_block_width + x] = color_order[color_idx];
       }
     }
-    prev_identity_row_flag = identity_row_flag;
   }
 #else
   // The first color index.

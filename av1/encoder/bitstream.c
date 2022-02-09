@@ -487,10 +487,19 @@ static AOM_INLINE void write_delta_lflevel(const AV1_COMMON *cm,
 static AOM_INLINE void pack_map_tokens(aom_writer *w, const TokenExtra **tp,
                                        int n, int cols, int rows) {
   const TokenExtra *p = *tp;
-  for (int y = 0; y < rows; y++) {
-    int identity_row_flag = p->identity_row_flag;
-    aom_write_symbol(w, identity_row_flag, p->identity_row_cdf, 2);
-    for (int x = 0; x < cols; x++) {
+  int identity_row_flag;
+  int row_flag_array[64];
+  for (int i = 0; i < rows + cols - 1; ++i) {
+    for (int j = AOMMAX(0, i - rows + 1); j <= AOMMIN(i, cols - 1); j++) {
+      int y = i - j;
+      int x = j;
+      if (x == 0) {
+        identity_row_flag = p->identity_row_flag;
+        aom_write_symbol(w, identity_row_flag, p->identity_row_cdf, 2);
+        row_flag_array[y] = identity_row_flag;
+      } else {
+        identity_row_flag = row_flag_array[y];
+      }
       if (y == 0 && x == 0) {
         write_uniform(w, n, p->token);
       } else if (!identity_row_flag || x == 0) {

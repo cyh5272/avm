@@ -47,16 +47,25 @@ static int cost_and_tokenize_map(Av1ColorMapParam *param, TokenExtra **t,
 
   (void)plane;
   (void)counts;
-  int prev_identity_row_flag = 0;
+
+  int prev_identity_row_flag;
+  int identity_row_flag;
+  int row_flag_array[64];
   for (int y = 0; y < rows; y++) {
-    int identity_row_flag = 1;
+    row_flag_array[y] = 1;
     for (int x = 1; x < cols; x++) {
       if (color_map[y * plane_block_width + x - 1] !=
           color_map[y * plane_block_width + x])
-        identity_row_flag = 0;
+        row_flag_array[y] = 0;
     }
-    int ctx = y == 0 ? 2 : prev_identity_row_flag;
-    for (int x = 0; x < cols; x++) {
+  }
+  for (int i = 0; i < rows + cols - 1; ++i) {
+    for (int j = AOMMAX(0, i - rows + 1); j <= AOMMIN(i, cols - 1); j++) {
+      int y = i - j;
+      int x = j;
+      identity_row_flag = row_flag_array[y];
+      prev_identity_row_flag = y > 0 ? row_flag_array[y - 1] : 0;
+      int ctx = y == 0 ? 2 : prev_identity_row_flag;
       if (x == 0 && y == 0) {
         if (!calc_rate) {
           (*t)->token = param->color_map[0];
@@ -106,7 +115,6 @@ static int cost_and_tokenize_map(Av1ColorMapParam *param, TokenExtra **t,
         }
       }
     }
-    prev_identity_row_flag = identity_row_flag;
   }
   if (calc_rate) return this_rate;
   return 0;
