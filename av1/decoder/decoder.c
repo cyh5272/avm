@@ -103,6 +103,9 @@ static void dec_setup_mi(CommonModeInfoParams *mi_params) {
       mi_params->mi_stride * calc_mi_size(mi_params->mi_rows);
   memset(mi_params->mi_grid_base, 0,
          mi_grid_size * sizeof(*mi_params->mi_grid_base));
+#if CONFIG_PC_WIENER
+  av1_reset_txk_skip_array_using_mi_params(mi_params);
+#endif // CONFIG_PC_WIENER
 }
 
 static void dec_free_mi(CommonModeInfoParams *mi_params) {
