@@ -208,13 +208,13 @@ static AOM_INLINE void read_coeffs_tx_intra_block(
     ++cm->txb_count;
 #endif
   }
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   else {
     // all tx blocks are skipped.
     av1_update_txk_skip_array(cm, dcb->xd.mi_row, dcb->xd.mi_col, plane, row,
                               col, tx_size, cm->mi_params.fDecTxSkipLog);
   }
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 }
 
 static AOM_INLINE void decode_block_void(const AV1_COMMON *const cm,
@@ -1225,10 +1225,10 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   DecoderCodingBlock *const dcb = &td->dcb;
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *mbmi = xd->mi[0];
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
                           xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
   xd->mi[0]->partition = partition;
   const int plane_start = get_partition_plane_start(xd->tree_type);
@@ -1330,12 +1330,12 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
         }
       }
     }
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     else {
       av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 1,
                               xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
     }
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     td->cfl_store_inter_block_visit(cm, xd);
   }
 
