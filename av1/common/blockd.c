@@ -185,8 +185,8 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
     blk_h >>= MIN_TX_SIZE_LOG2;
 
     if(plane && (blk_w ==0 || blk_h ==0) && is_chroma_ref) {
-      blk_w =  blk_w == 0 ? 1 : blk_w;
-      blk_h =  blk_h == 0 ? 1 : blk_h;
+      blk_w = blk_w == 0 ? 1 : blk_w;
+      blk_h = blk_h == 0 ? 1 : blk_h;
     }
 
     for (int r = 0; r < blk_h; r++) {
