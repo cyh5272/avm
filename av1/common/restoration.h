@@ -31,6 +31,10 @@ extern "C" {
 
 /*!\cond */
 
+#if CONFIG_PC_WIENER
+#define PC_WIENER_PROCESS_CHROMA 1
+#endif  // CONFIG_PC_WIENER
+
 // Border for Loop restoration buffer
 #define AOM_RESTORATION_FRAME_BORDER 32
 #define CLIP(x, lo, hi) ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : (x))
@@ -300,6 +304,10 @@ typedef struct {
    * Stride for tskip frame.
    */
   int tskip_stride;
+  /*!
+   * Offset to quantizer index.
+   */
+  int qindex_offset;
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_COMBINE_PC_NS_WIENER
   /*!
@@ -542,6 +550,7 @@ typedef struct FilterFrameCtxt {
 #if CONFIG_PC_WIENER
   const uint8_t *tskip;
   int tskip_stride;
+  int qindex_offset;
 #endif  // CONFIG_PC_WIENER
 } FilterFrameCtxt;
 
