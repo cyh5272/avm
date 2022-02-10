@@ -1008,7 +1008,7 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   MB_MODE_INFO *mbmi = xd->mi[0];
 #if CONFIG_PC_WIENER
   av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
-                          cm->mi_params.fDecTxSkipLog);
+                          xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
 #endif  // CONFIG_PC_WIENER
 
   xd->mi[0]->partition = partition;
@@ -1114,7 +1114,7 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
 #if CONFIG_PC_WIENER
     else {
       av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 1,
-                              cm->mi_params.fDecTxSkipLog);
+                              xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
     }
 #endif  // CONFIG_PC_WIENER
     td->cfl_store_inter_block_visit(cm, xd);
