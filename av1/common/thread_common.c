@@ -902,13 +902,18 @@ static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
     ctxt[plane].luma_stride = is_uv ? luma_stride : -1;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
-
+#if CONFIG_SAVE_IN_LOOP_DATA
+    ctxt[plane].lr_mode_info = cm->mi_params.lr_mode_info[plane];
+    const int tmp_stride = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+    ctxt[plane].lr_mode_info_stride = plane ? tmp_stride /2: tmp_stride;
+#endif // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
     ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
     ctxt[plane].base_qindex = cm->quant_params.base_qindex;
-    if(plane)
-      ctxt[plane].qindex_offset = plane == 1 ? cm->quant_params.u_dc_delta_q : cm->quant_params.v_dc_delta_q;
+    if (plane)
+      ctxt[plane].qindex_offset = plane == 1 ? cm->quant_params.u_dc_delta_q
+                                             : cm->quant_params.v_dc_delta_q;
     else
       ctxt[plane].qindex_offset = cm->quant_params.y_dc_delta_q;
     ctxt[plane].plane = plane;
