@@ -907,6 +907,10 @@ static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
     ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
     ctxt[plane].base_qindex = cm->quant_params.base_qindex;
+    if(plane)
+      ctxt[plane].qindex_offset = plane == 1 ? cm->quant_params.u_dc_delta_q : cm->quant_params.v_dc_delta_q;
+    else
+      ctxt[plane].qindex_offset = cm->quant_params.y_dc_delta_q;
     ctxt[plane].plane = plane;
 #endif  // CONFIG_PC_WIENER
 

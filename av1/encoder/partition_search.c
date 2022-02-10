@@ -1469,7 +1469,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #endif
 #if CONFIG_PC_WIENER
     av1_init_txk_skip_array(&cpi->common, mbmi, mi_row, mi_col, bsize, 0,
-                            cpi->common.mi_params.fEncTxSkipLog);
+                            xd->is_chroma_ref, cpi->common.mi_params.fEncTxSkipLog);
 #endif  // CONFIG_PC_WIENER
   }
 
