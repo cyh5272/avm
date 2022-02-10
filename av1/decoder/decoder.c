@@ -103,9 +103,9 @@ static void dec_setup_mi(CommonModeInfoParams *mi_params) {
       mi_params->mi_stride * calc_mi_size(mi_params->mi_rows);
   memset(mi_params->mi_grid_base, 0,
          mi_grid_size * sizeof(*mi_params->mi_grid_base));
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_reset_txk_skip_array_using_mi_params(mi_params);
-#endif // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 }
 
 static void dec_free_mi(CommonModeInfoParams *mi_params) {
@@ -116,9 +116,15 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
   mi_params->mi_alloc_size = 0;
   aom_free(mi_params->tx_type_map);
   mi_params->tx_type_map = NULL;
-#if CONFIG_PC_WIENER
+#if CONFIG_SAVE_IN_LOOP_DATA
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+    aom_free(mi_params->lr_mode_info[plane]);
+    mi_params->lr_mode_info[plane] = NULL;
+  }
+#endif // CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_dealloc_txk_skip_array(mi_params);
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 }
 
 #if CONFIG_TIP
