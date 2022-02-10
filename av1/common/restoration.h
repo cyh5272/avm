@@ -552,6 +552,10 @@ typedef struct FilterFrameCtxt {
   int tskip_stride;
   int qindex_offset;
 #endif  // CONFIG_PC_WIENER
+#if CONFIG_SAVE_IN_LOOP_DATA
+  uint8_t *lr_mode_info;
+  int lr_mode_info_stride;
+#endif // CONFIG_SAVE_IN_LOOP_DATA
 } FilterFrameCtxt;
 
 typedef struct AV1LrStruct {

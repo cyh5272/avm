@@ -1457,10 +1457,10 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     x->mbmi_ext_frame->cb_offset[plane_type] = x->cb_offset[plane_type];
     assert(x->cb_offset[plane_type] <
            (1 << num_pels_log2_lookup[cpi->common.seq_params.sb_size]));
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     av1_init_txk_skip_array(&cpi->common, mbmi, mi_row, mi_col, bsize, 0,
                             xd->is_chroma_ref, cpi->common.mi_params.fEncTxSkipLog);
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   }
 
   encode_superblock(cpi, tile_data, td, tp, dry_run, bsize, plane_start,

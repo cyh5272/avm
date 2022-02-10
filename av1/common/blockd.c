@@ -151,7 +151,7 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
   }
 }
 
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params) {
   // allocate based on the MIN_TX_SIZE, which is 4x4 block
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
@@ -311,4 +311,4 @@ uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
   return cm->mi_params.tx_skip[plane][idx];
 }
 
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
