@@ -1544,7 +1544,8 @@ static void fill_tskip_feature(int row, int col, const uint8_t *tskip,
 }
 
 // Calculates the features needed for get_pcwiener_index.
-static void calculate_features(int32_t *feature_vector, bool is_uv, int bit_depth) {
+static void calculate_features(int32_t *feature_vector, bool is_uv,
+                               int bit_depth) {
   const int *feature_normalizers =
       is_uv ? feature_normalizers_chroma : feature_normalizers_luma;
   for (int f = 0; f < NUM_PC_WIENER_FEATURES; ++f) {
@@ -1552,9 +1553,10 @@ static void calculate_features(int32_t *feature_vector, bool is_uv, int bit_dept
     feature_vector[f] = directional_feature_sums[f] * feature_normalizers[f];
   }
   const int bit_depth_shift = bit_depth - 8;
-  if(bit_depth_shift) {
+  if (bit_depth_shift) {
     for (int f = 0; f < NUM_PC_WIENER_FEATURES; ++f)
-      feature_vector[f] = ROUND_POWER_OF_TWO_SIGNED(feature_vector[f], bit_depth_shift);
+      feature_vector[f] =
+          ROUND_POWER_OF_TWO_SIGNED(feature_vector[f], bit_depth_shift);
   }
   const int tskip_index = NUM_PC_WIENER_FEATURES;
   const int tskip_normalizer =
@@ -1574,11 +1576,10 @@ static int get_pcwiener_index(int base_qindex, int bit_depth,
   int qstep = get_qstep(base_qindex, bit_depth, &qstep_shift);
   qstep_shift += 8;  // normalization in tf
   const int bit_depth_shift = bit_depth - 8;
-  if(bit_depth_shift) {
+  if (bit_depth_shift) {
     qstep = ROUND_POWER_OF_TWO_SIGNED(qstep, bit_depth_shift);
     qstep_shift -= bit_depth_shift;
   }
-
 
   // actual * 256
   const int tskip_index = NUM_PC_WIENER_FEATURES;
@@ -1702,7 +1703,8 @@ void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
       int32_t multiplier = 0;
       const int filter_index =
           get_pcwiener_index(base_qindex, bit_depth, &multiplier, is_uv);
-      const int32_t *filter = is_uv ? pcwiener_filters_chroma[filter_index] : pcwiener_filters_luma[filter_index];
+      const int32_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
+                                    : pcwiener_filters_luma[filter_index];
       const NonsepFilterConfig *filter_config = &pcfilter_config;
 #if CONFIG_COMBINE_PC_NS_WIENER
       if (nsfilter != NULL) {
@@ -1837,7 +1839,8 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
       int32_t multiplier = 0;
       const int filter_index =
           get_pcwiener_index(base_qindex, bit_depth, &multiplier, is_uv);
-      const int32_t *filter = is_uv ? pcwiener_filters_chroma[filter_index] : pcwiener_filters_luma[filter_index];
+      const int32_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
+                                    : pcwiener_filters_luma[filter_index];
       const NonsepFilterConfig *filter_config = &pcfilter_config;
 #if CONFIG_COMBINE_PC_NS_WIENER
       if (nsfilter != NULL) {
@@ -1901,8 +1904,7 @@ static void pc_wiener_stripe(const RestorationUnitInfo *rui, int stripe_width,
 #if CONFIG_COMBINE_PC_NS_WIENER
                     NULL,
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-                    rui->base_qindex + rui->qindex_offset, is_uv, bit_depth
-                    );
+                    rui->base_qindex + rui->qindex_offset, is_uv, bit_depth);
   }
 }
 
@@ -1920,13 +1922,13 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
 
-    apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
-                           dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
-                           rui->tskip_stride,
+    apply_pc_wiener_highbd(
+        src + j, w, stripe_height, src_stride, dst + j, dst_stride,
+        rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
 #if CONFIG_COMBINE_PC_NS_WIENER
-                           NULL,
+        NULL,
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-                           rui->base_qindex + rui->qindex_offset, is_uv, bit_depth);
+        rui->base_qindex + rui->qindex_offset, is_uv, bit_depth);
   }
 }
 #endif  // CONFIG_PC_WIENER
@@ -1990,7 +1992,8 @@ static void wiener_nsfilter_stripe(const RestorationUnitInfo *rui,
       apply_pc_wiener(src + j, w, stripe_height, src_stride, dst + j,
                       dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
                       rui->tskip_stride, rui->wiener_nonsep_info.nsfilter,
-                      rui->base_qindex + rui->qindex_offset, is_uv, bit_depth, rui->bit_depth);
+                      rui->base_qindex + rui->qindex_offset, is_uv, bit_depth,
+                      rui->bit_depth);
     }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
@@ -2054,10 +2057,12 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
 #if CONFIG_COMBINE_PC_NS_WIENER
     if (!ignore_pc_wiener) {
       bool is_uv = (rui->plane != AOM_PLANE_Y);
-      apply_pc_wiener_highbd(
-          src + j, w, stripe_height, src_stride, dst + j, dst_stride,
-          rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
-          rui->wiener_nonsep_info.nsfilter, rui->base_qindex + rui->qindex_offset, is_uv, bit_depth, rui->bit_depth);
+      apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
+                             dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
+                             rui->tskip_stride,
+                             rui->wiener_nonsep_info.nsfilter,
+                             rui->base_qindex + rui->qindex_offset, is_uv,
+                             bit_depth, rui->bit_depth);
     }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
@@ -2327,6 +2332,16 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
   rsi->unit_info[rest_unit_idx].luma_stride = is_uv ? ctxt->luma_stride : -1;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_SAVE_IN_LOOP_DATA
+  if(ctxt->lr_mode_info) {
+    const int unit_rtype = rsi->unit_info[rest_unit_idx].restoration_type;
+    for (int row = limits->v_start; row < limits->v_end; ++row) {
+      for (int col = limits->h_start; col < limits->h_end; ++col) {
+        ctxt->lr_mode_info[row * ctxt->lr_mode_info_stride + col] = unit_rtype;
+      }
+    }
+  }
+#endif // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
   rsi->unit_info[rest_unit_idx].tskip = ctxt->tskip;
   rsi->unit_info[rest_unit_idx].tskip_stride = ctxt->tskip_stride;
@@ -2442,6 +2457,14 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
 
   for (int plane = 0; plane < num_planes; ++plane) {
     if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) {
+#if CONFIG_SAVE_IN_LOOP_DATA
+      if(cm->mi_params.lr_mode_info[plane]) {
+        const int lr_mode_info_w = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+        const int lr_mode_info_h = cm->mi_params.mi_rows << MI_SIZE_LOG2;
+        const int buffer_size = plane ? lr_mode_info_w*lr_mode_info_h/4:lr_mode_info_w*lr_mode_info_h;
+        memset(cm->mi_params.lr_mode_info[plane], RESTORE_NONE, buffer_size);
+      }
+#endif // CONFIG_SAVE_IN_LOOP_DATA
       continue;
     }
 
@@ -2454,13 +2477,19 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     ctxt[plane].luma_stride = is_uv ? luma_stride : -1;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_SAVE_IN_LOOP_DATA
+    ctxt[plane].lr_mode_info = cm->mi_params.lr_mode_info[plane];
+    const int tmp_stride = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+    const int lr_mode_info_stride = plane ?  tmp_stride/2: tmp_stride;
+    ctxt[plane].lr_mode_info_stride = lr_mode_info_stride;
+#endif // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
     ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
     ctxt[plane].base_qindex = cm->quant_params.base_qindex;
-    if(plane)
+    if (plane)
       ctxt[plane].qindex_offset = plane == 1 ? cm->quant_params.u_dc_delta_q
-                          : cm->quant_params.v_dc_delta_q;
+                                             : cm->quant_params.v_dc_delta_q;
     else
       ctxt[plane].qindex_offset = cm->quant_params.y_dc_delta_q;
     ctxt[plane].plane = plane;

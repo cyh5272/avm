@@ -87,9 +87,15 @@ static AOM_INLINE void enc_free_mi(CommonModeInfoParams *mi_params) {
   mi_params->mi_alloc_size = 0;
   aom_free(mi_params->tx_type_map);
   mi_params->tx_type_map = NULL;
-#if CONFIG_PC_WIENER
+#if CONFIG_SAVE_IN_LOOP_DATA
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+    aom_free(mi_params->lr_mode_info[plane]);
+    mi_params->lr_mode_info[plane] = NULL;
+  }
+#endif // CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_dealloc_txk_skip_array(mi_params);
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 }
 
 static AOM_INLINE void enc_set_mb_mi(CommonModeInfoParams *mi_params, int width,
@@ -116,9 +122,9 @@ static AOM_INLINE void enc_setup_mi(CommonModeInfoParams *mi_params) {
          mi_grid_size * sizeof(*mi_params->mi_grid_base));
   memset(mi_params->tx_type_map, 0,
          mi_grid_size * sizeof(*mi_params->tx_type_map));
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_reset_txk_skip_array_using_mi_params(mi_params);
-#endif // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 }
 
 static AOM_INLINE void init_buffer_indices(
