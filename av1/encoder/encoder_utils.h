@@ -115,6 +115,9 @@ static AOM_INLINE void enc_setup_mi(CommonModeInfoParams *mi_params) {
          mi_grid_size * sizeof(*mi_params->mi_grid_base));
   memset(mi_params->tx_type_map, 0,
          mi_grid_size * sizeof(*mi_params->tx_type_map));
+#if CONFIG_PC_WIENER
+  av1_reset_txk_skip_array_using_mi_params(mi_params);
+#endif // CONFIG_PC_WIENER
 }
 
 static AOM_INLINE void init_buffer_indices(
