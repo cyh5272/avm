@@ -608,12 +608,12 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #endif
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (p->eobs[block] == 0 && dry_run == OUTPUT_ENABLED) {
     av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, blk_row,
                               blk_col, tx_size, cm->mi_params.fEncTxSkipLog);
   }
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_MISMATCH_DEBUG
   if (dry_run == OUTPUT_ENABLED) {
     int pixel_c, pixel_r;
@@ -817,7 +817,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (x->txfm_search_info.skip_txfm && dry_run == OUTPUT_ENABLED) {
     const AV1_COMMON *const cm = &cpi->common;
     const int sb_type = mbmi->sb_type[xd->tree_type == CHROMA_PART];
@@ -825,7 +825,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
                             xd->is_chroma_ref, plane_start, plane_end,
                             cm->mi_params.fEncTxSkipLog);
   }
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (x->txfm_search_info.skip_txfm) return;
 
   struct optimize_ctx ctx;
@@ -1051,12 +1051,12 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
 
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (*eob == 0 && args->dry_run == OUTPUT_ENABLED) {
     av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, blk_row,
                               blk_col, tx_size, cm->mi_params.fEncTxSkipLog);
   }
-#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
   // For intra mode, skipped blocks are so rare that transmitting skip=1 is
   // very expensive.

@@ -305,9 +305,12 @@ static bool export_context_initialize(int num_rows_luma, int num_cols_luma,
 
 // Saves the frame data as floating point values. frame should have
 // export_context.num_rows_luma and export_context.num_cols_luma dimensions.
+// If upsample_factor > 1 then frame data is pixel-repeated. This useful
+// in saving tskip-like data.
 static bool export_context_export_frame(const uint8_t *frame, int stride,
-                                        bool high_bd) {
+                                        bool high_bd, int upsample_factor) {
   assert(export_context.initialized == true);
+  assert(upsample_factor >= 1);
 
   // Inefficient but convenient. OK since we only export data infrequently.
   const uint8_t *frame_8bit = (uint8_t *)frame;
@@ -317,9 +320,11 @@ static bool export_context_export_frame(const uint8_t *frame, int stride,
   FILE *export_file = fopen(export_context.filename, "ab");
   if (export_file == NULL) return false;
   for (int r = 0; r < export_context.num_rows_luma; ++r) {
+    int dr = r / upsample_factor;
     for (int c = 0; c < export_context.num_cols_luma; ++c) {
-      const float pixel_value = (float)(high_bd ? frame_16bit[r * stride + c]
-                                                : frame_8bit[r * stride + c]);
+      int dc = c / upsample_factor;
+      const float pixel_value = (float)(high_bd ? frame_16bit[dr * stride + dc]
+                                                : frame_8bit[dr * stride + dc]);
       fwrite(&pixel_value, sizeof(pixel_value), 1, export_file);
     }
   }
@@ -332,17 +337,26 @@ static bool export_context_export_qstep(AV1_COMP *cpi) {
   assert(export_context.initialized == true);
 
   AV1_COMMON *const cm = &cpi->common;
-  const float qstep =
-      (float)av1_convert_qindex_to_q(cm->quant_params.base_qindex, AOM_BITS_8);
 
   // Append a constant qstep value to export. This should be replaced with
   // frame varying qstep if cases outside of AOM CC need to be considered.
   FILE *export_file = fopen(export_context.filename, "ab");
   if (export_file == NULL) return false;
-  for (int r = 0; r < export_context.num_rows_luma; ++r) {
-    for (int c = 0; c < export_context.num_cols_luma; ++c) {
-      const float pixel_value = qstep;
-      fwrite(&pixel_value, sizeof(pixel_value), 1, export_file);
+  for(int plane=0; plane<3;++plane) {
+    int offset = 0;
+    if(plane)
+      offset = plane == 1 ? cm->quant_params.u_dc_delta_q
+                          : cm->quant_params.v_dc_delta_q;
+    else
+      offset = cm->quant_params.y_dc_delta_q;
+    const float qstep =
+      (float)av1_convert_qindex_to_q(cm->quant_params.base_qindex + offset, cm->seq_params.bit_depth);
+
+    for (int r = 0; r < export_context.num_rows_luma; ++r) {
+      for (int c = 0; c < export_context.num_cols_luma; ++c) {
+        const float pixel_value = qstep;
+        fwrite(&pixel_value, sizeof(pixel_value), 1, export_file);
+      }
     }
   }
   fclose(export_file);
@@ -1682,20 +1696,21 @@ static AOM_INLINE void finalize_sym_filter(int wiener_win, int32_t *f,
   // The central element has an implicit +WIENER_FILT_STEP
   fi[3] = -2 * (fi[0] + fi[1] + fi[2]);
 }
-
-#if CONFIG_PC_WIENER
-
-static int count_pc_wiener_bits() {
-  // No side-information for now.
-  return 0;
-}
-
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
   int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
 
   int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
   w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
   return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+}
+#endif // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+
+#if CONFIG_PC_WIENER
+
+static int count_pc_wiener_bits() {
+  // No side-information for now.
+  return 0;
 }
 
 #if CONFIG_COMBINE_PC_NS_WIENER
@@ -1759,10 +1774,11 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
   rui.tskip = rsc->cm->mi_params.tx_skip[plane];
   rui.tskip_stride = get_tskip_stride(rsc->cm, plane);
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
-  if(plane)
+  if (plane)
     // TODO: Needs a codec fn to map plane to u or v in case things ever get
     //  switched.
-    rui.qindex_offset = plane == 1 ? rsc->cm->quant_params.u_dc_delta_q : rsc->cm->quant_params.v_dc_delta_q;
+    rui.qindex_offset = plane == 1 ? rsc->cm->quant_params.u_dc_delta_q
+                                   : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
   rusi->sse[RESTORE_PC_WIENER] =
@@ -2591,8 +2607,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
   rui.plane = rsc->plane;
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
-  if(rui.plane)
-    rui.qindex_offset = rui.plane == 1 ? rsc->cm->quant_params.u_dc_delta_q : rsc->cm->quant_params.v_dc_delta_q;
+  if (rui.plane)
+    rui.qindex_offset = rui.plane == 1 ? rsc->cm->quant_params.u_dc_delta_q
+                                       : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
   const WienernsFilterConfigPairType *wnsf =
@@ -2716,8 +2733,10 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     rui_temp.tskip = rsc->cm->mi_params.tx_skip[rsc->plane];
     rui_temp.tskip_stride = get_tskip_stride(rsc->cm, rsc->plane);
     rui_temp.base_qindex = rsc->cm->quant_params.base_qindex;
-    if(rsc->plane)
-      rui_temp.qindex_offset = rsc->plane == 1 ? rsc->cm->quant_params.u_dc_delta_q : rsc->cm->quant_params.v_dc_delta_q;
+    if (rsc->plane)
+      rui_temp.qindex_offset = rsc->plane == 1
+                                   ? rsc->cm->quant_params.u_dc_delta_q
+                                   : rsc->cm->quant_params.v_dc_delta_q;
     else
       rui_temp.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
     rui_temp.qindex_offset = offset;
@@ -3366,15 +3385,16 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   const int absolute_poc = cm->cur_frame->absolute_poc;
   const bool exporting_this_frame = !(export_context_is_skipped(absolute_poc) ||
                                       export_context_is_exported(absolute_poc));
+  assert(cm->seq_params.subsampling_y == 1);
+  assert(cm->seq_params.subsampling_x == 1);
   if (exporting_this_frame) {
     const YV12_BUFFER_CONFIG *pre_lr_decoded = &cpi->common.cur_frame->buf;
     bool success = true;
     if (!export_context_is_initialized()) {
       const int num_rows_luma = pre_lr_decoded->crop_heights[0];
       const int num_cols_luma = pre_lr_decoded->crop_widths[0];
-      const int rdmult_scale =
-          (1 << AV1_PROB_COST_SHIFT) * (1 << 4) * (1 << RDDIV_BITS);
-      const float rdmult_for_rate_in_bits = x->rdmult * 1.0 / rdmult_scale;
+      const int rdmult_scale = (1 << 4) * (1 << RDDIV_BITS);
+      const float rdmult_for_rate_in_bits = x->rdmult * 1.0f / rdmult_scale;
 
       // Keep default filename.
       export_context_set_filename(NULL);
@@ -3385,20 +3405,35 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     export_context_register_as_exported(absolute_poc);
 
     // Export original.
-    success =
-        export_context_export_frame(src->buffers[AOM_PLANE_Y], src->strides[0],
-                                    cm->seq_params.use_highbitdepth);
+    success = true;
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      const int stride_index = plane != AOM_PLANE_Y > 0 ? 1 : 0;
+      success =
+          success && export_context_export_frame(
+                         src->buffers[plane], src->strides[stride_index],
+                         cm->seq_params.use_highbitdepth, upsample_factor);
+    }
 
     // Export decoded frame before loop reconstruction.
-    success = success &&
-              export_context_export_frame(pre_lr_decoded->buffers[AOM_PLANE_Y],
-                                          pre_lr_decoded->strides[0],
-                                          cm->seq_params.use_highbitdepth);
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      const int stride_index = plane != AOM_PLANE_Y ? 1 : 0;
+      success =
+          success && export_context_export_frame(
+                         pre_lr_decoded->buffers[plane],
+                         pre_lr_decoded->strides[stride_index],
+                         cm->seq_params.use_highbitdepth, upsample_factor);
+    }
 
     // Export tskip.
-    success = success && export_context_export_frame(
-                             cm->mi_params.tx_skip[AOM_PLANE_Y],
-                             get_tskip_stride(cm, AOM_PLANE_Y), false);
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      success = success &&
+                export_context_export_frame(cm->mi_params.tx_skip[plane],
+                                            get_tskip_stride(cm, plane), false,
+                                            upsample_factor << MI_SIZE_LOG2);
+    }
     assert(success);
 
     // Export qstep.
@@ -3411,23 +3446,87 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     YV12_BUFFER_CONFIG *tmp_buffer = &cpi->trial_frame_rst;
     assert(tmp_buffer->crop_heights[0] >= export_context.num_rows_luma &&
            tmp_buffer->crop_widths[0] >= export_context.num_cols_luma);
-    const int tmp_buffer_stride = tmp_buffer->strides[0];
-    const int pre_lr_stride = pre_lr_decoded->strides[0];
-    for (int r = 0; r < export_context.num_rows_luma; ++r) {
-      for (int c = 0; c < export_context.num_cols_luma; ++c) {
-        tmp_buffer->buffers[AOM_PLANE_Y][r * tmp_buffer_stride + c] =
-            pre_lr_decoded->buffers[AOM_PLANE_Y][r * pre_lr_stride + c];
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int stride_index = plane != AOM_PLANE_Y ? 1 : 0;
+      const int tmp_buffer_stride = tmp_buffer->strides[stride_index];
+      const int pre_lr_stride = pre_lr_decoded->strides[stride_index];
+      uint8_t *tmp_buffer_buffers_8bit = (uint8_t *)tmp_buffer->buffers[plane];
+      uint16_t *tmp_buffer_buffers_16bit =
+          CONVERT_TO_SHORTPTR(tmp_buffer->buffers[plane]);
+      const uint8_t *pre_lr_decoded_buffers_8bit =
+          (uint8_t *)pre_lr_decoded->buffers[plane];
+      const uint16_t *pre_lr_decoded_buffers_16bit =
+          CONVERT_TO_SHORTPTR(pre_lr_decoded->buffers[plane]);
+
+      const int num_rows = plane != AOM_PLANE_Y ? export_context.num_rows_luma >> 1
+                                     : export_context.num_rows_luma;
+      const int num_cols = plane != AOM_PLANE_Y ? export_context.num_cols_luma >> 1
+                                     : export_context.num_cols_luma;
+      for (int r = 0; r < num_rows; ++r) {
+        for (int c = 0; c < num_cols; ++c) {
+          if (cm->seq_params.use_highbitdepth)
+            tmp_buffer_buffers_16bit[r * tmp_buffer_stride + c] =
+                pre_lr_decoded_buffers_16bit[r * pre_lr_stride + c];
+          else
+            tmp_buffer_buffers_8bit[r * tmp_buffer_stride + c] =
+                pre_lr_decoded_buffers_8bit[r * pre_lr_stride + c];
+        }
       }
+    }
+
+    const int lr_mode_info_w = cm->mi_params.mi_cols << MI_SIZE_LOG2;
+    const int lr_mode_info_h = cm->mi_params.mi_rows << MI_SIZE_LOG2;
+    assert(lr_mode_info_w == export_context.num_cols_luma);
+    assert(lr_mode_info_h == export_context.num_rows_luma);
+    const int impossible_lr_mode = 255;
+    for(int plane=0;plane<num_planes;++plane) {
+      const int buffer_size = plane ? lr_mode_info_w*lr_mode_info_h/4:lr_mode_info_w*lr_mode_info_h;
+      cm->mi_params.lr_mode_info[plane] = aom_calloc(buffer_size, sizeof(uint8_t));
+      memset(cm->mi_params.lr_mode_info[plane], impossible_lr_mode, buffer_size);
     }
 
     // (ii) Apply lr.
     av1_loop_restoration_filter_frame(tmp_buffer, cm, 0, &cpi->lr_ctxt);
 
-    // (iii) Export.
-    success = export_context_export_frame(tmp_buffer->buffers[AOM_PLANE_Y],
-                                          tmp_buffer_stride,
-                                          cm->seq_params.use_highbitdepth);
+    // (iii) Export reconstruction.
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      const int stride_index = plane != AOM_PLANE_Y  ? 1 : 0;
+      success = success &&
+                export_context_export_frame(tmp_buffer->buffers[plane],
+                                            tmp_buffer->strides[stride_index],
+                                            cm->seq_params.use_highbitdepth,
+                                            upsample_factor);
+    }
     assert(success);
+
+    // (iv) Export modes.
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      success = success &&
+                export_context_export_frame(cm->mi_params.lr_mode_info[plane],
+                                            export_context.num_cols_luma / upsample_factor,
+                                            false,
+                                            upsample_factor);
+    }
+    assert(success);
+
+    // Check consistency.
+    for(int plane=0;plane<num_planes;++plane) {
+      const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
+      const int num_rows = export_context.num_rows_luma / upsample_factor;
+      const int num_cols = export_context.num_cols_luma / upsample_factor;
+      for(int row=0;row<num_rows;++row) {
+        for(int col=0;col<num_cols;++col) {
+          assert(cm->mi_params.lr_mode_info[plane][row*num_cols+col]!=impossible_lr_mode && "Found pixel with unassigned mode.");
+        }
+      }
+    }
+  }
+
+  for(int plane=0;plane<num_planes;++plane) {
+    aom_free(cm->mi_params.lr_mode_info[plane]);
+    cm->mi_params.lr_mode_info[plane] = NULL;
   }
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
 
