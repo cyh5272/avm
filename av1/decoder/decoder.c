@@ -119,7 +119,7 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
     aom_free(mi_params->lr_mode_info[plane]);
     mi_params->lr_mode_info[plane] = NULL;
   }
-#endif // CONFIG_SAVE_IN_LOOP_DATA
+#endif  // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_dealloc_txk_skip_array(mi_params);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
