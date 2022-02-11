@@ -342,15 +342,15 @@ static bool export_context_export_qstep(AV1_COMP *cpi) {
   // frame varying qstep if cases outside of AOM CC need to be considered.
   FILE *export_file = fopen(export_context.filename, "ab");
   if (export_file == NULL) return false;
-  for(int plane=0; plane<3;++plane) {
+  for (int plane = 0; plane < 3; ++plane) {
     int offset = 0;
-    if(plane)
-      offset = plane == 1 ? cm->quant_params.u_dc_delta_q
-                          : cm->quant_params.v_dc_delta_q;
+    if (plane != AOM_PLANE_Y)
+      offset = plane == AOM_PLANE_U ? cm->quant_params.u_dc_delta_q
+                                    : cm->quant_params.v_dc_delta_q;
     else
       offset = cm->quant_params.y_dc_delta_q;
-    const float qstep =
-      (float)av1_convert_qindex_to_q(cm->quant_params.base_qindex + offset, cm->seq_params.bit_depth);
+    const float qstep = (float)av1_convert_qindex_to_q(
+        cm->quant_params.base_qindex + offset, cm->seq_params.bit_depth);
 
     for (int r = 0; r < export_context.num_rows_luma; ++r) {
       for (int c = 0; c < export_context.num_cols_luma; ++c) {
@@ -1704,7 +1704,7 @@ static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
   w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
   return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
 }
-#endif // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
 #if CONFIG_PC_WIENER
 
@@ -1774,11 +1774,10 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
   rui.tskip = rsc->cm->mi_params.tx_skip[plane];
   rui.tskip_stride = get_tskip_stride(rsc->cm, plane);
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
-  if (plane)
-    // TODO: Needs a codec fn to map plane to u or v in case things ever get
-    //  switched.
-    rui.qindex_offset = plane == 1 ? rsc->cm->quant_params.u_dc_delta_q
-                                   : rsc->cm->quant_params.v_dc_delta_q;
+  if (plane != AOM_PLANE_Y)
+    rui.qindex_offset = plane == AOM_PLANE_U
+                            ? rsc->cm->quant_params.u_dc_delta_q
+                            : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
   rusi->sse[RESTORE_PC_WIENER] =
@@ -2607,9 +2606,10 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
   rui.plane = rsc->plane;
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
-  if (rui.plane)
-    rui.qindex_offset = rui.plane == 1 ? rsc->cm->quant_params.u_dc_delta_q
-                                       : rsc->cm->quant_params.v_dc_delta_q;
+  if (rui.plane != AOM_PLANE_Y)
+    rui.qindex_offset = rui.plane == AOM_PLANE_U
+                            ? rsc->cm->quant_params.u_dc_delta_q
+                            : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
   const WienernsFilterConfigPairType *wnsf =
@@ -2733,8 +2733,8 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     rui_temp.tskip = rsc->cm->mi_params.tx_skip[rsc->plane];
     rui_temp.tskip_stride = get_tskip_stride(rsc->cm, rsc->plane);
     rui_temp.base_qindex = rsc->cm->quant_params.base_qindex;
-    if (rsc->plane)
-      rui_temp.qindex_offset = rsc->plane == 1
+    if (rsc->plane != AOM_PLANE_Y)
+      rui_temp.qindex_offset = rsc->plane == AOM_PLANE_U
                                    ? rsc->cm->quant_params.u_dc_delta_q
                                    : rsc->cm->quant_params.v_dc_delta_q;
     else
@@ -3348,7 +3348,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
 
         double cost = search_rest_type(&rsc, r);
 #if CONFIG_COMBINE_PC_NS_WIENER
-        // TODO: Clean this up.
+        // TODO(oguleryuz): Clean this up.
         if (r == RESTORE_PC_WIENER &&
             (plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA)) {
           rsc.is_buffered = true;  // Buffer is set.
@@ -3458,10 +3458,12 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
       const uint16_t *pre_lr_decoded_buffers_16bit =
           CONVERT_TO_SHORTPTR(pre_lr_decoded->buffers[plane]);
 
-      const int num_rows = plane != AOM_PLANE_Y ? export_context.num_rows_luma >> 1
-                                     : export_context.num_rows_luma;
-      const int num_cols = plane != AOM_PLANE_Y ? export_context.num_cols_luma >> 1
-                                     : export_context.num_cols_luma;
+      const int num_rows = plane != AOM_PLANE_Y
+                               ? export_context.num_rows_luma >> 1
+                               : export_context.num_rows_luma;
+      const int num_cols = plane != AOM_PLANE_Y
+                               ? export_context.num_cols_luma >> 1
+                               : export_context.num_cols_luma;
       for (int r = 0; r < num_rows; ++r) {
         for (int c = 0; c < num_cols; ++c) {
           if (cm->seq_params.use_highbitdepth)
@@ -3479,10 +3481,13 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     assert(lr_mode_info_w == export_context.num_cols_luma);
     assert(lr_mode_info_h == export_context.num_rows_luma);
     const int impossible_lr_mode = 255;
-    for(int plane=0;plane<num_planes;++plane) {
-      const int buffer_size = plane ? lr_mode_info_w*lr_mode_info_h/4:lr_mode_info_w*lr_mode_info_h;
-      cm->mi_params.lr_mode_info[plane] = aom_calloc(buffer_size, sizeof(uint8_t));
-      memset(cm->mi_params.lr_mode_info[plane], impossible_lr_mode, buffer_size);
+    for (int plane = 0; plane < num_planes; ++plane) {
+      const int buffer_size = plane ? lr_mode_info_w * lr_mode_info_h / 4
+                                    : lr_mode_info_w * lr_mode_info_h;
+      cm->mi_params.lr_mode_info[plane] =
+          aom_calloc(buffer_size, sizeof(uint8_t));
+      memset(cm->mi_params.lr_mode_info[plane], impossible_lr_mode,
+             buffer_size);
     }
 
     // (ii) Apply lr.
@@ -3491,7 +3496,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     // (iii) Export reconstruction.
     for (int plane = 0; plane < num_planes; ++plane) {
       const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
-      const int stride_index = plane != AOM_PLANE_Y  ? 1 : 0;
+      const int stride_index = plane != AOM_PLANE_Y ? 1 : 0;
       success = success &&
                 export_context_export_frame(tmp_buffer->buffers[plane],
                                             tmp_buffer->strides[stride_index],
@@ -3503,28 +3508,29 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     // (iv) Export modes.
     for (int plane = 0; plane < num_planes; ++plane) {
       const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
-      success = success &&
-                export_context_export_frame(cm->mi_params.lr_mode_info[plane],
-                                            export_context.num_cols_luma / upsample_factor,
-                                            false,
-                                            upsample_factor);
+      success = success && export_context_export_frame(
+                               cm->mi_params.lr_mode_info[plane],
+                               export_context.num_cols_luma / upsample_factor,
+                               false, upsample_factor);
     }
     assert(success);
 
     // Check consistency.
-    for(int plane=0;plane<num_planes;++plane) {
+    for (int plane = 0; plane < num_planes; ++plane) {
       const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
       const int num_rows = export_context.num_rows_luma / upsample_factor;
       const int num_cols = export_context.num_cols_luma / upsample_factor;
-      for(int row=0;row<num_rows;++row) {
-        for(int col=0;col<num_cols;++col) {
-          assert(cm->mi_params.lr_mode_info[plane][row*num_cols+col]!=impossible_lr_mode && "Found pixel with unassigned mode.");
+      for (int row = 0; row < num_rows; ++row) {
+        for (int col = 0; col < num_cols; ++col) {
+          assert(cm->mi_params.lr_mode_info[plane][row * num_cols + col] !=
+                     impossible_lr_mode &&
+                 "Found pixel with unassigned mode.");
         }
       }
     }
   }
 
-  for(int plane=0;plane<num_planes;++plane) {
+  for (int plane = 0; plane < num_planes; ++plane) {
     aom_free(cm->mi_params.lr_mode_info[plane]);
     cm->mi_params.lr_mode_info[plane] = NULL;
   }
