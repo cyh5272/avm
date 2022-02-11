@@ -159,7 +159,7 @@ void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params) {
     int h = mi_params->mi_rows << MI_SIZE_LOG2;
     w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
-    // TODO: hack, cm is not available here.
+    // TODO(oguleryuz): hack, cm is not available here.
     const int cm_seq_params_subsampling_x = 1;
     const int cm_seq_params_subsampling_y = 1;
     w >>= ((plane == 0) ? 0 : cm_seq_params_subsampling_x);
@@ -193,8 +193,7 @@ void av1_reset_txk_skip_array(AV1_COMMON *cm) {
   }
 }
 
-void av1_reset_txk_skip_array_using_mi_params(
-    CommonModeInfoParams *mi_params) {
+void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params) {
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
     memset(mi_params->tx_skip[plane], 0, mi_params->tx_skip_buf_size[plane]);
   }
@@ -221,7 +220,7 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
     blk_w >>= MIN_TX_SIZE_LOG2;
     blk_h >>= MIN_TX_SIZE_LOG2;
 
-    if(plane && (blk_w ==0 || blk_h ==0) && is_chroma_ref) {
+    if (plane && (blk_w == 0 || blk_h == 0) && is_chroma_ref) {
       blk_w = blk_w == 0 ? 1 : blk_w;
       blk_h = blk_h == 0 ? 1 : blk_h;
     }
