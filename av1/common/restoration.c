@@ -673,6 +673,7 @@ static void wiener_filter_stripe(const RestorationUnitInfo *rui,
                                  int32_t *tmpbuf, int bit_depth) {
   (void)tmpbuf;
   (void)bit_depth;
+  assert(bit_depth == 8);
   const ConvolveParams conv_params = get_conv_params_wiener(8);
 
   for (int j = 0; j < stripe_width; j += procunit_width) {
