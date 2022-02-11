@@ -555,7 +555,7 @@ typedef struct FilterFrameCtxt {
 #if CONFIG_SAVE_IN_LOOP_DATA
   uint8_t *lr_mode_info;
   int lr_mode_info_stride;
-#endif // CONFIG_SAVE_IN_LOOP_DATA
+#endif  // CONFIG_SAVE_IN_LOOP_DATA
 } FilterFrameCtxt;
 
 typedef struct AV1LrStruct {
