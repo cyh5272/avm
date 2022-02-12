@@ -761,7 +761,7 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
                            ? AOMMAX(AOMMIN(j + c, width - 1), 0)
                            : j + c;
         int16_t diff = clip_base(
-            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], bit_depth);
         tmp += filter[pos] * diff;
       }
       tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
@@ -832,7 +832,7 @@ void av1_convolve_nonsep_mask_highbd(
                            ? AOMMAX(AOMMIN(j + c, width - 1), 0)
                            : j + c;
         int16_t diff = clip_base(
-            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], bit_depth);
         tmp += filter[pos] * diff;
       }
       tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
@@ -912,7 +912,7 @@ void av1_convolve_nonsep_dual_highbd(const uint8_t *dgd8, int width, int height,
                            ? AOMMAX(AOMMIN(j + c, width - 1), 0)
                            : j + c;
         int16_t diff = clip_base(
-            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], bit_depth);
         tmp += filter[pos] * diff;
       }
       for (int k = 0; k < nsfilter->num_pixels2; ++k) {
@@ -926,7 +926,8 @@ void av1_convolve_nonsep_dual_highbd(const uint8_t *dgd8, int width, int height,
                            ? AOMMAX(AOMMIN(j + c, width - 1), 0)
                            : j + c;
         int16_t diff = clip_base(
-            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id], 8);
+            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id],
+            bit_depth);
         tmp += filter[pos] * diff;
       }
       tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);

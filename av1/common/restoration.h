@@ -187,15 +187,15 @@ extern "C" {
 #define WIENERNS_COL_ID 1
 #define WIENERNS_BUF_POS 2
 
+#define WIENERNS_COEFCFG_LEN 3
 #define WIENERNS_BIT_ID 0
 #define WIENERNS_MIN_ID 1
-#define WIENERNS_SUBEXP_K_ID 2
-#define WIENERNS_STEP_ID 3
+#define WIENERNS_PAR_ID 2
 
 typedef struct {
   NonsepFilterConfig nsfilter;
   int ncoeffs;
-  const int (*coeffs)[3];
+  const int (*coeffs)[WIENERNS_COEFCFG_LEN];
 } WienernsFilterConfigType;
 
 typedef struct {
@@ -213,7 +213,7 @@ static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
 #if USE_QBASED_WIENER_NONSEP
   if (qindex <= 96)
     return &wienerns_filters_lowqp;
-  else if (qindex <= 224)
+  else if (qindex <= 200)
     return &wienerns_filters_midqp;
   else
     return &wienerns_filters_highqp;
