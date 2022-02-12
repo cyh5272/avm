@@ -211,6 +211,7 @@ set_aom_config_var(CONFIG_CCSO_EXT 1
 set_aom_config_var(CONFIG_ADAPTIVE_MVD 1 "Enable adaptive MVD resolution")
 set_aom_config_var(CONFIG_JOINT_MVD 1 "Enable joint MVD coding")
 set_aom_config_var(CONFIG_MULTIQ_LR_SIGNALING 0 "Enable Multi-Q LR Signaling")
+set_aom_config_var(CONFIG_LR_4PART_CODE 0 "Enable 4-part code for LR Signaling")
 
 #
 # Variables in this section control optional features of the build system.
