@@ -182,6 +182,7 @@ set_aom_config_var(
 set_aom_config_var(CONFIG_QBASED_QP_OFFSET 1
                    "AV2 experiment flag to adjust q_offset based on QP.")
 set_aom_config_var(CONFIG_MULTIQ_LR_SIGNALING 0 "Enable Multi-Q LR Signaling")
+set_aom_config_var(CONFIG_LR_4PART_CODE 0 "Enable 4-part code for LR Signaling")
 
 #
 # Variables in this section control optional features of the build system.
