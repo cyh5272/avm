@@ -2600,6 +2600,12 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
   rui.combine_with_pc_wiener =
       rsc->plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA;
   rusi->combine_with_pc_wiener = rui.combine_with_pc_wiener;
+  if (rui.plane != AOM_PLANE_Y)
+    rui.qindex_offset = rui.plane == AOM_PLANE_U
+                            ? rsc->cm->quant_params.u_dc_delta_q
+                            : rsc->cm->quant_params.v_dc_delta_q;
+  else
+    rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   rui.luma = rsc->luma;
@@ -2607,12 +2613,6 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
   rui.plane = rsc->plane;
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
-  if (rui.plane != AOM_PLANE_Y)
-    rui.qindex_offset = rui.plane == AOM_PLANE_U
-                            ? rsc->cm->quant_params.u_dc_delta_q
-                            : rsc->cm->quant_params.v_dc_delta_q;
-  else
-    rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
   const WienernsFilterConfigPairType *wnsf =
       get_wienerns_filters(rsc->cm->quant_params.base_qindex);
 
