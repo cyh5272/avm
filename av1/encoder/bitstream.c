@@ -2632,7 +2632,7 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
 }
 
 #if CONFIG_WIENER_NONSEP
-static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
+static void write_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
                                   const WienerNonsepInfo *wienerns_info,
                                   WienerNonsepInfo *ref_wienerns_info,
                                   aom_writer *wb) {
@@ -2652,19 +2652,91 @@ static void write_wiener_nsfilter(MACROBLOCKD *xd, int is_uv,
   int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
   int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
-  const int(*wienerns_coeffs)[3] = is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
+      is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  // printf("%s ", is_uv ? "UV:" : "Y: ");
+  // printf("Enc %s ", is_uv ? "UV:" : "Y: ");
+  int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
+  if (end_feat - beg_feat > 1 && wienerns_info->nsfilter[end_feat - 1] == 0) {
+    reduce_step[WIENERNS_REDUCE_STEPS - 1] = 1;
+    if (end_feat - beg_feat > 2 && wienerns_info->nsfilter[end_feat - 2] == 0) {
+      reduce_step[WIENERNS_REDUCE_STEPS - 2] = 1;
+      if (end_feat - beg_feat > 3 &&
+          wienerns_info->nsfilter[end_feat - 3] == 0) {
+        reduce_step[WIENERNS_REDUCE_STEPS - 3] = 1;
+        if (end_feat - beg_feat > 4 &&
+            wienerns_info->nsfilter[end_feat - 4] == 0) {
+          reduce_step[WIENERNS_REDUCE_STEPS - 4] = 1;
+          if (end_feat - beg_feat > 5 &&
+              wienerns_info->nsfilter[end_feat - 5] == 0) {
+            reduce_step[WIENERNS_REDUCE_STEPS - 5] = 1;
+            if (end_feat - beg_feat > 6 &&
+                wienerns_info->nsfilter[end_feat - 6] == 0) {
+              reduce_step[WIENERNS_REDUCE_STEPS - 6] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
   for (int i = beg_feat; i < end_feat; ++i) {
     // printf("(%d/%d), ", wienerns_info->nsfilter[i],
-    // ref_wienerns_info->nsfilter[i]);
+    //        ref_wienerns_info->nsfilter[i]);
+    if (i == end_feat - 6 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[0],
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2);
+      if (reduce_step[0]) break;
+    }
+    /*
+    if (i == end_feat - 5 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[1],
+    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2); if (reduce_step[1])
+    break;
+    }
+    */
+    if (i == end_feat - 4 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[2],
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2);
+      if (reduce_step[2]) break;
+    }
+    /*
+    if (i == end_feat - 3 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[3],
+    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2); if (reduce_step[3])
+    break;
+    }
+    */
+    if (i == end_feat - 2 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[4],
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2);
+      if (reduce_step[4]) break;
+    }
+    /*
+    if (i == end_feat - 1 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[5],
+    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2); if (reduce_step[5])
+    break;
+    }
+    */
+#if CONFIG_LR_4PART_CODE
+    aom_write_4part_wref(
+        wb,
+        ref_wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        wienerns_info->nsfilter[i] -
+            wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+        xd->tile_ctx->wiener_nonsep_4part_cdf[wienerns_coeffs[i - beg_feat]
+                                                             [WIENERNS_PAR_ID]],
+        wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]);
+#else
     aom_write_primitive_refsubexpfin(
         wb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-        wienerns_coeffs[i - beg_feat][WIENERNS_SUBEXP_K_ID],
+        wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID],
         ref_wienerns_info->nsfilter[i] -
             wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
         wienerns_info->nsfilter[i] -
             wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID]);
+#endif  // CONFIG_LR_4PART_CODE
   }
   // printf("\n");
   memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
@@ -2715,7 +2787,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        write_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+        write_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
                               ref_wiener_nonsep_info, w);
         break;
 #endif  // CONFIG_WIENER_NONSEP
@@ -2753,7 +2825,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->wiener_nonsep_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS
     if (unit_rtype != RESTORE_NONE) {
-      write_wiener_nsfilter(xd, is_uv, &rui->wiener_nonsep_info,
+      write_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
                             ref_wiener_nonsep_info, w);
     }
 #endif  // CONFIG_WIENER_NONSEP
