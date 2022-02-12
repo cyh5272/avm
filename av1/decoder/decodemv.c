@@ -351,7 +351,7 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
   }
 }
 
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
 static PREDICTION_MODE read_adaptive_mvd_flag(MACROBLOCKD *xd, aom_reader *r,
                                               MB_MODE_INFO *const mbmi) {
   if (mbmi->mode != JOINT_NEWMV && mbmi->mode != JOINT_NEWMV_OPTFLOW) return 0;
@@ -1870,8 +1870,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       else
         mbmi->mode = read_inter_mode(ec_ctx, r, mode_ctx);
-#if IMPROVED_AMVD
-      if (enable_adaptive_mvd_resolution(cm, mbmi))
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+      if (cm->seq_params.enable_adaptive_mvd)
         mbmi->adaptive_mvd_flag = read_adaptive_mvd_flag(xd, r, mbmi);
       else
         mbmi->adaptive_mvd_flag = 0;
@@ -2031,7 +2031,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if CONFIG_OPTFLOW_REFINEMENT
       mbmi->mode < NEAR_NEARMV_OPTFLOW &&
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
       mbmi->adaptive_mvd_flag == 0 &&
 #endif
       !mbmi->skip_mode) {

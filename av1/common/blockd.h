@@ -371,7 +371,7 @@ typedef struct MB_MODE_INFO {
   int8_t interintra_wedge_index;
   /*! \brief Struct that stores the data used in interinter compound mode. */
   INTERINTER_COMPOUND_DATA interinter_comp;
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
   /*! \brief The adaptive MVD resolution flag for JOINT_NEWMV mode. */
   int adaptive_mvd_flag;
 #endif

@@ -3270,7 +3270,7 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 }
 #endif  // CONFIG_ADAPTIVE_MVD
 
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
 int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                                  SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                                  MV *start_mv, MV *bestmv, int *distortion,

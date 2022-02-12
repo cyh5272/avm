@@ -630,7 +630,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
   if (is_adaptive_mvd
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
       && mbmi->adaptive_mvd_flag == 0
 #endif
   ) {

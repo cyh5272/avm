@@ -214,7 +214,7 @@ static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
 #if IMPROVED_AMVD
           || mode == AMVDNEWMV
 #endif
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
           || mbmi->adaptive_mvd_flag
 #endif
           ) &&

@@ -1162,7 +1162,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_OPTFLOW_REFINEMENT
           && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
           && mbmi->adaptive_mvd_flag == 0
 #endif
       ) {
@@ -1239,9 +1239,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       update_cdf(fc->inter_compound_mode_cdf[mode_ctx],
                  INTER_COMPOUND_OFFSET(mode), INTER_COMPOUND_MODES);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
       if ((mode == JOINT_NEWMV || mode == JOINT_NEWMV_OPTFLOW) &&
-          enable_adaptive_mvd_resolution(cm, mbmi))
+          cm->seq_params.enable_adaptive_mvd)
         update_cdf(fc->adaptive_mvd_cdf, mbmi->adaptive_mvd_flag, 2);
 #endif
     } else {

@@ -170,7 +170,7 @@ static AOM_INLINE void write_drl_idx(
 }
 #endif  // CONFIG_NEW_INTER_MODES
 
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
 static AOM_INLINE void write_adaptive_mvd_flag(MACROBLOCKD *xd, aom_writer *w,
                                                const MB_MODE_INFO *const mbmi) {
   if (mbmi->mode != JOINT_NEWMV && mbmi->mode != JOINT_NEWMV_OPTFLOW) return;
@@ -1602,8 +1602,8 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                                   mode_ctx);
       else if (is_inter_singleref_mode(mode))
         write_inter_mode(w, mode, ec_ctx, mode_ctx);
-#if IMPROVED_AMVD
-      if (enable_adaptive_mvd_resolution(cm, mbmi))
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+      if (cm->seq_params.enable_adaptive_mvd)
         write_adaptive_mvd_flag(xd, w, mbmi);
 #endif
 #if IMPROVED_AMVD
@@ -1713,7 +1713,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #if CONFIG_OPTFLOW_REFINEMENT
         && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
         && mbmi->adaptive_mvd_flag == 0
 #endif
     ) {

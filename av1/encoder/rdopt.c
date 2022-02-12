@@ -2576,9 +2576,9 @@ static int64_t simple_translation_pred_rd(
                                       mode_ctx);
   rd_stats->rate += ref_mv_cost;
 
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
   if ((mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) &&
-      enable_adaptive_mvd_resolution(cm, mbmi))
+      cm->seq_params.enable_adaptive_mvd)
     rd_stats->rate += mode_costs->adaptive_mvd_cost[mbmi->adaptive_mvd_flag];
 #endif
 
@@ -3369,7 +3369,7 @@ static int64_t handle_inter_mode(
   //    5.) Pick the motion mode (SIMPLE_TRANSLATION, OBMC_CAUSAL,
   //        WARPED_CAUSAL)
   //    6.) Update stats if best so far
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
   const int is_joint_amvd_allowed =
       (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) &&
       cm->seq_params.enable_adaptive_mvd;
@@ -3417,7 +3417,7 @@ static int64_t handle_inter_mode(
       rd_stats->rate += drl_cost;
       mode_info[ref_mv_idx].drl_cost = drl_cost;
 
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
       if (is_joint_amvd_allowed)
         rd_stats->rate += mode_costs->adaptive_mvd_cost[amvd_idx];
 #endif
@@ -3501,7 +3501,7 @@ static int64_t handle_inter_mode(
       // Handle a compound predictor, continue if it is determined this
       // cannot be the best compound mode
       if (is_comp_pred
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
           && mbmi->adaptive_mvd_flag == 0
 #endif
       ) {
@@ -3617,7 +3617,7 @@ static int64_t handle_inter_mode(
       }
       restore_dst_buf(xd, orig_dst, num_planes);
     }
-#if IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
   }
 #endif
 
@@ -5966,6 +5966,11 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 
     // Apply speed features to decide if this inter mode can be skipped
     if (skip_inter_mode(cpi, x, bsize, ref_frame_rd, midx, &sf_args)) continue;
+
+#if IMPROVED_AMVD
+    if (this_mode == AMVDNEWMV && cm->seq_params.enable_adaptive_mvd == 0)
+      continue;
+#endif  // IMPROVED_AMVD
 
     // Select prediction reference frames.
     for (i = 0; i < num_planes; i++) {
