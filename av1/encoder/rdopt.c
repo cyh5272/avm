@@ -13,8 +13,6 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "av1/common/blockd.h"
-#include "av1/common/enums.h"
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 #include "config/av1_rtcd.h"
@@ -5620,7 +5618,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         const PARTITION_TYPE part =
             (rect_type == HORZ) ? PARTITION_HORZ : PARTITION_VERT;
         const BLOCK_SIZE subsize = get_partition_subsize(bsize, part);
-        // printf("Subsize: %d\n", subsize);
         if (subsize == BLOCK_INVALID) {
           continue;
         }
@@ -5629,7 +5626,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
               av1_get_prev_partition(x, mi_pos_rect[rect_type][sub_idx][0],
                                      mi_pos_rect[rect_type][sub_idx][1],
                                      subsize, cm->seq_params.sb_size);
-          // printf("prev_part: %d\n", prev_part);
           if (prev_part != PARTITION_INVALID) {
             prune_ref_frames = true;
             break;

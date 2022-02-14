@@ -3249,7 +3249,7 @@ static void rectangular_partition_search(
   const PARTITION_TYPE forced_partition = get_forced_partition_type(
       cm, x, blk_params.mi_row, blk_params.mi_col, blk_params.bsize);
 #endif  // CONFIG_SDP
-#else   // !CONFIG_EXT_RECUR_PARTITIONS
+#else  // !CONFIG_EXT_RECUR_PARTITIONS
   (void)part_none_rd;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   RD_STATS *sum_rdc = &part_search_state->sum_rdc;
