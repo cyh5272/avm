@@ -5813,8 +5813,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     set_ref_ptrs(cm, xd, ref_frame, second_ref_frame);
 
     // Apply speed features to decide if this inter mode can be skipped
-    if (skip_inter_mode(cpi, x, bsize, ref_frame_rd, midx, &sf_args))
-      continue;
+    if (skip_inter_mode(cpi, x, bsize, ref_frame_rd, midx, &sf_args)) continue;
 
     // Select prediction reference frames.
     for (i = 0; i < num_planes; i++) {
