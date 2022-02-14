@@ -1725,11 +1725,7 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
       if (has_rows && has_cols) {
 #if CONFIG_ENTROPY_STATS
-#if CONFIG_SDP
         td->counts->partition[plane_index][ctx][partition]++;
-#else   // CONFIG_SDP
-        td->counts->partition[ctx][partition]++;
-#endif  // CONFIG_SCP
 #endif
         if (tile_data->allow_update_cdf) {
           FRAME_CONTEXT *fc = xd->tile_ctx;
@@ -3042,7 +3038,7 @@ static void rectangular_partition_search(
     SB_MULTI_PASS_MODE multi_pass_mode, const PARTITION_TREE *ptree_luma,
     const PARTITION_TREE *template_tree,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-    RD_RECT_PART_WIN_INFO *rect_part_win_info) {
+    RD_RECT_PART_WIN_INFO *rect_part_win_info, int64_t part_none_rd) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   RD_STATS *sum_rdc = &part_search_state->sum_rdc;
@@ -3059,6 +3055,8 @@ static void rectangular_partition_search(
   const PARTITION_TYPE forced_partition =
       get_forced_partition_type(cm, x, blk_params.mi_row, blk_params.mi_col,
                                 blk_params.bsize, template_tree);
+#else  // !CONFIG_EXT_RECUR_PARTITIONS
+  (void)part_none_rd;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   // mi_pos_rect[NUM_RECT_PARTS][SUB_PARTITIONS_RECT][0]: mi_row postion of
   //                                           HORZ and VERT partition types.
@@ -3130,6 +3128,27 @@ static void rectangular_partition_search(
         is_bsize_pruning_cand(blk_params.bsize)) {
       if (av1_prune_part_hv_with_sms(cpi, tile_data, x, part_search_state,
                                      best_rdc, &blk_params, i, part_hv_rate)) {
+        continue;
+      }
+    }
+
+    if (cpi->sf.part_sf.prune_rect_with_none_rd &&
+        forced_partition == PARTITION_INVALID && !frame_is_intra_only(cm) &&
+        part_none_rd < INT64_MAX && sum_rdc->rate < INT_MAX &&
+        is_not_edge_block[i]) {
+      float discount_factor = 1.1f;
+      const int q_thresh = 180;
+      const int q = x->qindex;
+      if (q < q_thresh) {
+        discount_factor -= 0.025f;
+      }
+      if (AOMMAX(block_size_wide[blk_params.bsize],
+                 block_size_high[blk_params.bsize]) < 16) {
+        discount_factor -= 0.02f;
+      }
+      const int64_t est_rd = (int64_t)(part_none_rd / discount_factor) +
+                             RDCOST(x->rdmult, part_hv_rate, 0);
+      if (est_rd > part_none_rd) {
         continue;
       }
     }
@@ -3835,9 +3854,6 @@ static void none_partition_search(
   const BLOCK_SIZE bsize = blk_params.bsize;
   assert(bsize < BLOCK_SIZES_ALL);
 
-#if CONFIG_EXT_RECUR_PARTITIONS
-  (void)part_none_rd;
-#endif  // CONFIG_EXT_RECUR_PARTITIONS
   // Set PARTITION_NONE allowed flag.
   set_part_none_allowed_flag(cpi,
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -3903,9 +3919,7 @@ static void none_partition_search(
       this_rdc->rate += pt_cost;
       this_rdc->rdcost = RDCOST(x->rdmult, this_rdc->rate, this_rdc->dist);
     }
-#if !CONFIG_EXT_RECUR_PARTITIONS
     *part_none_rd = this_rdc->rdcost;
-#endif
     if (this_rdc->rdcost < best_rdc->rdcost) {
       *best_rdc = *this_rdc;
       part_search_state->found_best_partition = true;
@@ -4849,7 +4863,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_EXT_RECUR_PARTITIONS
                                multi_pass_mode, ptree_luma, template_tree,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-                               rect_part_win_info);
+                               rect_part_win_info, part_none_rd);
 
   if (pb_source_variance == UINT_MAX) {
     av1_setup_src_planes(x, cpi->source, mi_row, mi_col, num_planes, NULL);
