@@ -1351,6 +1351,10 @@ void av1_convolve_nonsep(const uint8_t *dgd, int width, int height, int stride,
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
@@ -1382,6 +1386,10 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
@@ -1417,6 +1425,10 @@ void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
@@ -1453,6 +1465,10 @@ void av1_convolve_nonsep_mask_highbd(
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
@@ -1484,6 +1500,10 @@ void av1_convolve_nonsep_dual(const uint8_t *dgd, int width, int height,
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
@@ -1533,6 +1553,10 @@ void av1_convolve_nonsep_dual_highbd(const uint8_t *dgd8, int width, int height,
         const int pos = nsfilter->config[k][NONSEP_BUF_POS];
         const int r = nsfilter->config[k][NONSEP_ROW_ID];
         const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
         const int ir = nsfilter->strict_bounds
                            ? AOMMAX(AOMMIN(i + r, height - 1), 0)
                            : i + r;
