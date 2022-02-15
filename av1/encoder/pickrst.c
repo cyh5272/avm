@@ -2192,14 +2192,6 @@ static int64_t finer_tile_search_wienerns(
   WienerNonsepInfo best = curr;
   int64_t best_err = calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 
-  /*
-  WienerNonsepInfo zero = { 0 };
-  rui->wiener_nonsep_info = zero;
-  int64_t best_err0 = calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-  rui->wiener_nonsep_info = curr;
-  if (best_err > best_err0) return best_err;
-  */
-
   int64_t best_bits =
       count_wienerns_bits(rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
 #if CONFIG_LR_4PART_CODE
@@ -2214,11 +2206,13 @@ static int64_t finer_tile_search_wienerns(
   int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
   int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
+  int num_feat = is_uv ? wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
       is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  int iter_step = 12;
-  int src_range = 3;
+  const int iter_step = 12;
+
+  int src_range = 2;
   for (int s = 0; s < iter_step; ++s) {
     int no_improv = 1;
     for (int i = beg_feat; i < end_feat; ++i) {
@@ -2253,6 +2247,75 @@ static int64_t finer_tile_search_wienerns(
       }
       curr = best;
       rui->wiener_nonsep_info.nsfilter[i] = curr.nsfilter[i];
+    }
+    if (no_improv) {
+      break;
+    }
+    rui->wiener_nonsep_info = best;
+    curr = rui->wiener_nonsep_info;
+  }
+  rui->wiener_nonsep_info = best;
+
+  const int src_steps[][2] = {
+    { 1, -1 },
+    { -1, 1 },
+    { 1, 1 },
+    { -1, -1 },
+    { 2, 1 },
+    { 1, 2 },
+    { -2, 1 },
+    { 1, -2 },
+    { 2, -1 },
+    { -1, 2 },
+    { -2, -1 },
+    { -1, -2 },
+  };
+  const int nsrc_steps = sizeof(src_steps) / (2 * sizeof(src_steps[0][0]));
+  for (int s = 0; s < iter_step; ++s) {
+    int no_improv = 1;
+    for (int i = beg_feat + (num_feat & 1); i < end_feat; i += 2) {
+      int cmin[2] = { wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+                      wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] };
+      int cmax[2] = {
+        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID] +
+            (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+        wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] +
+            (1 << wienerns_coeffs[i + 1 - beg_feat][WIENERNS_BIT_ID])
+      };
+
+      for (int ci = 0; ci < nsrc_steps; ++ci) {
+        rui->wiener_nonsep_info.nsfilter[i] =
+            curr.nsfilter[i] + src_steps[ci][0];
+        rui->wiener_nonsep_info.nsfilter[i + 1] =
+            curr.nsfilter[i + 1] + src_steps[ci][1];
+        if (rui->wiener_nonsep_info.nsfilter[i] < cmin[0] ||
+            rui->wiener_nonsep_info.nsfilter[i] >= cmax[0] ||
+            rui->wiener_nonsep_info.nsfilter[i + 1] < cmin[1] ||
+            rui->wiener_nonsep_info.nsfilter[i + 1] >= cmax[1]) {
+          rui->wiener_nonsep_info = curr;
+          continue;
+        }
+        const int64_t err =
+            calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+        const int64_t bits = count_wienerns_bits(
+            rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+            x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+        if (cost < best_cost) {
+          no_improv = 0;
+          best_err = err;
+          best_cost = cost;
+          best_bits = bits;
+          best = rui->wiener_nonsep_info;
+        }
+      }
+      curr = best;
+      rui->wiener_nonsep_info.nsfilter[i] = curr.nsfilter[i];
+      rui->wiener_nonsep_info.nsfilter[i + 1] = curr.nsfilter[i + 1];
     }
     if (no_improv) {
       break;
@@ -2417,6 +2480,10 @@ static int compute_quantized_wienerns_filter(
           const int pos = wienerns_config[k][WIENERNS_BUF_POS];
           const int r = wienerns_config[k][WIENERNS_ROW_ID];
           const int c = wienerns_config[k][WIENERNS_COL_ID];
+          if (r == 0 && c == 0) {
+            buf[pos] += 1;
+            continue;
+          }
           buf[pos] +=
               clip_base((int16_t)dgd_hbd[(i + r) * dgd_stride + (j + c)] -
                             (int16_t)dgd_hbd[dgd_id],
