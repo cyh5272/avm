@@ -1777,6 +1777,7 @@ static PARTITION_TYPE read_partition(MACROBLOCKD *xd, int mi_row, int mi_col,
   if (is_square_block(bsize)) {
     if (!has_rows && has_cols) return PARTITION_HORZ;
     if (has_rows && !has_cols) return PARTITION_VERT;
+    if (!has_rows && !has_cols) return PARTITION_HORZ;
 
     assert(ctx >= 0);
     if (has_rows && has_cols) {
@@ -1800,12 +1801,42 @@ static PARTITION_TYPE read_partition(MACROBLOCKD *xd, int mi_row, int mi_col,
         return (PARTITION_TYPE)aom_read_symbol(
             r, partition_cdf, partition_cdf_length(bsize), ACCT_STR);
       }
-    } else {  // !has_rows && !has_cols
-      aom_cdf_prob cdf[2] = { 16384, AOM_ICDF(CDF_PROB_TOP) };
-      return aom_read_cdf(r, cdf, 2, ACCT_STR) ? PARTITION_VERT
-                                               : PARTITION_HORZ;
     }
   } else {
+    // Handle boundary
+    if (!has_rows || !has_cols) {
+      // Force PARTITION_HORZ if
+      //  * The current size is tall and we are missing rows
+      //  * PARTITION_VERT will produce 1:4 block that is still missing cols
+      if (is_tall_block(bsize)) {
+        if (!has_rows) {
+          return PARTITION_HORZ;
+        } else {
+          assert(!has_cols);
+          const bool sub_has_cols =
+              (mi_col + mi_size_wide[bsize] / 4) < cm->mi_params.mi_cols;
+          if (mi_size_wide[bsize] >= 4 && !sub_has_cols) {
+            return PARTITION_HORZ;
+          }
+        }
+      } else {
+        // Force PARTITION_VERT if
+        //  * The current size is wide and we are missing cols
+        //  * PARTITION_HORZ will produce 1:4 block that is still missing rows
+        assert(is_wide_block(bsize));
+        if (!has_cols) {
+          return PARTITION_VERT;
+        } else {
+          assert(!has_rows);
+          const bool sub_has_rows =
+              (mi_row + mi_size_high[bsize] / 4) < cm->mi_params.mi_rows;
+          if (mi_size_high[bsize] >= 4 && !sub_has_rows) {
+            return PARTITION_VERT;
+          }
+        }
+      }
+    }
+
     if (limit_rect_split) {
       // If we are the middle block of a 3-way partitioning, disable HORZ/VERT
       // of the middle partition because it is redundant.
