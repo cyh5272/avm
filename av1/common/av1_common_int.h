@@ -1541,6 +1541,10 @@ typedef struct AV1Common {
    * `use_cnn[p]` is true if plane `p` is using CNN restoration.
    */
   int use_cnn[MAX_MB_PLANE];
+  /*!
+   * `cnn_indices[p]` is model index used by plane `p` if `use_cnn[p]` is true.
+   */
+  int cnn_indices[MAX_MB_PLANE];
 #endif  // CONFIG_CNN_RESTORATION
 } AV1_COMMON;
 
