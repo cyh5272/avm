@@ -2059,15 +2059,24 @@ static AOM_INLINE void setup_segmentation(AV1_COMMON *const cm,
 
 #if CONFIG_CNN_RESTORATION
 static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
-  if (av1_allow_cnn(cm)) {
-    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
-      if (av1_allow_cnn_for_plane(cm, plane))
+  for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+    if (av1_allow_cnn_for_plane(cm, plane)) {
+      const int num_cnn_indices = av1_num_cnn_indices_for_plane(cm, plane);
+      if (num_cnn_indices > 1) {
+        const int combined_code_num_bits =
+            av1_num_cnn_combined_code_bits(num_cnn_indices);
+        const int combined_code =
+            aom_rb_read_literal(rb, combined_code_num_bits);
+        cm->use_cnn[plane] = (combined_code < num_cnn_indices);
+        cm->cnn_indices[plane] = cm->use_cnn[plane] ? combined_code : 0;
+      } else {
         cm->use_cnn[plane] = aom_rb_read_bit(rb);
-      else
-        cm->use_cnn[plane] = 0;
+        cm->cnn_indices[plane] = 0;
+      }
+    } else {
+      cm->use_cnn[plane] = 0;
+      cm->cnn_indices[plane] = 0;
     }
-  } else {
-    memset(cm->use_cnn, 0, sizeof(cm->use_cnn));
   }
 }
 #endif  // CONFIG_CNN_RESTORATION
@@ -6426,6 +6435,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   setup_loopfilter(cm, rb);
 #if CONFIG_CNN_RESTORATION
   memset(cm->use_cnn, 0, sizeof(cm->use_cnn));
+  memset(cm->cnn_indices, 0, sizeof(cm->cnn_indices));
   if (!features->coded_lossless) decode_cnn(cm, rb);
 #endif  // CONFIG_CNN_RESTORATION
   if (!features->coded_lossless && seq_params->enable_cdef) {
@@ -6807,7 +6817,8 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
       superres_post_decode(pbi);
 
 #if CONFIG_CNN_RESTORATION
-      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn);
+      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
+                             cm->cnn_indices);
 #endif  // CONFIG_CNN_RESTORATION
 
       if (do_loop_restoration) {
@@ -6834,7 +6845,8 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
       // In no cdef and no superres case. Provide an optimized version of
       // loop_restoration_filter.
 #if CONFIG_CNN_RESTORATION
-      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn);
+      av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
+                             cm->cnn_indices);
 #endif  // CONFIG_CNN_RESTORATION
 
       if (do_loop_restoration) {
