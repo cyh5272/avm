@@ -2855,16 +2855,22 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 
 #if CONFIG_CNN_RESTORATION
 static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
-  if (av1_allow_cnn(cm)) {
-    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
-      if (av1_allow_cnn_for_plane(cm, plane))
+  for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+    if (av1_allow_cnn_for_plane(cm, plane)) {
+      const int num_cnn_indices = av1_num_cnn_indices_for_plane(cm, plane);
+      if (num_cnn_indices > 1) {
+        const int combined_code =
+            cm->use_cnn[plane] ? cm->cnn_indices[plane] : num_cnn_indices;
+        const int combined_code_num_bits =
+            av1_num_cnn_combined_code_bits(num_cnn_indices);
+        aom_wb_write_literal(wb, combined_code, combined_code_num_bits);
+      } else {
         aom_wb_write_bit(wb, cm->use_cnn[plane]);
-      else
-        assert(!cm->use_cnn[plane]);
-    }
-  } else {
-    for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+        assert(cm->cnn_indices[plane] == 0);
+      }
+    } else {
       assert(!cm->use_cnn[plane]);
+      assert(cm->cnn_indices[plane] == 0);
     }
   }
 }
