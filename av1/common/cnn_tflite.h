@@ -22,6 +22,12 @@ extern "C" {
 
 // Minimum base_qindex needed to run cnn.
 #define MIN_CNN_Q_INDEX 0
+// Number of options for Y channel CNN model, with chosen option signaled in the
+// bitstream as an index.
+#define CNN_INDICES_Y 3
+// Number of bits required to signal combined code for cnn_index
+// (CNN_INDICES_Y) and whether CNN is used or not (1).
+#define CNN_INDEX_Y_BITS 2  // log2(CNN_INDICES_Y + 1)
 
 // Returns true if we are allowed to use CNN for restoration for the frame.
 static INLINE bool av1_allow_cnn(const AV1_COMMON *cm) {
@@ -48,6 +54,23 @@ static INLINE bool av1_allow_cnn_for_plane(const AV1_COMMON *cm, int plane) {
   }
 }
 
+static INLINE int av1_num_cnn_indices_for_plane(const AV1_COMMON *cm,
+                                                int plane) {
+  if (!av1_allow_cnn_for_plane(cm, plane)) return 0;
+  if (av1_superres_scaled(cm)) return 1;
+  if (plane == AOM_PLANE_Y) {
+    return CNN_INDICES_Y;
+  } else {
+    return 1;
+  }
+}
+
+static INLINE int av1_num_cnn_combined_code_bits(int num_indices) {
+  assert(num_indices == CNN_INDICES_Y);
+  (void)num_indices;
+  return CNN_INDEX_Y_BITS;
+}
+
 // Returns true if we are allowed to use CNN for restoration.
 static INLINE bool av1_use_cnn_encode(const AV1_COMMON *cm,
                                       FRAME_UPDATE_TYPE update_type) {
@@ -62,7 +85,8 @@ static INLINE bool av1_use_cnn_encode(const AV1_COMMON *cm,
 int av1_restore_cnn_img_tflite(int qindex, int superres_denom,
                                const uint8_t *dgd, int width, int height,
                                int dgd_stride, uint8_t *rst, int rst_stride,
-                               int num_threads, int is_intra_only, int is_luma);
+                               int num_threads, int is_intra_only, int is_luma,
+                               int cnn_index);
 
 // Same as 'av1_restore_cnn_img_tflite' for highbd.
 int av1_restore_cnn_img_tflite_highbd(int qindex, int superres_denom,
@@ -70,14 +94,15 @@ int av1_restore_cnn_img_tflite_highbd(int qindex, int superres_denom,
                                       int height, int dgd_stride, uint16_t *rst,
                                       int rst_stride, int num_threads,
                                       int bit_depth, int is_intra_only,
-                                      int is_luma);
+                                      int is_luma, int cnn_index);
 
 struct AV1Common;
 
 // Restore current frame buffer in 'cm' in-place with a CNN model using TFlite.
 // Apply CNN to plane 'p' if and only if apply_cnn[p] is true.
 void av1_restore_cnn_tflite(const struct AV1Common *cm, int num_threads,
-                            const int apply_cnn[MAX_MB_PLANE]);
+                            const int apply_cnn[MAX_MB_PLANE],
+                            const int cnn_indices[MAX_MB_PLANE]);
 
 #ifdef __cplusplus
 }
