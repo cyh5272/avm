@@ -70,7 +70,8 @@
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_intra_model_from_qindex(int qindex,
                                                         int superres_denom,
-                                                        int is_luma) {
+                                                        int is_luma,
+                                                        int cnn_index) {
   if (qindex <= MIN_CNN_Q_INDEX) {
     assert(0);
     return nullptr;
@@ -85,19 +86,32 @@ static const unsigned char *get_intra_model_from_qindex(int qindex,
   if (superres_denom == SCALE_NUMERATOR) {
     if (is_luma) {
       if (qindex < 91) {
-        return qp0_90_model_tflite_data;
+        return (cnn_index == 0)   ? qp0_90_model_tflite_data
+               : (cnn_index == 1) ? qp91_120_model_tflite_data
+                                  : qp121_145_model_tflite_data;
       } else if (qindex < 121) {
-        return qp91_120_model_tflite_data;
+        return (cnn_index == 0)   ? qp91_120_model_tflite_data
+               : (cnn_index == 1) ? qp0_90_model_tflite_data
+                                  : qp121_145_model_tflite_data;
       } else if (qindex < 146) {
-        return qp121_145_model_tflite_data;
+        return (cnn_index == 0)   ? qp121_145_model_tflite_data
+               : (cnn_index == 1) ? qp91_120_model_tflite_data
+                                  : qp146_175_model_tflite_data;
       } else if (qindex < 176) {
-        return qp146_175_model_tflite_data;
+        return (cnn_index == 0)   ? qp146_175_model_tflite_data
+               : (cnn_index == 1) ? qp121_145_model_tflite_data
+                                  : qp176_205_model_tflite_data;
       } else if (qindex < 206) {
-        return qp176_205_model_tflite_data;
+        return (cnn_index == 0)   ? qp176_205_model_tflite_data
+               : (cnn_index == 1) ? qp146_175_model_tflite_data
+                                  : qp206_255_model_tflite_data;
       } else {
-        return qp206_255_model_tflite_data;
+        return (cnn_index == 0)   ? qp206_255_model_tflite_data
+               : (cnn_index == 1) ? qp176_205_model_tflite_data
+                                  : qp146_175_model_tflite_data;
       }
     } else {
+      assert(cnn_index == 0);
       if (qindex < 68) {
         return uv_qp12_model_tflite_data;
       } else if (qindex < 108) {
@@ -152,7 +166,8 @@ static const unsigned char *get_intra_model_from_qindex(int qindex,
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_inter_model_from_qindex(int qindex,
                                                         int superres_denom,
-                                                        int is_luma) {
+                                                        int is_luma,
+                                                        int cnn_index) {
   if (qindex <= MIN_CNN_Q_INDEX) {
     assert(0);
     return nullptr;
@@ -167,19 +182,32 @@ static const unsigned char *get_inter_model_from_qindex(int qindex,
   if (superres_denom == SCALE_NUMERATOR) {
     if (is_luma) {
       if (qindex < 91) {
-        return qp0_90_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp0_90_inter_model_tflite_data
+               : (cnn_index == 1) ? qp91_120_inter_model_tflite_data
+                                  : qp121_145_inter_model_tflite_data;
       } else if (qindex < 121) {
-        return qp91_120_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp91_120_inter_model_tflite_data
+               : (cnn_index == 1) ? qp0_90_inter_model_tflite_data
+                                  : qp121_145_inter_model_tflite_data;
       } else if (qindex < 146) {
-        return qp121_145_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp121_145_inter_model_tflite_data
+               : (cnn_index == 1) ? qp91_120_inter_model_tflite_data
+                                  : qp146_175_inter_model_tflite_data;
       } else if (qindex < 176) {
-        return qp146_175_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp146_175_inter_model_tflite_data
+               : (cnn_index == 1) ? qp121_145_inter_model_tflite_data
+                                  : qp176_205_inter_model_tflite_data;
       } else if (qindex < 206) {
-        return qp176_205_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp176_205_inter_model_tflite_data
+               : (cnn_index == 1) ? qp146_175_inter_model_tflite_data
+                                  : qp206_255_inter_model_tflite_data;
       } else {
-        return qp206_255_inter_model_tflite_data;
+        return (cnn_index == 0)   ? qp206_255_inter_model_tflite_data
+               : (cnn_index == 1) ? qp176_205_inter_model_tflite_data
+                                  : qp146_175_inter_model_tflite_data;
       }
     } else {
+      assert(cnn_index == 0);
       if (qindex < 68) {
         return uv_qp0_67_inter_model_tflite_data;
       } else if (qindex < 108) {
@@ -195,6 +223,7 @@ static const unsigned char *get_inter_model_from_qindex(int qindex,
       }
     }
   }
+
 #if CONFIG_EXT_SUPERRES
   assert(is_luma);
   switch (superres_denom) {
@@ -241,11 +270,13 @@ static TfLiteDelegate *get_tflite_xnnpack_delegate(int num_threads) {
 // Builds and returns the TFlite interpreter.
 static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
     int qindex, int superres_denom, int width, int height, int num_threads,
-    int is_intra_only, int is_luma, TfLiteDelegate *xnnpack_delegate) {
+    int is_intra_only, int is_luma, int cnn_index,
+    TfLiteDelegate *xnnpack_delegate) {
   const unsigned char *const model_tflite_data =
-      is_intra_only
-          ? get_intra_model_from_qindex(qindex, superres_denom, is_luma)
-          : get_inter_model_from_qindex(qindex, superres_denom, is_luma);
+      is_intra_only ? get_intra_model_from_qindex(qindex, superres_denom,
+                                                  is_luma, cnn_index)
+                    : get_inter_model_from_qindex(qindex, superres_denom,
+                                                  is_luma, cnn_index);
   auto model = tflite::GetModel(model_tflite_data);
   tflite::MutableOpResolver resolver;
   RegisterSelectedOpsAllQps(&resolver);
@@ -287,11 +318,11 @@ extern "C" int av1_restore_cnn_img_tflite(int qindex, int superres_denom,
                                           int height, int dgd_stride,
                                           uint8_t *rst, int rst_stride,
                                           int num_threads, int is_intra_only,
-                                          int is_luma) {
+                                          int is_luma, int cnn_index) {
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(qindex, superres_denom, width, height, num_threads,
-                             is_intra_only, is_luma, xnnpack_delegate);
+  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
+      qindex, superres_denom, width, height, num_threads, is_intra_only,
+      is_luma, cnn_index, xnnpack_delegate);
 
   // Prepare input.
   const float max_val = 255.0f;
@@ -335,11 +366,11 @@ extern "C" int av1_restore_cnn_img_tflite(int qindex, int superres_denom,
 extern "C" int av1_restore_cnn_img_tflite_highbd(
     int qindex, int superres_denom, const uint16_t *dgd, int width, int height,
     int dgd_stride, uint16_t *rst, int rst_stride, int num_threads,
-    int bit_depth, int is_intra_only, int is_luma) {
+    int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(qindex, superres_denom, width, height, num_threads,
-                             is_intra_only, is_luma, xnnpack_delegate);
+  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
+      qindex, superres_denom, width, height, num_threads, is_intra_only,
+      is_luma, cnn_index, xnnpack_delegate);
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -382,12 +413,16 @@ extern "C" int av1_restore_cnn_img_tflite_highbd(
 }
 
 extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
-                                       const int apply_cnn[MAX_MB_PLANE]) {
+                                       const int apply_cnn[MAX_MB_PLANE],
+                                       const int cnn_indices[MAX_MB_PLANE]) {
   YV12_BUFFER_CONFIG *buf = &cm->cur_frame->buf;
   const int is_intra_only = frame_is_intra_only(cm);
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
     if (!apply_cnn[plane]) continue;
     const int is_luma = (plane == AOM_PLANE_Y);
+    const int cnn_index = cnn_indices[plane];
+    assert(cnn_index >= 0 &&
+           cnn_index < av1_num_cnn_indices_for_plane(cm, plane));
     if (cm->seq_params.use_highbitdepth) {
       switch (plane) {
         case AOM_PLANE_Y:
@@ -396,7 +431,7 @@ extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
               CONVERT_TO_SHORTPTR(buf->y_buffer), buf->y_crop_width,
               buf->y_crop_height, buf->y_stride,
               CONVERT_TO_SHORTPTR(buf->y_buffer), buf->y_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma);
+              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
           break;
         case AOM_PLANE_U:
           av1_restore_cnn_img_tflite_highbd(
@@ -404,7 +439,7 @@ extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
               CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
               buf->uv_crop_height, buf->uv_stride,
               CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma);
+              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
           break;
         case AOM_PLANE_V:
           av1_restore_cnn_img_tflite_highbd(
@@ -412,7 +447,7 @@ extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
               CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
               buf->uv_crop_height, buf->uv_stride,
               CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma);
+              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
           break;
         default: assert(0 && "Invalid plane index");
       }
@@ -424,21 +459,21 @@ extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
               cm->quant_params.base_qindex, cm->superres_scale_denominator,
               buf->y_buffer, buf->y_crop_width, buf->y_crop_height,
               buf->y_stride, buf->y_buffer, buf->y_stride, num_threads,
-              is_intra_only, is_luma);
+              is_intra_only, is_luma, cnn_index);
           break;
         case AOM_PLANE_U:
           av1_restore_cnn_img_tflite(
               cm->quant_params.base_qindex, cm->superres_scale_denominator,
               buf->u_buffer, buf->uv_crop_width, buf->uv_crop_height,
               buf->uv_stride, buf->u_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma);
+              is_intra_only, is_luma, cnn_index);
           break;
         case AOM_PLANE_V:
           av1_restore_cnn_img_tflite(
               cm->quant_params.base_qindex, cm->superres_scale_denominator,
               buf->v_buffer, buf->uv_crop_width, buf->uv_crop_height,
               buf->uv_stride, buf->v_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma);
+              is_intra_only, is_luma, cnn_index);
           break;
         default: assert(0 && "Invalid plane index");
       }
