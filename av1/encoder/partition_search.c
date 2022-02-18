@@ -2899,7 +2899,7 @@ static void init_partition_search_state_params(
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   part_search_state->partition_rect_allowed[HORZ] =
 #if CONFIG_EXT_RECUR_PARTITIONS
-      (blk_params->has_cols || !blk_params->has_rows) &&
+      IMPLIES(is_square_block(bsize), blk_params->has_cols || !blk_params->has_rows) &&
 #else
       blk_params->has_cols &&
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -2913,7 +2913,7 @@ static void init_partition_search_state_params(
       is_horz_size_valid;
   part_search_state->partition_rect_allowed[VERT] =
 #if CONFIG_EXT_RECUR_PARTITIONS
-      (blk_params->has_rows || !blk_params->has_cols) &&
+      IMPLIES(is_square_block(bsize), blk_params->has_rows || !blk_params->has_cols) &&
 #else
       blk_params->has_rows &&
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -2948,7 +2948,7 @@ static void init_partition_search_state_params(
       blk_params->has_rows && blk_params->has_cols;
   part_search_state->partition_rect_allowed[HORZ] =
 #if CONFIG_EXT_RECUR_PARTITIONS
-      (blk_params->has_cols || !blk_params->has_rows) &&
+      IMPLIES(is_square_block(bsize), blk_params->has_cols) &&
       is_partition_valid(bsize, PARTITION_HORZ) && is_chroma_size_valid_horz &&
       is_bsize_geq(get_partition_subsize(bsize, PARTITION_HORZ),
                    blk_params->min_partition_size) &&
@@ -2961,7 +2961,7 @@ static void init_partition_search_state_params(
       cpi->oxcf.part_cfg.enable_rect_partitions;
   part_search_state->partition_rect_allowed[VERT] =
 #if CONFIG_EXT_RECUR_PARTITIONS
-      (blk_params->has_rows || !blk_params->has_cols) &&
+      IMPLIES(is_square_block(bsize), blk_params->has_rows) &&
       is_partition_valid(bsize, PARTITION_VERT) && is_chroma_size_valid_vert &&
       is_bsize_geq(get_partition_subsize(bsize, PARTITION_VERT),
                    blk_params->min_partition_size) &&
@@ -5345,6 +5345,7 @@ BEGIN_PARTITION_SEARCH:
     // Did not find a valid partition, go back and search again, with less
     // constraint on which partition types to search.
     x->must_find_valid_partition = 1;
+
 #if CONFIG_COLLECT_PARTITION_STATS == 2
     part_stats->partition_redo += 1;
 #endif
