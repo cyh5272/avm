@@ -3866,7 +3866,10 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
     mbmi->angle_delta[PLANE_TYPE_Y] = 0;
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
 #endif
-
+#if CONFIG_FORWARDSKIP
+    mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
+    mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
+#endif
     mbmi->mode = DC_PRED;
     mbmi->uv_mode = UV_DC_PRED;
     mbmi->motion_mode = SIMPLE_TRANSLATION;
@@ -4727,6 +4730,9 @@ static AOM_INLINE void init_intra_mode_search_state(
   intra_search_state->best_intra_mode = DC_PRED;
 #if CONFIG_MRLS
   intra_search_state->best_mrl_index = 0;
+#endif
+#if CONFIG_FORWARDSKIP
+  intra_search_state->best_fsc = 0;
 #endif
   intra_search_state->dir_mode_skip_mask_ready = 0;
   av1_zero(intra_search_state->directional_mode_skip_mask);
@@ -6035,6 +6041,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       if (comp_pred) xd->plane[i].pre[1] = yv12_mb[second_ref_frame][i];
     }
 
+#if CONFIG_FORWARDSKIP
+    mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
+    mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
+#endif
     mbmi->angle_delta[PLANE_TYPE_Y] = 0;
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
     mbmi->filter_intra_mode_info.use_filter_intra = 0;
@@ -6197,13 +6207,26 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   for (i = 0; i < TOP_INTRA_MODEL_COUNT; i++) {
     top_intra_model_rd[i] = INT64_MAX;
   }
+
 #if CONFIG_AIMC
   get_y_intra_mode_set(mbmi, xd);
 #endif  // CONFIG_AIMC
+
+#if CONFIG_FORWARDSKIP
+  for (int fsc_mode = 0;
+       fsc_mode < (allow_fsc_intra(cm, xd, bsize, mbmi) ? FSC_MODES : 1); fsc_mode++ ) {
+#endif
 #if CONFIG_MRLS
+#if CONFIG_FORWARDSKIP
+  uint8_t enable_mrls_flag = cm->seq_params.enable_mrls && !fsc_mode;
+#else
   uint8_t enable_mrls_flag = cm->seq_params.enable_mrls;
+#endif
   for (int mrl_index = 0; mrl_index < (enable_mrls_flag ? MRL_LINE_NUMBER : 1);
        mrl_index++) {
+#if CONFIG_FORWARDSKIP
+    mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = fsc_mode;
+#endif
     mbmi->mrl_index = mrl_index;
 #endif
     for (int mode_idx = INTRA_MODE_START; mode_idx < LUMA_MODE_COUNT;
@@ -6244,6 +6267,27 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         continue;
       }
 #endif
+#if CONFIG_FORWARDSKIP
+      if (!allow_fsc_intra(cm, xd, bsize, mbmi) &&
+          mbmi->fsc_mode[PLANE_TYPE_Y] > 0) {
+        continue;
+      }
+#if CONFIG_MRLS
+      if (mbmi->mrl_index > 0 && mbmi->fsc_mode[PLANE_TYPE_Y]) {
+        continue;
+      }
+#endif
+#if !CONFIG_AIMC
+      if (mbmi->angle_delta[PLANE_TYPE_Y] &&
+          mbmi->fsc_mode[PLANE_TYPE_Y]) {
+        continue;
+      }
+      if (mbmi->angle_delta[PLANE_TYPE_UV] &&
+          mbmi->fsc_mode[xd->tree_type == CHROMA_PART]) {
+        continue;
+      }
+#endif
+#endif
       const PREDICTION_MODE this_mode = mbmi->mode;
 
       assert(av1_mode_defs[mode_enum].ref_frame[0] == INTRA_FRAME);
@@ -6275,6 +6319,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       }
     }
 #if CONFIG_MRLS
+  }
+#endif
+#if CONFIG_FORWARDSKIP
   }
 #endif
 #if CONFIG_COLLECT_COMPONENT_TIMING
