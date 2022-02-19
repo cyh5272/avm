@@ -1699,7 +1699,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                   distortion, skippable, &beat_best_rd, ctx,
                                   ctx->blk_skip, ctx->tx_type_map);
   }
-    
+
   // Searches filter_intra
   if (beat_best_rd && av1_filter_intra_allowed_bsize(&cpi->common, bsize)) {
     if (rd_pick_filter_intra_sby(cpi, x, rate, rate_tokenonly, distortion,
