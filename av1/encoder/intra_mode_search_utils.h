@@ -297,14 +297,12 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
   }
 #if CONFIG_FORWARDSKIP
   if (allow_fsc_intra(&cpi->common, xd, bsize, mbmi)) {
-    const uint8_t fsc_above = (above_mi) ?
-        above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-    const uint8_t fsc_left = (left_mi) ?
-        left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-    const int fsc_ctx = frame_is_intra_only(&cpi->common) ?
-        fsc_above + fsc_left : 3;
-    total_rate += mode_costs->fsc_cost[fsc_ctx][fsc_bsize_groups[bsize]]
-                                      [use_fsc];
+    const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+    const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+    const int fsc_ctx =
+        frame_is_intra_only(&cpi->common) ? fsc_above + fsc_left : 3;
+    total_rate +=
+        mode_costs->fsc_cost[fsc_ctx][fsc_bsize_groups[bsize]][use_fsc];
   }
 #endif
   if (av1_filter_intra_allowed(&cpi->common, mbmi)) {

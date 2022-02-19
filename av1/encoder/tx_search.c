@@ -1364,8 +1364,9 @@ static INLINE int is_intra_hash_match(const AV1_COMP *cpi, MACROBLOCK *x,
         av1_get_tx_type(xd, get_plane_type(plane), blk_row, blk_col, tx_size,
                         cpi->common.features.reduced_tx_set_used);
 #if CONFIG_FORWARDSKIP
-    const int fsc_invalid = !xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART] &&
-                            (*intra_txb_rd_info)->tx_type == IDTX;
+    const int fsc_invalid =
+        !xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART] &&
+        (*intra_txb_rd_info)->tx_type == IDTX;
     if (fsc_invalid) return 0;
 #endif
     return (ref_tx_type == (*intra_txb_rd_info)->tx_type);
@@ -1488,11 +1489,12 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
     dist_block_tx_domain(x, plane, block, tx_size, &dist, &sse);
 
 #if CONFIG_FORWARDSKIP
-    rate_cost = av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
+    rate_cost =
+        av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
 #else
     rate_cost = av1_cost_coeffs_txb_laplacian(x, plane, block, tx_size, tx_type,
 #endif
-                                              txb_ctx, reduced_tx_set_used, 0);
+                                      txb_ctx, reduced_tx_set_used, 0);
 
     rds_h[idx] = RDCOST(x->rdmult, rate_cost, dist);
 
@@ -1527,11 +1529,12 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
     dist_block_tx_domain(x, plane, block, tx_size, &dist, &sse);
 
 #if CONFIG_FORWARDSKIP
-    rate_cost = av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
+    rate_cost =
+        av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
 #else
     rate_cost = av1_cost_coeffs_txb_laplacian(x, plane, block, tx_size, tx_type,
 #endif
-                                              txb_ctx, reduced_tx_set_used, 0);
+                                      txb_ctx, reduced_tx_set_used, 0);
 
     rds_v[idx] = RDCOST(x->rdmult, rate_cost, dist);
 
@@ -1623,11 +1626,12 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
     // estimate rate cost
 #if CONFIG_FORWARDSKIP
-    rate_cost = av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
+    rate_cost =
+        av1_cost_coeffs_txb_laplacian(cm, x, plane, block, tx_size, tx_type,
 #else
     rate_cost = av1_cost_coeffs_txb_laplacian(x, plane, block, tx_size, tx_type,
 #endif
-                                              txb_ctx, reduced_tx_set_used, 0);
+                                      txb_ctx, reduced_tx_set_used, 0);
     // tx domain dist
     dist_block_tx_domain(x, plane, block, tx_size, &dist, &sse);
 
@@ -2159,13 +2163,12 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
 
 #if CONFIG_FORWARDSKIP
   if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-      txsize_sqr_up_map[tx_size] < TX_32X32 &&
-      plane == PLANE_TYPE_Y) {
+      txsize_sqr_up_map[tx_size] < TX_32X32 && plane == PLANE_TYPE_Y) {
     txk_allowed = IDTX;
     allowed_tx_mask = (1 << txk_allowed);
   }
-  if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] == 0 &&
-      is_inter == 0 && (allowed_tx_mask >> IDTX)) {
+  if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] == 0 && is_inter == 0 &&
+      (allowed_tx_mask >> IDTX)) {
     uint16_t fsc_mask = UINT16_MAX - (1 << IDTX);
     allowed_tx_mask &= fsc_mask;
   }
@@ -2207,8 +2210,8 @@ static INLINE void update_txb_coeff_cost(RD_STATS *rd_stats, int plane,
 #endif
 
 #if CONFIG_FORWARDSKIP
-static INLINE int cost_coeffs(const AV1_COMMON *cm,
-                              MACROBLOCK *x, int plane, int block,
+static INLINE int cost_coeffs(const AV1_COMMON *cm, MACROBLOCK *x, int plane,
+                              int block,
 #else
 static INLINE int cost_coeffs(MACROBLOCK *x, int plane, int block,
 #endif
@@ -2323,8 +2326,8 @@ static INLINE void predict_dc_only_block(
     TXB_CTX txb_ctx_tmp;
     const PLANE_TYPE plane_type = get_plane_type(plane);
 #if CONFIG_FORWARDSKIP
-    get_txb_ctx(plane_bsize, tx_size, plane, ta, tl,
-                &txb_ctx_tmp, mbmi->fsc_mode[xd->tree_type == CHROMA_PART]);
+    get_txb_ctx(plane_bsize, tx_size, plane, ta, tl, &txb_ctx_tmp,
+                mbmi->fsc_mode[xd->tree_type == CHROMA_PART]);
 #else
     get_txb_ctx(plane_bsize, tx_size, plane, ta, tl, &txb_ctx_tmp);
 #endif
@@ -2388,8 +2391,8 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   skip_trellis |= !is_trellis_used(cpi->optimize_seg_arr[xd->mi[0]->segment_id],
                                    DRY_RUN_NORMAL);
 #if CONFIG_FORWARDSKIP
-  uint8_t fsc_mode = (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-                      plane == PLANE_TYPE_Y);
+  uint8_t fsc_mode =
+      (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] && plane == PLANE_TYPE_Y);
   skip_trellis |= fsc_mode;
 #endif
 
@@ -2537,8 +2540,8 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
                   tx_size, DCT_DCT, &txfm_param);
 
 #if CONFIG_FORWARDSKIP
-  const int xform_quant_b = USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
-                                                   : AV1_XFORM_QUANT_FP;
+  const int xform_quant_b =
+      USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B : AV1_XFORM_QUANT_FP;
   av1_setup_quant(tx_size, !skip_trellis,
                   skip_trellis ? xform_quant_b : AV1_XFORM_QUANT_FP,
 #else
@@ -2552,18 +2555,17 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // Iterate through all transform type candidates.
   for (int idx = 0; idx < TX_TYPES; ++idx) {
 #if CONFIG_FORWARDSKIP
-    int skip_trellis_in = skip_trellis ||
-                          use_inter_fsc(cm, plane, txk_map[idx], is_inter);
+    int skip_trellis_in =
+        skip_trellis || use_inter_fsc(cm, plane, txk_map[idx], is_inter);
     av1_update_trellisq(!skip_trellis_in,
-                        skip_trellis_in ? xform_quant_b
-                                        : AV1_XFORM_QUANT_FP,
+                        skip_trellis_in ? xform_quant_b : AV1_XFORM_QUANT_FP,
                         cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
     if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-        (TX_TYPE) txk_map[idx] != IDTX && plane == PLANE_TYPE_Y) {
+        (TX_TYPE)txk_map[idx] != IDTX && plane == PLANE_TYPE_Y) {
       continue;
     }
     if (!mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-       (TX_TYPE) txk_map[idx] == IDTX && !is_inter) {
+        (TX_TYPE)txk_map[idx] == IDTX && !is_inter) {
       continue;
     }
     if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
@@ -2642,10 +2644,10 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
               x, &quant_param, plane, block, tx_size,
               cpi->oxcf.q_cfg.quant_b_adapt, qstep,
 #if CONFIG_FORWARDSKIP
-              txfm_params->coeff_opt_satd_threshold,
-              skip_trellis_in, dc_only_blk);
+              txfm_params->coeff_opt_satd_threshold, skip_trellis_in,
+              dc_only_blk);
 #else
-              txfm_params->coeff_opt_satd_threshold, skip_trellis, dc_only_blk);
+        txfm_params->coeff_opt_satd_threshold, skip_trellis, dc_only_blk);
 #endif
 
 #if CONFIG_FORWARDSKIP
@@ -2662,11 +2664,11 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
         if (tx_type == IDTX) {
 #endif
           uint16_t *const eob = &p->eobs[block];
-          if(*eob != 0) *eob = av1_get_max_eob(txfm_param.tx_size);
+          if (*eob != 0) *eob = av1_get_max_eob(txfm_param.tx_size);
         }
       }
 #else
-      av1_quant(x, plane, block, &txfm_param, &quant_param);
+    av1_quant(x, plane, block, &txfm_param, &quant_param);
 #endif
       // Calculate rate cost of quantized coefficients.
       if (quant_param.use_optimize_b) {
@@ -2676,7 +2678,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_FORWARDSKIP
         rate_cost = cost_coeffs(cm, x, plane, block, tx_size, tx_type, txb_ctx,
 #else
-        rate_cost = cost_coeffs(x, plane, block, tx_size, tx_type, txb_ctx,
+      rate_cost = cost_coeffs(x, plane, block, tx_size, tx_type, txb_ctx,
 #endif
                                 cm->features.reduced_tx_set_used);
       }
@@ -2693,7 +2695,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_FORWARDSKIP
       } else if (dc_only_blk || (fsc_mode_in && plane == PLANE_TYPE_Y)) {
 #else
-      } else if (dc_only_blk) {
+    } else if (dc_only_blk) {
 #endif
         this_rd_stats.sse = block_sse;
         this_rd_stats.dist = dist_block_px_domain(
@@ -2835,9 +2837,9 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   skip_trellis = skip_trellis_based_on_satd[best_tx_type];
 #endif
 #if CONFIG_FORWARDSKIP
-  skip_trellis &= (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-                   plane == PLANE_TYPE_Y) ||
-                  use_inter_fsc(cm, plane, best_tx_type, is_inter);
+  skip_trellis &=
+      (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] && plane == PLANE_TYPE_Y) ||
+      use_inter_fsc(cm, plane, best_tx_type, is_inter);
 #endif
 
   // Point dqcoeff to the quantized coefficients corresponding to the best

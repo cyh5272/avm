@@ -453,7 +453,8 @@ static INLINE void load_levels_16x1x5_skip_sse2(const uint8_t *const src,
   level[1] = _mm_loadu_si128((__m128i *)(src - stride));
 }
 
-static INLINE __m128i get_coeff_contexts_kernel_skip_sse2(__m128i *const level) {
+static INLINE __m128i
+get_coeff_contexts_kernel_skip_sse2(__m128i *const level) {
   const __m128i const_3 = _mm_set1_epi8(3);
   const __m128i const_6 = _mm_set1_epi8(6);
   __m128i count;
@@ -464,14 +465,11 @@ static INLINE __m128i get_coeff_contexts_kernel_skip_sse2(__m128i *const level) 
   return count;
 }
 
-static INLINE void get_4_nz_map_contexts_2d_skip_sse2(const uint8_t *levels,
-                                                      const int height,
-                                                      int8_t *const coeff_contexts) {
+static INLINE void get_4_nz_map_contexts_2d_skip_sse2(
+    const uint8_t *levels, const int height, int8_t *const coeff_contexts) {
   const int stride = 4 + TX_PAD_LEFT;
-  __m128i offset = _mm_setr_epi8(0, 0, 7, 7,
-                                 0, 0, 7, 7,
-                                 7, 7, 7, 7,
-                                 7, 7, 7, 7);
+  __m128i offset =
+      _mm_setr_epi8(0, 0, 7, 7, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7);
   __m128i count;
   __m128i level[2];
   int8_t *cc = coeff_contexts;
@@ -492,8 +490,8 @@ static INLINE void get_8_coeff_contexts_2d_skip_sse2(const uint8_t *levels,
                                                      const int height,
                                                      int8_t *coeff_contexts) {
   const int stride = 8 + TX_PAD_LEFT;
-  __m128i offset = _mm_setr_epi8(0, 0, 7, 7, 7, 7, 7, 7,
-                                 0, 0, 7, 7, 7, 7, 7, 7);
+  __m128i offset =
+      _mm_setr_epi8(0, 0, 7, 7, 7, 7, 7, 7, 0, 0, 7, 7, 7, 7, 7, 7);
   __m128i count;
   __m128i level[2];
   int8_t *cc = coeff_contexts;
@@ -511,15 +509,16 @@ static INLINE void get_8_coeff_contexts_2d_skip_sse2(const uint8_t *levels,
 }
 
 static INLINE void get_16n_coeff_contexts_2d_skip_sse2(const uint8_t *levels,
-                                                  const int width, const int height,
-                                                  int8_t *coeff_contexts) {
+                                                       const int width,
+                                                       const int height,
+                                                       int8_t *coeff_contexts) {
   const int stride = width + TX_PAD_LEFT;
   int8_t *cc = coeff_contexts;
   __m128i pos_to_offset[2];
   __m128i pos_to_offset_large;
   pos_to_offset_large = _mm_set1_epi8(7);
-  pos_to_offset[0] = _mm_setr_epi8(0, 0, 7, 7, 7, 7, 7,
-                                   7, 7, 7, 7, 7, 7, 7, 7, 7);
+  pos_to_offset[0] =
+      _mm_setr_epi8(0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7);
   pos_to_offset[1] = pos_to_offset[0];
   __m128i count;
   __m128i level[2];

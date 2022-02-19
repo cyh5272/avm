@@ -77,8 +77,8 @@ static INLINE int get_padded_idx_left(const int idx, const int bwl) {
 }
 
 static INLINE int get_br_ctx_2d_skip(const uint8_t *const levels,
-                                const int c,  // raster order
-                                const int bwl) {
+                                     const int c,  // raster order
+                                     const int bwl) {
   assert(c > 0);
   const int row = (c >> bwl);
   const int col = (c - (row << bwl)) + TX_PAD_LEFT;
@@ -185,8 +185,8 @@ static const uint8_t clip_max3[256] = {
 #if CONFIG_FORWARDSKIP
 static AOM_FORCE_INLINE int get_nz_mag_skip(const uint8_t *const levels,
                                             const int bwl) {
-  int mag = clip_max3[levels[-1]]; // { 0, -1 }
-  mag += clip_max3[levels[-(1 << bwl) - TX_PAD_LEFT]]; // { -1, 0 }
+  int mag = clip_max3[levels[-1]];                      // { 0, -1 }
+  mag += clip_max3[levels[-(1 << bwl) - TX_PAD_LEFT]];  // { -1, 0 }
   return mag;
 }
 
@@ -194,15 +194,15 @@ static AOM_FORCE_INLINE int get_sign_skip(const int8_t *const signs,
                                           const uint8_t *const levels,
                                           const int bwl) {
   int signc = 0;
-  if(levels[1]) signc += signs[1];                // { 0, +1 }
-  if(levels[(1 << bwl) + TX_PAD_LEFT])
-    signc += signs[(1 << bwl) + TX_PAD_LEFT];     // { +1, 0 }
-  if(levels[(1 << bwl) + TX_PAD_LEFT + 1] )
-    signc += signs[(1 << bwl) + TX_PAD_LEFT + 1]; // { +1, +1 }
-  if( signc > 2 ) return 5;
-  if( signc < -2 ) return 6;
-  if( signc > 0 ) return 1;
-  if( signc < 0 ) return 2;
+  if (levels[1]) signc += signs[1];  // { 0, +1 }
+  if (levels[(1 << bwl) + TX_PAD_LEFT])
+    signc += signs[(1 << bwl) + TX_PAD_LEFT];  // { +1, 0 }
+  if (levels[(1 << bwl) + TX_PAD_LEFT + 1])
+    signc += signs[(1 << bwl) + TX_PAD_LEFT + 1];  // { +1, +1 }
+  if (signc > 2) return 5;
+  if (signc < -2) return 6;
+  if (signc > 0) return 1;
+  if (signc < 0) return 2;
   return 0;
 }
 
@@ -257,8 +257,9 @@ static const int nz_map_ctx_offset_1d[32] = {
 };
 
 #if CONFIG_FORWARDSKIP
-static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_skip(
-    const int stats, const int coeff_idx, const int bwl) {
+static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_skip(const int stats,
+                                                           const int coeff_idx,
+                                                           const int bwl) {
   const int ctx = AOMMIN(stats, 6);
   const int row = (coeff_idx >> bwl);
   const int col = (coeff_idx - (row << bwl)) + TX_PAD_LEFT;
@@ -315,12 +316,12 @@ static INLINE int get_lower_levels_ctx_eob(int bwl, int height, int scan_idx) {
 }
 
 #if CONFIG_FORWARDSKIP
-static INLINE int get_upper_levels_ctx_2d(const uint8_t *levels,
-                                          int coeff_idx, int bwl) {
+static INLINE int get_upper_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
+                                          int bwl) {
   int mag;
   levels = levels + get_padded_idx_left(coeff_idx, bwl);
-  mag = AOMMIN(levels[-1], 3); // { 0, -1 }
-  mag += AOMMIN(levels[-(1 << bwl) - TX_PAD_LEFT], 3); // { -1, 0 }
+  mag = AOMMIN(levels[-1], 3);                          // { 0, -1 }
+  mag += AOMMIN(levels[-(1 << bwl) - TX_PAD_LEFT], 3);  // { -1, 0 }
   const int ctx = AOMMIN(mag, 6);
   const int row = (coeff_idx >> bwl);
   const int col = (coeff_idx - (row << bwl)) + TX_PAD_LEFT;
@@ -330,8 +331,8 @@ static INLINE int get_upper_levels_ctx_2d(const uint8_t *levels,
 
 static AOM_FORCE_INLINE int get_upper_levels_ctx(const uint8_t *levels,
                                                  int coeff_idx, int bwl) {
-  const int stats = get_nz_mag_skip(levels +
-                                    get_padded_idx_left(coeff_idx, bwl), bwl);
+  const int stats =
+      get_nz_mag_skip(levels + get_padded_idx_left(coeff_idx, bwl), bwl);
   return get_nz_map_ctx_from_stats_skip(stats, coeff_idx, bwl);
 }
 #endif
@@ -428,10 +429,10 @@ static INLINE void get_txb_ctx(const BLOCK_SIZE plane_bsize,
 #endif
 #define MAX_TX_SIZE_UNIT 16
 #if CONFIG_FORWARDSKIP
-   if (fsc_mode && plane == PLANE_TYPE_Y) {
-     get_txb_ctx_skip(plane_bsize, tx_size, a, l, txb_ctx);
-     return;
-   }
+  if (fsc_mode && plane == PLANE_TYPE_Y) {
+    get_txb_ctx_skip(plane_bsize, tx_size, a, l, txb_ctx);
+    return;
+  }
 #endif
   static const int8_t signs[3] = { 0, -1, 1 };
   static const int8_t dc_sign_contexts[4 * MAX_TX_SIZE_UNIT + 1] = {

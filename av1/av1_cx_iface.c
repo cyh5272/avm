@@ -413,7 +413,7 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable multiple reference line selection
 #endif  // CONFIG_MRLS
 #if CONFIG_FORWARDSKIP
-  1,    // enable forward skip coding
+  1,  // enable forward skip coding
 #endif
 #if CONFIG_ORIP
   1,    // enable ORIP

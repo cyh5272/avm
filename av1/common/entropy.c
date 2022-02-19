@@ -49,8 +49,10 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
   av1_copy(cm->fc->coeff_base_cdf, av1_default_coeff_base_multi_cdfs[index]);
 #if CONFIG_FORWARDSKIP
   av1_copy(cm->fc->idtx_sign_cdf, av1_default_idtx_sign_cdfs[index]);
-  av1_copy(cm->fc->coeff_base_cdf_idtx, av1_default_coeff_base_multi_cdfs_idtx[index]);
-  av1_copy(cm->fc->coeff_br_cdf_idtx, av1_default_coeff_lps_multi_cdfs_idtx[index]);
+  av1_copy(cm->fc->coeff_base_cdf_idtx,
+           av1_default_coeff_base_multi_cdfs_idtx[index]);
+  av1_copy(cm->fc->coeff_br_cdf_idtx,
+           av1_default_coeff_lps_multi_cdfs_idtx[index]);
 #endif
   av1_copy(cm->fc->coeff_base_eob_cdf,
            av1_default_coeff_base_eob_multi_cdfs[index]);

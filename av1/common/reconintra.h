@@ -108,9 +108,8 @@ static INLINE int av1_allow_intrabc(const AV1_COMMON *const cm) {
 
 #if CONFIG_FORWARDSKIP
 static INLINE int allow_fsc_intra(const AV1_COMMON *const cm,
-                                const MACROBLOCKD *const xd,
-                                BLOCK_SIZE bs,
-                                const MB_MODE_INFO *const mbmi) {
+                                  const MACROBLOCKD *const xd, BLOCK_SIZE bs,
+                                  const MB_MODE_INFO *const mbmi) {
   bool allow_fsc = cm->seq_params.enable_fsc &&
                    !is_inter_block(mbmi, PLANE_TYPE_Y) &&
                    !xd->lossless[mbmi->segment_id] &&
@@ -122,13 +121,11 @@ static INLINE int allow_fsc_intra(const AV1_COMMON *const cm,
 }
 
 static INLINE int use_inter_fsc(const AV1_COMMON *const cm,
-                                PLANE_TYPE plane_type,
-                                TX_TYPE tx_type,
+                                PLANE_TYPE plane_type, TX_TYPE tx_type,
                                 int is_inter) {
   bool allow_fsc = cm->seq_params.enable_fsc &&
                    cm->features.allow_screen_content_tools &&
-                   plane_type == PLANE_TYPE_Y &&
-                   is_inter && tx_type == IDTX;
+                   plane_type == PLANE_TYPE_Y && is_inter && tx_type == IDTX;
   return allow_fsc;
 }
 #endif

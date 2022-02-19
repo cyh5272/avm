@@ -849,9 +849,7 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       int br_rate_skip[BR_CDF_SIZE];
       int prev_cost_skip = 0;
       int i, j;
-      av1_cost_tokens_from_cdf(
-          br_rate_skip, fc->coeff_br_cdf_idtx[ctx],
-          NULL);
+      av1_cost_tokens_from_cdf(br_rate_skip, fc->coeff_br_cdf_idtx[ctx], NULL);
       for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
         for (j = 0; j < BR_CDF_SIZE - 1; j++) {
           pcost->lps_cost_skip[ctx][i + j] = prev_cost_skip + br_rate_skip[j];
