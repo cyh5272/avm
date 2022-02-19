@@ -363,10 +363,9 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
               "(0: false, 1: true (default))"),
 #endif
 #if CONFIG_FORWARDSKIP
-  .enable_fsc =
-      ARG_DEF(NULL, "enable-fsc", 1,
-              "Enable forward skip coding"
-              "(0: false, 1: true (default))"),
+  .enable_fsc = ARG_DEF(NULL, "enable-fsc", 1,
+                        "Enable forward skip coding"
+                        "(0: false, 1: true (default))"),
 #endif
 #if CONFIG_ORIP
   .enable_orip = ARG_DEF(NULL, "enable-orip", 1,
