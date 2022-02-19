@@ -36,26 +36,24 @@ void av1_txb_init_levels_skip_sse4_1(const tran_low_t *const coeff, const int wi
   const int32_t bottom_len = sizeof(*levels) * (TX_PAD_BOTTOM * stride);
   uint8_t *bottom_buf = levels + stride * height;
   uint8_t *bottom_buf_end = bottom_buf + bottom_len;
-  
+
   do {
     _mm_storeu_si128((__m128i *)(bottom_buf), zeros);
     bottom_buf += 16;
   } while (bottom_buf < bottom_buf_end);
-  
+
   const int32_t top_len = sizeof(*levels) * (TX_PAD_TOP * stride);
   uint8_t *top_buf = levels;
   uint8_t *top_buf_end = top_buf + top_len;
-  
   do {
     _mm_storeu_si128((__m128i *)(top_buf), zeros);
     top_buf += 16;
   } while (top_buf < top_buf_end);
-  
+
   int i = 0;
   uint8_t *ls = levels;
   const tran_low_t *cf = coeff;
   ls += TX_PAD_TOP * stride;
-  
   if (width == 4) {
     do {
       const __m128i coeffA = xx_loadu_128(cf);
@@ -117,15 +115,15 @@ void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff, const int w
   const int stride = width + TX_PAD_HOR;
   const __m128i zeros = _mm_setzero_si128();
   const __m128i one16 = _mm_set1_epi16(1);
-  
+
   uint8_t *lvl_top_buf = levels;
   uint8_t *lvl_top_buf_end = lvl_top_buf + sizeof(*levels) * (TX_PAD_TOP * stride);
   _xx_fill_buffer((__m128i *)lvl_top_buf, (__m128i *)lvl_top_buf_end, zeros);
-  
+
   int8_t *si_bot_buf = signs + stride * height + sizeof(*signs) * (TX_PAD_TOP * stride);
   int8_t *si_bot_buf_end = si_bot_buf + sizeof(*signs) * (TX_PAD_BOTTOM * stride);
   _xx_fill_buffer((__m128i *)si_bot_buf, (__m128i *)si_bot_buf_end, zeros);
-  
+
   int i = 0;
   int8_t *si = signs;
   uint8_t *ls = levels;
@@ -133,7 +131,7 @@ void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff, const int w
 
   ls += TX_PAD_TOP * stride;
   si += TX_PAD_TOP * stride;
-  
+
   if (width == 4) {
     do {
       const __m128i coeffA = xx_loadu_128(cf);

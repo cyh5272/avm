@@ -35,7 +35,6 @@ static INLINE void _yy256_fill_buffer(__m256i *buff,
 void av1_txb_init_levels_skip_avx2(const tran_low_t *const coeff,
                                    const int width, const int height,
                                    uint8_t *const levels) {
-  
   const int stride = width + TX_PAD_LEFT;
   const __m256i y_zeros = _mm256_setzero_si256();
   const __m128i x_zeros = _mm_setzero_si128();
@@ -142,15 +141,15 @@ void av1_txb_init_levels_signs_avx2(const tran_low_t *const coeff, const int wid
   int8_t *si_bot_buf = signs + stride * height + sizeof(*signs) * (TX_PAD_TOP * stride);
   int8_t *si_bot_buf_end = si_bot_buf + sizeof(*signs) * (TX_PAD_BOTTOM * stride);
   _yy256_fill_buffer((__m256i *)si_bot_buf, (__m256i *)si_bot_buf_end, y_zeros);
-  
+
   int i = 0;
   uint8_t *ls = levels;
   int8_t *si = signs;
   const tran_low_t *cf = coeff;
-  
+
   ls += TX_PAD_TOP * stride;
   si += TX_PAD_TOP * stride;
-  
+
   if (width == 4) {
     do {
       const __m256i c0 = yy_loadu_256(cf);

@@ -1050,7 +1050,6 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     }
   }
 
-      
   if (*eob) {
     av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, dst,
                                 dst_stride, *eob,

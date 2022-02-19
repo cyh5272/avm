@@ -1229,7 +1229,7 @@ static AOM_INLINE void write_mrl_index(FRAME_CONTEXT *ec_ctx, uint8_t mrl_index,
   aom_write_symbol(w, mrl_index, ec_ctx->mrl_index_cdf, MRL_LINE_NUMBER);
 }
 #endif
-  
+
 #if CONFIG_FORWARDSKIP
 static AOM_INLINE void write_fsc_mode(uint8_t fsc_mode,
                                       aom_writer *w,
