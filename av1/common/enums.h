@@ -117,6 +117,14 @@ extern "C" {
 #define IST_8x8_HEIGHT 32
 #endif  // CONFIG_IST
 
+#if CONFIG_FORWARDSKIP
+#define FSC_MODES 2
+#define FSC_MAXWIDTH 16
+#define FSC_MAXHEIGHT 16
+#define FSC_MINWIDTH 4
+#define FSC_MINHEIGHT 4
+#endif
+
 #define DIST_PRECISION_BITS 4
 #define DIST_PRECISION (1 << DIST_PRECISION_BITS)  // 16
 
@@ -324,7 +332,13 @@ enum {
 #define TX_PAD_HOR 4
 // Pad 6 extra rows (2 on top and 4 on bottom) to remove vertical availability
 // check.
+#if CONFIG_FORWARDSKIP
+#define TX_PAD_LEFT 4
+#define TX_PAD_RIGHT 4
+#define TX_PAD_TOP 4
+#else
 #define TX_PAD_TOP 0
+#endif
 #define TX_PAD_BOTTOM 4
 #define TX_PAD_VER (TX_PAD_TOP + TX_PAD_BOTTOM)
 // Pad 16 extra bytes to avoid reading overflow in SIMD optimization.
