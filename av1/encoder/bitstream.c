@@ -565,12 +565,12 @@ static AOM_INLINE void pack_txb_tokens(
 
   if (tx_size == plane_tx_size || plane) {
 #if CONFIG_FORWARDSKIP
-    //code significance and TXB
-    const int code_rest = av1_write_sig_txtype(cm, x, w, blk_row, blk_col,
-                                               plane, block, tx_size);
-    const TX_TYPE tx_type = av1_get_tx_type(xd, get_plane_type(plane),
-                                            blk_row, blk_col, tx_size,
-                                            cm->features.reduced_tx_set_used);
+    // code significance and TXB
+    const int code_rest =
+        av1_write_sig_txtype(cm, x, w, blk_row, blk_col, plane, block, tx_size);
+    const TX_TYPE tx_type =
+        av1_get_tx_type(xd, get_plane_type(plane), blk_row, blk_col, tx_size,
+                        cm->features.reduced_tx_set_used);
     const int is_inter = is_inter_block(mbmi, xd->tree_type);
     if (code_rest) {
       if ((mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
@@ -580,7 +580,8 @@ static AOM_INLINE void pack_txb_tokens(
            tx_type == IDTX && plane == PLANE_TYPE_Y) ||
 #endif
           use_inter_fsc(cm, plane, tx_type, is_inter)) {
-        av1_write_coeffs_txb_skip(cm, x, w, blk_row, blk_col, plane, block, tx_size);
+        av1_write_coeffs_txb_skip(cm, x, w, blk_row, blk_col, plane, block,
+                                  tx_size);
       } else {
         av1_write_coeffs_txb(cm, x, w, blk_row, blk_col, plane, block, tx_size);
       }
@@ -1231,8 +1232,7 @@ static AOM_INLINE void write_mrl_index(FRAME_CONTEXT *ec_ctx, uint8_t mrl_index,
 #endif
 
 #if CONFIG_FORWARDSKIP
-static AOM_INLINE void write_fsc_mode(uint8_t fsc_mode,
-                                      aom_writer *w,
+static AOM_INLINE void write_fsc_mode(uint8_t fsc_mode, aom_writer *w,
                                       aom_cdf_prob *fsc_cdf) {
   aom_write_symbol(w, fsc_mode, fsc_cdf, FSC_MODES);
 }
@@ -1522,10 +1522,9 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
     write_intra_luma_mode(xd, w);
 #if CONFIG_FORWARDSKIP
     if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
-      aom_cdf_prob * fsc_cdf = get_fsc_mode_cdf(ec_ctx, above_mi, left_mi,
-                                                bsize, is_keyframe);
-      write_fsc_mode(mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
-                      w, fsc_cdf);
+      aom_cdf_prob *fsc_cdf =
+          get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, is_keyframe);
+      write_fsc_mode(mbmi->fsc_mode[xd->tree_type == CHROMA_PART], w, fsc_cdf);
     }
 #endif
 #else
@@ -1539,12 +1538,11 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
     write_intra_y_mode_nonkf(ec_ctx, bsize, mode, w);
   }
 #if CONFIG_FORWARDSKIP
-    if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
-      aom_cdf_prob * fsc_cdf = get_fsc_mode_cdf(ec_ctx, above_mi, left_mi,
-                                                bsize, is_keyframe);
-      write_fsc_mode(mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
-                      w, fsc_cdf);
-    }
+  if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
+    aom_cdf_prob *fsc_cdf =
+        get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, is_keyframe);
+    write_fsc_mode(mbmi->fsc_mode[xd->tree_type == CHROMA_PART], w, fsc_cdf);
+  }
 #endif
   // Y angle delta.
   if (use_angle_delta && av1_is_directional_mode(mode)) {

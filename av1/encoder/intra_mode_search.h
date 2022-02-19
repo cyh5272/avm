@@ -199,18 +199,16 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
  * \param[in]    best_mbmi          Pointer to structure holding
  *                                  the mode info for the best macroblock.
  */
-void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
-                     int *rate, int *rate_tokenonly,
-                     int64_t *distortion, int *skippable,
+void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
+                     int *rate_tokenonly, int64_t *distortion, int *skippable,
                      BLOCK_SIZE bsize,
 #if CONFIG_AIMC
                      int mode_costs,
 #else
                      const int *mode_costs,
 #endif
-                     uint8_t *directional_mode_skip_mask,
-                     int64_t *best_rd, int64_t *best_model_rd,
-                     PICK_MODE_CONTEXT *ctx,
+                     uint8_t *directional_mode_skip_mask, int64_t *best_rd,
+                     int64_t *best_model_rd, PICK_MODE_CONTEXT *ctx,
                      MB_MODE_INFO *best_mbmi);
 #endif
 

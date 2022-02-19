@@ -145,8 +145,8 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
  block.
  */
 #if CONFIG_FORWARDSKIP
-int av1_cost_coeffs_txb_laplacian(const AV1_COMMON *cm,
-                                  const MACROBLOCK *x, const int plane,
+int av1_cost_coeffs_txb_laplacian(const AV1_COMMON *cm, const MACROBLOCK *x,
+                                  const int plane,
 #else
 int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
 #endif
@@ -299,7 +299,8 @@ int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
  *
  * \ingroup coefficient_coding
  *
- * This function will write the quantized coefficients in a transform block after 2D
+ * This function will write the quantized coefficients in a transform block
+ after 2D
  * identity transform into the bitstream using forward skip entropy coding.
  *
  * The coding steps are as follows.
@@ -326,8 +327,8 @@ int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
  * \param[in]    tx_size        The given transform size
  */
 void av1_write_coeffs_txb_skip(const AV1_COMMON *const cm, MACROBLOCK *const x,
-                               aom_writer *w, int blk_row, int blk_col, int plane,
-                               int block, TX_SIZE tx_size);
+                               aom_writer *w, int blk_row, int blk_col,
+                               int plane, int block, TX_SIZE tx_size);
 #endif
 
 /*!\brief Write quantized coefficients of all transform blocks in an intra
@@ -428,8 +429,8 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
 
 #if CONFIG_FORWARDSKIP
 /*!\brief Update the probability model (cdf) and the entropy context related to
- * coefficient coding for a transform block when the transform type is 2D identity
- * (IDTX) and the forward skip residual coding mode is used..
+ * coefficient coding for a transform block when the transform type is 2D
+ * identity (IDTX) and the forward skip residual coding mode is used..
  *
  * \ingroup coefficient_coding
  *

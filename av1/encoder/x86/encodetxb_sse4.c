@@ -20,16 +20,16 @@
 #include "aom_dsp/x86/synonyms.h"
 
 #if CONFIG_FORWARDSKIP
-static INLINE void _xx_fill_buffer(__m128i *buff, __m128i *end, __m128i zeros)
-{
+static INLINE void _xx_fill_buffer(__m128i *buff, __m128i *end, __m128i zeros) {
   do {
     _mm_storeu_si128(buff, zeros);
     buff++;
   } while (buff < end);
 }
 
-void av1_txb_init_levels_skip_sse4_1(const tran_low_t *const coeff, const int width,
-                                const int height, uint8_t *const levels) {
+void av1_txb_init_levels_skip_sse4_1(const tran_low_t *const coeff,
+                                     const int width, const int height,
+                                     uint8_t *const levels) {
   const int stride = width + TX_PAD_LEFT;
   const __m128i zeros = _mm_setzero_si128();
 
@@ -108,19 +108,23 @@ void av1_txb_init_levels_skip_sse4_1(const tran_low_t *const coeff, const int wi
   }
 }
 
-void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff, const int width,
-                                      const int height, uint8_t *const levels,
+void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff,
+                                      const int width, const int height,
+                                      uint8_t *const levels,
                                       int8_t *const signs) {
   const int stride = width + TX_PAD_HOR;
   const __m128i zeros = _mm_setzero_si128();
   const __m128i one16 = _mm_set1_epi16(1);
 
   uint8_t *lvl_top_buf = levels;
-  uint8_t *lvl_top_buf_end = lvl_top_buf + sizeof(*levels) * (TX_PAD_TOP * stride);
+  uint8_t *lvl_top_buf_end =
+      lvl_top_buf + sizeof(*levels) * (TX_PAD_TOP * stride);
   _xx_fill_buffer((__m128i *)lvl_top_buf, (__m128i *)lvl_top_buf_end, zeros);
 
-  int8_t *si_bot_buf = signs + stride * height + sizeof(*signs) * (TX_PAD_TOP * stride);
-  int8_t *si_bot_buf_end = si_bot_buf + sizeof(*signs) * (TX_PAD_BOTTOM * stride);
+  int8_t *si_bot_buf =
+      signs + stride * height + sizeof(*signs) * (TX_PAD_TOP * stride);
+  int8_t *si_bot_buf_end =
+      si_bot_buf + sizeof(*signs) * (TX_PAD_BOTTOM * stride);
   _xx_fill_buffer((__m128i *)si_bot_buf, (__m128i *)si_bot_buf_end, zeros);
 
   int i = 0;
@@ -138,8 +142,10 @@ void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff, const int w
       const __m128i absZA = _mm_abs_epi16(_mm_packs_epi32(zeros, coeffA));
       const __m128i absZB = _mm_abs_epi16(_mm_packs_epi32(zeros, coeffB));
       const __m128i coeffAB = _mm_packs_epi16(absZA, absZB);
-      const __m128i signZA = _mm_sign_epi16(one16, _mm_packs_epi32(coeffA, zeros));
-      const __m128i signZB = _mm_sign_epi16(one16, _mm_packs_epi32(coeffB, zeros));
+      const __m128i signZA =
+          _mm_sign_epi16(one16, _mm_packs_epi32(coeffA, zeros));
+      const __m128i signZB =
+          _mm_sign_epi16(one16, _mm_packs_epi32(coeffB, zeros));
       const __m128i signAB = _mm_packs_epi16(signZA, signZB);
       xx_storeu_128(ls, coeffAB);
       xx_storeu_128(si, signAB);

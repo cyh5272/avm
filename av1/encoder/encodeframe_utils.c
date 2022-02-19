@@ -562,14 +562,15 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_ENTROPY_STATS
       const MB_MODE_INFO *above_mi = xd->above_mbmi;
       const MB_MODE_INFO *left_mi = xd->left_mbmi;
-      const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+      const uint8_t fsc_above =
+          (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
       const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
       const int fsc_ctx = intraonly ? fsc_above + fsc_left : 3;
       ++counts->fsc_mode[fsc_ctx][fsc_bsize_groups[bsize]]
                         [mbmi->fsc_mode[xd->tree_type == CHROMA_PART]];
 #endif
-      aom_cdf_prob * fsc_cdf = get_fsc_mode_cdf(fc, xd->above_mbmi, xd->left_mbmi,
-                                                bsize, intraonly);
+      aom_cdf_prob *fsc_cdf =
+          get_fsc_mode_cdf(fc, xd->above_mbmi, xd->left_mbmi, bsize, intraonly);
       update_cdf(fsc_cdf, mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
                  FSC_MODES);
     }
@@ -591,19 +592,19 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
     update_cdf(fc->y_mode_cdf[size_group_lookup[bsize]], y_mode, INTRA_MODES);
   }
 #if CONFIG_FORWARDSKIP
-    if (allow_fsc_intra(cm, xd, bsize, mbmi)) {
+  if (allow_fsc_intra(cm, xd, bsize, mbmi)) {
 #if CONFIG_ENTROPY_STATS
-      const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-      const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-      const int fsc_ctx = intraonly ? fsc_above + fsc_left : 3;
-      ++counts->fsc_mode[fsc_ctx][fsc_bsize_groups[bsize]]
-                        [mbmi->fsc_mode[xd->tree_type == CHROMA_PART]];
+    const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+    const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+    const int fsc_ctx = intraonly ? fsc_above + fsc_left : 3;
+    ++counts->fsc_mode[fsc_ctx][fsc_bsize_groups[bsize]]
+                      [mbmi->fsc_mode[xd->tree_type == CHROMA_PART]];
 #endif
-      aom_cdf_prob * fsc_cdf = get_fsc_mode_cdf(fc, xd->above_mbmi, xd->left_mbmi,
-                                                bsize, intraonly);
-      update_cdf(fsc_cdf, mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
-                 FSC_MODES);
-    }
+    aom_cdf_prob *fsc_cdf =
+        get_fsc_mode_cdf(fc, xd->above_mbmi, xd->left_mbmi, bsize, intraonly);
+    update_cdf(fsc_cdf, mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
+               FSC_MODES);
+  }
 #endif
 #endif  // CONFIG_AIMC
 #if CONFIG_MRLS
@@ -1320,7 +1321,8 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #if CONFIG_FORWARDSKIP
   AVERAGE_CDF(ctx_left->idtx_sign_cdf, ctx_tr->idtx_sign_cdf, 2);
   AVERAGE_CDF(ctx_left->coeff_base_cdf_idtx, ctx_tr->coeff_base_cdf_idtx, 4);
-  AVERAGE_CDF(ctx_left->coeff_br_cdf_idtx, ctx_tr->coeff_br_cdf_idtx, BR_CDF_SIZE);
+  AVERAGE_CDF(ctx_left->coeff_br_cdf_idtx, ctx_tr->coeff_br_cdf_idtx,
+              BR_CDF_SIZE);
 #endif
   AVERAGE_CDF(ctx_left->coeff_br_cdf, ctx_tr->coeff_br_cdf, BR_CDF_SIZE);
 #if CONFIG_NEW_INTER_MODES

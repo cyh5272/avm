@@ -95,8 +95,8 @@ void av1_xform_dc_only(MACROBLOCK *x, int plane, int block,
                        TxfmParam *txfm_param, int64_t per_px_mean);
 
 #if CONFIG_FORWARDSKIP
-void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x,
-                     int plane, int block, int blk_row,
+void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x, int plane, int block,
+                     int blk_row,
 #else
 void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
 #endif

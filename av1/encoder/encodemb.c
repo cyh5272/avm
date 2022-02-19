@@ -276,8 +276,8 @@ void av1_xform_dc_only(MACROBLOCK *x, int plane, int block,
 }
 
 #if CONFIG_FORWARDSKIP
-void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x,
-                     int plane, int block, int blk_row,
+void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x, int plane, int block,
+                     int blk_row,
 #else
 void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
 #endif
@@ -295,9 +295,9 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
   av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param);
 #endif
 #if CONFIG_FORWARDSKIP
-  const uint8_t fsc_mode = (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
-                            plane == PLANE_TYPE_Y) ||
-                           use_inter_fsc(cm, plane, txfm_param->tx_type, is_inter);
+  const uint8_t fsc_mode =
+      (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] && plane == PLANE_TYPE_Y) ||
+      use_inter_fsc(cm, plane, txfm_param->tx_type, is_inter);
   if (fsc_mode) qparam->use_optimize_b = false;
 #endif
   av1_quant(x, plane, block, txfm_param, qparam);
@@ -537,8 +537,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     const int fsc_mode = (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] &&
                           plane == PLANE_TYPE_Y) ||
                          use_inter_fsc(cm, plane, tx_type, is_inter);
-    const int use_trellis = is_trellis_used(args->enable_optimize_b, dry_run) &&
-                            !fsc_mode;
+    const int use_trellis =
+        is_trellis_used(args->enable_optimize_b, dry_run) && !fsc_mode;
 #else
     const int use_trellis = is_trellis_used(args->enable_optimize_b, dry_run);
 #endif

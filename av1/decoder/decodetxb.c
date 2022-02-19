@@ -139,8 +139,8 @@ static INLINE void read_coeffs_forward_2d(aom_reader *r, int start_si,
   }
 }
 
-static INLINE void read_coeffs_forward(aom_reader *r, int start_si,
-                                       int end_si, const int16_t *scan, int bwl,
+static INLINE void read_coeffs_forward(aom_reader *r, int start_si, int end_si,
+                                       const int16_t *scan, int bwl,
                                        uint8_t *levels, base_cdf_arr base_cdf,
                                        br_cdf_arr br_cdf) {
   for (int c = start_si; c <= end_si; c++) {
@@ -165,8 +165,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
                             aom_reader *const r, const int blk_row,
                             const int blk_col, const int plane,
                             const TXB_CTX *const txb_ctx,
-                            const TX_SIZE tx_size
-                            ) {
+                            const TX_SIZE tx_size) {
   MACROBLOCKD *const xd = &dcb->xd;
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
@@ -225,17 +224,16 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     }
     return 0;
   }
-  if (plane == AOM_PLANE_Y) { // only y plane's tx_type is transmitted
+  if (plane == AOM_PLANE_Y) {  // only y plane's tx_type is transmitted
     av1_read_tx_type(cm, xd, blk_row, blk_col, tx_size, r);
   }
   return 1;
 }
 
 uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
-                                 DecoderCodingBlock *dcb,
-                                 aom_reader *const r, const int blk_row,
-                                 const int blk_col, const int plane,
-                                 const TX_SIZE tx_size) {
+                                 DecoderCodingBlock *dcb, aom_reader *const r,
+                                 const int blk_row, const int blk_col,
+                                 const int plane, const TX_SIZE tx_size) {
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
@@ -270,8 +268,8 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
 #else
   const TX_CLASS tx_class = tx_type_to_class[tx_type];
 #endif
-  const qm_val_t *iqmatrix = av1_get_iqmatrix(&cm->quant_params,
-                                              xd, plane, tx_size, tx_type);
+  const qm_val_t *iqmatrix =
+      av1_get_iqmatrix(&cm->quant_params, xd, plane, tx_size, tx_type);
   const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
   const int16_t *const scan = scan_order->scan;
 
@@ -285,13 +283,11 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
     base_cdf_arr base_cdf = ec_ctx->coeff_base_cdf_idtx;
     br_cdf_arr br_cdf = ec_ctx->coeff_br_cdf_idtx;
     if (tx_class == TX_CLASS_2D) {
-      read_coeffs_forward(r, 0, 0, scan, bwl,
-                          levels, base_cdf, br_cdf);
-      read_coeffs_forward_2d(r, 1, *eob-1, scan, bwl, levels,
-                             base_cdf, br_cdf);
+      read_coeffs_forward(r, 0, 0, scan, bwl, levels, base_cdf, br_cdf);
+      read_coeffs_forward_2d(r, 1, *eob - 1, scan, bwl, levels, base_cdf,
+                             br_cdf);
     } else {
-      read_coeffs_forward(r, 0, *eob-1, scan, bwl,
-                          levels, base_cdf, br_cdf);
+      read_coeffs_forward(r, 0, *eob - 1, scan, bwl, levels, base_cdf, br_cdf);
     }
   }
 
@@ -301,7 +297,8 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
     tran_low_t level = levels[get_padded_idx_left(pos, bwl)];
     if (level) {
       int idtx_sign_ctx = get_sign_ctx_skip(signs, levels, pos, bwl);
-      sign = aom_read_symbol(r, ec_ctx->idtx_sign_cdf[idtx_sign_ctx], 2, ACCT_STR);
+      sign =
+          aom_read_symbol(r, ec_ctx->idtx_sign_cdf[idtx_sign_ctx], 2, ACCT_STR);
       signs[get_padded_idx(pos, bwl)] = sign > 0 ? -1 : 1;
       if (level >= MAX_BASE_BR_RANGE) {
         level += read_golomb(xd, r);
@@ -687,8 +684,8 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
               pd->left_entropy_context + row, &txb_ctx,
               mbmi->fsc_mode[xd->tree_type == CHROMA_PART]);
 
-  const uint8_t decode_rest = av1_read_sig_txtype(cm, dcb, r, row, col,
-                                                  plane, &txb_ctx, tx_size);
+  const uint8_t decode_rest =
+      av1_read_sig_txtype(cm, dcb, r, row, col, plane, &txb_ctx, tx_size);
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const TX_TYPE tx_type = av1_get_tx_type(xd, plane_type, row, col, tx_size,
                                           cm->features.reduced_tx_set_used);
@@ -699,14 +696,14 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
 #if CONFIG_IST
          get_primary_tx_type(tx_type) == IDTX && plane == PLANE_TYPE_Y) ||
 #else
-        tx_type == IDTX && plane == PLANE_TYPE_Y) ||
+         tx_type == IDTX && plane == PLANE_TYPE_Y) ||
 #endif
         use_inter_fsc(cm, plane, tx_type, is_inter)) {
-      cul_level = av1_read_coeffs_txb_skip(cm, dcb, r, row, col,
-                                           plane, tx_size);
+      cul_level =
+          av1_read_coeffs_txb_skip(cm, dcb, r, row, col, plane, tx_size);
     } else {
-      cul_level = av1_read_coeffs_txb(cm, dcb, r, row, col,
-                                      plane, &txb_ctx, tx_size);
+      cul_level =
+          av1_read_coeffs_txb(cm, dcb, r, row, col, plane, &txb_ctx, tx_size);
     }
   }
 #else

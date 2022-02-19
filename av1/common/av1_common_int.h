@@ -316,7 +316,7 @@ typedef struct SequenceHeader {
   uint8_t enable_mrls;  // enables/disables multiple reference line selection
 #endif
 #if CONFIG_FORWARDSKIP
-  uint8_t enable_fsc;   // enables/disables forward skip coding
+  uint8_t enable_fsc;  // enables/disables forward skip coding
 #endif
   uint8_t enable_filter_intra;       // enables/disables filterintra
   uint8_t enable_intra_edge_filter;  // enables/disables edge upsampling
@@ -1609,10 +1609,8 @@ static INLINE aom_cdf_prob *get_fsc_mode_cdf(FRAME_CONTEXT *tile_ctx,
                                              const int is_key) {
   const uint8_t fsc_size_group = fsc_bsize_groups[bsize];
   assert(fsc_size_group < FSC_BSIZE_CONTEXTS);
-  const uint8_t fsc_above = (above_mi) ?
-      above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-  const uint8_t fsc_left = (left_mi) ?
-      left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+  const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
+  const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
   const int fsc_ctx = is_key ? fsc_above + fsc_left : 3;
   return tile_ctx->fsc_mode_cdf[fsc_ctx][fsc_size_group];
 }

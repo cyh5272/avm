@@ -1637,8 +1637,7 @@ static INLINE TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
   }
 #if CONFIG_FORWARDSKIP
   if (xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART] &&
-      !is_inter_block(mbmi, xd->tree_type) &&
-      plane_type == PLANE_TYPE_Y) {
+      !is_inter_block(mbmi, xd->tree_type) && plane_type == PLANE_TYPE_Y) {
     return IDTX;
   }
 #endif
