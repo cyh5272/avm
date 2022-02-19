@@ -359,7 +359,7 @@ void av1_txb_init_levels_skip_c(const tran_low_t *const coeff,
   }
 }
 #endif
-  
+
 void av1_txb_init_levels_c(const tran_low_t *const coeff, const int width,
                            const int height, uint8_t *const levels) {
   const int stride = width + TX_PAD_HOR;
@@ -402,7 +402,7 @@ void av1_get_nz_map_contexts_skip_c(const uint8_t *const levels,
     coeff_contexts[pos] = get_nz_map_ctx_skip(levels, pos, bwl);
   }
 }
-  
+
 int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
                          aom_writer *w, int blk_row, int blk_col, int plane,
                          int block, TX_SIZE tx_size) {
@@ -423,11 +423,11 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
   if (plane == AOM_PLANE_U)
     memset(xd->tmp_sign, 0, width * height * sizeof(int32_t));
 #endif
-  
+
   const uint16_t *eob_txb = cb_coef_buff->eobs[plane] + txb_offset;
   const uint16_t eob = eob_txb[block];
   const uint8_t *entropy_ctx = cb_coef_buff->entropy_ctx[plane] + txb_offset;
-  
+
 #if CONFIG_CONTEXT_DERIVATION
   int txb_skip_ctx = (entropy_ctx[block] & TXB_SKIP_CTX_MASK);
   if (plane == AOM_PLANE_V) {
@@ -439,12 +439,12 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
-  
+
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const TX_TYPE tx_type = av1_get_tx_type(xd, plane_type, blk_row,
                                           blk_col, tx_size,
                                           cm->features.reduced_tx_set_used);
-  
+
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = eob ? 1 : 0;
@@ -1291,7 +1291,6 @@ int av1_cost_coeffs_txb_estimate(const MACROBLOCK *x, const int plane,
   return cost;
 }
 
-  
 #if CONFIG_FORWARDSKIP
 int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
                                       const int block, const TX_SIZE tx_size,
@@ -1315,7 +1314,7 @@ int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
   return cost;
 }
 #endif
-  
+
 #if CONFIG_FORWARDSKIP
 int av1_cost_coeffs_txb(const AV1_COMMON *cm, const MACROBLOCK *x,
                         const int plane, const int block,
@@ -2378,7 +2377,6 @@ void av1_update_and_record_txb_skip_context(int plane, int block,
       if (level > NUM_BASE_LEVELS) {
         const int base_range = level - 1 - NUM_BASE_LEVELS;
         const int br_ctx = get_br_ctx_skip(levels, pos, bwl);
-        
         for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k = AOMMIN(base_range - idx, BR_CDF_SIZE - 1);
           if (allow_update_cdf) {
@@ -2410,7 +2408,6 @@ void av1_update_and_record_txb_skip_context(int plane, int block,
 #endif  // CONFIG_ENTROPY_STATS
         if (allow_update_cdf)
           update_cdf(ec_ctx->idtx_sign_cdf[idtx_sign_ctx], idtx_sign, 2);
-        
       }
     }
 #endif

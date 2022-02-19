@@ -1477,8 +1477,7 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_ibp);
 #else
 #if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra,
-          encoder_cfg->enable_mrls,
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
           encoder_cfg->enable_fsc);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls);
@@ -1489,17 +1488,16 @@ static void show_stream_config(struct stream_state *stream,
 #if CONFIG_ORIP
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
 #if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, 
-		  encoder_cfg->enable_fsc,
-		  encoder_cfg->enable_orip,
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
+          encoder_cfg->enable_orip,
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip,
 #endif
           encoder_cfg->enable_ibp);
 #else
 #if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra,
-          encoder_cfg->enable_fsc, encoder_cfg->enable_orip);
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
+          encoder_cfg->enable_orip);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip);
 #endif
@@ -1507,16 +1505,14 @@ static void show_stream_config(struct stream_state *stream,
 #else
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
 #if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra,
-          encoder_cfg->enable_fsc,
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
           encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_ibp);
 #endif
 #else
 #if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra,
-          encoder_cfg->enable_fsc);
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc);
 #else
           encoder_cfg->enable_paeth_intra);
 #endif

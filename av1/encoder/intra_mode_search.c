@@ -1402,7 +1402,6 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 #else
                                  mode_costs[mbmi->mode]);
 #endif
-      
       this_rd = RDCOST(x->rdmult, this_rate, tokenonly_rd_stats.dist);
       // Collect mode stats for multiwinner mode processing
       const int txfm_search_done = 1;
@@ -1454,7 +1453,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
  }
 }
 #endif
-  
+
 // Finds the best non-intrabc mode on an intra frame.
 int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                    int *rate, int *rate_tokenonly,
@@ -1666,7 +1665,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_MRLS
   }
 #endif
-    
+
 #if CONFIG_FORWARDSKIP
   // Searches forward skip coding
   if (beat_best_rd && allow_fsc_intra(&cpi->common, xd, bsize, mbmi)) {
@@ -1682,7 +1681,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                     ctx, &best_mbmi);
   }
 #endif
-    
+
   // Searches palette
 #if CONFIG_AIMC
   mode_costs = x->mode_costs.y_primary_flag_cost[DC_PRED];
@@ -1714,7 +1713,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       best_mbmi = *mbmi;
     }
   }
-    
+
   // No mode is identified with less rd value than best_rd passed to this
   // function. In such cases winner mode processing is not necessary and return
   // best_rd as INT64_MAX to indicate best mode is not identified

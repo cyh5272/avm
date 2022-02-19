@@ -702,7 +702,7 @@ int main(int argc, const char **argv) {
                      "default_fsc_mode_cdf[FSC_MODE_CONTEXTS]"
                      "[FSC_BSIZE_CONTEXTS][CDF_SIZE(FSC_MODES)]");
 #endif
-  
+
   /* restoration type */
   cts_each_dim[0] = RESTORE_SWITCHABLE_TYPES;
   optimize_cdf_table(&fc.switchable_restore[0], probsfile, 1, cts_each_dim,

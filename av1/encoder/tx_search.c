@@ -2535,7 +2535,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
                   plane,
 #endif
                   tx_size, DCT_DCT, &txfm_param);
-      
+
 #if CONFIG_FORWARDSKIP
   const int xform_quant_b = USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
                                                    : AV1_XFORM_QUANT_FP;
