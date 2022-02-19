@@ -81,6 +81,12 @@ void av1_setup_xform(const AV1_COMMON *cm, MACROBLOCK *x,
                      TX_SIZE tx_size, TX_TYPE tx_type, TxfmParam *txfm_param);
 void av1_setup_quant(TX_SIZE tx_size, int use_optimize_b, int xform_quant_idx,
                      int use_quant_b_adapt, QUANT_PARAM *qparam);
+
+#if CONFIG_FORWARDSKIP
+void av1_update_trellisq(int use_optimize_b, int xform_quant_idx,
+                         int use_quant_b_adapt, QUANT_PARAM *qparam);
+#endif
+
 void av1_setup_qmatrix(const CommonQuantParams *quant_params,
                        const MACROBLOCKD *xd, int plane, TX_SIZE tx_size,
                        TX_TYPE tx_type, QUANT_PARAM *qparam);
@@ -88,7 +94,12 @@ void av1_setup_qmatrix(const CommonQuantParams *quant_params,
 void av1_xform_dc_only(MACROBLOCK *x, int plane, int block,
                        TxfmParam *txfm_param, int64_t per_px_mean);
 
+#if CONFIG_FORWARDSKIP
+void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x, int plane, int block,
+                     int blk_row,
+#else
 void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
+#endif
                      int blk_col, BLOCK_SIZE plane_bsize, TxfmParam *txfm_param,
                      QUANT_PARAM *qparam);
 

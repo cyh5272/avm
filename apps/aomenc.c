@@ -427,6 +427,9 @@ const arg_def_t *av1_key_val_args[] = {
 #if CONFIG_MRLS
   &g_av1_codec_arg_defs.enable_mrls,
 #endif
+#if CONFIG_FORWARDSKIP
+  &g_av1_codec_arg_defs.enable_fsc,
+#endif
 #if CONFIG_ORIP
   &g_av1_codec_arg_defs.enable_orip,
 #endif
@@ -594,6 +597,9 @@ static void init_config(cfg_options_t *config) {
 #endif
 #if CONFIG_MRLS
   config->enable_mrls = 1;
+#endif
+#if CONFIG_FORWARDSKIP
+  config->enable_fsc = 1;
 #endif
 #if CONFIG_ORIP
   config->enable_orip = 1;
@@ -1435,6 +1441,9 @@ static void show_stream_config(struct stream_state *stream,
 #if CONFIG_MRLS
           ", MRLS(%d)"
 #endif
+#if CONFIG_FORWARDSKIP
+          ", FSC(%d)"
+#endif
 #if CONFIG_ORIP
           ", ORIP(%d)"
 #endif
@@ -1448,32 +1457,65 @@ static void show_stream_config(struct stream_state *stream,
 #if CONFIG_ORIP
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_fsc,
+#endif
           encoder_cfg->enable_orip, encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_fsc,
+#endif
           encoder_cfg->enable_orip);
 #endif
 #else
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_fsc,
+#endif
           encoder_cfg->enable_ibp);
 #else
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
+          encoder_cfg->enable_fsc);
+#else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls);
+#endif
 #endif
 #endif
 #else
 #if CONFIG_ORIP
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
+          encoder_cfg->enable_orip,
+#else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip,
+#endif
           encoder_cfg->enable_ibp);
+#else
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
+          encoder_cfg->enable_orip);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip);
 #endif
+#endif
 #else
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
+          encoder_cfg->enable_ibp);
+#else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_ibp);
+#endif
+#else
+#if CONFIG_FORWARDSKIP
+          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc);
 #else
           encoder_cfg->enable_paeth_intra);
+#endif
 #endif
 #endif
 #endif
