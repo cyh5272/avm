@@ -3663,6 +3663,14 @@ static AOM_INLINE void block_rd_txfm(int plane, int block, int blk_row,
   search_tx_type(cpi, x, plane, block, blk_row, blk_col, plane_bsize, tx_size,
                  &txb_ctx, args->ftxs_mode, args->skip_trellis,
                  args->best_rd - args->current_rd, &this_rd_stats);
+#if CONFIG_FORWARDSKIP
+  if (this_rd_stats.dist == INT64_MAX) {
+    args->exit_early = 1;
+    args->incomplete_exit = 1;
+    return;
+  }
+#endif
+
 #if CONFIG_SDP
   if (plane == AOM_PLANE_Y && xd->cfl.store_y && xd->tree_type == SHARED_PART) {
 #else
