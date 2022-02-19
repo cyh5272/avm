@@ -111,7 +111,6 @@ void av1_txb_init_levels_skip_sse4_1(const tran_low_t *const coeff, const int wi
 void av1_txb_init_levels_signs_sse4_1(const tran_low_t *const coeff, const int width,
                                       const int height, uint8_t *const levels,
                                       int8_t *const signs) {
-  
   const int stride = width + TX_PAD_HOR;
   const __m128i zeros = _mm_setzero_si128();
   const __m128i one16 = _mm_set1_epi16(1);
