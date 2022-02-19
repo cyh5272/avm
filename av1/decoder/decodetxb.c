@@ -199,6 +199,20 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   *max_scan_line = 0;
   *eob = 0;
   
+#if CONFIG_FORWARDSKIP
+#if CONFIG_INSPECTION
+  if (plane == 0) {
+    const int txk_type_idx =
+#if CONFIG_SDP
+        av1_get_txk_type_index(mbmi->sb_type[0], blk_row, blk_col);
+#else
+        av1_get_txk_type_index(mbmi->sb_type, blk_row, blk_col);
+#endif
+    mbmi->tx_skip[txk_type_idx] = all_zero;
+  }
+#endif
+#endif
+  
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = all_zero ? 0 : 1;
@@ -378,6 +392,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   *max_scan_line = 0;
   *eob = 0;
 
+#if !CONFIG_FORWARDSKIP
 #if CONFIG_INSPECTION
   if (plane == 0) {
     const int txk_type_idx =
@@ -388,6 +403,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif
     mbmi->tx_skip[txk_type_idx] = all_zero;
   }
+#endif
 #endif
 
 #if DEBUG_EXTQUANT
