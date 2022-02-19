@@ -391,6 +391,7 @@ static INLINE void get_txb_ctx_skip(const BLOCK_SIZE plane_bsize,
   const int txb_w_unit = tx_size_wide_unit[tx_size];
   const int txb_h_unit = tx_size_high_unit[tx_size];
   const int skip_offset = 13;
+  txb_ctx->dc_sign_ctx = 0;
   if (plane_bsize == txsize_to_bsize[tx_size]) {
     txb_ctx->txb_skip_ctx = skip_offset;
   } else {

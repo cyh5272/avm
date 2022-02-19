@@ -1356,7 +1356,14 @@ static INLINE int is_intra_hash_match(const AV1_COMP *cpi, MACROBLOCK *x,
       find_tx_size_rd_info(&txfm_info->txb_rd_record_intra, intra_hash);
   *intra_txb_rd_info =
       &txfm_info->txb_rd_record_intra.tx_rd_info[intra_hash_idx];
+#if CONFIG_FORWARDSKIP
+  *cur_joint_ctx = txb_ctx->txb_skip_ctx;
+  if (xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART] == 0) {
+    *cur_joint_ctx += (txb_ctx->dc_sign_ctx << 8);
+  }
+#else
   *cur_joint_ctx = (txb_ctx->dc_sign_ctx << 8) + txb_ctx->txb_skip_ctx;
+#endif
   if ((*intra_txb_rd_info)->entropy_context == *cur_joint_ctx &&
       txfm_info->txb_rd_record_intra.tx_rd_info[intra_hash_idx].valid) {
     xd->tx_type_map[tx_type_map_idx] = (*intra_txb_rd_info)->tx_type;
