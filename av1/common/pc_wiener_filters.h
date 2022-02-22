@@ -13,7 +13,7 @@
 #define AV1_COMMON_PC_WIENER_FILTERS_H_
 
 #define NUM_PC_WIENER_FILTERS 256
-#define PC_WIENER_FEATURE_LENGTH_LUMA 5
+#define PC_WIENER_FEATURE_LENGTH_LUMA 5  // Lengths are odd numbers.
 #define PC_WIENER_FEATURE_LENGTH_CHROMA 3
 #define PC_WIENER_TSKIP_LENGTH_LUMA 5
 #define PC_WIENER_TSKIP_LENGTH_CHROMA 3
@@ -43,6 +43,7 @@ const int32_t mode_weights[NUM_PC_WIENER_FEATURES][3] = { { -527, 15325, 321 },
 const int32_t mode_offsets[NUM_PC_WIENER_FEATURES] = { -547, -21565, -573,
                                                        -680 };
 
+// Origin-symmetric taps first then the last singleton tap.
 const int pcwiener_tap_config_luma[2 * NUM_PC_WIENER_TAPS_LUMA - 1][3] = {
   { -3, -3, 0 }, { 3, 3, 0 },   { -3, 0, 1 },  { 3, 0, 1 },   { -3, 3, 2 },
   { 3, -3, 2 },  { -2, -2, 3 }, { 2, 2, 3 },   { -2, -1, 4 }, { 2, 1, 4 },
