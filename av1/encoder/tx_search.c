@@ -565,7 +565,8 @@ static AOM_INLINE void set_skip_txfm(MACROBLOCK *x, RD_STATS *rd_stats,
   TXB_CTX txb_ctx;
   get_txb_ctx(bsize, tx_size, 0, ta, tl, &txb_ctx
 #if CONFIG_FORWARDSKIP
-              , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+              ,
+              mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
   );
   const int zero_blk_rate = x->coeff_costs.coeff_costs[txs_ctx][PLANE_TYPE_Y]
@@ -2319,7 +2320,8 @@ static INLINE void predict_dc_only_block(
     const PLANE_TYPE plane_type = get_plane_type(plane);
     get_txb_ctx(plane_bsize, tx_size, plane, ta, tl, &txb_ctx_tmp
 #if CONFIG_FORWARDSKIP
-                , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+                ,
+                mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
     );
 #if CONFIG_CONTEXT_DERIVATION
@@ -2942,7 +2944,8 @@ static AOM_INLINE void try_tx_block_no_split(
   TXB_CTX txb_ctx;
   get_txb_ctx(plane_bsize, tx_size, 0, pta, ptl, &txb_ctx
 #if CONFIG_FORWARDSKIP
-              , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+              ,
+              mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
   );
   const int zero_blk_rate = x->coeff_costs.coeff_costs[txs_ctx][PLANE_TYPE_Y]
@@ -3637,7 +3640,8 @@ static AOM_INLINE void block_rd_txfm(int plane, int block, int blk_row,
   TXB_CTX txb_ctx;
   get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx
 #if CONFIG_FORWARDSKIP
-              , xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART]
+              ,
+              xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
   );
   search_tx_type(cpi, x, plane, block, blk_row, blk_col, plane_bsize, tx_size,
@@ -3824,7 +3828,8 @@ static AOM_INLINE void tx_block_yrd(
     TXB_CTX txb_ctx;
     get_txb_ctx(plane_bsize, tx_size, 0, ta, tl, &txb_ctx
 #if CONFIG_FORWARDSKIP
-                , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+                ,
+                mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
     );
 

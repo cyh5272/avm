@@ -573,7 +573,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       TXB_CTX txb_ctx;
       get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx
 #if CONFIG_FORWARDSKIP
-                  , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+                  ,
+                  mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, &txb_ctx,
@@ -1027,7 +1028,8 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       TXB_CTX txb_ctx;
       get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx
 #if CONFIG_FORWARDSKIP
-                  , mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
+                  ,
+                  mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, &txb_ctx,

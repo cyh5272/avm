@@ -1373,10 +1373,9 @@ int av1_cost_coeffs_txb_laplacian(
 #if CONFIG_FORWARDSKIP
     const AV1_COMMON *cm,
 #endif  // CONFIG_FORWARDSKIP
-    const MACROBLOCK *x, const int plane,
-    const int block, const TX_SIZE tx_size, const TX_TYPE tx_type,
-    const TXB_CTX *const txb_ctx, const int reduced_tx_set_used,
-    const int adjust_eob) {
+    const MACROBLOCK *x, const int plane, const int block,
+    const TX_SIZE tx_size, const TX_TYPE tx_type, const TXB_CTX *const txb_ctx,
+    const int reduced_tx_set_used, const int adjust_eob) {
   const struct macroblock_plane *p = &x->plane[plane];
   int eob = p->eobs[block];
 
@@ -2448,7 +2447,8 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
                 pd->above_entropy_context + blk_col,
                 pd->left_entropy_context + blk_row, &txb_ctx
 #if CONFIG_FORWARDSKIP
-                , 0
+                ,
+                0
 #endif  // CONFIG_FORWARDSKIP
     );
     const int bwl = get_txb_bwl(tx_size);
