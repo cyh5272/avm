@@ -28,6 +28,9 @@ extern "C" {
 // Number of bits required to signal combined code for cnn_index
 // (CNN_INDICES_Y) and whether CNN is used or not (1).
 #define CNN_INDEX_Y_BITS 2  // log2(CNN_INDICES_Y + 1)
+#if CONFIG_EXT_SUPERRES
+#define SELECT_CNN_FOR_SUPERRES 1
+#endif  // CONFIG_EXT_SUPERRES
 
 // Returns true if we are allowed to use CNN for restoration for the frame.
 static INLINE bool av1_allow_cnn(const AV1_COMMON *cm) {
@@ -57,7 +60,11 @@ static INLINE bool av1_allow_cnn_for_plane(const AV1_COMMON *cm, int plane) {
 static INLINE int av1_num_cnn_indices_for_plane(const AV1_COMMON *cm,
                                                 int plane) {
   if (!av1_allow_cnn_for_plane(cm, plane)) return 0;
+#if CONFIG_EXT_SUPERRES && SELECT_CNN_FOR_SUPERRES
+  if (av1_superres_scaled(cm)) return plane == AOM_PLANE_Y ? CNN_INDICES_Y : 1;
+#else   // CONFIG_EXT_SUPERRES && SELECT_CNN_FOR_SUPERRES
   if (av1_superres_scaled(cm)) return 1;
+#endif  // CONFIG_EXT_SUPERRES && SELECT_CNN_FOR_SUPERRES
   if (plane == AOM_PLANE_Y) {
     return CNN_INDICES_Y;
   } else {
