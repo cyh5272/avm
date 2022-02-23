@@ -129,6 +129,27 @@ static const unsigned char *get_intra_model_from_qindex(int qindex,
   }
 #if CONFIG_EXT_SUPERRES
   assert(is_luma);
+#if SELECT_CNN_FOR_SUPERRES
+  switch (superres_denom) {
+    case 10:
+      return (cnn_index == 0)   ? sr5by4ai_1_tflite
+             : (cnn_index == 1) ? sr5by4ai_2_tflite
+                                : sr5by4ai_3_tflite;
+    case 12:
+      return (cnn_index == 0)   ? sr3by2ai_1_tflite
+             : (cnn_index == 1) ? sr3by2ai_2_tflite
+                                : sr3by2ai_3_tflite;
+    case 14:
+      return (cnn_index == 0)   ? sr7by4ai_1_tflite
+             : (cnn_index == 1) ? sr7by4ai_2_tflite
+                                : sr7by4ai_3_tflite;
+    case 16:
+      return (cnn_index == 0)   ? sr2by1ai_1_tflite
+             : (cnn_index == 1) ? sr2by1ai_2_tflite
+                                : sr2by1ai_3_tflite;
+    default: assert(0); return nullptr;
+  }
+#else   // SELECT_CNN_FOR_SUPERRES
   switch (superres_denom) {
     case 10:
       if (qindex < 120)
@@ -160,6 +181,7 @@ static const unsigned char *get_intra_model_from_qindex(int qindex,
         return sr2by1ai_3_tflite;
     default: assert(0); return nullptr;
   }
+#endif  // SELECT_CNN_FOR_SUPERRES
 #endif  // CONFIG_EXT_SUPERRES
 }
 
