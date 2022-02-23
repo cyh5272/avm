@@ -108,6 +108,9 @@ struct av1_extracfg {
   unsigned int motion_vector_unit_test;
   unsigned int cdf_update_mode;
   int disable_ml_partition_speed_features;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  unsigned int erp_pruning_level;
+#endif                         // CONFIG_EXT_RECUR_PARTITIONS
   int enable_rect_partitions;  // enable rectangular partitions for sequence
   int enable_ab_partitions;    // enable AB partitions for sequence
   int enable_1to4_partitions;  // enable 1:4 and 4:1 partitions for sequence
@@ -407,6 +410,9 @@ static struct av1_extracfg default_extra_cfg = {
   1,  // disable ML based partition speed up features
 #else
   0,  // disable ML based partition speed up features
+#endif
+#if CONFIG_EXT_RECUR_PARTITIONS
+  4,  // aggressiveness for erp pruning
 #endif
   1,  // enable rectangular partitions
   1,  // enable ab shape partitions
@@ -861,9 +867,10 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_ccso = extra_cfg->enable_ccso;
 #endif
   cfg->superblock_size =
-      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)     ? 64
-      : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
-                                                                    : 0;
+      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)
+          ? 64
+          : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
+                                                                        : 0;
   cfg->enable_warped_motion = extra_cfg->enable_warped_motion;
   cfg->enable_diff_wtd_comp = extra_cfg->enable_diff_wtd_comp;
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -872,6 +879,9 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_angle_delta = extra_cfg->enable_angle_delta;
   cfg->disable_ml_partition_speed_features =
       extra_cfg->disable_ml_partition_speed_features;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  cfg->erp_pruning_level = extra_cfg->erp_pruning_level;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   cfg->enable_rect_partitions = extra_cfg->enable_rect_partitions;
   cfg->enable_ab_partitions = extra_cfg->enable_ab_partitions;
   cfg->enable_1to4_partitions = extra_cfg->enable_1to4_partitions;
@@ -946,10 +956,11 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #if CONFIG_CCSO
   extra_cfg->enable_ccso = cfg->enable_ccso;
 #endif
-  extra_cfg->superblock_size =
-      (cfg->superblock_size == 64)    ? AOM_SUPERBLOCK_SIZE_64X64
-      : (cfg->superblock_size == 128) ? AOM_SUPERBLOCK_SIZE_128X128
-                                      : AOM_SUPERBLOCK_SIZE_DYNAMIC;
+  extra_cfg->superblock_size = (cfg->superblock_size == 64)
+                                   ? AOM_SUPERBLOCK_SIZE_64X64
+                                   : (cfg->superblock_size == 128)
+                                         ? AOM_SUPERBLOCK_SIZE_128X128
+                                         : AOM_SUPERBLOCK_SIZE_DYNAMIC;
   extra_cfg->enable_warped_motion = cfg->enable_warped_motion;
   extra_cfg->enable_diff_wtd_comp = cfg->enable_diff_wtd_comp;
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -963,6 +974,9 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
       cfg->disable_ml_transform_speed_features;
   extra_cfg->disable_ml_partition_speed_features =
       cfg->disable_ml_partition_speed_features;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  extra_cfg->erp_pruning_level = cfg->erp_pruning_level;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   extra_cfg->enable_sdp = cfg->enable_sdp;
   extra_cfg->enable_mrls = cfg->enable_mrls;
 #if CONFIG_TIP
@@ -1043,9 +1057,9 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth,
     // At higher end of QP the slope of quant step-size grows exponentially,
     // captured by qp_threshold.
 
-    const int max_q = (bit_depth == AOM_BITS_8)    ? MAXQ_8_BITS
-                      : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS
-                                                   : MAXQ;
+    const int max_q = (bit_depth == AOM_BITS_8)
+                          ? MAXQ_8_BITS
+                          : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS : MAXQ;
 
     const int qp_threshold = (max_q * 7) / 10;
     if (qp < qp_threshold) {
@@ -1436,8 +1450,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   part_cfg->enable_1to4_partitions = extra_cfg->enable_1to4_partitions;
   part_cfg->enable_sdp = extra_cfg->enable_sdp;
 #if CONFIG_EXT_RECUR_PARTITIONS
-  part_cfg->disable_ml_partition_speed_features =
-      extra_cfg->disable_ml_partition_speed_features;
+  part_cfg->erp_pruning_level = extra_cfg->erp_pruning_level;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   part_cfg->min_partition_size = extra_cfg->min_partition_size;
   part_cfg->max_partition_size = extra_cfg->max_partition_size;
@@ -3535,6 +3548,9 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                  argv, err_string)) {
     extra_cfg.disable_ml_partition_speed_features =
         arg_parse_int_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.erp_pruning_level,
+                              argv, err_string)) {
+    extra_cfg.erp_pruning_level = arg_parse_int_helper(&arg, err_string);
   } else if (arg_match_helper(
                  &arg,
                  &g_av1_codec_arg_defs.disable_ml_transform_speed_features,
@@ -3998,6 +4014,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #else   // CONFIG_EXT_RECUR_PARTITIONS
         0,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_EXT_RECUR_PARTITIONS
+        4,  // aggressiveness for erp pruning
+#endif
         0, 1,   1,
 #if CONFIG_TIP
         1,
