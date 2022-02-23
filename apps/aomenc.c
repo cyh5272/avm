@@ -1440,85 +1440,36 @@ static void show_stream_config(struct stream_state *stream,
           "EdgeFilter (%d), PaethPredictor (%d)"
 #if CONFIG_MRLS
           ", MRLS(%d)"
-#endif
+#endif  // CONFIG_MRLS
 #if CONFIG_FORWARDSKIP
           ", FSC(%d)"
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
           ", ORIP(%d)"
-#endif
+#endif  // CONFIG_CONFIG_ORIP
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
           ", IBP(%d)"
-#endif
+#endif  // CONFIG_IBP_DC || CONFIG_IBP_DIR
           "\n",
-          encoder_cfg->enable_intra_edge_filter,
-
+          encoder_cfg->enable_intra_edge_filter, encoder_cfg->enable_paeth_intra
 #if CONFIG_MRLS
+          ,
+          encoder_cfg->enable_mrls
+#endif  //  CONFIG_MRLS
+#if CONFIG_FORWARDSKIP
+          ,
+          encoder_cfg->enable_fsc
+#endif  //  CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
+          ,
+          encoder_cfg->enable_orip
+#endif  //  CONFIG_ORIP
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_fsc,
-#endif  // CONFIG_FORWARDSKIP
-          encoder_cfg->enable_orip, encoder_cfg->enable_ibp);
-#else
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_fsc,
-#endif  // CONFIG_FORWARDSKIP
-          encoder_cfg->enable_orip);
-#endif
-#else
-#if CONFIG_IBP_DC || CONFIG_IBP_DIR
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_fsc,
-#endif  // CONFIG_FORWARDSKIP
-          encoder_cfg->enable_ibp);
-#else
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
-          encoder_cfg->enable_fsc);
-#else
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls);
-#endif  // CONFIG_FORWARDSKIP
-#endif
-#endif
-#else
-#if CONFIG_ORIP
-#if CONFIG_IBP_DC || CONFIG_IBP_DIR
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
-          encoder_cfg->enable_orip,
-#else
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip,
-#endif  // CONFIG_FORWARDSKIP
-          encoder_cfg->enable_ibp);
-#else
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
-          encoder_cfg->enable_orip);
-#else
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip);
-#endif  // CONFIG_FORWARDSKIP
-#endif
-#else
-#if CONFIG_IBP_DC || CONFIG_IBP_DIR
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc,
-          encoder_cfg->enable_ibp);
-#else
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_ibp);
-#endif  // CONFIG_FORWARDSKIP
-#else
-#if CONFIG_FORWARDSKIP
-          encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc);
-#else
-          encoder_cfg->enable_paeth_intra);
-#endif  // CONFIG_FORWARDSKIP
-#endif
-#endif
-#endif
+          ,
+          encoder_cfg->enable_ibp
+#endif  //  CONFIG_IBP_DC || CONFIG_IBP_DIR
+  );
+
   fprintf(stdout,
           "Tool setting (Inter)           : OBMC (%d), WarpMotion (%d), "
           "GlobalMotion (%d)\n",
