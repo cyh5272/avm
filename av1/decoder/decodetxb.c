@@ -127,28 +127,6 @@ static INLINE void read_coeffs_forward_2d(aom_reader *r, int start_si,
     const int nsymbs = 4;
     int level = aom_read_symbol(r, base_cdf[coeff_ctx], nsymbs, ACCT_STR);
     if (level > NUM_BASE_LEVELS) {
-      const int br_ctx = get_br_ctx_2d_skip(levels, pos, bwl);
-      aom_cdf_prob *cdf = br_cdf[br_ctx];
-      for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
-        const int k = aom_read_symbol(r, cdf, BR_CDF_SIZE, ACCT_STR);
-        level += k;
-        if (k < BR_CDF_SIZE - 1) break;
-      }
-    }
-    levels[get_padded_idx_left(pos, bwl)] = level;
-  }
-}
-
-static INLINE void read_coeffs_forward(aom_reader *r, int start_si, int end_si,
-                                       const int16_t *scan, int bwl,
-                                       uint8_t *levels, base_cdf_arr base_cdf,
-                                       br_cdf_arr br_cdf) {
-  for (int c = start_si; c <= end_si; c++) {
-    const int pos = scan[c];
-    const int coeff_ctx = get_upper_levels_ctx(levels, pos, bwl);
-    const int nsymbs = 4;
-    int level = aom_read_symbol(r, base_cdf[coeff_ctx], nsymbs, ACCT_STR);
-    if (level > NUM_BASE_LEVELS) {
       const int br_ctx = get_br_ctx_skip(levels, pos, bwl);
       aom_cdf_prob *cdf = br_cdf[br_ctx];
       for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
@@ -259,11 +237,6 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
   const TX_TYPE tx_type =
       av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
                       cm->features.reduced_tx_set_used);
-#if CONFIG_IST
-  const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
-#else
-  const TX_CLASS tx_class = tx_type_to_class[tx_type];
-#endif
   const qm_val_t *iqmatrix =
       av1_get_iqmatrix(&cm->quant_params, xd, plane, tx_size, tx_type);
   const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
@@ -278,13 +251,7 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
     memset(signs_buf, 0, sizeof(*signs_buf) * TX_PAD_2D);
     base_cdf_arr base_cdf = ec_ctx->coeff_base_cdf_idtx;
     br_cdf_arr br_cdf = ec_ctx->coeff_br_cdf_idtx;
-    if (tx_class == TX_CLASS_2D) {
-      read_coeffs_forward(r, 0, 0, scan, bwl, levels, base_cdf, br_cdf);
-      read_coeffs_forward_2d(r, 1, *eob - 1, scan, bwl, levels, base_cdf,
-                             br_cdf);
-    } else {
-      read_coeffs_forward(r, 0, *eob - 1, scan, bwl, levels, base_cdf, br_cdf);
-    }
+    read_coeffs_forward_2d(r, 0, *eob - 1, scan, bwl, levels, base_cdf, br_cdf);
   }
 
   for (int c = *eob - 1; c >= 0; --c) {

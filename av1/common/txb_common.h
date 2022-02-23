@@ -85,21 +85,6 @@ static INLINE int get_padded_idx_left(const int idx, const int bwl) {
  samples: levels[pos - 1] + levels[pos - stride] and adds an
  appropriate offset depending on row and column.
 */
-static INLINE int get_br_ctx_2d_skip(const uint8_t *const levels,
-                                     const int c,  // raster order
-                                     const int bwl) {
-  assert(c > 0);
-  const int row = (c >> bwl);
-  const int col = (c - (row << bwl)) + TX_PAD_LEFT;
-  const int stride = (1 << bwl) + TX_PAD_LEFT;
-  const int pos = row * stride + col;
-  int mag = AOMMIN(levels[pos - 1], MAX_BASE_BR_RANGE) +
-            AOMMIN(levels[pos - stride], MAX_BASE_BR_RANGE);
-  mag = AOMMIN(mag, 6);
-  if ((row < 2) && (col < (2 + TX_PAD_LEFT))) return mag;
-  return mag + 7;
-}
-
 static AOM_FORCE_INLINE int get_br_ctx_skip(const uint8_t *const levels,
                                             const int c, const int bwl) {
   const int row = c >> bwl;
@@ -343,13 +328,6 @@ static INLINE int get_upper_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
   const int col = (coeff_idx - (row << bwl)) + TX_PAD_LEFT;
   if ((row < 2) && (col < (2 + TX_PAD_LEFT))) return ctx;
   return ctx + 7;
-}
-
-static AOM_FORCE_INLINE int get_upper_levels_ctx(const uint8_t *levels,
-                                                 int coeff_idx, int bwl) {
-  const int stats =
-      get_nz_mag_skip(levels + get_padded_idx_left(coeff_idx, bwl), bwl);
-  return get_nz_map_ctx_from_stats_skip(stats, coeff_idx, bwl);
 }
 #endif  // CONFIG_FORWARDSKIP
 
