@@ -235,7 +235,7 @@ static uint8_t read_fsc_mode(aom_reader *r, aom_cdf_prob *fsc_cdf) {
   const uint8_t fsc_mode = aom_read_symbol(r, fsc_cdf, FSC_MODES, ACCT_STR);
   return fsc_mode;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if !CONFIG_AIMC
 static UV_PREDICTION_MODE read_intra_mode_uv(FRAME_CONTEXT *ec_ctx,
@@ -870,7 +870,7 @@ void av1_read_tx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd, int blk_row,
         *tx_type = IDTX;
         return;
       }
-#endif
+#endif  // CONFIG_FORWARDSKIP
       const PREDICTION_MODE intra_mode =
           mbmi->filter_intra_mode_info.use_filter_intra
               ? fimode_to_intradir[mbmi->filter_intra_mode_info
@@ -884,7 +884,7 @@ void av1_read_tx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd, int blk_row,
       *tx_type = av1_ext_tx_inv[tx_set_type][aom_read_symbol(
           r, ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_mode],
           av1_num_ext_tx_set[tx_set_type], ACCT_STR)];
-#endif
+#endif  // CONFIG_FORWARDSKIP
     }
   }
 }
@@ -990,7 +990,7 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #if CONFIG_FORWARDSKIP
     mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
     mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
     mbmi->uv_mode = UV_DC_PRED;
     mbmi->interp_fltr = BILINEAR;
     mbmi->motion_mode = SIMPLE_TRANSLATION;
@@ -1229,7 +1229,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
     } else {
       mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
     }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #else
   mbmi->mode = read_intra_mode(r, get_y_mode_cdf(ec_ctx, above_mi, left_mi));
 #if CONFIG_FORWARDSKIP
@@ -1240,7 +1240,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   } else {
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_SDP
   mbmi->angle_delta[PLANE_TYPE_Y] =
       (use_angle_delta && av1_is_directional_mode(mbmi->mode))
@@ -1622,10 +1622,11 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   } else {
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #else
   const int use_angle_delta = av1_use_angle_delta(bsize);
   mbmi->mode = read_intra_mode(r, ec_ctx->y_mode_cdf[size_group_lookup[bsize]]);
+
 #if CONFIG_FORWARDSKIP
   if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
     const MB_MODE_INFO *above_mi = xd->above_mbmi;
@@ -1639,7 +1640,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   } else {
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_SDP
   mbmi->angle_delta[PLANE_TYPE_Y] =
       use_angle_delta && av1_is_directional_mode(mbmi->mode)
@@ -2014,7 +2015,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
   mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
   av1_collect_neighbors_ref_counts(xd);
 
@@ -2311,7 +2312,7 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
   mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
   if (!cm->seg.segid_preskip)
     mbmi->segment_id = read_inter_segment_id(cm, xd, 0, r);
 

@@ -276,7 +276,7 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   /*!\brief enable Offset based refinement of Intra prediction
    *

@@ -277,7 +277,7 @@ typedef struct {
    * Flag to indicate if forward skip coding is enabled
    */
   bool enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   /*!
    * Flag to indicate if ORIP should be enabled
@@ -1170,7 +1170,7 @@ typedef struct FRAME_COUNTS {
 #endif
 #if CONFIG_FORWARDSKIP
   unsigned int fsc_mode[FSC_MODE_CONTEXTS][FSC_BSIZE_CONTEXTS][FSC_MODES];
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_MRLS
   unsigned int mrl_index[MRL_LINE_NUMBER];
 #endif
@@ -1206,7 +1206,7 @@ typedef struct FRAME_COUNTS {
                                    [BR_CDF_SIZE];
   unsigned int coeff_base_multi_skip[TOKEN_CDF_Q_CTXS][IDTX_SIG_COEF_CONTEXTS]
                                     [NUM_BASE_LEVELS + 2];
-#endif
+#endif  // CONFIG_FORWARDSKIP
   unsigned int coeff_lps[TX_SIZES][PLANE_TYPES][BR_CDF_SIZE - 1][LEVEL_CONTEXTS]
                         [2];
   unsigned int eob_flag[TX_SIZES][PLANE_TYPES][EOB_COEF_CONTEXTS][2];

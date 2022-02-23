@@ -148,7 +148,7 @@ static const aom_cdf_prob
                                                   { AOM_CDF2(307) },
                                                   { AOM_CDF2(32759) },
                                                   { AOM_CDF2(108) } } };
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static const aom_cdf_prob
     av1_default_dc_sign_cdfs[TOKEN_CDF_Q_CTXS][PLANE_TYPES][DC_SIGN_CONTEXTS]
@@ -207,7 +207,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(32117) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31548) }, { AOM_CDF2(1549) },  { AOM_CDF2(10130) },
           { AOM_CDF2(16656) }, { AOM_CDF2(18591) }, { AOM_CDF2(26308) },
           { AOM_CDF2(32537) }, { AOM_CDF2(5403) },  { AOM_CDF2(18096) },
@@ -218,7 +218,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(29957) }, { AOM_CDF2(5391) },  { AOM_CDF2(18039) },
           { AOM_CDF2(23566) }, { AOM_CDF2(22431) }, { AOM_CDF2(25822) },
           { AOM_CDF2(32197) }, { AOM_CDF2(3778) },  { AOM_CDF2(15336) },
@@ -229,7 +229,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(17920) }, { AOM_CDF2(1818) },  { AOM_CDF2(7282) },
           { AOM_CDF2(25273) }, { AOM_CDF2(10923) }, { AOM_CDF2(31554) },
           { AOM_CDF2(32624) }, { AOM_CDF2(1366) },  { AOM_CDF2(15628) },
@@ -240,7 +240,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(31657) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(6308) },  { AOM_CDF2(117) },   { AOM_CDF2(1638) },
           { AOM_CDF2(2161) },  { AOM_CDF2(16384) }, { AOM_CDF2(10923) },
           { AOM_CDF2(30247) }, { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
@@ -251,7 +251,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } } },
 #else
                                                    { AOM_CDF2(16384) } } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
       { { { AOM_CDF2(30371) }, { AOM_CDF2(7570) },  { AOM_CDF2(13155) },
           { AOM_CDF2(20751) }, { AOM_CDF2(20969) }, { AOM_CDF2(27067) },
           { AOM_CDF2(32013) }, { AOM_CDF2(5495) },  { AOM_CDF2(17942) },
@@ -262,7 +262,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(23700) }, { AOM_CDF2(31844) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31782) }, { AOM_CDF2(1836) },  { AOM_CDF2(10689) },
           { AOM_CDF2(17604) }, { AOM_CDF2(21622) }, { AOM_CDF2(27518) },
           { AOM_CDF2(32399) }, { AOM_CDF2(4419) },  { AOM_CDF2(16294) },
@@ -273,7 +273,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(22617) }, { AOM_CDF2(26771) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31901) }, { AOM_CDF2(10311) }, { AOM_CDF2(18047) },
           { AOM_CDF2(24806) }, { AOM_CDF2(23288) }, { AOM_CDF2(27914) },
           { AOM_CDF2(32296) }, { AOM_CDF2(4215) },  { AOM_CDF2(15756) },
@@ -284,7 +284,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(26726) }, { AOM_CDF2(1045) },  { AOM_CDF2(11703) },
           { AOM_CDF2(20590) }, { AOM_CDF2(18554) }, { AOM_CDF2(25970) },
           { AOM_CDF2(31938) }, { AOM_CDF2(5583) },  { AOM_CDF2(21313) },
@@ -295,7 +295,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(31452) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(26584) }, { AOM_CDF2(188) },   { AOM_CDF2(8847) },
           { AOM_CDF2(24519) }, { AOM_CDF2(22938) }, { AOM_CDF2(30583) },
           { AOM_CDF2(32608) }, { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
@@ -306,7 +306,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } } },
 #else
                                                    { AOM_CDF2(16384) } } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
       { { { AOM_CDF2(29614) }, { AOM_CDF2(9068) },  { AOM_CDF2(12924) },
           { AOM_CDF2(19538) }, { AOM_CDF2(17737) }, { AOM_CDF2(24619) },
           { AOM_CDF2(30642) }, { AOM_CDF2(4119) },  { AOM_CDF2(16026) },
@@ -317,7 +317,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(21712) }, { AOM_CDF2(29393) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31957) }, { AOM_CDF2(3230) },  { AOM_CDF2(11153) },
           { AOM_CDF2(18123) }, { AOM_CDF2(20143) }, { AOM_CDF2(26536) },
           { AOM_CDF2(31986) }, { AOM_CDF2(3050) },  { AOM_CDF2(14603) },
@@ -328,7 +328,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16117) }, { AOM_CDF2(23916) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(32363) }, { AOM_CDF2(10692) }, { AOM_CDF2(19090) },
           { AOM_CDF2(24357) }, { AOM_CDF2(24442) }, { AOM_CDF2(28312) },
           { AOM_CDF2(32169) }, { AOM_CDF2(3648) },  { AOM_CDF2(15690) },
@@ -339,7 +339,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(30669) }, { AOM_CDF2(3832) },  { AOM_CDF2(11663) },
           { AOM_CDF2(18889) }, { AOM_CDF2(19782) }, { AOM_CDF2(23313) },
           { AOM_CDF2(31330) }, { AOM_CDF2(5124) },  { AOM_CDF2(18719) },
@@ -350,7 +350,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(29443) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(28573) }, { AOM_CDF2(3183) },  { AOM_CDF2(17802) },
           { AOM_CDF2(25977) }, { AOM_CDF2(26677) }, { AOM_CDF2(27832) },
           { AOM_CDF2(32387) }, { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
@@ -361,7 +361,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } } },
 #else
                                                    { AOM_CDF2(16384) } } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
       { { { AOM_CDF2(26887) }, { AOM_CDF2(6729) },  { AOM_CDF2(10361) },
           { AOM_CDF2(17442) }, { AOM_CDF2(15045) }, { AOM_CDF2(22478) },
           { AOM_CDF2(29072) }, { AOM_CDF2(2713) },  { AOM_CDF2(11861) },
@@ -372,7 +372,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(20746) }, { AOM_CDF2(26270) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31903) }, { AOM_CDF2(2044) },  { AOM_CDF2(7528) },
           { AOM_CDF2(14618) }, { AOM_CDF2(16182) }, { AOM_CDF2(24168) },
           { AOM_CDF2(31037) }, { AOM_CDF2(2786) },  { AOM_CDF2(11194) },
@@ -383,7 +383,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16048) }, { AOM_CDF2(20878) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(32510) }, { AOM_CDF2(8430) },  { AOM_CDF2(17318) },
           { AOM_CDF2(24154) }, { AOM_CDF2(23674) }, { AOM_CDF2(28789) },
           { AOM_CDF2(32139) }, { AOM_CDF2(3440) },  { AOM_CDF2(13117) },
@@ -394,7 +394,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(16384) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31671) }, { AOM_CDF2(2056) },  { AOM_CDF2(11746) },
           { AOM_CDF2(16852) }, { AOM_CDF2(18635) }, { AOM_CDF2(24715) },
           { AOM_CDF2(31484) }, { AOM_CDF2(4656) },  { AOM_CDF2(16074) },
@@ -405,7 +405,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
           { AOM_CDF2(16384) }, { AOM_CDF2(16384) } },
 #else
                                                    { AOM_CDF2(25336) } },
-#endif
+#endif  // CONFIG_FORWARDSKIP
         { { AOM_CDF2(31539) }, { AOM_CDF2(8433) },  { AOM_CDF2(20576) },
           { AOM_CDF2(27904) }, { AOM_CDF2(27852) }, { AOM_CDF2(30026) },
           { AOM_CDF2(32441) }, { AOM_CDF2(16384) }, { AOM_CDF2(16384) },
@@ -417,7 +417,7 @@ static const aom_cdf_prob av1_default_txb_skip_cdfs
     };
 #else
                                                    { AOM_CDF2(16384) } } } };
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_CONTEXT_DERIVATION
 static const aom_cdf_prob
@@ -1157,7 +1157,7 @@ static const aom_cdf_prob
                                              { AOM_CDF4(14818, 22048, 30042) },
                                              { AOM_CDF4(13384, 20248, 26029) } }
                                          };
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static const aom_cdf_prob av1_default_coeff_lps_multi_cdfs
     [TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES][LEVEL_CONTEXTS]
@@ -1983,7 +1983,7 @@ static const aom_cdf_prob av1_default_coeff_base_multi_cdfs_idtx
                                           { AOM_CDF4(4206, 10098, 20341) },
                                           { AOM_CDF4(2674, 5476, 12215) },
                                           { AOM_CDF4(1568, 3054, 5228) } } };
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static const aom_cdf_prob av1_default_coeff_base_multi_cdfs
     [TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES][SIG_COEF_CONTEXTS]

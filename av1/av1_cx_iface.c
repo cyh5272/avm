@@ -120,7 +120,7 @@ struct av1_extracfg {
 #endif              // CONFIG_MRLS
 #if CONFIG_FORWARDSKIP
   int enable_fsc;  // enable forward skip coding
-#endif
+#endif             // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   int enable_orip;  // enable ORIP
 #endif              // CONFIG_ORIP
@@ -413,8 +413,8 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable multiple reference line selection
 #endif  // CONFIG_MRLS
 #if CONFIG_FORWARDSKIP
-  1,  // enable forward skip coding
-#endif
+  1,    // enable forward skip coding
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   1,    // enable ORIP
 #endif  // CONFIG_ORIP
@@ -884,7 +884,7 @@ static void update_encoder_config(cfg_options_t *cfg,
 #endif
 #if CONFIG_FORWARDSKIP
   cfg->enable_fsc = extra_cfg->enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   cfg->enable_orip = extra_cfg->enable_orip;
 #endif
@@ -968,7 +968,7 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #endif
 #if CONFIG_FORWARDSKIP
   extra_cfg->enable_fsc = cfg->enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   extra_cfg->enable_orip = cfg->enable_orip;
 #endif
@@ -1457,7 +1457,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
 #endif
 #if CONFIG_FORWARDSKIP
   intra_mode_cfg->enable_fsc = extra_cfg->enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   intra_mode_cfg->enable_orip = extra_cfg->enable_orip;
 #endif
@@ -3554,7 +3554,7 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_fsc, argv,
                               err_string)) {
     extra_cfg.enable_fsc = arg_parse_int_helper(&arg, err_string);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_orip, argv,
                               err_string)) {
@@ -3993,7 +3993,7 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #endif
 #if CONFIG_FORWARDSKIP
         1,
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
         1,
 #endif

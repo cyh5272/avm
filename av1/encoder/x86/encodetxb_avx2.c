@@ -281,7 +281,7 @@ void av1_txb_init_levels_signs_avx2(const tran_low_t *const coeff,
     } while (i < height);
   }
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
                               const int height, uint8_t *const levels) {

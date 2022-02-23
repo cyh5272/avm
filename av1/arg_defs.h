@@ -148,7 +148,7 @@ typedef struct av1_codec_arg_definitions {
 #endif
 #if CONFIG_FORWARDSKIP
   arg_def_t enable_fsc;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   arg_def_t enable_orip;
 #endif

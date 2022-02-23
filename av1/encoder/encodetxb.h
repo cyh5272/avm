@@ -26,13 +26,14 @@ extern "C" {
 #endif
 
 /*!\cond */
+
 #if CONFIG_FORWARDSKIP
 #define TXB_SKIP_CTX_MASK 31
 #define DC_SIGN_CTX_SHIFT 5
 #else
 #define TXB_SKIP_CTX_MASK 15
 #define DC_SIGN_CTX_SHIFT 4
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #define DC_SIGN_CTX_MASK 3
 
 typedef struct TxbInfo {
@@ -85,6 +86,8 @@ void av1_free_txb_buf(AV1_COMP *cpi);
  *
  * \ingroup coefficient_coding
  *
+ * \param[in]    cm                   Top-level structure shared by encoder and
+ * decoder
  * \param[in]    x                    Pointer to structure holding the data for
  the current encoding macroblock.
  * \param[in]    plane                The index of the current plane.
@@ -100,14 +103,13 @@ void av1_free_txb_buf(AV1_COMP *cpi);
  * \param[in]    reduced_tx_set_used  Whether the transform type is chosen from
  * a reduced set.
  */
+int av1_cost_coeffs_txb(
 #if CONFIG_FORWARDSKIP
-int av1_cost_coeffs_txb(const AV1_COMMON *cm, const MACROBLOCK *x,
-                        const int plane, const int block,
-#else
-int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
-#endif
-                        const TX_SIZE tx_size, const TX_TYPE tx_type,
-                        const TXB_CTX *const txb_ctx, int reduced_tx_set_used);
+    const AV1_COMMON *cm,
+#endif  // CONFIG_FORWARDSKIP
+    const MACROBLOCK *x, const int plane, const int block,
+    const TX_SIZE tx_size, const TX_TYPE tx_type, const TXB_CTX *const txb_ctx,
+    int reduced_tx_set_used);
 
 /*!\brief Estimate the entropy cost of coding a transform block using Laplacian
  * distribution.
@@ -126,6 +128,8 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
  * Compared to \ref av1_cost_coeffs_txb, this function is much faster but less
  * accurate.
  *
+ * \param[in]    cm             Top-level structure shared by encoder and
+ * decoder
  * \param[in]    x              Pointer to structure holding the data for the
                                 current encoding macroblock
  * \param[in]    plane          The index of the current plane
@@ -144,17 +148,13 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
  * \return       int            Estimated entropy cost of coding the transform
  block.
  */
+int av1_cost_coeffs_txb_laplacian(
 #if CONFIG_FORWARDSKIP
-int av1_cost_coeffs_txb_laplacian(const AV1_COMMON *cm, const MACROBLOCK *x,
-                                  const int plane,
-#else
-int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
-#endif
-                                  const int block, const TX_SIZE tx_size,
-                                  const TX_TYPE tx_type,
-                                  const TXB_CTX *const txb_ctx,
-                                  const int reduced_tx_set_used,
-                                  const int adjust_eob);
+    const AV1_COMMON *cm,
+#endif  // CONFIG_FORWARDSKIP
+    const MACROBLOCK *x, const int plane, const int block,
+    const TX_SIZE tx_size, const TX_TYPE tx_type, const TXB_CTX *const txb_ctx,
+    const int reduced_tx_set_used, const int adjust_eob);
 
 /*!\brief Estimate the entropy cost of transform coefficients using Laplacian
  * distribution.
@@ -329,7 +329,7 @@ int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
 void av1_write_coeffs_txb_skip(const AV1_COMMON *const cm, MACROBLOCK *const x,
                                aom_writer *w, int blk_row, int blk_col,
                                int plane, int block, TX_SIZE tx_size);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 /*!\brief Write quantized coefficients of all transform blocks in an intra
  * macroblock into the bitstream using entropy coding.
@@ -467,7 +467,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
 void av1_update_and_record_txb_skip_context(int plane, int block, int blk_row,
                                             int blk_col, BLOCK_SIZE plane_bsize,
                                             TX_SIZE tx_size, void *arg);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 /*!\brief Adjust the magnitude of quantized coefficients to achieve better
  * rate-distortion (RD) trade-off.

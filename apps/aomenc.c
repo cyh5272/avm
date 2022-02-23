@@ -429,7 +429,7 @@ const arg_def_t *av1_key_val_args[] = {
 #endif
 #if CONFIG_FORWARDSKIP
   &g_av1_codec_arg_defs.enable_fsc,
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   &g_av1_codec_arg_defs.enable_orip,
 #endif
@@ -600,7 +600,7 @@ static void init_config(cfg_options_t *config) {
 #endif
 #if CONFIG_FORWARDSKIP
   config->enable_fsc = 1;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   config->enable_orip = 1;
 #endif
@@ -1443,7 +1443,7 @@ static void show_stream_config(struct stream_state *stream,
 #endif
 #if CONFIG_FORWARDSKIP
           ", FSC(%d)"
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
           ", ORIP(%d)"
 #endif
@@ -1459,13 +1459,13 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
 #if CONFIG_FORWARDSKIP
           encoder_cfg->enable_fsc,
-#endif
+#endif  // CONFIG_FORWARDSKIP
           encoder_cfg->enable_orip, encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
 #if CONFIG_FORWARDSKIP
           encoder_cfg->enable_fsc,
-#endif
+#endif  // CONFIG_FORWARDSKIP
           encoder_cfg->enable_orip);
 #endif
 #else
@@ -1473,7 +1473,7 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls,
 #if CONFIG_FORWARDSKIP
           encoder_cfg->enable_fsc,
-#endif
+#endif  // CONFIG_FORWARDSKIP
           encoder_cfg->enable_ibp);
 #else
 #if CONFIG_FORWARDSKIP
@@ -1481,7 +1481,7 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_fsc);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_mrls);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #endif
 #endif
 #else
@@ -1492,7 +1492,7 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_orip,
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip,
-#endif
+#endif  // CONFIG_FORWARDSKIP
           encoder_cfg->enable_ibp);
 #else
 #if CONFIG_FORWARDSKIP
@@ -1500,7 +1500,7 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_orip);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_orip);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #endif
 #else
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
@@ -1509,13 +1509,13 @@ static void show_stream_config(struct stream_state *stream,
           encoder_cfg->enable_ibp);
 #else
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_ibp);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #else
 #if CONFIG_FORWARDSKIP
           encoder_cfg->enable_paeth_intra, encoder_cfg->enable_fsc);
 #else
           encoder_cfg->enable_paeth_intra);
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #endif
 #endif
 #endif

@@ -104,7 +104,7 @@ static const aom_cdf_prob
                                                     { AOM_CDF2(31947) },
                                                     { AOM_CDF2(32203) },
                                                     { AOM_CDF2(32283) } } };
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_AIMC
 static const aom_cdf_prob default_y_mode_set_cdf[CDF_SIZE(INTRA_MODE_SETS)] = {
@@ -342,7 +342,6 @@ static const aom_cdf_prob default_partition_cdf[PARTITION_CONTEXTS][CDF_SIZE(
 };
 #endif
 
-#if CONFIG_FORWARDSKIP
 static const aom_cdf_prob default_intra_ext_tx_cdf
     [EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES][CDF_SIZE(TX_TYPES)] = {
       {
@@ -407,6 +406,7 @@ static const aom_cdf_prob default_intra_ext_tx_cdf
               { 0 },
           },
       },
+#if CONFIG_FORWARDSKIP
       {
           {
               { AOM_CDF6(4509, 4513, 6614, 19602, 25868) },
@@ -531,72 +531,7 @@ static const aom_cdf_prob default_intra_ext_tx_cdf
               { AOM_CDF4(8192, 16384, 24576) },
           },
       }
-    };
 #else
-static const aom_cdf_prob default_intra_ext_tx_cdf
-    [EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES][CDF_SIZE(TX_TYPES)] = {
-      {
-          {
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-          },
-          {
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-          },
-          {
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-          },
-          {
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-              { 0 },
-          },
-      },
       {
           {
               { AOM_CDF7(1535, 8035, 9461, 12751, 23467, 27825) },
@@ -721,8 +656,8 @@ static const aom_cdf_prob default_intra_ext_tx_cdf
               { AOM_CDF5(6554, 13107, 19661, 26214) },
           },
       },
+#endif  // CONFIG_FORWARDSKIP
     };
-#endif
 
 static const aom_cdf_prob
     default_inter_ext_tx_cdf[EXT_TX_SETS_INTER][EXT_TX_SIZES][CDF_SIZE(
@@ -1725,7 +1660,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif
 #if CONFIG_FORWARDSKIP
   av1_copy(fc->fsc_mode_cdf, default_fsc_mode_cdf);
-#endif
+#endif  // CONFIG_FORWARDSKIP
   av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
   av1_copy(fc->partition_cdf, default_partition_cdf);
   av1_copy(fc->intra_ext_tx_cdf, default_intra_ext_tx_cdf);

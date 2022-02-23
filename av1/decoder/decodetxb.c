@@ -18,7 +18,7 @@
 #include "av1/common/txb_common.h"
 #if CONFIG_FORWARDSKIP
 #include "av1/common/reconintra.h"
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #include "av1/decoder/decodemv.h"
 
 #define ACCT_STR __func__
@@ -173,8 +173,6 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   if (plane == AOM_PLANE_U) {
     xd->eob_u = 0;
   }
-#endif
-#if CONFIG_CONTEXT_DERIVATION
   int txb_skip_ctx = txb_ctx->txb_skip_ctx;
   int all_zero;
   if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
@@ -188,7 +186,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #else
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);
-#endif
+#endif  // CONFIG_CONTEXT_DERIVATION
 
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
   uint16_t *const eob = &(eob_data->eob);
@@ -196,7 +194,6 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   *max_scan_line = 0;
   *eob = 0;
 
-#if CONFIG_FORWARDSKIP
 #if CONFIG_INSPECTION
   MB_MODE_INFO *const mbmi = xd->mi[0];
   if (plane == 0) {
@@ -205,17 +202,16 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         av1_get_txk_type_index(mbmi->sb_type[0], blk_row, blk_col);
 #else
         av1_get_txk_type_index(mbmi->sb_type, blk_row, blk_col);
-#endif
+#endif  // CONFIG_SDP
     mbmi->tx_skip[txk_type_idx] = all_zero;
   }
-#endif
-#endif
+#endif  // CONFIG_INSPECTION
 
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = all_zero ? 0 : 1;
   }
-#endif
+#endif  // CONFIG_CONTEXT_DERIVATION
 
   if (all_zero) {
     *max_scan_line = 0;
@@ -331,7 +327,7 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
   set_dc_sign(&cul_level, dc_val);
   return cul_level;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
                             aom_reader *const r, const int blk_row,
@@ -381,7 +377,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);
 #endif  // CONFIG_CONTEXT_DERIVATION
-#endif
+#endif  // CONFIG_FORWARDSKIP
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
   uint16_t *const eob = &(eob_data->eob);
   uint16_t *const max_scan_line = &(eob_data->max_scan_line);
@@ -400,7 +396,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     mbmi->tx_skip[txk_type_idx] = all_zero;
   }
 #endif
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if DEBUG_EXTQUANT
   fprintf(cm->fDecCoeffLog,
@@ -408,6 +404,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
           " blk_col = %d, plane = %d, tx_size = %d ",
           xd->mi_row, xd->mi_col, blk_row, blk_col, plane, tx_size);
 #endif
+
 #if !CONFIG_FORWARDSKIP
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
@@ -427,7 +424,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     // only y plane's tx_type is transmitted
     av1_read_tx_type(cm, xd, blk_row, blk_col, tx_size, r);
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
   const TX_TYPE tx_type =
       av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
                       cm->features.reduced_tx_set_used);
@@ -508,11 +505,13 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     }
   }
   *eob = rec_eob_pos(eob_pt, eob_extra);
+
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u = *eob;
   }
 #endif  // CONFIG_CONTEXT_DERIVATION
+
 #if CONFIG_IST
   // read  sec_tx_type here
   // Only y plane's sec_tx_type is transmitted
@@ -528,7 +527,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     memset(levels_buf, 0,
            sizeof(*levels_buf) *
                ((width + TX_PAD_HOR) * (height + TX_PAD_VER) + TX_PAD_END));
-#endif
+#endif  // CONFIG_FORWARDSKIP
   }
 
 #if DEBUG_EXTQUANT
@@ -697,7 +696,7 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
          get_primary_tx_type(tx_type) == IDTX && plane == PLANE_TYPE_Y) ||
 #else
          tx_type == IDTX && plane == PLANE_TYPE_Y) ||
-#endif
+#endif  // CONFIG_IST
         use_inter_fsc(cm, plane, tx_type, is_inter)) {
       cul_level =
           av1_read_coeffs_txb_skip(cm, dcb, r, row, col, plane, tx_size);
@@ -711,7 +710,7 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
               pd->left_entropy_context + row, &txb_ctx);
   const uint8_t cul_level =
       av1_read_coeffs_txb(cm, dcb, r, row, col, plane, &txb_ctx, tx_size);
-#endif
+#endif  // CONFIG_FORWARDSKIP
   av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, cul_level, col,
                            row);
 #if CONFIG_SDP
@@ -724,7 +723,8 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
     // tx_type will be read out in av1_read_coeffs_txb_facade
     const TX_TYPE tx_type = av1_get_tx_type(xd, plane_type, row, col, tx_size,
                                             cm->features.reduced_tx_set_used);
-#endif
+#endif  // CONFIG_FORWARDSKIP
+
     if (plane == 0) {
       const int txw = tx_size_wide_unit[tx_size];
       const int txh = tx_size_high_unit[tx_size];

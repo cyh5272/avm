@@ -562,7 +562,7 @@ void av1_get_nz_map_contexts_skip_sse2(const uint8_t *const levels,
     get_16n_coeff_contexts_2d_skip_sse2(levels, width, height, coeff_contexts);
   }
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 // Note: levels[] must be in the range [0, 127], inclusive.
 void av1_get_nz_map_contexts_sse2(const uint8_t *const levels,

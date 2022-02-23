@@ -38,13 +38,13 @@ extern "C" {
 #define TXB_SKIP_CONTEXTS 20
 #else
 #define TXB_SKIP_CONTEXTS 13
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_FORWARDSKIP
 #define IDTX_SIGN_CONTEXTS 9
 #define IDTX_SIG_COEF_CONTEXTS 14
 #define IDTX_LEVEL_CONTEXTS 14
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #define EOB_COEF_CONTEXTS 9
 

@@ -53,7 +53,7 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
            av1_default_coeff_base_multi_cdfs_idtx[index]);
   av1_copy(cm->fc->coeff_br_cdf_idtx,
            av1_default_coeff_lps_multi_cdfs_idtx[index]);
-#endif
+#endif  // CONFIG_FORWARDSKIP
   av1_copy(cm->fc->coeff_base_eob_cdf,
            av1_default_coeff_base_eob_multi_cdfs[index]);
   av1_copy(cm->fc->eob_flag_cdf16, av1_default_eob_multi16_cdfs[index]);
@@ -128,7 +128,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->idtx_sign_cdf, 2);
   RESET_CDF_COUNTER(fc->coeff_base_cdf_idtx, 4);
   RESET_CDF_COUNTER(fc->coeff_br_cdf_idtx, BR_CDF_SIZE);
-#endif
+#endif  // CONFIG_FORWARDSKIP
   RESET_CDF_COUNTER(fc->coeff_br_cdf, BR_CDF_SIZE);
 #if CONFIG_NEW_INTER_MODES
   RESET_CDF_COUNTER(fc->inter_single_mode_cdf, INTER_SINGLE_MODES);
@@ -201,7 +201,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #endif
 #if CONFIG_FORWARDSKIP
   RESET_CDF_COUNTER(fc->fsc_mode_cdf, FSC_MODES);
-#endif
+#endif  // CONFIG_FORWARDSKIP
   RESET_CDF_COUNTER(fc->filter_intra_cdfs, 2);
   RESET_CDF_COUNTER(fc->filter_intra_mode_cdf, FILTER_INTRA_MODES);
   RESET_CDF_COUNTER(fc->switchable_restore_cdf, RESTORE_SWITCHABLE_TYPES);
@@ -271,13 +271,10 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   for (int i = 0; i < FRAME_LF_COUNT; i++) {
     RESET_CDF_COUNTER(fc->delta_lf_multi_cdf[i], DELTA_LF_PROBS + 1);
   }
-#if CONFIG_FORWARDSKIP
-  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[1], 6, CDF_SIZE(TX_TYPES));
-  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[2], 4, CDF_SIZE(TX_TYPES));
-#else
-  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[1], 7, CDF_SIZE(TX_TYPES));
-  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[2], 5, CDF_SIZE(TX_TYPES));
-#endif
+  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[1], INTRA_TX_SET1,
+                           CDF_SIZE(TX_TYPES));
+  RESET_CDF_COUNTER_STRIDE(fc->intra_ext_tx_cdf[2], INTRA_TX_SET2,
+                           CDF_SIZE(TX_TYPES));
   RESET_CDF_COUNTER_STRIDE(fc->inter_ext_tx_cdf[1], 16, CDF_SIZE(TX_TYPES));
   RESET_CDF_COUNTER_STRIDE(fc->inter_ext_tx_cdf[2], 12, CDF_SIZE(TX_TYPES));
   RESET_CDF_COUNTER_STRIDE(fc->inter_ext_tx_cdf[3], 2, CDF_SIZE(TX_TYPES));

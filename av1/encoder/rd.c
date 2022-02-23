@@ -138,7 +138,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->fsc_mode_cdf[i][j], NULL);
     }
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_AIMC
   av1_cost_tokens_from_cdf(mode_costs->y_primary_flag_cost, fc->y_mode_set_cdf,
@@ -285,7 +285,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
               av1_ext_tx_inv_intra[av1_ext_tx_set_idx_to_type[0][s]]);
 #else
               av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[0][s]]);
-#endif
+#endif  // CONFIG_FORWARDSKIP
         }
       }
     }
@@ -867,7 +867,7 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       }
     }
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 }
 
 void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,

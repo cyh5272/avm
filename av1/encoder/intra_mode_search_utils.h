@@ -261,7 +261,7 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
   const int use_fsc = mbmi->fsc_mode[PLANE_TYPE_Y];
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_SDP
   const int try_palette =
       av1_allow_palette(cpi->common.features.allow_screen_content_tools,
@@ -304,7 +304,7 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
     total_rate +=
         mode_costs->fsc_cost[fsc_ctx][fsc_bsize_groups[bsize]][use_fsc];
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
   if (av1_filter_intra_allowed(&cpi->common, mbmi)) {
 #if CONFIG_SDP
     total_rate +=

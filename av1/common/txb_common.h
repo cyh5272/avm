@@ -68,14 +68,23 @@ static INLINE int get_padded_idx(const int idx, const int bwl) {
 }
 
 #if CONFIG_FORWARDSKIP
+// This function sets the signs buffer for coefficient coding.
 static INLINE int8_t *set_signs(int8_t *const signs_buf, const int width) {
   return signs_buf + TX_PAD_TOP * (width + TX_PAD_HOR);
 }
 
+// This function returns the coefficient index after left padding.
 static INLINE int get_padded_idx_left(const int idx, const int bwl) {
   return TX_PAD_LEFT + idx + ((idx >> bwl) << TX_PAD_HOR_LOG2);
 }
 
+/*
+ This function returns the base range coefficient coding context index
+ for forward skip residual coding for a given coefficient index.
+ It assumes padding from left and sums left and above level
+ samples: levels[pos - 1] + levels[pos - stride] and adds an
+ appropriate offset depending on row and column.
+*/
 static INLINE int get_br_ctx_2d_skip(const uint8_t *const levels,
                                      const int c,  // raster order
                                      const int bwl) {
@@ -103,7 +112,7 @@ static AOM_FORCE_INLINE int get_br_ctx_skip(const uint8_t *const levels,
   if ((row < 2) && (col < (2 + TX_PAD_LEFT))) return mag;
   return mag + 7;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static INLINE int get_br_ctx_2d(const uint8_t *const levels,
                                 const int c,  // raster order
@@ -183,6 +192,7 @@ static const uint8_t clip_max3[256] = {
 };
 
 #if CONFIG_FORWARDSKIP
+// This function returns the neighboring left + above levels with clipping.
 static AOM_FORCE_INLINE int get_nz_mag_skip(const uint8_t *const levels,
                                             const int bwl) {
   int mag = clip_max3[levels[-1]];                      // { 0, -1 }
@@ -190,6 +200,11 @@ static AOM_FORCE_INLINE int get_nz_mag_skip(const uint8_t *const levels,
   return mag;
 }
 
+/*
+ This helper function computes the sign context index for FSC residual
+ coding for a given coefficient index. Bottom, left and bottom-left
+ samples are used to derive the index.
+*/
 static AOM_FORCE_INLINE int get_sign_skip(const int8_t *const signs,
                                           const uint8_t *const levels,
                                           const int bwl) {
@@ -206,6 +221,7 @@ static AOM_FORCE_INLINE int get_sign_skip(const int8_t *const signs,
   return 0;
 }
 
+// This function returns the sign context index for residual coding.
 static INLINE int get_sign_ctx_skip(const int8_t *const signs,
                                     const uint8_t *const levels,
                                     const int coeff_idx, const int bwl) {
@@ -215,7 +231,7 @@ static INLINE int get_sign_ctx_skip(const int8_t *const signs,
   if (level_pt[0] > COEFF_BASE_RANGE && sign_ctx != 0) sign_ctx += 2;
   return sign_ctx;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
                                        const int bwl, const TX_CLASS tx_class) {
@@ -266,7 +282,7 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_skip(const int stats,
   if ((row < 2) && (col < (2 + TX_PAD_LEFT))) return ctx;
   return ctx + 7;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats(
     const int stats,
@@ -335,7 +351,7 @@ static AOM_FORCE_INLINE int get_upper_levels_ctx(const uint8_t *levels,
       get_nz_mag_skip(levels + get_padded_idx_left(coeff_idx, bwl), bwl);
   return get_nz_map_ctx_from_stats_skip(stats, coeff_idx, bwl);
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static INLINE int get_lower_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
                                           int bwl, TX_SIZE tx_size) {
@@ -417,7 +433,7 @@ static INLINE void get_txb_ctx_skip(const BLOCK_SIZE plane_bsize,
     txb_ctx->txb_skip_ctx = skip_contexts[top][left] + skip_offset;
   }
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static INLINE void get_txb_ctx(const BLOCK_SIZE plane_bsize,
                                const TX_SIZE tx_size, const int plane,

@@ -199,7 +199,7 @@ typedef struct {
   int idtx_sign_cost[IDTX_SIGN_CONTEXTS][2];
   int lps_cost_skip[IDTX_LEVEL_CONTEXTS]
                    [COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
-#endif
+#endif  // CONFIG_FORWARDSKIP
 } LV_MAP_COEFF_COST;
 
 /*! \brief Costs for encoding the eob.
@@ -654,7 +654,7 @@ typedef struct {
 #if CONFIG_FORWARDSKIP
   //! Cost of signaling the forward skip coding mode
   int fsc_cost[FSC_MODE_CONTEXTS][FSC_BSIZE_CONTEXTS][FSC_MODES];
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_AIMC
   //! y primary flag cost
   int y_primary_flag_cost[INTRA_MODE_SETS];

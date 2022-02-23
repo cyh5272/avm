@@ -52,7 +52,7 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
   mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_AIMC
   mbmi->joint_y_mode_delta_angle = DC_PRED;
   mbmi->y_mode_idx = DC_PRED;
@@ -121,7 +121,7 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_FORWARDSKIP
     mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
     mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
     return 1;
   } else {
     return 0;
@@ -1249,7 +1249,7 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
     intra_search_state->best_intra_mode = mode;
 #if CONFIG_FORWARDSKIP
     intra_search_state->best_fsc = mbmi->fsc_mode[xd->tree_type == CHROMA_PART];
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_MRLS
     intra_search_state->best_mrl_index = mbmi->mrl_index;
 #endif
@@ -1276,7 +1276,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
                      int mode_costs,
 #else
                      const int *mode_costs,
-#endif
+#endif  // CONFIG_AIMC
                      uint8_t *directional_mode_skip_mask, int64_t *best_rd,
                      int64_t *best_model_rd, PICK_MODE_CONTEXT *ctx,
                      MB_MODE_INFO *best_mbmi) {
@@ -1287,7 +1287,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
   const int context = get_y_mode_idx_ctx(xd);
   uint8_t best_y_mode_idx = best_mbmi->y_mode_idx;
   uint8_t best_joint_ymode = best_mbmi->joint_y_mode_delta_angle;
-#endif
+#endif  // CONFIG_AIMC
   uint8_t best_fsc_mode = 0;
   PREDICTION_MODE best_intra_mode = best_mbmi->mode;
   TX_SIZE best_tx_size = best_mbmi->tx_size;
@@ -1300,7 +1300,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
   uint8_t mrl_loop = (enable_mrls_flag && best_mrl) ? 2 : 1;
   for (int mrl_idx = 0; mrl_idx < mrl_loop; ++mrl_idx) {
     mbmi->mrl_index = mrl_idx ? best_mbmi->mrl_index : mrl_idx;
-#endif
+#endif  // CONFIG_MRLS
 #if CONFIG_AIMC
     for (int mode_idx = INTRA_MODE_START; mode_idx < LUMA_MODE_COUNT;
          ++mode_idx) {
@@ -1334,7 +1334,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
       mbmi->mode = best_mbmi->mode;
       mbmi->angle_delta[PLANE_TYPE_Y] = best_mbmi->angle_delta[PLANE_TYPE_Y];
     }
-#endif
+#endif  // CONFIG_AIMC
       mbmi->fsc_mode[PLANE_TYPE_Y] = 1;
       mbmi->filter_intra_mode_info.use_filter_intra = 0;
       mbmi->palette_mode_info.palette_size[0] = 0;
@@ -1356,7 +1356,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
           mbmi->angle_delta[PLANE_TYPE_Y] != 0) {
         continue;
       }
-#endif
+#endif  // CONFIG_AIMC
 #if CONFIG_AIMC
       if (is_directional_mode && directional_mode_skip_mask[mbmi->mode] &&
           mode_idx >= FIRST_MODE_COUNT)
@@ -1376,8 +1376,8 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
                              : 0;
 #if CONFIG_AIMC
       mode_costs += mrl_idx_cost;
-#endif
-#endif
+#endif  // CONFIG_AIMC
+#endif  // CONFIG_MRLS
       if (model_intra_yrd_and_prune(cpi, x, bsize,
 #if CONFIG_AIMC
                                     mode_costs,
@@ -1416,10 +1416,10 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
 #if CONFIG_AIMC
         best_y_mode_idx = mbmi->y_mode_idx;
         best_joint_ymode = mbmi->joint_y_mode_delta_angle;
-#endif
+#endif  // CONFIG_AIMC
 #if CONFIG_MRLS
         best_mrl = mbmi->mrl_index;
-#endif
+#endif  // CONFIG_MRLS
         best_filt = 0;
         best_angle_delta = mbmi->angle_delta[PLANE_TYPE_Y];
         av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
@@ -1434,18 +1434,18 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
     }
 #if CONFIG_MRLS
   }
-#endif
+#endif  // CONFIG_MRLS
   if (best_fsc_mode) {
     mbmi->fsc_mode[PLANE_TYPE_Y] = 1;
     mbmi->mode = best_intra_mode;
 #if CONFIG_AIMC
     mbmi->y_mode_idx = best_y_mode_idx;
     mbmi->joint_y_mode_delta_angle = best_joint_ymode;
-#endif
+#endif  // CONFIG_AIMC
     mbmi->tx_size = best_tx_size;
 #if CONFIG_MRLS
     mbmi->mrl_index = best_mrl;
-#endif
+#endif  // CONFIG_MRLS
     mbmi->filter_intra_mode_info.use_filter_intra = best_filt;
     mbmi->angle_delta[PLANE_TYPE_Y] = best_angle_delta;
     av1_copy_array(ctx->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
@@ -1454,7 +1454,7 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
     *mbmi = *best_mbmi;
   }
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 // Finds the best non-intrabc mode on an intra frame.
 int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
@@ -1473,7 +1473,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   int is_directional_mode;
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
   uint8_t directional_mode_skip_mask[INTRA_MODES] = { 0 };
   // Flag to check rd of any intra mode is better than best_rd passed to this
   // function
@@ -1676,11 +1676,11 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                     mode_costs,
 #else
                     bmode_costs,
-#endif
+#endif  // CONFIG_AIMC
                     directional_mode_skip_mask, &best_rd, &best_model_rd, ctx,
                     &best_mbmi);
   }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
   // Searches palette
 #if CONFIG_AIMC

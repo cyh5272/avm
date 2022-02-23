@@ -128,7 +128,7 @@ static INLINE int use_inter_fsc(const AV1_COMMON *const cm,
                    plane_type == PLANE_TYPE_Y && is_inter && tx_type == IDTX;
   return allow_fsc;
 }
-#endif
+#endif  // CONFIG_FORWARDSKIP
 
 static INLINE int av1_filter_intra_allowed_bsize(const AV1_COMMON *const cm,
                                                  BLOCK_SIZE bs) {

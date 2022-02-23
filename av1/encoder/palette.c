@@ -421,9 +421,10 @@ void av1_rd_pick_palette_intra_sby(
 #if CONFIG_MRLS
   mbmi->mrl_index = 0;
 #endif
+
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_SDP
   assert(!is_inter_block(mbmi, xd->tree_type));
 #else
@@ -677,7 +678,7 @@ void av1_rd_pick_palette_intra_sbuv(const AV1_COMP *cpi, MACROBLOCK *x,
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_UV];
 #if CONFIG_FORWARDSKIP
   mbmi->fsc_mode[PLANE_TYPE_UV] = 0;
-#endif
+#endif  // CONFIG_FORWARDSKIP
 #else
   const BLOCK_SIZE bsize = mbmi->sb_type;
 #endif
