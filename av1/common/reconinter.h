@@ -37,6 +37,8 @@ extern "C" {
 #endif
 
 #define MAX_WEDGE_TYPES 16
+#define MAX_WEDGE_TYPES2 6
+#define MAX_WEDGE_TYPES_TOTAL (MAX_WEDGE_TYPES + MAX_WEDGE_TYPES2)
 
 #define MAX_WEDGE_SIZE_LOG2 5  // 32x32
 #define MAX_WEDGE_SIZE (1 << MAX_WEDGE_SIZE_LOG2)
@@ -48,12 +50,14 @@ extern "C" {
 
 // Angles are with respect to horizontal anti-clockwise
 enum {
-  WEDGE_HORIZONTAL = 0,
-  WEDGE_VERTICAL = 1,
-  WEDGE_OBLIQUE27 = 2,
-  WEDGE_OBLIQUE63 = 3,
-  WEDGE_OBLIQUE117 = 4,
-  WEDGE_OBLIQUE153 = 5,
+  WEDGE_HORIZONTAL,
+  WEDGE_VERTICAL,
+  WEDGE_OBLIQUE27,
+  WEDGE_OBLIQUE63,
+  WEDGE_OBLIQUE117,
+  WEDGE_OBLIQUE153,
+  WEDGE_OBLIQUE45,
+  WEDGE_OBLIQUE135,
   WEDGE_DIRECTIONS
 } UENUM1BYTE(WedgeDirectionType);
 
@@ -64,7 +68,7 @@ typedef struct {
   int y_offset;
 } wedge_code_type;
 
-typedef uint8_t *wedge_masks_type[MAX_WEDGE_TYPES];
+typedef uint8_t *wedge_masks_type[MAX_WEDGE_TYPES_TOTAL];
 
 typedef struct {
   int wedge_types;

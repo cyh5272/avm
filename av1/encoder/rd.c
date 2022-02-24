@@ -417,8 +417,12 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->compound_type_cdf[i], NULL);
     for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
       if (av1_is_wedge_used(i)) {
+        av1_cost_tokens_from_cdf(mode_costs->wedge_category_cost[i],
+                                 fc->wedge_category_cdf[i], NULL);
         av1_cost_tokens_from_cdf(mode_costs->wedge_idx_cost[i],
                                  fc->wedge_idx_cdf[i], NULL);
+        av1_cost_tokens_from_cdf(mode_costs->wedge_idx2_cost[i],
+                                 fc->wedge_idx2_cdf[i], NULL);
       }
     }
     for (i = 0; i < BLOCK_SIZE_GROUPS; ++i) {

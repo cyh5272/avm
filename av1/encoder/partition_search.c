@@ -1261,11 +1261,27 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
             update_cdf(fc->wedge_interintra_cdf[bsize],
                        mbmi->use_wedge_interintra, 2);
             if (mbmi->use_wedge_interintra) {
+              const int8_t category =
+                  mbmi->interintra_wedge_index >= MAX_WEDGE_TYPES;
 #if CONFIG_ENTROPY_STATS
-              counts->wedge_idx[bsize][mbmi->interintra_wedge_index]++;
+              counts->wedge_category[bsize][category]++;
 #endif
-              update_cdf(fc->wedge_idx_cdf[bsize], mbmi->interintra_wedge_index,
-                         16);
+              update_cdf(fc->wedge_category_cdf[bsize], category, 2);
+              if (category == 0) {
+#if CONFIG_ENTROPY_STATS
+                counts->wedge_idx[bsize][mbmi->interintra_wedge_index]++;
+#endif
+                update_cdf(fc->wedge_idx_cdf[bsize],
+                           mbmi->interintra_wedge_index, MAX_WEDGE_TYPES);
+              } else {
+#if CONFIG_ENTROPY_STATS
+                counts->wedge_idx2[bsize][mbmi->interintra_wedge_index -
+                                          MAX_WEDGE_TYPES]++;
+#endif
+                update_cdf(fc->wedge_idx2_cdf[bsize],
+                           mbmi->interintra_wedge_index - MAX_WEDGE_TYPES,
+                           MAX_WEDGE_TYPES2);
+              }
             }
           }
         } else {
@@ -1331,11 +1347,27 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
       if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
         if (is_interinter_compound_used(COMPOUND_WEDGE, bsize)) {
+          const int8_t category =
+              mbmi->interinter_comp.wedge_index >= MAX_WEDGE_TYPES;
 #if CONFIG_ENTROPY_STATS
-          counts->wedge_idx[bsize][mbmi->interinter_comp.wedge_index]++;
+          counts->wedge_category[bsize][category]++;
 #endif
-          update_cdf(fc->wedge_idx_cdf[bsize],
-                     mbmi->interinter_comp.wedge_index, 16);
+          update_cdf(fc->wedge_category_cdf[bsize], category, 2);
+          if (category == 0) {
+#if CONFIG_ENTROPY_STATS
+            counts->wedge_idx[bsize][mbmi->interinter_comp.wedge_index]++;
+#endif
+            update_cdf(fc->wedge_idx_cdf[bsize],
+                       mbmi->interinter_comp.wedge_index, MAX_WEDGE_TYPES);
+          } else {
+#if CONFIG_ENTROPY_STATS
+            counts->wedge_idx2[bsize][mbmi->interinter_comp.wedge_index -
+                                      MAX_WEDGE_TYPES]++;
+#endif
+            update_cdf(fc->wedge_idx2_cdf[bsize],
+                       mbmi->interinter_comp.wedge_index - MAX_WEDGE_TYPES,
+                       MAX_WEDGE_TYPES2);
+          }
         }
       }
     }

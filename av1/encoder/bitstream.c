@@ -1837,8 +1837,18 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
           aom_write_symbol(w, mbmi->use_wedge_interintra,
                            ec_ctx->wedge_interintra_cdf[bsize], 2);
           if (mbmi->use_wedge_interintra) {
-            aom_write_symbol(w, mbmi->interintra_wedge_index,
-                             ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+            const int wedge_category =
+                (mbmi->interintra_wedge_index >= MAX_WEDGE_TYPES);
+            aom_write_symbol(w, wedge_category,
+                             ec_ctx->wedge_category_cdf[bsize], 2);
+            if (wedge_category == 0) {
+              aom_write_symbol(w, mbmi->interintra_wedge_index,
+                               ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+            } else {
+              aom_write_symbol(w,
+                               mbmi->interintra_wedge_index - MAX_WEDGE_TYPES,
+                               ec_ctx->wedge_idx2_cdf[bsize], MAX_WEDGE_TYPES2);
+            }
           }
         }
       }
@@ -1883,8 +1893,18 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
         if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
           assert(is_interinter_compound_used(COMPOUND_WEDGE, bsize));
-          aom_write_symbol(w, mbmi->interinter_comp.wedge_index,
-                           ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+          const int wedge_category =
+              (mbmi->interinter_comp.wedge_index >= MAX_WEDGE_TYPES);
+          aom_write_symbol(w, wedge_category, ec_ctx->wedge_category_cdf[bsize],
+                           2);
+          if (wedge_category == 0) {
+            aom_write_symbol(w, mbmi->interinter_comp.wedge_index,
+                             ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+          } else {
+            aom_write_symbol(
+                w, mbmi->interinter_comp.wedge_index - MAX_WEDGE_TYPES,
+                ec_ctx->wedge_idx2_cdf[bsize], MAX_WEDGE_TYPES2);
+          }
           aom_write_bit(w, mbmi->interinter_comp.wedge_sign);
         } else {
           assert(mbmi->interinter_comp.type == COMPOUND_DIFFWTD);

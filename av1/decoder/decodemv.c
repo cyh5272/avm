@@ -2164,8 +2164,17 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         mbmi->use_wedge_interintra = aom_read_symbol(
             r, ec_ctx->wedge_interintra_cdf[bsize], 2, ACCT_STR);
         if (mbmi->use_wedge_interintra) {
-          mbmi->interintra_wedge_index = (int8_t)aom_read_symbol(
-              r, ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES, ACCT_STR);
+          const int8_t wedge_category = (int8_t)aom_read_symbol(
+              r, ec_ctx->wedge_category_cdf[bsize], 2, ACCT_STR);
+          if (wedge_category == 0) {
+            mbmi->interintra_wedge_index = (int8_t)aom_read_symbol(
+                r, ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES, ACCT_STR);
+          } else {
+            mbmi->interintra_wedge_index =
+                (int8_t)(MAX_WEDGE_TYPES +
+                         aom_read_symbol(r, ec_ctx->wedge_idx2_cdf[bsize],
+                                         MAX_WEDGE_TYPES2, ACCT_STR));
+          }
         }
       }
     }
@@ -2230,8 +2239,17 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 
       if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
         assert(is_interinter_compound_used(COMPOUND_WEDGE, bsize));
-        mbmi->interinter_comp.wedge_index = (int8_t)aom_read_symbol(
-            r, ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES, ACCT_STR);
+        const int8_t wedge_category = (int8_t)aom_read_symbol(
+            r, ec_ctx->wedge_category_cdf[bsize], 2, ACCT_STR);
+        if (wedge_category == 0) {
+          mbmi->interinter_comp.wedge_index = (int8_t)aom_read_symbol(
+              r, ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES, ACCT_STR);
+        } else {
+          mbmi->interinter_comp.wedge_index =
+              (int8_t)(MAX_WEDGE_TYPES +
+                       aom_read_symbol(r, ec_ctx->wedge_idx2_cdf[bsize],
+                                       MAX_WEDGE_TYPES2, ACCT_STR));
+        }
         mbmi->interinter_comp.wedge_sign = (int8_t)aom_read_bit(r, ACCT_STR);
       } else {
         assert(mbmi->interinter_comp.type == COMPOUND_DIFFWTD);
