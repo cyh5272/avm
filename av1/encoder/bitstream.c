@@ -824,7 +824,7 @@ static AOM_INLINE void write_mb_interp_filter(AV1_COMMON *const cm,
 #if CONFIG_OPTFLOW_REFINEMENT
     // Sharp filter is always used whenever optical flow refinement is applied.
     int mb_interp_filter =
-        (mbmi->mode > NEW_NEWMV || use_opfl_refine_all(cm, mbmi))
+        (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))
             ? MULTITAP_SHARP
             : cm->features.interp_filter;
 #else
