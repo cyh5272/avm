@@ -306,16 +306,6 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
   }
 }
 
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-static PREDICTION_MODE read_adaptive_mvd_flag(MACROBLOCKD *xd, aom_reader *r,
-                                              MB_MODE_INFO *const mbmi) {
-  if (!is_joint_mvd_coding_mode(mbmi->mode)) return 0;
-  const int adaptive_mvd_flag =
-      aom_read_symbol(r, xd->tile_ctx->adaptive_mvd_cdf, 2, ACCT_STR);
-  return adaptive_mvd_flag;
-}
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
-
 static PREDICTION_MODE read_inter_compound_mode(MACROBLOCKD *xd, aom_reader *r,
 #if CONFIG_OPTFLOW_REFINEMENT
                                                 const AV1_COMMON *cm,
@@ -1331,14 +1321,13 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp,
           ? aom_read_symbol(r, mvcomp->amvd_classes_cdf, MV_CLASSES, ACCT_STR)
           :
 #endif  // CONFIG_ADAPTIVE_MVD
-          aom_read_symbol(
-              r,
 #if CONFIG_FLEX_MVRES
-              mvcomp->classes_cdf[av1_get_mv_class_context(precision)],
-#else
-          mvcomp->classes_cdf,
-#endif
+          aom_read_symbol(
+              r, mvcomp->classes_cdf[av1_get_mv_class_context(precision)],
               MV_CLASSES, ACCT_STR);
+#else
+      aom_read_symbol(r, mvcomp->classes_cdf, MV_CLASSES, ACCT_STR);
+#endif
 
   const int class0 = mv_class == MV_CLASS_0;
 
@@ -2015,7 +2004,13 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
 #if CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
     case JOINT_NEWMV_OPTFLOW:
-#endif
+#if IMPROVED_AMVD
+    case JOINT_AMVDNEWMV_OPTFLOW:
+#endif  // IMPROVED_AMVD
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+#if IMPROVED_AMVD
+    case JOINT_AMVDNEWMV:
+#endif  // IMPROVED_AMVD
     case JOINT_NEWMV: {
       nmv_context *const nmvc = &ec_ctx->nmvc;
       assert(is_compound);
@@ -2271,12 +2266,6 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       else
         mbmi->mode = read_inter_mode(ec_ctx, r, mode_ctx);
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      if (cm->seq_params.enable_adaptive_mvd)
-        mbmi->adaptive_mvd_flag = read_adaptive_mvd_flag(xd, r, mbmi);
-      else
-        mbmi->adaptive_mvd_flag = 0;
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if IMPROVED_AMVD
       int max_drl_bits = cm->features.max_drl_bits;
       if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
@@ -2427,7 +2416,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       mbmi->mode < NEAR_NEARMV_OPTFLOW &&
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag) &&
+      !is_joint_amvd_coding_mode(mbmi->mode) &&
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
       !mbmi->skip_mode) {
     // Read idx to indicate current compound inter prediction mode group

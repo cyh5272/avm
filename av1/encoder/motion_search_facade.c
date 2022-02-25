@@ -914,7 +914,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
   if (is_adaptive_mvd
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
+      && !is_joint_amvd_coding_mode(mbmi->mode)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
   ) {
     int dis; /* TODO: use dis in distortion calculation later. */
@@ -933,7 +933,11 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   } else
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-      if (is_joint_mvd_coding_mode(mbmi->mode)) {
+      if (mbmi->mode == JOINT_NEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+          || mbmi->mode == JOINT_NEWMV_OPTFLOW
+#endif
+      ) {
     int dis; /* TODO: use dis in distortion calculation later. */
     unsigned int sse;
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
@@ -945,36 +949,47 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     av1_set_ms_compound_refs(&ms_params.var_params.ms_buffers, second_pred,
                              mask, mask_stride, ref_idx);
     ms_params.forced_stop = EIGHTH_PEL;
-#if IMPROVED_AMVD
-    if (mbmi->adaptive_mvd_flag == 1)
-      bestsme = av1_joint_amvd_motion_search(
-          cm, xd, &ms_params, &ref_mv.as_mv, &best_mv.as_mv, &dis, &sse,
+#if CONFIG_FLEX_MVRES
+    lower_mv_precision(this_mv, pb_mv_precision);
+    if (pb_mv_precision < MV_PRECISION_ONE_PEL) {
+      bestsme = low_precision_joint_mvd_search(
+          cm, xd, &ms_params, ref_mv.as_mv, this_mv, &best_mv.as_mv, &dis, &sse,
           ref_idx, other_mv, &best_other_mv.as_mv, second_pred,
           &inter_pred_params);
-    else
-#endif  // IMPROVED_AMVD
-
-#if CONFIG_FLEX_MVRES
-    {
-      lower_mv_precision(this_mv, pb_mv_precision);
-      if (pb_mv_precision < MV_PRECISION_ONE_PEL) {
-        bestsme = low_precision_joint_mvd_search(
-            cm, xd, &ms_params, ref_mv.as_mv, this_mv, &best_mv.as_mv, &dis,
-            &sse, ref_idx, other_mv, &best_other_mv.as_mv, second_pred,
-            &inter_pred_params);
-      } else {
+    } else {
 #endif
-
-        bestsme = joint_mvd_search(cm, xd, &ms_params, ref_mv.as_mv, this_mv,
-                                   &best_mv.as_mv, &dis, &sse, ref_idx,
-                                   other_mv, &best_other_mv.as_mv, second_pred,
-                                   &inter_pred_params, NULL);
+      bestsme = joint_mvd_search(cm, xd, &ms_params, ref_mv.as_mv, this_mv,
+                                 &best_mv.as_mv, &dis, &sse, ref_idx, other_mv,
+                                 &best_other_mv.as_mv, second_pred,
+                                 &inter_pred_params, NULL);
 #if CONFIG_FLEX_MVRES
-      }
     }
 #endif
   } else
 #endif  // CONFIG_JOINT_MVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+#if CONFIG_OPTFLOW_REFINEMENT
+      if (mbmi->mode == JOINT_AMVDNEWMV ||
+          mbmi->mode == JOINT_AMVDNEWMV_OPTFLOW) {
+#else
+      if (mbmi->mode == JOINT_AMVDNEWMV) {
+#endif
+    int dis; /* TODO: use dis in distortion calculation later. */
+    unsigned int sse;
+    SUBPEL_MOTION_SEARCH_PARAMS ms_params;
+    av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                      pb_mv_precision,
+#endif
+                                      NULL);
+    av1_set_ms_compound_refs(&ms_params.var_params.ms_buffers, second_pred,
+                             mask, mask_stride, ref_idx);
+    ms_params.forced_stop = EIGHTH_PEL;
+    bestsme = av1_joint_amvd_motion_search(
+        cm, xd, &ms_params, this_mv, &best_mv.as_mv, &dis, &sse, ref_idx,
+        other_mv, &best_other_mv.as_mv, second_pred, &inter_pred_params);
+  } else
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
   {
 #endif  // CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
