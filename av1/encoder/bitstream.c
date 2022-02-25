@@ -121,15 +121,6 @@ static void write_drl_idx(int max_drl_bits, const int16_t mode_ctx,
   }
 }
 
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-static AOM_INLINE void write_adaptive_mvd_flag(MACROBLOCKD *xd, aom_writer *w,
-                                               const MB_MODE_INFO *const mbmi) {
-  if (!is_joint_mvd_coding_mode(mbmi->mode)) return;
-  aom_write_symbol(w, mbmi->adaptive_mvd_flag, xd->tile_ctx->adaptive_mvd_cdf,
-                   2);
-}
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
-
 static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
                                                  PREDICTION_MODE mode,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1743,10 +1734,6 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                                   mode_ctx);
       else if (is_inter_singleref_mode(mode))
         write_inter_mode(w, mode, ec_ctx, mode_ctx);
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      if (cm->seq_params.enable_adaptive_mvd)
-        write_adaptive_mvd_flag(xd, w, mbmi);
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if IMPROVED_AMVD
       int max_drl_bits = cm->features.max_drl_bits;
       if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
@@ -1879,7 +1866,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-        && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
+        && !is_joint_amvd_coding_mode(mbmi->mode)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
     ) {
       const int masked_compound_used = is_any_masked_compound_used(bsize) &&
