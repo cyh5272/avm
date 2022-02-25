@@ -1215,7 +1215,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           && mbmi->mode < NEAR_NEARMV_OPTFLOW
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-          && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
+          && !is_joint_amvd_coding_mode(mbmi->mode)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
       ) {
         assert(current_frame->reference_mode != SINGLE_REFERENCE &&
@@ -1291,11 +1291,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       update_cdf(fc->inter_compound_mode_cdf[mode_ctx],
                  INTER_COMPOUND_OFFSET(mode), INTER_COMPOUND_MODES);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      if (is_joint_mvd_coding_mode(mbmi->mode) &&
-          cm->seq_params.enable_adaptive_mvd)
-        update_cdf(fc->adaptive_mvd_cdf, mbmi->adaptive_mvd_flag, 2);
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
     } else {
       av1_update_inter_mode_stats(fc, counts, mode, mode_ctx);
     }
