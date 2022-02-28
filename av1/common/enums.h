@@ -29,6 +29,35 @@ extern "C" {
 
 #undef MAX_SB_SIZE
 
+#if CONFIG_FLEX_MVRES
+#define DEBUG_FLEX_MV 0
+#define SIGNAL_MOST_PROBABLE_PRECISION 1
+#define JOINT_MODE_BUG_FIX 1
+#define FAST_ALGORITHMS 1
+
+#if FAST_ALGORITHMS
+#define REUSE_PREV_MV 1
+#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 1
+#define EANBLE_EARLY_TERMINATION 0
+#define ET_TEST_NUMBER 4
+#define DISABLE_MOTION_MODE_LOW_PRECISION 1
+#else
+#define REUSE_PREV_MV 0
+#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 0
+#define EANBLE_EARLY_TERMINATION 0
+#define ET_TEST_NUMBER 0
+#define DISABLE_MOTION_MODE_LOW_PRECISION 0
+#endif
+
+#if DEBUG_FLEX_MV
+#define CHECK_FLEX_MV(c, err)                                            \
+  if (c) {                                                               \
+    printf("The assertion failed on line %d, in file %s %s\n", __LINE__, \
+           __FILE__, err);                                               \
+  }
+#endif
+#endif  // CONFIG_FLEX_MVRES
+
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
 #define CCSO_BLK_SIZE 7
