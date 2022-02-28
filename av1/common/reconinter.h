@@ -617,6 +617,9 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
                                        const MACROBLOCKD *const xd) {
   (void)cm;
   const MB_MODE_INFO *const mbmi = xd->mi[0];
+#if CONFIG_FLEX_MVRES && DISABLE_INTERPOLATION_FILTER_FOR_INT_MV
+  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return 0;
+#endif
   if (mbmi->skip_mode) return 0;
 #if CONFIG_OPTFLOW_REFINEMENT
   // No interpolation filter search when optical flow MV refinement is used.
@@ -686,6 +689,30 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
                    const WarpedMotionParams *const gm_params,
                    int build_for_obmc, const struct scale_factors *const sf,
                    WarpedMotionParams *final_warp_params);
+
+#if CONFIG_FLEX_MVRES
+#if SIGNAL_MOST_PROBABLE_PRECISION
+int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd);
+#endif
+int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
+                                         const MACROBLOCKD *xd);
+int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision);
+void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+
+#if SIGNAL_MOST_PROBABLE_PRECISION
+void set_most_probable_mv_precision(const AV1_COMMON *const cm,
+                                    MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
+#endif
+
+void set_max_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
+                                                const SB_INFO *sbi,
+                                                const MB_MODE_INFO *mbmi);
+
+int is_pb_mv_precision_active(const AV1_COMMON *const cm,
+                              const MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
+
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
