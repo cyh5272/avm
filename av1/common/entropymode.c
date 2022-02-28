@@ -1226,6 +1226,59 @@ static const aom_cdf_prob default_stx_cdf[TX_SIZES][CDF_SIZE(STX_TYPES)] = {
 };
 #endif
 
+#if CONFIG_FLEX_MVRES
+static const aom_cdf_prob
+    default_sb_mv_precision_cdf[NUM_PB_FLEX_QUALIFIED_MAX_PREC][CDF_SIZE(
+        FLEX_MV_COSTS_SIZE)] = {
+      { AOM_CDF4(24000, 29000, 31000) },
+      { AOM_CDF5(22980, 25479, 27781, 29986) },
+      { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+    };
+
+#if SIGNAL_MOST_PROBABLE_PRECISION
+static const aom_cdf_prob
+    default_pb_mv_most_probable_precision_cdf[NUM_MV_PREC_MPP_CONTEXT]
+                                             [CDF_SIZE(2)] = {
+                                               { AOM_CDF2(24320) },
+                                               { AOM_CDF2(24320) },
+                                               { AOM_CDF2(24320) },
+                                             };
+#endif
+
+#if SIGNAL_MOST_PROBABLE_PRECISION
+static const aom_cdf_prob default_pb_mv_precision_cdf
+    [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+    [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+      {
+          { AOM_CDF4(24000, 29000, 31000) },
+          { AOM_CDF5(22980, 25479, 27781, 29986) },
+          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+
+      },
+      {
+          { AOM_CDF4(24000, 29000, 31000) },
+          { AOM_CDF5(22980, 25479, 27781, 29986) },
+          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+
+      },
+    };
+#else
+static const aom_cdf_prob default_pb_mv_precision_cdf
+    [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+    [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+      { { AOM_CDF5(22980, 25479, 27781, 29986) },
+        { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+        { AOM_CDF7(30988, 31204, 31479, 31734, 31983, 32325) } },
+      {
+          { AOM_CDF5(22980, 25479, 27781, 29986) },
+          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+          { AOM_CDF7(30988, 31204, 31479, 31734, 31983, 32325) },
+      },
+    };
+#endif
+
+#endif  // CONFIG_FLEX_MVRES
+
 #define MAX_COLOR_CONTEXT_HASH 8
 // Negative values are invalid
 static const int palette_color_index_context_lookup[MAX_COLOR_CONTEXT_HASH +
@@ -1540,6 +1593,13 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #if CONFIG_IST
   av1_copy(fc->stx_cdf, default_stx_cdf);
 #endif
+#if CONFIG_FLEX_MVRES
+  av1_copy(fc->sb_mv_precision_cdf, default_sb_mv_precision_cdf);
+  av1_copy(fc->pb_mv_precision_cdf, default_pb_mv_precision_cdf);
+#if SIGNAL_MOST_PROBABLE_PRECISION
+  av1_copy(fc->pb_mv_mpp_flag_cdf, default_pb_mv_most_probable_precision_cdf);
+#endif
+#endif  // CONFIG_FLEX_MVRES
 }
 
 void av1_set_default_ref_deltas(int8_t *ref_deltas) {

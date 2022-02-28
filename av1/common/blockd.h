@@ -202,6 +202,23 @@ static INLINE int have_nearmv_newmv_in_inter_mode(PREDICTION_MODE mode) {
          mode == NEW_NEARMV;
 }
 
+#if CONFIG_FLEX_MVRES && EANBLE_EARLY_TERMINATION
+static INLINE int have_precision_in_inter_mode(PREDICTION_MODE mode) {
+  return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
+#if CONFIG_JOINT_MVD
+          mode == JOINT_NEWMV ||
+#endif  // CONFIG_JOINT_MVD
+#if CONFIG_OPTFLOW_REFINEMENT
+          mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
+          mode == NEW_NEWMV_OPTFLOW ||
+#if CONFIG_JOINT_MVD
+          mode == JOINT_NEWMV_OPTFLOW ||
+#endif  // CONFIG_JOINT_MVD
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+          mode == NEW_NEARMV);
+}
+#endif
+
 #if CONFIG_NEW_INTER_MODES
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
@@ -347,6 +364,16 @@ typedef struct MB_MODE_INFO {
 #endif  // CONFIG_NEW_TX_PARTITION
   /*! \brief Filter used in subpel interpolation. */
   int interp_fltr;
+#if CONFIG_FLEX_MVRES
+  /*! The maximum mv_precision allowed for the given partition block. */
+  MvSubpelPrecision max_mv_precision;
+  /*! The mv_precision used by the given partition block. */
+  MvSubpelPrecision pb_mv_precision;
+#if SIGNAL_MOST_PROBABLE_PRECISION
+  /*! The most probable mv_precision used by the given partition block. */
+  MvSubpelPrecision most_probable_pb_mv_precision;
+#endif
+#endif
   /*! \brief The motion mode used by the inter prediction. */
   MOTION_MODE motion_mode;
   /*! \brief Number of samples used by warp causal */
@@ -488,7 +515,13 @@ static INLINE int is_intrabc_block(const MB_MODE_INFO *mbmi) {
   return mbmi->use_intrabc;
 }
 #endif
-
+#if CONFIG_FLEX_MVRES
+typedef struct SB_INFO {
+  int mi_row;
+  int mi_col;
+  MvSubpelPrecision sb_mv_precision;
+} SB_INFO;
+#endif
 static INLINE PREDICTION_MODE get_uv_mode(UV_PREDICTION_MODE mode) {
   assert(mode < UV_INTRA_MODES);
   static const PREDICTION_MODE uv2y[] = {
@@ -877,6 +910,12 @@ typedef struct macroblockd {
    */
   MB_MODE_INFO *chroma_above_mbmi;
 
+#if CONFIG_FLEX_MVRES
+  /*!
+   * SB_INFO for the superblock that the current coding block is located in
+   */
+  SB_INFO *sbi;
+#endif
   /*!
    * Appropriate offset based on current 'mi_row' and 'mi_col', inside
    * 'tx_type_map' in one of 'CommonModeInfoParams', 'PICK_MODE_CONTEXT' or
@@ -1773,6 +1812,8 @@ typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   BLOCK_SIZE plane_bsize,
                                                   TX_SIZE tx_size, void *arg);
 
+void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride);
+
 void av1_set_entropy_contexts(const MACROBLOCKD *xd,
                               struct macroblockd_plane *pd, int plane,
                               BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
@@ -1857,6 +1898,11 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
     const TransformationType gm_type = gm_params[mbmi->ref_frame[0]].wmtype;
     if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
   }
+
+#if CONFIG_FLEX_MVRES && DISABLE_MOTION_MODE_LOW_PRECISION
+  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return SIMPLE_TRANSLATION;
+#endif
+
 #if CONFIG_SDP
   if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
 #else
