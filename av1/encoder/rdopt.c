@@ -6944,6 +6944,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
           if (comp_pred)
             xd->plane[i].pre[1] =
                 yv12_mb[COMPACT_INDEX0_NRS(second_ref_frame)][i];
+
 #else
         xd->plane[i].pre[0] = yv12_mb[ref_frame][i];
         if (comp_pred) xd->plane[i].pre[1] = yv12_mb[second_ref_frame][i];
