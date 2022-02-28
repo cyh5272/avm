@@ -542,6 +542,9 @@ enum {
 #if CONFIG_JOINT_MVD
   JOINT_NEWMV,
 #endif  // CONFIG_JOINT_MVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+  JOINT_AMVDNEWMV,
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
   NEAR_NEARMV_OPTFLOW,
   NEAR_NEWMV_OPTFLOW,
@@ -550,6 +553,9 @@ enum {
 #if CONFIG_JOINT_MVD
   JOINT_NEWMV_OPTFLOW,
 #endif  // CONFIG_JOINT_MVD
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+  JOINT_AMVDNEWMV_OPTFLOW,
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #endif  // CONFIG_OPTFLOW_REFINEMENT
   MB_MODE_COUNT,
   INTRA_MODE_START = DC_PRED,
@@ -904,6 +910,14 @@ enum {
 #define IBP_WEIGHT_SHIFT 8
 #define IBP_WEIGHT_MAX 255
 #endif
+
+#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#define CHECK_FLEX_MV(c, err)                                            \
+  if (c) {                                                               \
+    printf("The assertion failed on line %d, in file %s %s\n", __LINE__, \
+           __FILE__, err);                                               \
+  }
+#endif  // CONFIG_DEBUG
 
 /*!\endcond */
 

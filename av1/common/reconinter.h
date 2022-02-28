@@ -215,16 +215,20 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
 static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
                                                  const MB_MODE_INFO *mbmi) {
   const int mode = mbmi->mode;
+
   return (mode == NEAR_NEWMV || mode == NEW_NEARMV
 #if CONFIG_OPTFLOW_REFINEMENT
           || mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW
+#if IMPROVED_AMVD && CONFIG_JOINT_MVD
+          || mode == JOINT_AMVDNEWMV_OPTFLOW
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #endif
 #if IMPROVED_AMVD
           || mode == AMVDNEWMV
 #endif  // IMPROVED_AMVD
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-          || mbmi->adaptive_mvd_flag
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
+          || mode == JOINT_AMVDNEWMV
+#endif
           ) &&
          cm->seq_params.enable_adaptive_mvd;
 }
@@ -664,6 +668,34 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
                    const WarpedMotionParams *const gm_params,
                    int build_for_obmc, const struct scale_factors *const sf,
                    WarpedMotionParams *final_warp_params);
+
+#if CONFIG_FLEX_MVRES
+int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd);
+int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
+                                         const MACROBLOCKD *xd);
+int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision);
+void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+void set_most_probable_mv_precision(const AV1_COMMON *const cm,
+                                    MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
+
+void set_default_precision_set(const AV1_COMMON *const cm, MB_MODE_INFO *mbmi,
+                               const BLOCK_SIZE bsize);
+void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
+                       MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize,
+                       uint8_t ref_mv_idx);
+int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi);
+MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
+                                               int precision_idx_coded_value);
+void set_default_max_mv_precision(MB_MODE_INFO *mbmi,
+                                  MvSubpelPrecision precision);
+MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
+                                                const SB_INFO *sbi,
+                                                const MB_MODE_INFO *mbmi);
+
+int is_pb_mv_precision_active(const AV1_COMMON *const cm,
+                              const MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
+
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
