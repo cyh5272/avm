@@ -56,6 +56,9 @@ extern "C" {
            __FILE__, err);                                               \
   }
 #endif
+#else
+#define JOINT_MODE_BUG_FIX 0
+#define REUSE_PREV_MV 0
 #endif  // CONFIG_FLEX_MVRES
 
 // Cross-Component Sample Offset (CCSO)

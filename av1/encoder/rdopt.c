@@ -6532,7 +6532,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
           inter_modes_info, &motion_mode_cand, skip_rd,
           &inter_cost_info_from_tpl);
 
-#if EANBLE_EARLY_TERMINATION
+#if CONFIG_FLEX_MVRES && EANBLE_EARLY_TERMINATION
 #if ET_TEST_NUMBER == 3 || ET_TEST_NUMBER == 2 || ET_TEST_NUMBER == 4 || \
     ET_TEST_NUMBER == 1
       if (have_precision_in_inter_mode(mbmi->mode)) {
