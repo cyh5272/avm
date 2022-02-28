@@ -33,7 +33,7 @@ extern "C" {
 #define DEBUG_FLEX_MV 0
 #define SIGNAL_MOST_PROBABLE_PRECISION 1
 #define JOINT_MODE_BUG_FIX 1
-#define FAST_ALGORITHMS 1
+#define FAST_ALGORITHMS 1  // Enable/disable fast algorithms
 
 #if FAST_ALGORITHMS
 #define REUSE_PREV_MV 1
