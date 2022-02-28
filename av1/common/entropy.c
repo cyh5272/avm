@@ -94,8 +94,13 @@ static AOM_INLINE void reset_nmv_counter(nmv_context *nmv) {
 #if CONFIG_ADAPTIVE_MVD
     RESET_CDF_COUNTER(nmv->comps[i].amvd_classes_cdf, MV_CLASSES);
 #endif  // CONFIG_ADAPTIVE_MVD
+#if CONFIG_FLEX_MVRES
+    RESET_CDF_COUNTER(nmv->comps[i].class0_fp_cdf, 2);
+    RESET_CDF_COUNTER(nmv->comps[i].fp_cdf, 2);
+#else
     RESET_CDF_COUNTER(nmv->comps[i].class0_fp_cdf, MV_FP_SIZE);
     RESET_CDF_COUNTER(nmv->comps[i].fp_cdf, MV_FP_SIZE);
+#endif  // CONFIG_FLEX_MVRES
     RESET_CDF_COUNTER(nmv->comps[i].sign_cdf, 2);
     RESET_CDF_COUNTER(nmv->comps[i].class0_hp_cdf, 2);
     RESET_CDF_COUNTER(nmv->comps[i].hp_cdf, 2);
@@ -281,4 +286,29 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #if CONFIG_IST
   RESET_CDF_COUNTER_STRIDE(fc->stx_cdf, STX_TYPES, CDF_SIZE(STX_TYPES));
 #endif
+#if CONFIG_FLEX_MVRES
+  for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
+    RESET_CDF_COUNTER(fc->sb_mv_precision_cdf[p - MV_PRECISION_HALF_PEL],
+                      p + 1);
+  }
+#if SIGNAL_MOST_PROBABLE_PRECISION
+  for (int p = 0; p < NUM_MV_PREC_MPP_CONTEXT; ++p) {
+    RESET_CDF_COUNTER(fc->pb_mv_mpp_flag_cdf[p], 2);
+  }
+#endif
+
+  for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
+    for (int j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j) {
+      RESET_CDF_COUNTER_STRIDE(
+          fc->pb_mv_precision_cdf[j][p - MV_PRECISION_HALF_PEL],
+          p
+#if !SIGNAL_MOST_PROBABLE_PRECISION
+              + 1
+#endif
+          ,
+          CDF_SIZE(FLEX_MV_COSTS_SIZE));
+    }
+  }
+
+#endif  // CONFIG_FLEX_MVRES
 }
