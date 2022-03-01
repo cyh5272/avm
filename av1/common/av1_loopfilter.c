@@ -37,8 +37,8 @@ static const int mode_lf_lut[] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // INTRA_MODES
   1, 0, 1,                                // INTER_SINGLE_MODES (GLOBALMV == 0)
 #if IMPROVED_AMVD
-  1,  // AMVD_NEWMV
-#endif
+  1,              // AMVDNEWMV
+#endif            // IMPROVED_AMVD
   1, 1, 1, 0, 1,  // INTER_COMPOUND_MODES (GLOBAL_GLOBALMV == 0)
 #if CONFIG_JOINT_MVD
   1,

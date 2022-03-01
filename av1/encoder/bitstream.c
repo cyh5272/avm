@@ -177,7 +177,7 @@ static AOM_INLINE void write_adaptive_mvd_flag(MACROBLOCKD *xd, aom_writer *w,
   aom_write_symbol(w, mbmi->adaptive_mvd_flag, xd->tile_ctx->adaptive_mvd_cdf,
                    2);
 }
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 
 static AOM_INLINE void write_inter_compound_mode(MACROBLOCKD *xd, aom_writer *w,
                                                  PREDICTION_MODE mode,
@@ -1605,11 +1605,11 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
       if (cm->seq_params.enable_adaptive_mvd)
         write_adaptive_mvd_flag(xd, w, mbmi);
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if IMPROVED_AMVD
       int max_drl_bits = cm->features.max_drl_bits;
       if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
-#endif
+#endif  // IMPROVED_AMVD
 
       if (have_drl_index(mode))
         write_drl_idx(
@@ -1618,7 +1618,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
             max_drl_bits,
 #else
             cm->features.max_drl_bits,
-#endif
+#endif  // IMPROVED_AMVD
             mbmi_ext_frame->mode_context,
 #endif  // CONFIG_NEW_INTER_MODES
             ec_ctx, mbmi, mbmi_ext_frame, w);
@@ -1629,7 +1629,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     if (mode == NEWMV ||
 #if IMPROVED_AMVD
         mode == AMVDNEWMV ||
-#endif
+#endif  // IMPROVED_AMVD
 #if CONFIG_OPTFLOW_REFINEMENT
         mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1715,7 +1715,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
         && mbmi->adaptive_mvd_flag == 0
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
     ) {
       const int masked_compound_used = is_any_masked_compound_used(bsize) &&
                                        cm->seq_params.enable_masked_compound;

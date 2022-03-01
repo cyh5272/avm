@@ -3191,7 +3191,7 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const int allow_hp = 0;
 #else
   const int allow_hp = ms_params->allow_hp;
-#endif
+#endif  // IMPROVED_AMVD
   const int forced_stop = ms_params->forced_stop;
   // const int iters_per_step = ms_params->iters_per_step;
   const MV_COST_PARAMS *mv_cost_params = &ms_params->mv_cost_params;
@@ -3330,9 +3330,10 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   other_ref_dist = same_side ? other_ref_dist : -other_ref_dist;
 
-  for (int iter = hstep; iter <= 8 * 32;) {
+  for (int iter = hstep; iter <= 256;) {
     int dummy = 0;
     MV candidate_mv[2];
+    // loop left, right, above, bottom directions
     for (int i = 0; i < 4; ++i) {
       const MV cur_mvd = { cand_pos[i][0] * iter, cand_pos[i][1] * iter };
       MV other_mvd = { 0, 0 };
@@ -3369,24 +3370,24 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     // allow integer and fractional MVD in (0,1]
     if (iter < 8) iter += hstep;
     // only allow integer MVD in (1,2]
-    else if (iter < 2 * 8)
+    else if (iter < 16)
       iter += 8;
     // only allow 4 integer MVD in (2,4]
-    else if (iter < 4 * 8)
-      iter += 8 * 2;
+    else if (iter < 32)
+      iter += 16;
     // only allow 8 sample integer MVD in (4,8]
-    else if (iter < 8 * 8)
-      iter += 8 * 4;
+    else if (iter < 64)
+      iter += 32;
     // only allow 16 sample integer MVD in (8,16]
-    else if (iter < 8 * 16)
-      iter += 8 * 8;
+    else if (iter < 128)
+      iter += 64;
     // only allow 32 sample integer MVD in (16,32]
     else
-      iter += 8 * 16;
+      iter += 128;
   }
   return besterr;
 }
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 
 int av1_find_best_sub_pixel_tree_pruned_evenmore(
     MACROBLOCKD *xd, const AV1_COMMON *const cm,

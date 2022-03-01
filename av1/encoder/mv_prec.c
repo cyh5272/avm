@@ -77,7 +77,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
                                                                          : 0;
 #else
   const int use_hp = cpi->common.features.allow_high_precision_mv;
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
   int r_idx = 0;
 
   const MACROBLOCK *const x = &cpi->td.mb;
@@ -264,7 +264,7 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
   if (mode == NEWMV ||
 #if IMPROVED_AMVD
       mode == AMVDNEWMV ||
-#endif
+#endif  // IMPROVED_AMVD
 #if CONFIG_OPTFLOW_REFINEMENT
       mode == NEW_NEWMV_OPTFLOW ||
 #endif  // CONFIG_OPTFLOW_REFINEMENT

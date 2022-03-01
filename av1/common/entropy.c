@@ -149,7 +149,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD
   RESET_CDF_COUNTER(fc->adaptive_mvd_cdf, 2);
-#endif
+#endif  // IMPROVED_AMVD
   RESET_CDF_COUNTER(fc->compound_type_cdf, MASKED_COMPOUND_TYPES);
   RESET_CDF_COUNTER(fc->wedge_idx_cdf, 16);
   RESET_CDF_COUNTER(fc->interintra_cdf, 2);

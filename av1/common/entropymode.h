@@ -128,7 +128,7 @@ typedef struct frame_contexts {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD
   aom_cdf_prob adaptive_mvd_cdf[CDF_SIZE(2)];
-#endif
+#endif  // IMPROVED_AMVD
   aom_cdf_prob compound_type_cdf[BLOCK_SIZES_ALL]
                                 [CDF_SIZE(MASKED_COMPOUND_TYPES)];
   aom_cdf_prob wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(16)];

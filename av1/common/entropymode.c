@@ -723,7 +723,7 @@ static const aom_cdf_prob
       { AOM_CDF3(27072, 28206) }, { AOM_CDF3(10923, 21845) },
       { AOM_CDF3(24626, 24936) }, { AOM_CDF3(10923, 21845) }
     };
-#endif
+#endif  // IMPROVED_AMVD
 #if CONFIG_REF_MV_BANK
 static const aom_cdf_prob
     default_drl0_cdf_refmvbank[DRL_MODE_CONTEXTS][CDF_SIZE(2)] = {
@@ -774,7 +774,7 @@ static const aom_cdf_prob default_drl2_cdf[DRL_MODE_CONTEXTS][CDF_SIZE(2)] = {
 #if IMPROVED_AMVD
 static const aom_cdf_prob default_adaptive_mvd_cdf[CDF_SIZE(2)] = { AOM_CDF2(
     25384) };
-#endif
+#endif  // IMPROVED_AMVD
 #if CONFIG_OPTFLOW_REFINEMENT
 static const aom_cdf_prob
     default_use_optflow_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(2)] = {
@@ -1612,7 +1612,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD
   av1_copy(fc->adaptive_mvd_cdf, default_adaptive_mvd_cdf);
-#endif
+#endif  // IMPROVED_AMVD
   av1_copy(fc->inter_compound_mode_cdf, default_inter_compound_mode_cdf);
   av1_copy(fc->compound_type_cdf, default_compound_type_cdf);
   av1_copy(fc->wedge_idx_cdf, default_wedge_idx_cdf);

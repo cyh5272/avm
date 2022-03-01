@@ -72,7 +72,7 @@ static const MODE_DEFINITION av1_mode_defs[MAX_MODES] = {
   { AMVDNEWMV, { ALTREF2_FRAME, NONE_FRAME } },
   { AMVDNEWMV, { GOLDEN_FRAME, NONE_FRAME } },
   { AMVDNEWMV, { ALTREF_FRAME, NONE_FRAME } },
-#endif
+#endif  // IMPROVED_AMVD
 
   // TODO(zoeliu): May need to reconsider the order on the modes to check
   { NEAR_NEARMV, { LAST_FRAME, ALTREF_FRAME } },

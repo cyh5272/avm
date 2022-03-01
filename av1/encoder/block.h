@@ -757,8 +757,9 @@ typedef struct {
                               [INTER_COMPOUND_MODES];
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
+  //! adaptive_mvd_cost
   int adaptive_mvd_cost[2];
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
   //! compound_type_cost
   int compound_type_cost[BLOCK_SIZES_ALL][MASKED_COMPOUND_TYPES];
   //! wedge_idx_cost

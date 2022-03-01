@@ -43,7 +43,7 @@ extern "C" {
 #endif
 #if CONFIG_ADAPTIVE_MVD
 #define IMPROVED_AMVD 1
-#endif
+#endif  // CONFIG_ADAPTIVE_MVD
 
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
@@ -533,7 +533,7 @@ enum {
   NEWMV,
 #if IMPROVED_AMVD
   AMVDNEWMV,
-#endif
+#endif  // IMPROVED_AMVD
 // Compound ref compound modes
 #if !CONFIG_NEW_INTER_MODES
   NEAREST_NEARESTMV,

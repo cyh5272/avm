@@ -394,7 +394,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
     av1_cost_tokens_from_cdf(mode_costs->adaptive_mvd_cost,
                              fc->adaptive_mvd_cdf, NULL);
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
     for (i = 0; i < INTER_COMPOUND_MODE_CONTEXTS; ++i)
       av1_cost_tokens_from_cdf(mode_costs->inter_compound_mode_cost[i],
                                fc->inter_compound_mode_cdf[i], NULL);

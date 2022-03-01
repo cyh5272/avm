@@ -551,7 +551,7 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
       av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->amvd_nmv_joint_cost,
                       mv_costs->amvd_mv_cost_stack, MV_COST_WEIGHT);
 }
-#endif
+#endif  // IMPROVED_AMVD
 
 // Search for the best mv for one component of a compound,
 // given that the other component is fixed.
@@ -632,7 +632,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   if (is_adaptive_mvd
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
       && mbmi->adaptive_mvd_flag == 0
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
   ) {
     int dis; /* TODO: use dis in distortion calculation later. */
     unsigned int sse;
@@ -666,7 +666,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
           cm, xd, &ms_params, this_mv, &best_mv.as_mv, &dis, &sse, ref_idx,
           other_mv, &best_other_mv.as_mv, second_pred, &inter_pred_params);
     else
-#endif
+#endif  // IMPROVED_AMVD
       bestsme = joint_mvd_search(cm, xd, &ms_params, ref_mv.as_mv, this_mv,
                                  &best_mv.as_mv, &dis, &sse, ref_idx, other_mv,
                                  &best_other_mv.as_mv, second_pred,

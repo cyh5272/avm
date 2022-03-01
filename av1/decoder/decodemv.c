@@ -359,7 +359,7 @@ static PREDICTION_MODE read_adaptive_mvd_flag(MACROBLOCKD *xd, aom_reader *r,
       aom_read_symbol(r, xd->tile_ctx->adaptive_mvd_cdf, 2, ACCT_STR);
   return adaptive_mvd_flag;
 }
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 
 static PREDICTION_MODE read_inter_compound_mode(MACROBLOCKD *xd, aom_reader *r,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1251,10 +1251,10 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
 #endif  // CONFIG_ADAPTIVE_MVD
                            nmv_context *ctx, MvSubpelPrecision precision) {
   MV diff = kZeroMv;
-#if CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
+#if IMPROVED_AMVD && CONFIG_ADAPTIVE_MVD
   if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
     precision = MV_SUBPEL_LOW_PRECISION;
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
   const MV_JOINT_TYPE joint_type =
 #if CONFIG_ADAPTIVE_MVD
       is_adaptive_mvd ? (MV_JOINT_TYPE)aom_read_symbol(r, ctx->amvd_joints_cdf,
@@ -1583,7 +1583,7 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
   switch (mode) {
 #if IMPROVED_AMVD
     case AMVDNEWMV:
-#endif
+#endif  // IMPROVED_AMVD
     case NEWMV: {
       nmv_context *const nmvc = &ec_ctx->nmvc;
       read_mv(r, &mv[0].as_mv, &ref_mv[0].as_mv,
@@ -1733,7 +1733,7 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
                          allow_hp & !is_adaptive_mvd,
 #else
                          allow_hp,
-#endif
+#endif  // IMPROVED_AMVD
                          features->cur_frame_force_integer_mv);
       mv[1 - jmvd_base_ref_list].as_mv.row =
           (int)(near_mv[1 - jmvd_base_ref_list].as_mv.row + other_mvd.row);
@@ -1875,11 +1875,11 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         mbmi->adaptive_mvd_flag = read_adaptive_mvd_flag(xd, r, mbmi);
       else
         mbmi->adaptive_mvd_flag = 0;
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 #if IMPROVED_AMVD
       int max_drl_bits = cm->features.max_drl_bits;
       if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
-#endif
+#endif  // IMPROVED_AMVD
       if (have_drl_index(mbmi->mode))
         read_drl_idx(
 #if CONFIG_NEW_INTER_MODES
@@ -1887,7 +1887,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
             max_drl_bits,
 #else
             cm->features.max_drl_bits,
-#endif
+#endif  // IMPROVED_AMVD
             av1_mode_context_pristine(inter_mode_ctx, mbmi->ref_frame),
 #endif  // CONFIG_NEW_INTER_MODES
             ec_ctx, dcb, mbmi, r);
@@ -1962,7 +1962,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     if (mbmi->mode == NEWMV
 #if IMPROVED_AMVD
         || mbmi->mode == AMVDNEWMV
-#endif
+#endif  // IMPROVED_AMVD
     ) {
       if (dcb->ref_mv_count[ref_frame] > 1)
         ref_mv[0] = xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx].this_mv;
@@ -2033,7 +2033,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
       mbmi->adaptive_mvd_flag == 0 &&
-#endif
+#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
       !mbmi->skip_mode) {
     // Read idx to indicate current compound inter prediction mode group
     const int masked_compound_used = is_any_masked_compound_used(bsize) &&
