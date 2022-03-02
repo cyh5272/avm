@@ -574,11 +574,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   const MvCosts *mv_costs = &x->mv_costs;
 #if CONFIG_JOINT_MVD
   InterPredParams inter_pred_params;
-#if CONFIG_OPTFLOW_REFINEMENT
-  if (mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) {
-#else
-  if (mbmi->mode == JOINT_NEWMV) {
-#endif
+  if (is_joint_mvd_coding_mode(mbmi->mode)) {
     const int pw = block_size_wide[bsize];
     const int ph = block_size_high[bsize];
     const int mi_row = xd->mi_row;
@@ -631,7 +627,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
   if (is_adaptive_mvd
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-      && mbmi->adaptive_mvd_flag == 0
+      && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
   ) {
     int dis; /* TODO: use dis in distortion calculation later. */
@@ -647,11 +643,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   } else
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-#if CONFIG_OPTFLOW_REFINEMENT
-      if (mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) {
-#else
-      if (mbmi->mode == JOINT_NEWMV) {
-#endif
+      if (is_joint_mvd_coding_mode(mbmi->mode)) {
     int dis; /* TODO: use dis in distortion calculation later. */
     unsigned int sse;
     SUBPEL_MOTION_SEARCH_PARAMS ms_params;
@@ -728,11 +720,7 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   if (bestsme < INT_MAX) *this_mv = best_mv.as_mv;
 
 #if CONFIG_JOINT_MVD
-#if CONFIG_OPTFLOW_REFINEMENT
-  if (mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) {
-#else
-  if (mbmi->mode == JOINT_NEWMV) {
-#endif
+  if (is_joint_mvd_coding_mode(mbmi->mode)) {
     if (bestsme < INT_MAX) *other_mv = best_other_mv.as_mv;
   }
 #endif  // CONFIG_JOINT_MVD
@@ -884,14 +872,8 @@ int av1_interinter_compound_motion_search(const AV1_COMP *const cpi,
 #if CONFIG_JOINT_MVD
     const AV1_COMMON *const cm = &cpi->common;
     const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
-    int which =
-        (NEWMV == compound_ref1_mode(this_mode) ||
-#if CONFIG_OPTFLOW_REFINEMENT
-         ((this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) &&
-          jmvd_base_ref_list));
-#else
-         (this_mode == JOINT_NEWMV && jmvd_base_ref_list));
-#endif
+    int which = (NEWMV == compound_ref1_mode(this_mode) ||
+                 (is_joint_mvd_coding_mode(this_mode) && jmvd_base_ref_list));
 #else
     int which = (NEWMV == compound_ref1_mode(this_mode));
 #endif  // CONFIG_JOINT_MVD

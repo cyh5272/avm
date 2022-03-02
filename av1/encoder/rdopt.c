@@ -1560,11 +1560,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-#if CONFIG_OPTFLOW_REFINEMENT
-    } else if (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) {
-#else
-    } else if (this_mode == JOINT_NEWMV) {
-#endif
+    } else if (is_joint_mvd_coding_mode(this_mode)) {
       if (!cm->seq_params.enable_joint_mvd) return INT64_MAX;
       const int same_side = is_ref_frame_same_side(cm, mbmi);
       // skip JOINT_NEWMV mode when two reference frames are from same side
@@ -1585,7 +1581,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
                                 (jmvd_base_ref_list && valid_mv1);
       if (valid_mv_base
 #if IMPROVED_AMVD
-          && mbmi->adaptive_mvd_flag == 0
+          && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
 #endif  // IMPROVED_AMVD
       ) {
         cur_mv[jmvd_base_ref_list].as_int =
@@ -1891,11 +1887,7 @@ static int64_t motion_mode_rd(
       const uint32_t cur_mv = mbmi->mv[0].as_int;
       // OBMC_CAUSAL not allowed for compound prediction
       assert(!is_comp_pred);
-      if (have_newmv_in_inter_mode(this_mode)
-#if IMPROVED_AMVD
-          && this_mode != AMVDNEWMV
-#endif  // IMPROVED_AMVD
-      ) {
+      if (this_mode == NEWMV) {
         av1_single_motion_search(cpi, x, bsize, 0, &tmp_rate_mv, INT_MAX, NULL,
                                  &mbmi->mv[0]);
         tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
@@ -1931,11 +1923,7 @@ static int64_t motion_mode_rd(
                                mbmi->mv[0].as_mv.row, mbmi->mv[0].as_mv.col,
                                &mbmi->wm_params, mi_row, mi_col)) {
         assert(!is_comp_pred);
-        if (have_newmv_in_inter_mode(this_mode)
-#if IMPROVED_AMVD
-            && this_mode != AMVDNEWMV
-#endif  // IMPROVED_AMVD
-        ) {
+        if (this_mode == NEWMV) {
           // Refine MV for NEWMV mode
           const int_mv mv0 = mbmi->mv[0];
           const WarpedMotionParams wm_params0 = mbmi->wm_params;
@@ -2577,7 +2565,7 @@ static int64_t simple_translation_pred_rd(
   rd_stats->rate += ref_mv_cost;
 
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-  if ((mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW) &&
+  if (is_joint_mvd_coding_mode(mbmi->mode) &&
       cm->seq_params.enable_adaptive_mvd)
     rd_stats->rate += mode_costs->adaptive_mvd_cost[mbmi->adaptive_mvd_flag];
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
@@ -3371,8 +3359,7 @@ static int64_t handle_inter_mode(
   //    6.) Update stats if best so far
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
   const int is_joint_amvd_allowed =
-      (this_mode == JOINT_NEWMV || this_mode == JOINT_NEWMV_OPTFLOW) &&
-      cm->seq_params.enable_adaptive_mvd;
+      is_joint_mvd_coding_mode(this_mode) && cm->seq_params.enable_adaptive_mvd;
   for (int amvd_idx = 0; amvd_idx <= is_joint_amvd_allowed; ++amvd_idx) {
     mbmi->adaptive_mvd_flag = amvd_idx;
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
@@ -3502,7 +3489,7 @@ static int64_t handle_inter_mode(
       // cannot be the best compound mode
       if (is_comp_pred
 #if IMPROVED_AMVD && CONFIG_JOINT_MVD
-          && mbmi->adaptive_mvd_flag == 0
+          && !is_joint_amvd_coding_mode(mbmi->adaptive_mvd_flag)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
       ) {
         const int not_best_mode = process_compound_inter_mode(
@@ -6336,20 +6323,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   // Make sure that the ref_mv_idx is only nonzero when we're
   // using a mode which can support ref_mv_idx
   if (search_state.best_mbmode.ref_mv_idx != 0 &&
-      !(search_state.best_mbmode.mode == NEWMV ||
-#if IMPROVED_AMVD
-        search_state.best_mbmode.mode == AMVDNEWMV ||
-#endif  // IMPROVED_AMVD
-        search_state.best_mbmode.mode == NEW_NEWMV ||
+      !(have_newmv_in_each_reference(search_state.best_mbmode.mode) ||
 #if CONFIG_JOINT_MVD
-        search_state.best_mbmode.mode == JOINT_NEWMV ||
-#if CONFIG_OPTFLOW_REFINEMENT
-        search_state.best_mbmode.mode == JOINT_NEWMV_OPTFLOW ||
-#endif
+        is_joint_mvd_coding_mode(search_state.best_mbmode.mode) ||
 #endif  // CONFIG_JOINT_MVD
-#if CONFIG_OPTFLOW_REFINEMENT
-        search_state.best_mbmode.mode == NEW_NEWMV_OPTFLOW ||
-#endif  // CONFIG_OPTFLOW_REFINEMENT
         have_nearmv_in_inter_mode(search_state.best_mbmode.mode))) {
     search_state.best_mbmode.ref_mv_idx = 0;
   }

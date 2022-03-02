@@ -73,8 +73,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   const int high_part = offset & 1;         // high precision mv data
 #if CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
   const int use_hp =
-      (cpi->common.features.allow_high_precision_mv && !is_adaptive_mvd) ? 1
-                                                                         : 0;
+      (cpi->common.features.allow_high_precision_mv && !is_adaptive_mvd);
 #else
   const int use_hp = cpi->common.features.allow_high_precision_mv;
 #endif  // CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
