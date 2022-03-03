@@ -763,15 +763,28 @@ struct CommonModeInfoParams {
   TX_TYPE *tx_type_map;
 
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+  /*!
+   * Encoder TxSkip log
+   */
   FILE *fEncTxSkipLog;
+  /*!
+   * Decoder TxSkip log
+   */
   FILE *fDecTxSkipLog;
-  // indicate if a transform block has any non-zero coefficients or not.
-  // the buffer is allocated for each 4x4 block
+  /*!
+   * indicate if a transform block has any non-zero coefficients or not.
+   * the buffer is allocated for each 4x4 block
+   */
   uint8_t *tx_skip[MAX_MB_PLANE];
+  /*!
+   * tx_skip buffer allocated for each 4x4 block
+   */
   uint32_t tx_skip_buf_size[MAX_MB_PLANE];
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_SAVE_IN_LOOP_DATA
-  // Useful in saving lr modes.
+  /*!
+   * Useful in saving lr modes.
+   */
   uint8_t *lr_mode_info[MAX_MB_PLANE];
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
   /**
@@ -1533,8 +1546,7 @@ typedef struct AV1Common {
 void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params);
 void av1_dealloc_txk_skip_array(CommonModeInfoParams *mi_params);
 void av1_reset_txk_skip_array(AV1_COMMON *cm);
-void av1_reset_txk_skip_array_using_mi_params(
-    CommonModeInfoParams *mi_params);
+void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params);
 void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                              int mi_row, int mi_col, BLOCK_SIZE bsize,
                              uint8_t value, bool is_chroma_ref, FILE *fLog);
