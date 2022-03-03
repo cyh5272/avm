@@ -197,25 +197,27 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
     }
   }
 
+  /*
   if (fLog) {
     int row = (mi_row << MI_SIZE_LOG2);
     int col = (mi_col << MI_SIZE_LOG2);
     int w = block_size_wide[bsize];
     int h = block_size_high[bsize];
     // Conflicts with SDP mod of is_inter_block.
-    //    if (value != 0) {
-    //      fprintf(fLog,
-    //              "\n\tSkipped TxBlock: row = %d, col = %d, blk_width = %d, "
-    //              "blk_height = %d",
-    //              row, col, w, h);
-    //    } else {
-    //      fprintf(
-    //          fLog,
-    //          "\nrow = %d, col = %d, width = %d, height = %d, %s, blk skipped
-    //          = %d", row, col, w, h, is_inter_block(mbmi) ? "INTER" : "INTRA",
-    //          value);
-    //    }
+    if (value != 0) {
+      fprintf(fLog,
+              "\n\tSkipped TxBlock: row = %d, col = %d, blk_width = %d, "
+              "blk_height = %d",
+              row, col, w, h);
+    } else {
+      fprintf(
+          fLog,
+          "\nrow = %d, col = %d, width = %d, height = %d, %s, blk skipped
+          = %d", row, col, w, h, is_inter_block(mbmi) ? "INTER" : "INTRA",
+          value);
+    }
   }
+  */
 }
 
 void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
