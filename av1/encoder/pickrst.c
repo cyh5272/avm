@@ -2501,18 +2501,8 @@ static int64_t finer_tile_search_wienerns(
   rui->wiener_nonsep_info = best;
 
   const int src_steps[][2] = {
-    { 1, -1 },
-    { -1, 1 },
-    { 1, 1 },
-    { -1, -1 },
-    { 2, 1 },
-    { 1, 2 },
-    { -2, 1 },
-    { 1, -2 },
-    { 2, -1 },
-    { -1, 2 },
-    { -2, -1 },
-    { -1, -2 },
+    { 1, -1 }, { -1, 1 }, { 1, 1 },  { -1, -1 }, { 2, 1 },   { 1, 2 },
+    { -2, 1 }, { 1, -2 }, { 2, -1 }, { -1, 2 },  { -2, -1 }, { -1, -2 },
   };
   const int nsrc_steps = sizeof(src_steps) / (2 * sizeof(src_steps[0][0]));
   for (int s = 0; s < iter_step; ++s) {
