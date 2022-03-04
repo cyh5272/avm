@@ -345,10 +345,9 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-  // TODO(oguleryuz): Resolve the assert failure. Turning this off temporarily
-  // assert((eob == 0) ==
-  //        av1_get_txk_skip(cm, xd->mi_row, xd->mi_col, plane, blk_row,
-  //        blk_col));
+   assert((eob == 0) ==
+          av1_get_txk_skip(cm, xd->mi_row, xd->mi_col, plane, blk_row,
+          blk_col));
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (eob == 0) return;
 
