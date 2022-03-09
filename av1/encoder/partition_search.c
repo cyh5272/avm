@@ -1343,10 +1343,8 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
  * Reconstructs an individual coding block by applying the chosen modes stored
  * in ctx, also updates mode counts and entropy models.
  *
- * When tree_type is SHARED_PART, encode_b is run for both
- * luma and chroma components together when tree_type is LUMA_PART,
- * encode_b is run for luma component only when tree_type is
- * CHROMA_PART, encode_b is run for chroma component only.
+ * This function works on planes determined by get_partition_plane_start() and
+ * get_partition_plane_end() based on xd->tree_type.
  *
  * \param[in]    cpi       Top-level encoder structure
  * \param[in]    tile_data Pointer to struct holding adaptive
@@ -1386,9 +1384,9 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   av1_update_state(cpi, td, ctx, mi_row, mi_col, bsize, dry_run);
 
   int plane_type = (xd->tree_type == CHROMA_PART);
-  const int num_planes = av1_num_planes(cm);
-  const int plane_start = (xd->tree_type == CHROMA_PART);
-  const int plane_end = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+  const int plane_start = get_partition_plane_start(xd->tree_type);
+  const int plane_end =
+      get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
 
   if (!dry_run) {
     x->mbmi_ext_frame->cb_offset[plane_type] = x->cb_offset[plane_type];
@@ -1515,10 +1513,8 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
  * Reconstructs a sub-partition of the superblock by applying the chosen modes
  * and partition trees stored in pc_tree.
  *
- * When tree_type is SHARED_PART, encode_sb is run for both
- * luma and chroma components together when tree_type is LUMA_PART,
- * encode_sb is run for luma component only when tree_type is
- * CHROMA_PART, encode_sb is run for chroma component only.
+ * This function works on planes determined by get_partition_plane_start() and
+ * get_partition_plane_end() based on xd->tree_type.
  *
  * \param[in]    cpi       Top-level encoder structure
  * \param[in]    td        Pointer to thread data
@@ -1738,8 +1734,8 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   RD_SEARCH_MACROBLOCK_CONTEXT x_ctx;
   RD_STATS last_part_rdc, invalid_rdc;
   int plane_type = (xd->tree_type == CHROMA_PART);
-  const int plane_start = (xd->tree_type == CHROMA_PART);
-  const int plane_end = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+  const int plane_start = get_partition_plane_start(xd->tree_type);
+  const int plane_end = get_partition_plane_end(xd->tree_type, num_planes);
 
   if (pc_tree->none == NULL) {
     pc_tree->none = av1_alloc_pmc(cm, bsize, &td->shared_coeff_buf);
@@ -1945,9 +1941,9 @@ static int rd_try_subblock(AV1_COMP *const cpi, ThreadData *td,
 
   MACROBLOCKD *xd = &x->e_mbd;
   const AV1_COMMON *const cm = &cpi->common;
-  const int num_planes = av1_num_planes(cm);
-  const int plane_start = (xd->tree_type == CHROMA_PART);
-  const int plane_end = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+  const int plane_start = get_partition_plane_start(xd->tree_type);
+  const int plane_end =
+      get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
 
   if (!is_last) {
     av1_update_state(cpi, td, this_ctx, mi_row, mi_col, subsize, 1);
@@ -2226,9 +2222,9 @@ static void rectangular_partition_search(
                                                     PARTITION_VERT };
 
   MACROBLOCKD *xd = &x->e_mbd;
-  const int num_planes = av1_num_planes(cm);
-  const int plane_start = (xd->tree_type == CHROMA_PART);
-  const int plane_end = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+  const int plane_start = get_partition_plane_start(xd->tree_type);
+  const int plane_end =
+      get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
 
   // mi_pos_rect[NUM_RECT_PARTS][SUB_PARTITIONS_RECT][0]: mi_row postion of
   //                                           HORZ and VERT partition types.
@@ -3091,10 +3087,8 @@ static void split_partition_search(
 * partition pattern is found. The partition can recursively go down to the
 * smallest block size.
 *
-* When tree_type is SHARED_PART, av1_rd_pick_partition is run for both
-* luma and chroma components together when tree_type is LUMA_PART,
-* av1_rd_pick_partition is run for luma component only when tree_type is
-* CHROMA_PART, av1_rd_pick_partition is run for chroma component only.
+* This function works on planes determined by get_partition_plane_start() and
+* get_partition_plane_end() based on xd->tree_type.
 *
 * \param[in]    cpi                Top-level encoder structure
 * \param[in]    td                 Pointer to thread data
