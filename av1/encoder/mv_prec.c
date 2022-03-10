@@ -165,7 +165,7 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   const int high_part = offset & 1;         // high precision mv data
 
 #if CONFIG_FLEX_MVRES
-  const int use_hp =       pb_mv_precision > MV_PRECISION_QTR_PEL;
+  const int use_hp = pb_mv_precision > MV_PRECISION_QTR_PEL;
 #else
 #if CONFIG_ADAPTIVE_MVD && IMPROVED_AMVD
   const int use_hp =
@@ -533,9 +533,9 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
     mv_stats->default_mvs += 1;
 #if CONFIG_NEW_INTER_MODES
 #if CONFIG_OPTFLOW_REFINEMENT
-        int ref_idx = (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW);
+    int ref_idx = (mode == NEAR_NEWMV || mode == NEAR_NEWMV_OPTFLOW);
 #else
-       int ref_idx = (mode == NEAR_NEWMV);
+    int ref_idx = (mode == NEAR_NEWMV);
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #else
     const int ref_idx = (mode == NEAREST_NEWMV || mode == NEAR_NEWMV);

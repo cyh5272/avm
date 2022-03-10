@@ -1959,7 +1959,7 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
 #else
                          allow_hp,
 #endif  // IMPROVED_AMVD
-                       features->cur_frame_force_integer_mv);
+                         features->cur_frame_force_integer_mv);
 #endif
       mv[1 - jmvd_base_ref_list].as_mv.row =
           (int)(near_mv[1 - jmvd_base_ref_list].as_mv.row + other_mvd.row);

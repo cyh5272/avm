@@ -184,14 +184,14 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
 
 #if CONFIG_ADAPTIVE_MVD
-  if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
+    if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
-  if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
-    precision = MV_SUBPEL_LOW_PRECISION;
+    if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
+      precision = MV_SUBPEL_LOW_PRECISION;
 #endif  // IMPROVED_AMVD
-  if (is_adaptive_mvd)
-    update_cdf(mvctx->amvd_joints_cdf, j, MV_JOINTS);
-  else
+    if (is_adaptive_mvd)
+      update_cdf(mvctx->amvd_joints_cdf, j, MV_JOINTS);
+    else
 #endif  // CONFIG_ADAPTIVE_MVD
       update_cdf(mvctx->joints_cdf, j, MV_JOINTS);
 
@@ -663,19 +663,20 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
   const MV diff = { mv->row - ref->row, mv->col - ref->col };
 #endif
 #if CONFIG_ADAPTIVE_MVD
-  const AV1_COMMON *cm = &cpi->common;
-  const MACROBLOCK *const x = &cpi->td.mb;
-  const MACROBLOCKD *const xd = &x->e_mbd;
-  MB_MODE_INFO *mbmi = xd->mi[0];
-  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+      const AV1_COMMON *cm = &cpi->common;
+      const MACROBLOCK *const x = &cpi->td.mb;
+      const MACROBLOCKD *const xd = &x->e_mbd;
+      MB_MODE_INFO *mbmi = xd->mi[0];
+      const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
 #endif  // CONFIG_ADAPTIVE_MVD
-  const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
+      const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
 #if !CONFIG_FLEX_MVRES
-  // If the mv_diff is zero, then we should have used near or nearest instead.
-  assert(j != MV_JOINT_ZERO);
-  if (cpi->common.features.cur_frame_force_integer_mv) {
-    usehp = MV_SUBPEL_NONE;
-  }
+      // If the mv_diff is zero, then we should have used near or nearest
+      // instead.
+      assert(j != MV_JOINT_ZERO);
+      if (cpi->common.features.cur_frame_force_integer_mv) {
+        usehp = MV_SUBPEL_NONE;
+      }
 #endif
 
 #if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
@@ -704,23 +705,22 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
           &cpi->common.error, "Error in ref.col in the function av1_encode_mv");
 #endif  // CONFIG_FLEX_MVRES
 
-
 #if CONFIG_ADAPTIVE_MVD
-  if (is_adaptive_mvd) {
-    assert(j < MV_JOINTS - 1);
+      if (is_adaptive_mvd) {
+        assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
-    if (usehp > MV_SUBPEL_NONE) usehp = MV_SUBPEL_LOW_PRECISION;
+        if (usehp > MV_SUBPEL_NONE) usehp = MV_SUBPEL_LOW_PRECISION;
 #endif  // IMPROVED_AMVD
-  }
-  if (is_adaptive_mvd)
-    aom_write_symbol(w, j, mvctx->amvd_joints_cdf, MV_JOINTS);
-  else
+      }
+      if (is_adaptive_mvd)
+        aom_write_symbol(w, j, mvctx->amvd_joints_cdf, MV_JOINTS);
+      else
 #endif  // CONFIG_ADAPTIVE_MVD
-    aom_write_symbol(w, j, mvctx->joints_cdf, MV_JOINTS);
-  if (mv_joint_vertical(j))
-    encode_mv_component(w, diff.row, &mvctx->comps[0],
+        aom_write_symbol(w, j, mvctx->joints_cdf, MV_JOINTS);
+      if (mv_joint_vertical(j))
+        encode_mv_component(w, diff.row, &mvctx->comps[0],
 #if CONFIG_ADAPTIVE_MVD
-                        is_adaptive_mvd,
+                            is_adaptive_mvd,
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
                             pb_mv_precision);
