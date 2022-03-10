@@ -3558,6 +3558,7 @@ static int64_t handle_inter_mode(
             check_mv_precision(cm, mbmi) == 0,
             " precision and MV mismatch at the end of the motion_mode_rd");
 #endif
+
         if (tmp_rd < ref_best_rd) {
           ref_best_rd = tmp_rd;
           best_ref_mv_idx = ref_mv_idx;
@@ -7223,7 +7224,6 @@ for (int fsc_mode = 0;
                   xd->sbi
 #endif
         );
-
 #endif  // CONFIG_IBC_SR_EXT
       txfm_info->skip_txfm = 0;
 
