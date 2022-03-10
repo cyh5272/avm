@@ -4562,7 +4562,7 @@ int av1_find_best_sub_pixel_tree(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 
   *bestmv = start_mv;
 
-  #if !CONFIG_FLEX_MVRES
+#if !CONFIG_FLEX_MVRES
   const struct scale_factors *const sf =
       is_intrabc_block(xd->mi[0], xd->tree_type)
           ? &cm->sf_identity
@@ -4576,11 +4576,11 @@ int av1_find_best_sub_pixel_tree(MACROBLOCKD *xd, const AV1_COMMON *const cm,
     besterr = setup_center_error(xd, bestmv, var_params, mv_cost_params, sse1,
                                  distortion);
   }
-  #else
-    besterr = upsampled_setup_center_error(xd, cm, bestmv, var_params,
+#else
+  besterr = upsampled_setup_center_error(xd, cm, bestmv, var_params,
                                          mv_cost_params, sse1, distortion);
 
-  #endif
+#endif
 
   // If forced_stop is FULL_PEL, return.
   if (!round) return besterr;
