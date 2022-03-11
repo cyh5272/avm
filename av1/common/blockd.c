@@ -16,6 +16,9 @@
 
 #include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
+#if CONFIG_DERIVED_MV
+#include "av1/common/reconinter.h"
+#endif  // CONFIG_DERIVED_MV
 
 #if CONFIG_AIMC
 PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi) {
@@ -145,5 +148,45 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
   for (i = num_planes; i < MAX_MB_PLANE; i++) {
     xd->plane[i].subsampling_x = 1;
     xd->plane[i].subsampling_y = 1;
+  }
+}
+
+MOTION_MODE
+motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
+                    const MB_MODE_INFO *mbmi, int allow_warped_motion) {
+#if CONFIG_TIP
+  if (is_tip_ref_frame(mbmi->ref_frame[0])) return SIMPLE_TRANSLATION;
+#endif  // CONFIG_TIP
+
+#if CONFIG_DERIVED_MV
+  if (av1_derived_mv_allowed(xd, mbmi) && mbmi->use_derived_mv) {
+    return SIMPLE_TRANSLATION;
+  }
+#endif  // CONFIG_DERIVED_MV
+
+  if (xd->cur_frame_force_integer_mv == 0) {
+    const TransformationType gm_type = gm_params[mbmi->ref_frame[0]].wmtype;
+    if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
+  }
+
+#if CONFIG_FLEX_MVRES && DISABLE_MOTION_MODE_LOW_PRECISION
+  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return SIMPLE_TRANSLATION;
+#endif
+  if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
+      is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
+      is_motion_variation_allowed_compound(mbmi)) {
+    if (!check_num_overlappable_neighbors(mbmi)) return SIMPLE_TRANSLATION;
+    assert(!has_second_ref(mbmi));
+    if (mbmi->num_proj_ref >= 1 &&
+        (allow_warped_motion &&
+         !av1_is_scaled(xd->block_ref_scale_factors[0]))) {
+      if (xd->cur_frame_force_integer_mv) {
+        return OBMC_CAUSAL;
+      }
+      return WARPED_CAUSAL;
+    }
+    return OBMC_CAUSAL;
+  } else {
+    return SIMPLE_TRANSLATION;
   }
 }

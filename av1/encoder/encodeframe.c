@@ -533,11 +533,9 @@ static AOM_INLINE MvSubpelPrecision determine_best_sb_mv_precision(
   const CommonModeInfoParams *mi_params = &cm->mi_params;
   const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
 
-#if CONFIG_SDP
   MACROBLOCK *const x = &td->mb;
   MACROBLOCKD *const xd = &x->e_mbd;
   xd->tree_type = SHARED_PART;
-#endif
 
   const FeatureFlags *features = &cm->features;
   MvSubpelPrecision best_prec = features->fr_mv_precision;

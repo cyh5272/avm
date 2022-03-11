@@ -395,6 +395,44 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       av1_setup_pre_planes(xd, ref, cfg, mi_row, mi_col,
                            xd->block_ref_scale_factors[ref], num_planes);
     }
+
+#if CONFIG_DERIVED_MV
+    assert(mbmi->derived_mv_allowed == av1_derived_mv_allowed(xd, mbmi));
+    if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+      MV derived_mv[2];
+      int need_update = 0;
+      for (ref = 0; ref < 1 + is_compound; ++ref) {
+        derived_mv[ref] =
+            av1_derive_mv(cm, xd, ref, mbmi, x->mbmi_ext->ref_mv_count,
+                          xd->plane[0].dst.buf, xd->plane[0].dst.stride);
+        /*
+if (dry_run == OUTPUT_ENABLED) {
+  fprintf(stderr, "ENCODER derived_mv[%d] = (%d, %d) at (%d, %d), bsize = %d,
+motion_mode = %d\n", ref, derived_mv[ref].row, derived_mv[ref].col, xd->mi_row *
+4, xd->mi_col * 4, bsize, mbmi->motion_mode);
+}*/
+        if (mbmi->derived_mv[ref].row != derived_mv[ref].row ||
+            mbmi->derived_mv[ref].col != derived_mv[ref].col) {
+          need_update = 1;
+        }
+      }
+
+      if (need_update) {
+        mbmi->derived_mv[0] = derived_mv[0];
+        if (is_compound) mbmi->derived_mv[1] = derived_mv[1];
+        assert(mbmi->motion_mode = SIMPLE_TRANSLATION);
+        // Update the frame MV buffers.
+        if (!dry_run && cm->seq_params.order_hint_info.enable_ref_frame_mvs) {
+          const int bw = mi_size_wide[bsize];
+          const int bh = mi_size_high[bsize];
+          const int x_mis = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
+          const int y_mis = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
+          av1_copy_frame_mvs(cm, mbmi, mi_row, mi_col, x_mis, y_mis);
+        }
+      }
+    }
+#endif  // CONFIG_DERIVED_MV
+
     int start_plane = 0;
     av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize,
                                   start_plane, av1_num_planes(cm) - 1);
@@ -781,6 +819,10 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
   av1_set_error_per_bit(&x->mv_costs, x->rdmult);
   av1_rd_cost_update(x->rdmult, &best_rd);
 
+#if CONFIG_DERIVED_MV
+  mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
+
   // Find best coding mode & reconstruct the MB so it is available
   // as a predictor for MBs that follow in the SB
   if (frame_is_intra_only(cm)) {
@@ -836,6 +878,9 @@ static void update_drl_index_stats(int max_drl_bits, const int16_t mode_ctx,
 #if !CONFIG_ENTROPY_STATS
   (void)counts;
 #endif  // !CONFIG_ENTROPY_STATS
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) return;
+#endif  // CONFIG_DERIVED_MV
   assert(have_drl_index(mbmi->mode));
 #if IMPROVED_AMVD
   if (mbmi->mode == AMVDNEWMV) max_drl_bits = AOMMIN(max_drl_bits, 1);
@@ -1226,6 +1271,14 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
 #endif  // CONFIG_NEW_REF_SIGNALING
       }
+
+#if CONFIG_DERIVED_MV
+      if (mbmi->derived_mv_allowed) {
+        update_cdf(fc->use_derived_mv_cdf[has_second_ref(mbmi)]
+                                         [mbmi->sb_type[PLANE_TYPE_Y]],
+                   mbmi->use_derived_mv, 2);
+      }
+#endif  // CONFIG_DERIVED_MV
 
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {

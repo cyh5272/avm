@@ -712,7 +712,16 @@ MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
 int is_pb_mv_precision_active(const AV1_COMMON *const cm,
                               const MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
 
-#endif
+#endif  // CONFIG_FLEX_MVRES
+
+#if CONFIG_DERIVED_MV
+int av1_derived_mv_allowed(const MACROBLOCKD *const xd,
+                           const MB_MODE_INFO *const mbmi);
+
+MV av1_derive_mv(const AV1_COMMON *const cm, MACROBLOCKD *xd, int ref,
+                 MB_MODE_INFO *mbmi, uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
+                 uint8_t *recon_buf, int recon_stride);
+#endif  // CONFIG_DERIVED_MV
 
 #ifdef __cplusplus
 }  // extern "C"
