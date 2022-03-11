@@ -251,6 +251,10 @@ typedef struct frame_contexts {
                                   [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
                                   [CDF_SIZE(FLEX_MV_COSTS_SIZE)];
 #endif  // CONFIG_FLEX_MVRES
+#if CONFIG_DERIVED_MV
+  // First index: 0: single reference; 1: compound reference; 2: skip mode.
+  aom_cdf_prob use_derived_mv_cdf[3][BLOCK_SIZES_ALL][CDF_SIZE(2)];
+#endif  // CONFIG_DERIVED_MV
   int initialized;
 } FRAME_CONTEXT;
 

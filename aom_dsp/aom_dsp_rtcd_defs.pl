@@ -1306,6 +1306,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sub_pixel_avg_variance16x64 sse2 ssse3/;
   specialize qw/aom_sub_pixel_avg_variance64x16 sse2 ssse3/;
 
+  if (aom_config("CONFIG_DERIVED_MV") eq "yes") {
+    add_proto qw/uint32_t/, "aom_sub_pixel_variance4x64", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+    add_proto qw/uint32_t/, "aom_sub_pixel_variance64x4", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+    add_proto qw/uint32_t/, "aom_sub_pixel_variance4x32", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+    add_proto qw/uint32_t/, "aom_sub_pixel_variance32x4", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+  }
+
   specialize qw/aom_dist_wtd_sub_pixel_avg_variance64x64 ssse3/;
   specialize qw/aom_dist_wtd_sub_pixel_avg_variance64x32 ssse3/;
   specialize qw/aom_dist_wtd_sub_pixel_avg_variance32x64 ssse3/;
@@ -1337,6 +1344,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     add_proto qw/unsigned int/, "aom_highbd_${bd}_variance2x4", "const uint8_t *src_ptr, int source_stride, const uint8_t *ref_ptr, int ref_stride, unsigned int *sse";
 
     add_proto qw/unsigned int/, "aom_highbd_${bd}_variance4x2", "const uint8_t *src_ptr, int source_stride, const uint8_t *ref_ptr, int ref_stride, unsigned int *sse";
+
+    if (aom_config("CONFIG_DERIVED_MV") eq "yes") {
+      add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_variance4x64", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+      add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_variance64x4", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+      add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_variance4x32", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+      add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_variance32x4", "const uint8_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint8_t *ref_ptr, int ref_stride, uint32_t *sse";
+    }
 
     foreach (@block_sizes) {
       ($w, $h) = @$_;

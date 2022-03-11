@@ -17,9 +17,15 @@
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 #include "config/aom_scale_rtcd.h"
+#if CONFIG_DERIVED_MV
+#include "config/av1_rtcd.h"
+#endif  // CONFIG_DERIVED_MV
 
 #include "aom/aom_integer.h"
 #include "aom_dsp/blend.h"
+#if CONFIG_DERIVED_MV
+#include "aom_dsp/variance.h"
+#endif  // CONFIG_DERIVED_MV
 
 #include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
@@ -149,6 +155,432 @@ void av1_make_inter_predictor(const uint8_t *src, int src_stride, uint8_t *dst,
     }
   }
 }
+
+#if CONFIG_DERIVED_MV
+#define DERIVED_MV_REF_LINES 4
+#define REFINE_SUBPEL_RANGE 8
+#define REFINE_FULLPEL_RANGE 4
+#define REFINE_FULLPEL_STEP 1
+#define DERIVED_MV_IDX_RANGE 1
+#define DERIVED_MV_MAX_BSIZE 64
+#define DERIVED_MV_MIN_BSIZE 4
+
+int av1_derived_mv_allowed(const MACROBLOCKD *const xd,
+                           const MB_MODE_INFO *const mbmi) {
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  const int bw = block_size_wide[bsize];
+  const int bh = block_size_high[bsize];
+  return (mbmi->mode == NEARMV || mbmi->mode == NEAR_NEARMV) &&
+         bw <= DERIVED_MV_MAX_BSIZE && bh <= DERIVED_MV_MAX_BSIZE &&
+         bw >= DERIVED_MV_MIN_BSIZE && bh >= DERIVED_MV_MIN_BSIZE &&
+         xd->mi_row + mi_size_high[bsize] <= xd->tile.mi_row_end &&
+         xd->mi_col + mi_size_wide[bsize] <= xd->tile.mi_col_end &&
+         xd->mi_row > xd->tile.mi_row_start &&
+         xd->mi_col > xd->tile.mi_col_start;
+}
+
+// A mesh full pel search around the reference MV.
+static MV full_pel_refine(const AV1_COMMON *const cm, MACROBLOCKD *xd, int ref,
+                          BLOCK_SIZE bsize, MV ref_mv, const uint8_t *top,
+                          const uint8_t *left, const uint8_t *top_left,
+                          int stride, aom_subpixvariance_fn_t svp_fn_top,
+                          aom_subpixvariance_fn_t svp_fn_left,
+                          aom_subpixvariance_fn_t svp_fn_topleft,
+                          uint32_t *best_error) {
+  struct macroblockd_plane *const pd = &xd->plane[0];
+  const uint8_t *ref_buf = pd->pre[ref].buf;
+  const int ref_stride = pd->pre[ref].stride;
+  *best_error = UINT32_MAX;
+  uint32_t sse;
+  MV best_mv = ref_mv;
+  ref_mv.row = ref_mv.row >> 3;
+  ref_mv.col = ref_mv.col >> 3;
+  const int x = xd->mi_col * 4 * 8;
+  const int y = xd->mi_row * 4 * 8;
+  for (int r = ref_mv.row - REFINE_FULLPEL_RANGE;
+       r <= ref_mv.row + REFINE_FULLPEL_RANGE; r += REFINE_FULLPEL_STEP) {
+    for (int c = ref_mv.col - REFINE_FULLPEL_RANGE;
+         c <= ref_mv.col + REFINE_FULLPEL_RANGE; c += REFINE_FULLPEL_STEP) {
+      // Do not consider it when falling out of frame boundary. It may cause
+      // mismatches because boarder extenstion is handled differently on the
+      // encoder and decoder side.
+      if (x + c * 8 - DERIVED_MV_REF_LINES * 8 < 0 ||
+          y + r * 8 - DERIVED_MV_REF_LINES * 8 < 0 ||
+          xd->mi_col * 4 + block_size_wide[bsize] + c >= cm->width ||
+          xd->mi_row * 4 + block_size_high[bsize] + r >= cm->height) {
+        continue;
+      }
+      const uint8_t *pre_top =
+          ref_buf + (r - DERIVED_MV_REF_LINES) * ref_stride + c;
+      const uint8_t *pre_left =
+          ref_buf + r * ref_stride + c - DERIVED_MV_REF_LINES;
+      const uint8_t *pre_top_left = ref_buf +
+                                    (r - DERIVED_MV_REF_LINES) * ref_stride +
+                                    c - DERIVED_MV_REF_LINES;
+      const uint32_t top_error =
+          svp_fn_top(pre_top, ref_stride, 0, 0, top, stride, &sse);
+      const uint32_t left_error =
+          svp_fn_left(pre_left, ref_stride, 0, 0, left, stride, &sse);
+      const uint32_t top_left_error = svp_fn_topleft(
+          pre_top_left, ref_stride, 0, 0, top_left, stride, &sse);
+      const uint32_t this_error = top_error + left_error + top_left_error;
+      if (this_error < *best_error) {
+        *best_error = this_error;
+        best_mv.row = r * 8;
+        best_mv.col = c * 8;
+      }
+    }
+  }
+  return best_mv;
+}
+
+static MV full_pel_refine_highbd(const AV1_COMMON *const cm, MACROBLOCKD *xd,
+                                 int ref, BLOCK_SIZE bsize, MV ref_mv,
+                                 const uint8_t *top8, const uint8_t *left8,
+                                 const uint8_t *top_left8, int stride,
+                                 aom_subpixvariance_fn_t svp_fn_top,
+                                 aom_subpixvariance_fn_t svp_fn_left,
+                                 aom_subpixvariance_fn_t svp_fn_topleft,
+                                 uint32_t *best_error) {
+  struct macroblockd_plane *const pd = &xd->plane[0];
+  const uint16_t *ref_buf = CONVERT_TO_SHORTPTR(pd->pre[ref].buf);
+  const int ref_stride = pd->pre[ref].stride;
+  *best_error = UINT32_MAX;
+  uint32_t sse;
+  MV best_mv = ref_mv;
+  ref_mv.row = ref_mv.row >> 3;
+  ref_mv.col = ref_mv.col >> 3;
+  const int x = xd->mi_col * 4 * 8;
+  const int y = xd->mi_row * 4 * 8;
+  for (int r = ref_mv.row - REFINE_FULLPEL_RANGE;
+       r <= ref_mv.row + REFINE_FULLPEL_RANGE; r += REFINE_FULLPEL_STEP) {
+    for (int c = ref_mv.col - REFINE_FULLPEL_RANGE;
+         c <= ref_mv.col + REFINE_FULLPEL_RANGE; c += REFINE_FULLPEL_STEP) {
+      // Do not consider it when falling out of frame boundary. It may cause
+      // mismatches because boarder extenstion is handled differently on the
+      // encoder and decoder side.
+      if (x + c * 8 - DERIVED_MV_REF_LINES * 8 < 0 ||
+          y + r * 8 - DERIVED_MV_REF_LINES * 8 < 0 ||
+          xd->mi_col * 4 + block_size_wide[bsize] + c >= cm->width ||
+          xd->mi_row * 4 + block_size_high[bsize] + r >= cm->height) {
+        continue;
+      }
+      const uint8_t *pre_top = CONVERT_TO_BYTEPTR(
+          ref_buf + (r - DERIVED_MV_REF_LINES) * ref_stride + c);
+      const uint8_t *pre_left = CONVERT_TO_BYTEPTR(ref_buf + r * ref_stride +
+                                                   c - DERIVED_MV_REF_LINES);
+      const uint8_t *pre_top_left =
+          CONVERT_TO_BYTEPTR(ref_buf + (r - DERIVED_MV_REF_LINES) * ref_stride +
+                             c - DERIVED_MV_REF_LINES);
+      const uint32_t top_error =
+          svp_fn_top(pre_top, ref_stride, 0, 0, top8, stride, &sse);
+      const uint32_t left_error =
+          svp_fn_left(pre_left, ref_stride, 0, 0, left8, stride, &sse);
+      const uint32_t top_left_error = svp_fn_topleft(
+          pre_top_left, ref_stride, 0, 0, top_left8, stride, &sse);
+      const uint32_t this_error = top_error + left_error + top_left_error;
+      if (this_error < *best_error) {
+        *best_error = this_error;
+        best_mv.row = r * 8;
+        best_mv.col = c * 8;
+      }
+    }
+  }
+  return best_mv;
+}
+
+#if CONFIG_FLEX_MVRES
+static int get_step_size_from_precision(MvSubpelPrecision precision) {
+  switch (precision) {
+    case MV_PRECISION_8_PEL: AOM_FALLTHROUGH_INTENDED;
+    case MV_PRECISION_FOUR_PEL: return 16;  // 2 pel.
+    case MV_PRECISION_TWO_PEL: return 8;    // 1 pel.
+    case MV_PRECISION_ONE_PEL: return 4;    // half-pel.
+    case MV_PRECISION_HALF_PEL: return 2;   // quarter-pel.
+    case MV_PRECISION_QTR_PEL: AOM_FALLTHROUGH_INTENDED;
+    case MV_PRECISION_ONE_EIGHTH_PEL: return 1;  // 1/8th pel.
+    default: assert(0); return -1;
+  }
+}
+#else
+static int get_step_size_from_features(const FeatureFlags &features) {
+  if (cm->features.cur_frame_force_integer_mv) return 8;
+  if (cm->features.allow_high_precision_mv) return 1;
+  return 2;
+}
+#endif  // CONFIG_FLEX_MVRES
+
+static MV derive_mv(const AV1_COMMON *const cm, MACROBLOCKD *xd, int ref,
+                    MB_MODE_INFO *mbmi,
+                    uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
+                    uint8_t *recon_buf, int recon_stride) {
+  struct macroblockd_plane *const pd = &xd->plane[0];
+  const uint8_t *ref_buf = pd->pre[ref].buf;
+  const int ref_stride = pd->pre[ref].stride;
+  const uint8_t *recon_top = recon_buf - DERIVED_MV_REF_LINES * recon_stride;
+  const uint8_t *recon_left = recon_buf - DERIVED_MV_REF_LINES;
+  const uint8_t *recon_top_left =
+      recon_buf - DERIVED_MV_REF_LINES * recon_stride - DERIVED_MV_REF_LINES;
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  const int bwl = mi_size_wide_log2[bsize];
+  const int bhl = mi_size_high_log2[bsize];
+  aom_subpixvariance_fn_t svp_fn_top, svp_fn_left, svp_fn_topleft;
+  switch (bwl) {
+    case 0: svp_fn_top = aom_sub_pixel_variance4x4; break;
+    case 1: svp_fn_top = aom_sub_pixel_variance8x4; break;
+    case 2: svp_fn_top = aom_sub_pixel_variance16x4; break;
+    case 3: svp_fn_top = aom_sub_pixel_variance32x4; break;
+    default: svp_fn_top = aom_sub_pixel_variance64x4; break;
+  }
+  switch (bhl) {
+    case 0: svp_fn_left = aom_sub_pixel_variance4x4; break;
+    case 1: svp_fn_left = aom_sub_pixel_variance4x8; break;
+    case 2: svp_fn_left = aom_sub_pixel_variance4x16; break;
+    case 3: svp_fn_left = aom_sub_pixel_variance4x32; break;
+    default: svp_fn_left = aom_sub_pixel_variance4x64; break;
+  }
+  svp_fn_topleft = aom_sub_pixel_variance4x4;
+
+  uint32_t best_error = UINT32_MAX;
+  uint32_t sse;
+  int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
+  int_mv ref_mvs[MODE_CTX_REF_FRAMES][MAX_MV_REF_CANDIDATES] = { { { 0 } } };
+  MV_REFERENCE_FRAME ref_frame = av1_ref_frame_type(mbmi->ref_frame);
+  av1_find_mv_refs(cm, xd, mbmi, ref_frame, ref_mv_count, xd->ref_mv_stack,
+                   xd->weight, ref_mvs, /*global_mvs=*/NULL, inter_mode_ctx);
+  MV best_mv = ref ? xd->ref_mv_stack[ref_frame][0].comp_mv.as_mv
+                   : xd->ref_mv_stack[ref_frame][0].this_mv.as_mv;
+#if CONFIG_FLEX_MVRES
+  const int step = get_step_size_from_precision(mbmi->pb_mv_precision);
+#else
+  const int step = get_step_size_from_features(&cm->features);
+#endif  // CONFIG_FLEX_MVRES
+  const int x = xd->mi_col * 4 * 8;
+  const int y = xd->mi_row * 4 * 8;
+  const int bw = block_size_wide[bsize];
+  const int bh = block_size_high[bsize];
+  // Full pixel motion search around each reference MV.
+  for (int i = 0; i < AOMMIN(DERIVED_MV_IDX_RANGE, ref_mv_count[ref_frame]);
+       ++i) {
+    MV ref_mv = ref ? xd->ref_mv_stack[ref_frame][i].comp_mv.as_mv
+                    : xd->ref_mv_stack[ref_frame][i].this_mv.as_mv;
+    uint32_t full_pel_error;
+    // Search the full pel locations around the ref_mv.
+    ref_mv = full_pel_refine(cm, xd, ref, bsize, ref_mv, recon_top, recon_left,
+                             recon_top_left, recon_stride, svp_fn_top,
+                             svp_fn_left, svp_fn_topleft, &full_pel_error);
+    if (full_pel_error < best_error) {
+      best_error = full_pel_error;
+      best_mv = ref_mv;
+    }
+  }
+
+  const MV best_full_pel_mv = best_mv;
+  // Subpel search around the best full pel MV.
+  for (int r = best_full_pel_mv.row - REFINE_SUBPEL_RANGE;
+       r <= best_full_pel_mv.row + REFINE_SUBPEL_RANGE; r += step) {
+    for (int c = best_full_pel_mv.col - REFINE_SUBPEL_RANGE;
+         c <= best_full_pel_mv.col + REFINE_SUBPEL_RANGE; c += step) {
+      if (x + c - DERIVED_MV_REF_LINES * 8 < 0 ||
+          y + r - DERIVED_MV_REF_LINES * 8 < 0 ||
+          (xd->mi_col * 4 + bw) * 8 + c >= cm->width * 8 ||
+          (xd->mi_row * 4 + bh) * 8 + r >= cm->height * 8) {
+        continue;
+      }
+      const int r_int = r >> 3;
+      const int c_int = c >> 3;
+      const int r_sub = r & 7;
+      const int c_sub = c & 7;
+      const uint8_t *pre_top =
+          ref_buf + (r_int - DERIVED_MV_REF_LINES) * ref_stride + c_int;
+      const uint8_t *pre_left =
+          ref_buf + r_int * ref_stride + c_int - DERIVED_MV_REF_LINES;
+      const uint8_t *pre_top_left =
+          ref_buf + (r_int - DERIVED_MV_REF_LINES) * ref_stride + c_int -
+          DERIVED_MV_REF_LINES;
+      const uint32_t top_error = svp_fn_top(pre_top, ref_stride, c_sub, r_sub,
+                                            recon_top, recon_stride, &sse);
+      const uint32_t left_error = svp_fn_left(
+          pre_left, ref_stride, c_sub, r_sub, recon_left, recon_stride, &sse);
+      const uint32_t top_left_error =
+          svp_fn_topleft(pre_top_left, ref_stride, c_sub, r_sub, recon_top_left,
+                         recon_stride, &sse);
+      const uint32_t this_error = top_error + left_error + top_left_error;
+      if (this_error < best_error) {
+        best_error = this_error;
+        best_mv.row = r;
+        best_mv.col = c;
+      }
+    }
+  }
+
+  return best_mv;
+}
+
+static MV derive_mv_highbd(const AV1_COMMON *const cm, MACROBLOCKD *xd, int ref,
+                           MB_MODE_INFO *mbmi,
+                           uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
+                           uint8_t *recon_buf8, int recon_stride) {
+  struct macroblockd_plane *const pd = &xd->plane[0];
+  const uint16_t *ref_buf = CONVERT_TO_SHORTPTR(pd->pre[ref].buf);
+  uint16_t *recon_buf = CONVERT_TO_SHORTPTR(recon_buf8);
+  const int ref_stride = pd->pre[ref].stride;
+  const uint8_t *recon_top =
+      CONVERT_TO_BYTEPTR(recon_buf - DERIVED_MV_REF_LINES * recon_stride);
+  const uint8_t *recon_left =
+      CONVERT_TO_BYTEPTR(recon_buf - DERIVED_MV_REF_LINES);
+  const uint8_t *recon_top_left = CONVERT_TO_BYTEPTR(
+      recon_buf - DERIVED_MV_REF_LINES * recon_stride - DERIVED_MV_REF_LINES);
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  const int bwl = mi_size_wide_log2[bsize];
+  const int bhl = mi_size_high_log2[bsize];
+  aom_subpixvariance_fn_t svp_fn_top = NULL;
+  aom_subpixvariance_fn_t svp_fn_left = NULL;
+  aom_subpixvariance_fn_t svp_fn_topleft = NULL;
+  switch (xd->bd) {
+    case 8: {
+      switch (bwl) {
+        case 0: svp_fn_top = aom_highbd_8_sub_pixel_variance4x4; break;
+        case 1: svp_fn_top = aom_highbd_8_sub_pixel_variance8x4; break;
+        case 2: svp_fn_top = aom_highbd_8_sub_pixel_variance16x4; break;
+        case 3: svp_fn_top = aom_highbd_8_sub_pixel_variance32x4; break;
+        default: svp_fn_top = aom_highbd_8_sub_pixel_variance64x4; break;
+      }
+      switch (bhl) {
+        case 0: svp_fn_left = aom_highbd_8_sub_pixel_variance4x4; break;
+        case 1: svp_fn_left = aom_highbd_8_sub_pixel_variance4x8; break;
+        case 2: svp_fn_left = aom_highbd_8_sub_pixel_variance4x16; break;
+        case 3: svp_fn_left = aom_highbd_8_sub_pixel_variance4x32; break;
+        default: svp_fn_left = aom_highbd_8_sub_pixel_variance4x64; break;
+      }
+      svp_fn_topleft = aom_highbd_8_sub_pixel_variance4x4;
+      break;
+    }
+    case 10: {
+      switch (bwl) {
+        case 0: svp_fn_top = aom_highbd_10_sub_pixel_variance4x4; break;
+        case 1: svp_fn_top = aom_highbd_10_sub_pixel_variance8x4; break;
+        case 2: svp_fn_top = aom_highbd_10_sub_pixel_variance16x4; break;
+        case 3: svp_fn_top = aom_highbd_10_sub_pixel_variance32x4; break;
+        default: svp_fn_top = aom_highbd_10_sub_pixel_variance64x4; break;
+      }
+      switch (bhl) {
+        case 0: svp_fn_left = aom_highbd_10_sub_pixel_variance4x4; break;
+        case 1: svp_fn_left = aom_highbd_10_sub_pixel_variance4x8; break;
+        case 2: svp_fn_left = aom_highbd_10_sub_pixel_variance4x16; break;
+        case 3: svp_fn_left = aom_highbd_10_sub_pixel_variance4x32; break;
+        default: svp_fn_left = aom_highbd_10_sub_pixel_variance4x64; break;
+      }
+      svp_fn_topleft = aom_highbd_10_sub_pixel_variance4x4;
+      break;
+    }
+    case 12: {
+      switch (bwl) {
+        case 0: svp_fn_top = aom_highbd_12_sub_pixel_variance4x4; break;
+        case 1: svp_fn_top = aom_highbd_12_sub_pixel_variance8x4; break;
+        case 2: svp_fn_top = aom_highbd_12_sub_pixel_variance16x4; break;
+        case 3: svp_fn_top = aom_highbd_12_sub_pixel_variance32x4; break;
+        default: svp_fn_top = aom_highbd_12_sub_pixel_variance64x4; break;
+      }
+      switch (bhl) {
+        case 0: svp_fn_left = aom_highbd_12_sub_pixel_variance4x4; break;
+        case 1: svp_fn_left = aom_highbd_12_sub_pixel_variance4x8; break;
+        case 2: svp_fn_left = aom_highbd_12_sub_pixel_variance4x16; break;
+        case 3: svp_fn_left = aom_highbd_12_sub_pixel_variance4x32; break;
+        default: svp_fn_left = aom_highbd_12_sub_pixel_variance4x64; break;
+      }
+      svp_fn_topleft = aom_highbd_12_sub_pixel_variance4x4;
+      break;
+    }
+    default: assert(0);
+  }
+  uint32_t best_error = UINT32_MAX;
+  uint32_t sse;
+  int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
+  int_mv ref_mvs[MODE_CTX_REF_FRAMES][MAX_MV_REF_CANDIDATES] = { { { 0 } } };
+  MV_REFERENCE_FRAME ref_frame = av1_ref_frame_type(mbmi->ref_frame);
+  av1_find_mv_refs(cm, xd, mbmi, ref_frame, ref_mv_count, xd->ref_mv_stack,
+                   xd->weight, ref_mvs, /*global_mvs=*/NULL, inter_mode_ctx);
+  MV best_mv = ref ? xd->ref_mv_stack[ref_frame][0].comp_mv.as_mv
+                   : xd->ref_mv_stack[ref_frame][0].this_mv.as_mv;
+#if CONFIG_FLEX_MVRES
+  const int step = get_step_size_from_precision(mbmi->pb_mv_precision);
+#else
+  const int step = get_step_size_from_features(&cm->features);
+#endif  // CONFIG_FLEX_MVRES
+  const int x = xd->mi_col * 4 * 8;
+  const int y = xd->mi_row * 4 * 8;
+  const int bw = block_size_wide[bsize];
+  const int bh = block_size_high[bsize];
+  // Full pixel motion search around each reference MV.
+  for (int i = 0; i < AOMMIN(DERIVED_MV_IDX_RANGE, ref_mv_count[ref_frame]);
+       ++i) {
+    MV ref_mv = ref ? xd->ref_mv_stack[ref_frame][i].comp_mv.as_mv
+                    : xd->ref_mv_stack[ref_frame][i].this_mv.as_mv;
+    uint32_t full_pel_error;
+    // Search the full pel locations around the ref_mv.
+    ref_mv = full_pel_refine_highbd(
+        cm, xd, ref, bsize, ref_mv, recon_top, recon_left, recon_top_left,
+        recon_stride, svp_fn_top, svp_fn_left, svp_fn_topleft, &full_pel_error);
+    if (full_pel_error < best_error) {
+      best_error = full_pel_error;
+      best_mv = ref_mv;
+    }
+  }
+
+  const MV best_full_pel_mv = best_mv;
+  // Subpel search around the best full pel MV.
+  for (int r = best_full_pel_mv.row - REFINE_SUBPEL_RANGE;
+       r <= best_full_pel_mv.row + REFINE_SUBPEL_RANGE; r += step) {
+    for (int c = best_full_pel_mv.col - REFINE_SUBPEL_RANGE;
+         c <= best_full_pel_mv.col + REFINE_SUBPEL_RANGE; c += step) {
+      if (x + c - DERIVED_MV_REF_LINES * 8 < 0 ||
+          y + r - DERIVED_MV_REF_LINES * 8 < 0 ||
+          (xd->mi_col * 4 + bw) * 8 + c >= cm->width * 8 ||
+          (xd->mi_row * 4 + bh) * 8 + r >= cm->height * 8) {
+        continue;
+      }
+      const int r_int = r >> 3;
+      const int c_int = c >> 3;
+      const int r_sub = r & 7;
+      const int c_sub = c & 7;
+      const uint8_t *pre_top = CONVERT_TO_BYTEPTR(
+          ref_buf + (r_int - DERIVED_MV_REF_LINES) * ref_stride + c_int);
+      const uint8_t *pre_left = CONVERT_TO_BYTEPTR(
+          ref_buf + r_int * ref_stride + c_int - DERIVED_MV_REF_LINES);
+      const uint8_t *pre_top_left = CONVERT_TO_BYTEPTR(
+          ref_buf + (r_int - DERIVED_MV_REF_LINES) * ref_stride + c_int -
+          DERIVED_MV_REF_LINES);
+      const uint32_t top_error = svp_fn_top(pre_top, ref_stride, c_sub, r_sub,
+                                            recon_top, recon_stride, &sse);
+      const uint32_t left_error = svp_fn_left(
+          pre_left, ref_stride, c_sub, r_sub, recon_left, recon_stride, &sse);
+      const uint32_t top_left_error =
+          svp_fn_topleft(pre_top_left, ref_stride, c_sub, r_sub, recon_top_left,
+                         recon_stride, &sse);
+      const uint32_t this_error = top_error + left_error + top_left_error;
+      if (this_error < best_error) {
+        best_error = this_error;
+        best_mv.row = r;
+        best_mv.col = c;
+      }
+    }
+  }
+
+  return best_mv;
+}
+
+MV av1_derive_mv(const AV1_COMMON *const cm, MACROBLOCKD *xd, int ref,
+                 MB_MODE_INFO *mbmi, uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
+                 uint8_t *recon_buf, int recon_stride) {
+  if (is_cur_buf_hbd(xd)) {
+    return derive_mv_highbd(cm, xd, ref, mbmi, ref_mv_count, recon_buf,
+                            recon_stride);
+  } else {
+    return derive_mv(cm, xd, ref, mbmi, ref_mv_count, recon_buf, recon_stride);
+  }
+}
+#endif  // CONFIG_DERIVED_MV
 
 static const uint8_t wedge_master_oblique_odd[MASK_MASTER_SIZE] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -1734,7 +2166,13 @@ static void build_inter_predictors_sub8x8(
         ref_buf->buf.uv_stride,
       };
 
+#if CONFIG_DERIVED_MV
+      const MV mv = (this_mbmi->derived_mv_allowed && this_mbmi->use_derived_mv)
+                        ? this_mbmi->derived_mv[ref]
+                        : this_mbmi->mv[ref].as_mv;
+#else
       const MV mv = this_mbmi->mv[ref].as_mv;
+#endif  // CONFIG_DERIVED_MV
 
       InterPredParams inter_pred_params;
       av1_init_inter_params(&inter_pred_params, b4_w, b4_h, pre_y + y,
@@ -1857,7 +2295,13 @@ static void build_inter_predictors_8x8_and_bigger(
     const struct scale_factors *const sf =
         is_intrabc ? &cm->sf_identity : xd->block_ref_scale_factors[ref];
     struct buf_2d *const pre_buf = is_intrabc ? dst_buf : &pd->pre[ref];
+#if CONFIG_DERIVED_MV
+    const MV mv = (mi->derived_mv_allowed && mi->use_derived_mv)
+                      ? mi->derived_mv[ref]
+                      : mi->mv[ref].as_mv;
+#else
     const MV mv = mi->mv[ref].as_mv;
+#endif  // CONFIG_DERIVED_MV
     const WarpTypesAllowed warp_types = { is_global[ref],
                                           mi->motion_mode == WARPED_CAUSAL };
 

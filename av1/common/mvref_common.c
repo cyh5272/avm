@@ -43,7 +43,15 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
         if ((abs(mi->mv[0].as_mv.row) <= REFMVS_LIMIT) &&
             (abs(mi->mv[0].as_mv.col) <= REFMVS_LIMIT)) {
           mv->ref_frame = mi->ref_frame[0];
+#if CONFIG_DERIVED_MV
+          if (mi->derived_mv_allowed && mi->use_derived_mv) {
+            mv->mv.as_mv = mi->derived_mv[0];
+          } else {
+            mv->mv.as_int = mi->mv[0].as_int;
+          }
+#else
           mv->mv.as_int = mi->mv[0].as_int;
+#endif  // CONFIG_DERIVED_MV
         }
       } else {
 #endif  // CONFIG_TMVP_IMPROVEMENT
@@ -56,7 +64,15 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
                 (abs(mi->mv[idx].as_mv.col) > REFMVS_LIMIT))
               continue;
             mv->ref_frame = ref_frame;
-            mv->mv.as_int = mi->mv[idx].as_int;
+#if CONFIG_DERIVED_MV
+            if (mi->derived_mv_allowed && mi->use_derived_mv) {
+              mv->mv.as_mv = mi->derived_mv[idx];
+            } else {
+              mv->mv.as_int = mi->mv[idx].as_int;
+            }
+#else
+          mv->mv.as_int = mi->mv[idx].as_int;
+#endif  // CONFIG_DERIVED_MV
           }
         }
 #if CONFIG_TMVP_IMPROVEMENT
@@ -1725,8 +1741,18 @@ static INLINE void record_samples(const MB_MODE_INFO *mbmi,
 #if !CONFIG_COMPOUND_WARP_SAMPLES
   const int ref = 0;
 #endif  // CONFIG_COMPOUND_WARP_SAMPLES
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+    pts_inref[0] = GET_MV_SUBPEL(x) + mbmi->derived_mv[ref].col;
+    pts_inref[1] = GET_MV_SUBPEL(y) + mbmi->derived_mv[ref].row;
+  } else {
+    pts_inref[0] = GET_MV_SUBPEL(x) + mbmi->mv[ref].as_mv.col;
+    pts_inref[1] = GET_MV_SUBPEL(y) + mbmi->mv[ref].as_mv.row;
+  }
+#else
   pts_inref[0] = GET_MV_SUBPEL(x) + mbmi->mv[ref].as_mv.col;
   pts_inref[1] = GET_MV_SUBPEL(y) + mbmi->mv[ref].as_mv.row;
+#endif  // CONFIG_DERIVED_MV
 }
 
 // Select samples according to the motion vector difference.
