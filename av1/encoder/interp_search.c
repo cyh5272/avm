@@ -51,6 +51,12 @@ static INLINE int save_interp_filter_search_stat(
                                         mbmi->interinter_comp.type,
                                         rd,
                                         pred_sse };
+#if CONFIG_DERIVED_MV
+    if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+      stat.mv[0].as_mv = mbmi->derived_mv[0];
+      if (has_second_ref(mbmi)) stat.mv[1].as_mv = mbmi->derived_mv[1];
+    }
+#endif  // CONFIG_DERIVED_MV
     interp_filter_stats[interp_filter_stats_idx] = stat;
     interp_filter_stats_idx++;
   }
@@ -99,6 +105,10 @@ int av1_find_interp_filter_match(
     match_found_idx = find_interp_filter_in_stats(
         mbmi, interp_filter_stats, interp_filter_stats_idx,
         cpi->sf.interp_sf.use_interp_filter);
+
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) match_found_idx = -1;
+#endif  // CONFIG_DERIVED_MV
 
   if (!need_search || match_found_idx == -1)
     set_default_interp_filters(mbmi,
@@ -314,7 +324,13 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
       *skip_ver = 0;
       break;
     }
+#if CONFIG_DERIVED_MV
+    const MV mv = (mbmi->derived_mv_allowed && mbmi->use_derived_mv)
+                      ? mbmi->derived_mv[ref]
+                      : mbmi->mv[ref].as_mv;
+#else
     const MV mv = mbmi->mv[ref].as_mv;
+#endif  // CONFIG_DERIVED_MV
     int skip_hor_plane = 0;
     int skip_ver_plane = 0;
     for (int plane_idx = 0; plane_idx < AOMMAX(1, (num_planes - 1));

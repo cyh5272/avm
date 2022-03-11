@@ -201,6 +201,8 @@ set_aom_config_var(CONFIG_NEW_DF 1
 set_aom_config_var(CONFIG_TIP 1 "Enable temporal interpolated prediction (TIP)")
 set_aom_config_var(CONFIG_FLEX_MVRES 0
                    "AV2 flexible mv precision experiment flag")
+set_aom_config_var(CONFIG_DERIVED_MV 0 NUMBER
+                   "AV2 derived motion vector experiment flag")
 #
 # Variables in this section control optional features of the build system.
 #

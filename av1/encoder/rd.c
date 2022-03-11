@@ -306,6 +306,15 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   }
 #endif  // CONFIG_IST
 
+#if CONFIG_DERIVED_MV
+  for (j = 0; j < 3; ++j) {
+    for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->use_derived_mv_cost[j][i],
+                               fc->use_derived_mv_cdf[j][i], NULL);
+    }
+  }
+#endif  // CONFIG_DERIVED_MV
+
   if (!frame_is_intra_only(cm)) {
     for (i = 0; i < COMP_INTER_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_inter_cost[i],

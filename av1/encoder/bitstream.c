@@ -104,6 +104,9 @@ static void write_drl_idx(int max_drl_bits, const int16_t mode_ctx,
 #if !CONFIG_SKIP_MODE_ENHANCEMENT
   assert(!mbmi->skip_mode);
 #endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) return;
+#endif  // CONFIG_DERIVED_MV
   // Write the DRL index as a sequence of bits encoding a decision tree:
   // 0 -> 0   10 -> 1   110 -> 2    111 -> 3
   // Also use the number of reference MVs for a frame type to reduce the
@@ -1666,6 +1669,14 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
   const int skip =
       mbmi->skip_mode ? 1 : write_skip(cm, xd, segment_id, mbmi, w);
 #endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
+#if CONFIG_DERIVED_MV
+  if (mbmi->skip_mode && mbmi->derived_mv_allowed) {
+    // if (mbmi->use_derived_mv) fprintf(stderr, "derived_mv used: with
+    // skip\n");
+    aom_write_symbol(w, mbmi->use_derived_mv,
+                     ec_ctx->use_derived_mv_cdf[2][bsize], 2);
+  }
+#endif  // CONFIG_DERIVED_MV
   write_inter_segment_id(cpi, w, seg, segp, skip, 0);
 
   write_cdef(cm, xd, w, skip);
@@ -1773,6 +1784,17 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
           " incorrect mv precision in the function pack_inter_mode_mvs");
 #endif
 #endif  // CONFIG_FLEX_MVRES
+
+#if CONFIG_DERIVED_MV
+      if (mbmi->derived_mv_allowed) {
+        /* if (mbmi->use_derived_mv) {
+           fprintf(stderr, "derived_mv used: non-skip at (%d, %d), bsize =
+         %d\n", xd->mi_row, xd->mi_col, bsize);
+         }*/
+        aom_write_symbol(w, mbmi->use_derived_mv,
+                         ec_ctx->use_derived_mv_cdf[is_compound][bsize], 2);
+      }
+#endif  // CONFIG_DERIVED_MV
 
       if (have_drl_index(mode))
         write_drl_idx(
