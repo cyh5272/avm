@@ -183,33 +183,31 @@ static INLINE void update_keyframe_counters(AV1_COMP *cpi) {
   }
 }
 
-#if !CONFIG_NEW_REF_SIGNALING
 static INLINE int is_frame_droppable(
     const ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags) {
   // Droppable frame is only used by external refresh flags. VoD setting won't
   // trigger its use case.
   if (ext_refresh_frame_flags->update_pending)
+#if CONFIG_NEW_REF_SIGNALING
+    return ext_refresh_frame_flags->all_ref_frames == 0;
+#else
     return !(ext_refresh_frame_flags->alt_ref_frame ||
              ext_refresh_frame_flags->alt2_ref_frame ||
              ext_refresh_frame_flags->bwd_ref_frame ||
              ext_refresh_frame_flags->golden_frame ||
              ext_refresh_frame_flags->last_frame);
+#endif  // CONFIG_NEW_REF_SIGNALING
   else
     return 0;
 }
-#endif  // !CONFIG_NEW_REF_SIGNALING
 
 static INLINE void update_frames_till_gf_update(AV1_COMP *cpi) {
   // TODO(weitinglin): Updating this counter for is_frame_droppable
   // is a work-around to handle the condition when a frame is drop.
   // We should fix the cpi->common.show_frame flag
   // instead of checking the other condition to update the counter properly.
-#if CONFIG_NEW_REF_SIGNALING
-  if (cpi->common.show_frame) {
-#else
   if (cpi->common.show_frame ||
       is_frame_droppable(&cpi->ext_flags.refresh_frame)) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     // Decrement count down till next gf
     if (cpi->rc.frames_till_gf_update_due > 0)
       cpi->rc.frames_till_gf_update_due--;
@@ -871,17 +869,17 @@ int av1_get_refresh_frame_flags(
   }
 
   int refresh_mask = 0;
-#if !CONFIG_NEW_REF_SIGNALING
-  const AV1_COMMON *const cm = &cpi->common;
   const ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags =
       &cpi->ext_flags.refresh_frame;
 
   if (is_frame_droppable(ext_refresh_frame_flags)) return 0;
 
   if (ext_refresh_frame_flags->update_pending) {
+#if !CONFIG_NEW_REF_SIGNALING
     // Unfortunately the encoder interface reflects the old refresh_*_frame
     // flags so we have to replicate the old refresh_frame_flags logic here in
     // order to preserve the behaviour of the flag overrides.
+    const AV1_COMMON *const cm = &cpi->common;
     int ref_frame_map_idx = get_ref_frame_map_idx(cm, LAST_FRAME);
     if (ref_frame_map_idx != INVALID_IDX)
       refresh_mask |= ext_refresh_frame_flags->last_frame << ref_frame_map_idx;
@@ -913,9 +911,9 @@ int av1_get_refresh_frame_flags(
         refresh_mask |= ext_refresh_frame_flags->alt_ref_frame
                         << ref_frame_map_idx;
     }
+#endif  // !CONFIG_NEW_REF_SIGNALING
     return refresh_mask;
   }
-#endif  // !CONFIG_NEW_REF_SIGNALING
 
   // Search for the open slot to store the current frame.
   int free_fb_index = get_free_ref_map_index(ref_frame_map_pairs);
@@ -1408,11 +1406,7 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
 
   // Leave a signal for a higher level caller about if this frame is droppable
   if (*size > 0) {
-#if CONFIG_NEW_REF_SIGNALING
-    cpi->droppable = 0;
-#else
     cpi->droppable = is_frame_droppable(&ext_flags->refresh_frame);
-#endif  // CONFIG_NEW_REF_SIGNALING
   }
 
   return AOM_CODEC_OK;

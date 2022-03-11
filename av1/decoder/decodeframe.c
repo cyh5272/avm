@@ -4903,6 +4903,8 @@ static AOM_INLINE void show_existing_frame_reset(AV1Decoder *const pbi,
     cm->remapped_ref_idx[i] = INVALID_IDX;
   }
 
+  cm->cur_frame->display_order_hint = 0;
+
   if (pbi->need_resync) {
     reset_ref_frame_map(cm);
     pbi->need_resync = 0;

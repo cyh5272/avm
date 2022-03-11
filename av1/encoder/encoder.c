@@ -852,6 +852,9 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
 
   cpi->ext_flags.refresh_frame.update_pending = 0;
   cpi->ext_flags.refresh_frame_context_pending = 0;
+#if CONFIG_NEW_REF_SIGNALING
+  cpi->ext_flags.refresh_frame.all_ref_frames = 1;
+#endif  // CONFIG_NEW_REF_SIGNALING
 
   highbd_set_var_fns(cpi);
 
@@ -3821,9 +3824,8 @@ void av1_apply_encoding_flags(AV1_COMP *cpi, aom_enc_frame_flags_t flags) {
   ExtRefreshFrameFlagsInfo *const ext_refresh_frame_flags =
       &ext_flags->refresh_frame;
   ext_flags->ref_frame_flags = AOM_REFFRAME_ALL;
-#if CONFIG_NEW_REF_SIGNALING
-  ext_refresh_frame_flags->update_pending = 0;
-#else
+
+#if !CONFIG_NEW_REF_SIGNALING
   if (flags &
       (AOM_EFLAG_NO_REF_LAST | AOM_EFLAG_NO_REF_LAST2 | AOM_EFLAG_NO_REF_LAST3 |
        AOM_EFLAG_NO_REF_GF | AOM_EFLAG_NO_REF_ARF | AOM_EFLAG_NO_REF_BWD |
@@ -3847,7 +3849,17 @@ void av1_apply_encoding_flags(AV1_COMP *cpi, aom_enc_frame_flags_t flags) {
 
     av1_use_as_reference(&ext_flags->ref_frame_flags, ref);
   }
+#endif  // !CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_NEW_REF_SIGNALING
+  if (flags & AOM_EFLAG_NO_UPD_ALL) {
+    ext_refresh_frame_flags->all_ref_frames = 0;
+    ext_refresh_frame_flags->update_pending = 1;
+  } else {
+    ext_refresh_frame_flags->all_ref_frames = 1;
+    ext_refresh_frame_flags->update_pending = 0;
+  }
+#else
   if (flags &
       (AOM_EFLAG_NO_UPD_LAST | AOM_EFLAG_NO_UPD_GF | AOM_EFLAG_NO_UPD_ARF)) {
     int upd = AOM_REFFRAME_ALL;

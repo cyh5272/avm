@@ -149,7 +149,10 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
     RefFrameMapPair cur_ref = ref_frame_map_pairs[i];
     if (cur_ref.disp_order == -1) continue;
     const int ref_disp = cur_ref.disp_order;
-    const int ref_base_qindex = cur_ref.base_qindex;
+    // In error resilient mode, ref mapping must be independent of the
+    // base_qindex to ensure decoding independency
+    const int ref_base_qindex =
+        cm->features.error_resilient_mode ? 0 : cur_ref.base_qindex;
     const int disp_diff = cur_frame_disp - ref_disp;
 #if USE_DECAYING_WEIGHTS_ONESIDED
     int tdist = abs(disp_diff);

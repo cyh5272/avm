@@ -2074,13 +2074,15 @@ typedef struct {
  * reference frame buffer with the contents of the current frame.
  */
 typedef struct {
-#if !CONFIG_NEW_REF_SIGNALING
+#if CONFIG_NEW_REF_SIGNALING
+  bool all_ref_frames; /*!< Refresh all refs */
+#else
   bool last_frame;     /*!< Refresh flag for last frame */
   bool golden_frame;   /*!< Refresh flag for golden frame */
   bool bwd_ref_frame;  /*!< Refresh flag for bwd-ref frame */
   bool alt2_ref_frame; /*!< Refresh flag for alt2-ref frame */
   bool alt_ref_frame;  /*!< Refresh flag for alt-ref frame */
-#endif                 // !CONFIG_NEW_REF_SIGNALING
+#endif  // CONFIG_NEW_REF_SIGNALING
   /*!
    * Flag indicating if the update of refresh frame flags is pending.
    */
