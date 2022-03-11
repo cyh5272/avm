@@ -285,6 +285,9 @@ static void read_drl_idx(int max_drl_bits, const int16_t mode_ctx,
   uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
   mbmi->ref_mv_idx = 0;
   assert(!mbmi->skip_mode);
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) return;
+#endif  // CONFIG_DERIVED_MV
   for (int idx = 0; idx < max_drl_bits; ++idx) {
     aom_cdf_prob *drl_cdf =
         av1_get_drl_cdf(ec_ctx, xd->weight[ref_frame_type], mode_ctx, idx);
@@ -2181,6 +2184,19 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         mbmi->pb_mv_precision = av1_read_pb_mv_precision(cm, xd, r);
       }
 #endif  // CONFIG_FLEX_MVRES
+
+#if CONFIG_DERIVED_MV
+      mbmi->derived_mv_allowed = av1_derived_mv_allowed(xd, mbmi);
+      if (mbmi->derived_mv_allowed) {
+        mbmi->use_derived_mv = aom_read_symbol(
+            r, ec_ctx->use_derived_mv_cdf[is_compound][bsize], 2, ACCT_STR);
+        /* if (mbmi->use_derived_mv) {
+          fprintf(stderr, "DECODER: derived_mv used: non-skip at (%d, %d), bsize
+        = %d\n", xd->mi_row, xd->mi_col, bsize);
+        }*/
+      }
+#endif  // CONFIG_DERIVED_MV
+
       if (have_drl_index(mbmi->mode))
         read_drl_idx(
 #if CONFIG_NEW_INTER_MODES
@@ -2298,6 +2314,29 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif
   aom_merge_corrupted_flag(&dcb->corrupted, mv_corrupted_flag);
 
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+    assert(mbmi->ref_mv_idx == 0);
+    const int num_planes = av1_num_planes(cm);
+    for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
+      const MV_REFERENCE_FRAME frame = mbmi->ref_frame[ref];
+      const RefCntBuffer *ref_buf = get_ref_frame_buf(cm, frame);
+      const struct scale_factors *ref_scale_factors =
+          get_ref_scale_factors_const(cm, frame);
+      xd->block_ref_scale_factors[ref] = ref_scale_factors;
+      av1_setup_pre_planes(xd, ref, &ref_buf->buf, xd->mi_row, xd->mi_col,
+                           ref_scale_factors, num_planes);
+      mbmi->derived_mv[ref] =
+          av1_derive_mv(cm, xd, ref, mbmi, dcb->ref_mv_count,
+                        xd->plane[0].dst.buf, xd->plane[0].dst.stride);
+      /*fprintf(stderr, "DECODER derived_mv[%d] = (%d, %d) at (%d, %d), bsize =
+         %d, motion_mode = %d\n", ref, mbmi->derived_mv[ref].row,
+         mbmi->derived_mv[ref].col, xd->mi_row * 4, xd->mi_col * 4, bsize,
+         mbmi->motion_mode);*/
+    }
+  }
+#endif  // CONFIG_DERIVED_MV
+
   mbmi->use_wedge_interintra = 0;
   if (cm->seq_params.enable_interintra_compound && !mbmi->skip_mode &&
       is_interintra_allowed(mbmi)) {
@@ -2400,15 +2439,21 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
   if (mbmi->motion_mode == WARPED_CAUSAL) {
     mbmi->wm_params.wmtype = DEFAULT_WMTYPE;
     mbmi->wm_params.invalid = 0;
+    MV mv = mbmi->mv[0].as_mv;
+#if CONFIG_DERIVED_MV
+    // TODO(huisu): this introduces parsing depenency for warped motion.
+    if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+      mv = mbmi->derived_mv[0];
+    }
+#endif  // CONFIG_DERIVED_MV
 
     if (mbmi->num_proj_ref > 1) {
-      mbmi->num_proj_ref = av1_selectSamples(&mbmi->mv[0].as_mv, pts, pts_inref,
-                                             mbmi->num_proj_ref, bsize);
+      mbmi->num_proj_ref =
+          av1_selectSamples(&mv, pts, pts_inref, mbmi->num_proj_ref, bsize);
     }
 
-    if (av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                            mbmi->mv[0].as_mv.row, mbmi->mv[0].as_mv.col,
-                            &mbmi->wm_params, mi_row, mi_col)) {
+    if (av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize, mv.row,
+                            mv.col, &mbmi->wm_params, mi_row, mi_col)) {
 #if WARPED_MOTION_DEBUG
       printf("Warning: unexpected warped model from aomenc\n");
 #endif
@@ -2441,8 +2486,22 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
   mbmi->mv[0].as_int = 0;
   mbmi->mv[1].as_int = 0;
   mbmi->segment_id = read_inter_segment_id(cm, xd, 1, r);
-
+#if CONFIG_DERIVED_MV
+  mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
   mbmi->skip_mode = read_skip_mode(cm, xd, mbmi->segment_id, r);
+
+#if CONFIG_DERIVED_MV
+  if (mbmi->skip_mode) {
+    mbmi->mode = NEAR_NEARMV;
+    mbmi->derived_mv_allowed = av1_derived_mv_allowed(xd, mbmi);
+    if (mbmi->derived_mv_allowed) {
+      mbmi->use_derived_mv = aom_read_symbol(
+          r, xd->tile_ctx->use_derived_mv_cdf[2][mbmi->sb_type[PLANE_TYPE_Y]],
+          2, ACCT_STR);
+    }
+  }
+#endif  // CONFIG_DERIVED_MV
 
   if (mbmi->skip_mode)
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
@@ -2521,6 +2580,10 @@ void av1_read_mode_info(AV1Decoder *const pbi, DecoderCodingBlock *dcb,
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *const mi = xd->mi[0];
   mi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
+#if CONFIG_DERIVED_MV
+  mi->derived_mv_allowed = mi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
+  mi->ref_mv_idx = 0;
 
   if (xd->tree_type == SHARED_PART)
     mi->sb_type[PLANE_TYPE_UV] = mi->sb_type[PLANE_TYPE_Y];

@@ -847,6 +847,10 @@ typedef struct {
   int wiener_restore_cost[2];
   //! sgrproj_restore_cost
   int sgrproj_restore_cost[2];
+#if CONFIG_DERIVED_MV
+  //! use_derived_mv_cost
+  int use_derived_mv_cost[3][BLOCK_SIZES_ALL][2];
+#endif  // CONFIG_DERIVED_MV
   /**@}*/
 } ModeCosts;
 
