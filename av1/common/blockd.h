@@ -527,6 +527,14 @@ typedef struct MB_MODE_INFO {
   /*! \brief Whether we are skipping the current rows or columns. */
   int16_t tx_skip[TXK_TYPE_BUF_LEN];
 #endif
+#if CONFIG_DERIVED_MV
+  /*! \brief True if derived motion vector is allowed. */
+  int derived_mv_allowed;
+  /*! \brief True if derived motion vector is actually used. */
+  int use_derived_mv;
+  /*! \brief Derived motion vectors. */
+  MV derived_mv[2];
+#endif  // CONFIG_DERIVED_MV
 } MB_MODE_INFO;
 
 /*!\cond */
@@ -1861,34 +1869,9 @@ static INLINE int check_num_overlappable_neighbors(const MB_MODE_INFO *mbmi) {
            mbmi->overlappable_neighbors[1] == 0);
 }
 
-static INLINE MOTION_MODE
+MOTION_MODE
 motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
-                    const MB_MODE_INFO *mbmi, int allow_warped_motion) {
-  if (xd->cur_frame_force_integer_mv == 0) {
-    const TransformationType gm_type = gm_params[mbmi->ref_frame[0]].wmtype;
-    if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
-  }
-#if CONFIG_FLEX_MVRES && DISABLE_MOTION_MODE_LOW_PRECISION
-  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return SIMPLE_TRANSLATION;
-#endif
-  if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
-      is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
-      is_motion_variation_allowed_compound(mbmi)) {
-    if (!check_num_overlappable_neighbors(mbmi)) return SIMPLE_TRANSLATION;
-    assert(!has_second_ref(mbmi));
-    if (mbmi->num_proj_ref >= 1 &&
-        (allow_warped_motion &&
-         !av1_is_scaled(xd->block_ref_scale_factors[0]))) {
-      if (xd->cur_frame_force_integer_mv) {
-        return OBMC_CAUSAL;
-      }
-      return WARPED_CAUSAL;
-    }
-    return OBMC_CAUSAL;
-  } else {
-    return SIMPLE_TRANSLATION;
-  }
-}
+                    const MB_MODE_INFO *mbmi, int allow_warped_motion);
 
 static INLINE int is_neighbor_overlappable(const MB_MODE_INFO *mbmi,
                                            int tree_type) {

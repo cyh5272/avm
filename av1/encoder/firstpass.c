@@ -711,6 +711,9 @@ static int firstpass_inter_prediction(
     xd->mi[0]->tx_size = TX_4X4;
     xd->mi[0]->ref_frame[0] = LAST_FRAME;
     xd->mi[0]->ref_frame[1] = NONE_FRAME;
+#if CONFIG_DERIVED_MV
+    xd->mi[0]->derived_mv_allowed = xd->mi[0]->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
     av1_enc_build_inter_predictor(cm, xd, mb_row * mb_scale, mb_col * mb_scale,
                                   NULL, bsize, AOM_PLANE_Y, AOM_PLANE_Y);
     av1_encode_sby_pass1(cpi, x, bsize);

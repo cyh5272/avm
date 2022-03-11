@@ -2032,17 +2032,23 @@ static int64_t motion_mode_rd(
 
       memcpy(pts, pts0, total_samples * 2 * sizeof(*pts0));
       memcpy(pts_inref, pts_inref0, total_samples * 2 * sizeof(*pts_inref0));
+      MV mv = mbmi->mv[0].as_mv;
+#if CONFIG_DERIVED_MV
+      if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+        mv = mbmi->derived_mv[0];
+      }
+#endif  // CONFIG_DERIVED_MV
       // Select the samples according to motion vector difference
       if (mbmi->num_proj_ref > 1) {
-        mbmi->num_proj_ref = av1_selectSamples(
-            &mbmi->mv[0].as_mv, pts, pts_inref, mbmi->num_proj_ref, bsize);
+        mbmi->num_proj_ref =
+            av1_selectSamples(&mv, pts, pts_inref, mbmi->num_proj_ref, bsize);
       }
 
       // Compute the warped motion parameters with a least squares fit
       //  using the collected samples
       if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                               mbmi->mv[0].as_mv.row, mbmi->mv[0].as_mv.col,
-                               &mbmi->wm_params, mi_row, mi_col)) {
+                               mv.row, mv.col, &mbmi->wm_params, mi_row,
+                               mi_col)) {
         assert(!is_comp_pred);
         if (this_mode == NEWMV
 #if CONFIG_FLEX_MVRES
@@ -2275,6 +2281,9 @@ static int64_t skip_mode_rd(RD_STATS *rd_stats, const AV1_COMP *const cpi,
   const AV1_COMMON *cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   MACROBLOCKD *const xd = &x->e_mbd;
+#if CONFIG_DERIVED_MV
+  const MB_MODE_INFO *mbmi = xd->mi[0];
+#endif  // CONFIG_DERIVED_MV
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
   av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, orig_dst, bsize, 0,
@@ -2296,6 +2305,12 @@ static int64_t skip_mode_rd(RD_STATS *rd_stats, const AV1_COMP *const cpi,
   const int skip_mode_ctx = av1_get_skip_mode_context(xd);
   rd_stats->dist = rd_stats->sse = total_sse;
   rd_stats->rate = x->mode_costs.skip_mode_cost[skip_mode_ctx][1];
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed) {
+    rd_stats->rate +=
+        x->mode_costs.use_derived_mv_cost[2][bsize][mbmi->use_derived_mv];
+  }
+#endif  // CONFIG_DERIVED_MV
   rd_stats->rdcost = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
 
   restore_dst_buf(xd, *orig_dst, num_planes);
@@ -3576,6 +3591,9 @@ static int64_t handle_inter_mode(
       mbmi->num_proj_ref = 0;
       mbmi->motion_mode = SIMPLE_TRANSLATION;
       mbmi->ref_mv_idx = ref_mv_idx;
+#if CONFIG_DERIVED_MV
+      mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
 
       // Compute cost for signalling this DRL index
       rd_stats->rate = base_rate;
@@ -3650,7 +3668,50 @@ static int64_t handle_inter_mode(
 #if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
       CHECK_FLEX_MV(check_mv_precision(cm, mbmi) == 0,
                     " precision and MV mismatch after handle_newmv");
-#endif
+#endif  // CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+
+#if CONFIG_DERIVED_MV
+      mbmi->derived_mv_allowed = av1_derived_mv_allowed(xd, mbmi);
+      if (mbmi->derived_mv_allowed && mbmi->ref_mv_idx == 0) {
+        for (int ref = 0; ref < 1 + is_comp_pred; ++ref) {
+          mbmi->derived_mv[ref] =
+              av1_derive_mv(cm, xd, ref, mbmi, x->mbmi_ext->ref_mv_count,
+                            orig_dst.plane[0], orig_dst.stride[0]);
+        }
+        RD_STATS tmp_rd_stats, tmp_rd_stats_y, tmp_rd_stats_uv;
+        av1_enc_build_inter_predictor(cm, xd, xd->mi_row, xd->mi_col, &orig_dst,
+                                      bsize, 0, av1_num_planes(cm) - 1);
+        int rd_valid = av1_txfm_search(
+            cpi, x, bsize, &tmp_rd_stats, &tmp_rd_stats_y, &tmp_rd_stats_uv,
+            mode_costs->use_derived_mv_cost[is_comp_pred][bsize][0], INT64_MAX);
+        const int64_t no_refine_rd =
+            rd_valid ? RDCOST(x->rdmult, tmp_rd_stats.rate, tmp_rd_stats.dist)
+                     : INT64_MAX;
+        mbmi->use_derived_mv = 1;
+        av1_enc_build_inter_predictor(cm, xd, xd->mi_row, xd->mi_col, &orig_dst,
+                                      bsize, 0, av1_num_planes(cm) - 1);
+        rd_valid = av1_txfm_search(
+            cpi, x, bsize, &tmp_rd_stats, &tmp_rd_stats_y, &tmp_rd_stats_uv,
+            mode_costs->use_derived_mv_cost[is_comp_pred][bsize][1], INT64_MAX);
+        const int64_t refine_rd =
+            rd_valid ? RDCOST(x->rdmult, tmp_rd_stats.rate, tmp_rd_stats.dist)
+                     : INT64_MAX;
+        if (refine_rd < no_refine_rd) {
+          mbmi->use_derived_mv = 1;
+        } else {
+          mbmi->use_derived_mv = 0;
+        }
+      } else {
+        mbmi->use_derived_mv = 0;
+      }
+      if (mbmi->derived_mv_allowed) {
+        rd_stats->rate += mode_costs->use_derived_mv_cost[is_comp_pred][bsize]
+                                                         [mbmi->use_derived_mv];
+        if (mbmi->use_derived_mv) {
+          rd_stats->rate -= drl_cost;
+        }
+      }
+#endif  // CONFIG_DERIVED_MV
 
 #if CONFIG_NEW_INTER_MODES
       const int like_nearest = (mbmi->mode == NEARMV ||
@@ -3789,6 +3850,11 @@ static int64_t handle_inter_mode(
           // Only update mode_info if the new result is actually better.
           mode_info[ref_mv_idx].mv.as_int = mbmi->mv[0].as_int;
           mode_info[ref_mv_idx].rate_mv = rate_mv;
+#if CONFIG_DERIVED_MV
+          if (mbmi->derived_mv_allowed && mbmi->use_derived_mv) {
+            mode_info[ref_mv_idx].mv.as_mv = mbmi->derived_mv[0];
+          }
+#endif  // CONFIG_DERIVED_MV
           mode_info[ref_mv_idx].rd = tmp_rd;
         }
         const THR_MODES mode_enum = get_prediction_mode_idx(
@@ -4121,6 +4187,10 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
     mbmi->mv[0].as_mv = dv;
     mbmi->interp_fltr = BILINEAR;
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 0;
+#if CONFIG_DERIVED_MV
+    mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
+
     av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
                                   av1_num_planes(cm) - 1);
 
@@ -4339,6 +4409,10 @@ static AOM_INLINE void rd_pick_skip_mode(
   mbmi->motion_mode = SIMPLE_TRANSLATION;
   mbmi->ref_mv_idx = 0;
   mbmi->skip_mode = mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
+#if CONFIG_DERIVED_MV
+  mbmi->derived_mv_allowed = av1_derived_mv_allowed(xd, mbmi);
+  mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
 
   set_default_interp_filters(mbmi,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -4361,8 +4435,31 @@ static AOM_INLINE void rd_pick_skip_mode(
     orig_dst.stride[i] = xd->plane[i].dst.stride;
   }
 
+#if CONFIG_DERIVED_MV
+  if (mbmi->derived_mv_allowed) {
+    for (int ref = 0; ref < 2; ++ref) {
+      mbmi->derived_mv[ref] =
+          av1_derive_mv(cm, xd, ref, mbmi, x->mbmi_ext->ref_mv_count,
+                        orig_dst.plane[0], orig_dst.stride[0]);
+    }
+  }
+
+  MB_MODE_INFO best_mbmi = *mbmi;
+  for (int i = 0; i < 1 + mbmi->derived_mv_allowed; ++i) {
+    RD_STATS tmp_rd_stats;
+    av1_invalid_rd_stats(&tmp_rd_stats);
+    mbmi->use_derived_mv = i;
+    skip_mode_rd(&tmp_rd_stats, cpi, x, bsize, &orig_dst);
+    if (i == 0 || tmp_rd_stats.rdcost < skip_mode_rd_stats.rdcost) {
+      skip_mode_rd_stats = tmp_rd_stats;
+      best_mbmi = *mbmi;
+    }
+  }
+  *mbmi = best_mbmi;
+#else
   // Obtain the rdcost for skip_mode.
   skip_mode_rd(&skip_mode_rd_stats, cpi, x, bsize, &orig_dst);
+#endif  // CONFIG_DERIVED_MV
 
   // Compare the use of skip_mode with the best intra/inter mode obtained.
   const int skip_mode_ctx = av1_get_skip_mode_context(xd);
@@ -5203,6 +5300,9 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
   set_max_mv_precision(mbmi, sbi->sb_mv_precision);
   // set_mv_precision(mbmi, mbmi->max_mv_precision);
 #endif
+#if CONFIG_DERIVED_MV
+  mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DERIVED_MV
 }
 
 static AOM_INLINE void collect_single_states(const FeatureFlags *const features,
@@ -6994,8 +7094,10 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
           .as_int;
   mbmi->tx_size = max_txsize_lookup[bsize];
   x->txfm_search_info.skip_txfm = 1;
-
   mbmi->ref_mv_idx = 0;
+#if CONFIG_DERIVED_MV
+  mbmi->derived_mv_allowed = mbmi->use_derived_mv = 0;
+#endif  // CONFIG_DEIRVED_MV
 
   mbmi->motion_mode = SIMPLE_TRANSLATION;
 #if CONFIG_FLEX_MVRES
