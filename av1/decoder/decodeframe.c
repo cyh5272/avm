@@ -1023,8 +1023,14 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   const int num_planes = av1_num_planes(cm);
   MB_MODE_INFO *mbmi = xd->mi[0];
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+  int start_plane = 0;
+  int end_plane = num_planes;
+#if CONFIG_SDP
+  start_plane = (xd->tree_type == CHROMA_PART);
+  end_plane = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+#endif // CONFIG_SDP
   av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
-                          xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
+                          xd->is_chroma_ref, start_plane, end_plane, cm->mi_params.fDecTxSkipLog);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
 #if CONFIG_SDP
@@ -1144,8 +1150,14 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
     }
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     else {
+      start_plane = 0;
+      end_plane = num_planes;
+#if CONFIG_SDP
+      start_plane = (xd->tree_type == CHROMA_PART);
+      end_plane = (xd->tree_type == LUMA_PART) ? 1 : num_planes;
+#endif // CONFIG_SDP
       av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 1,
-                              xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
+                              xd->is_chroma_ref, start_plane, end_plane, cm->mi_params.fDecTxSkipLog);
     }
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     td->cfl_store_inter_block_visit(cm, xd);
