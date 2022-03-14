@@ -352,4 +352,9 @@ static INLINE int use_auto_max_partition(const AV1_COMP *const cpi,
          cpi->gf_group.update_type[cpi->gf_group.index] != INTNL_OVERLAY_UPDATE;
 }
 
+void av1_gather_erp_rect_features(
+    float *ml_features, AV1_COMP *cpi, MACROBLOCK *x, const TileInfo *tile_info,
+    const PC_TREE *pc_tree,
+    const struct PartitionSearchState *part_search_state, int64_t part_none_rd,
+    const int (*mi_pos_rect)[SUB_PARTITIONS_RECT][2]);
 #endif  // AOM_AV1_ENCODER_PARTITION_STRATEGY_H_
