@@ -164,8 +164,8 @@ void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params) {
 
 void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                              int mi_row, int mi_col, BLOCK_SIZE bsize,
-                             uint8_t value, bool is_chroma_ref, FILE *fLog) {
-  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+                             uint8_t value, bool is_chroma_ref, int plane_start, int plane_end, FILE *fLog) {
+  for (int plane = plane_start; plane < plane_end; plane++) {
     int w = ((cm->width + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2)
             << MAX_SB_SIZE_LOG2;
     w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
