@@ -626,7 +626,6 @@ static void read_palette_colors_y(MACROBLOCKD *const xd, int bit_depth,
     if (aom_read_bit(r, ACCT_STR)) pmi->palette_colors[idx++] = color_cache[i];
   }
   if (idx < n) {
-    const int n_cached_colors = idx;
     pmi->palette_colors[idx++] = aom_read_literal(r, bit_depth, ACCT_STR);
     if (idx < n) {
       const int min_bits = bit_depth - 3;
@@ -695,7 +694,6 @@ static void read_palette_colors_uv(MACROBLOCKD *const xd, int bit_depth,
   for (int i = 0; i < n_cache && idx < n; ++i)
     if (aom_read_bit(r, ACCT_STR)) pmi->palette_colors[idx++] = color_cache[i];
   if (idx < n) {
-    const int n_cached_colors = idx;
     idx += PALETTE_MAX_SIZE;
     pmi->palette_colors[idx++] = aom_read_literal(r, bit_depth, ACCT_STR);
     if (idx < PALETTE_MAX_SIZE + n) {
