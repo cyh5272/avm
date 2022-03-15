@@ -94,28 +94,28 @@ static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
     PAETH_PRED,     // PAETH_PRED
 #if !CONFIG_NEW_INTER_MODES
     NEARESTMV,  // NEARESTMV
-#endif          // !CONFIG_NEW_INTER_MODES
-    NEARMV,     // NEARMV
-    GLOBALMV,   // GLOBALMV
-    NEWMV,      // NEWMV
+#endif  // !CONFIG_NEW_INTER_MODES
+    NEARMV,    // NEARMV
+    GLOBALMV,  // GLOBALMV
+    NEWMV,     // NEWMV
 #if IMPROVED_AMVD
     NEWMV,  // AMVDNEWMV
-#endif      // IMPROVED_AMVD
+#endif  // IMPROVED_AMVD
 #if !CONFIG_NEW_INTER_MODES
     NEARESTMV,  // NEAREST_NEARESTMV
-#endif          // !CONFIG_NEW_INTER_MODES
-    NEARMV,     // NEAR_NEARMV
+#endif  // !CONFIG_NEW_INTER_MODES
+    NEARMV,  // NEAR_NEARMV
 #if !CONFIG_NEW_INTER_MODES
     NEARESTMV,  // NEAREST_NEWMV
     NEWMV,      // NEW_NEARESTMV
-#endif          // !CONFIG_NEW_INTER_MODES
-    NEARMV,     // NEAR_NEWMV
-    NEWMV,      // NEW_NEARMV
-    GLOBALMV,   // GLOBAL_GLOBALMV
-    NEWMV,      // NEW_NEWMV
+#endif  // !CONFIG_NEW_INTER_MODES
+    NEARMV,    // NEAR_NEWMV
+    NEWMV,     // NEW_NEARMV
+    GLOBALMV,  // GLOBAL_GLOBALMV
+    NEWMV,     // NEW_NEWMV
 #if CONFIG_JOINT_MVD
     NEWMV,  // JOINT_NEWMV
-#endif      // CONFIG_JOINT_MVD
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
     NEARMV,  // NEAR_NEARMV_OPTFLOW
     NEARMV,  // NEAR_NEWMV_OPTFLOW
@@ -123,8 +123,8 @@ static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
     NEWMV,   // NEW_NEWMV_OPTFLOW
 #if CONFIG_JOINT_MVD
     NEWMV,  // JOINT_NEWMV_OPTFLOW
-#endif      // CONFIG_JOINT_MVD
-#endif      // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_JOINT_MVD
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   };
   assert(NELEMENTS(lut) == MB_MODE_COUNT);
   assert(is_inter_compound_mode(mode) || is_inter_singleref_mode(mode));
@@ -148,28 +148,28 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
     MB_MODE_COUNT,  // PAETH_PRED
 #if !CONFIG_NEW_INTER_MODES
     MB_MODE_COUNT,  // NEARESTMV
-#endif              // !CONFIG_NEW_INTER_MODES
+#endif  // !CONFIG_NEW_INTER_MODES
     MB_MODE_COUNT,  // NEARMV
     MB_MODE_COUNT,  // GLOBALMV
     MB_MODE_COUNT,  // NEWMV
 #if IMPROVED_AMVD
     MB_MODE_COUNT,  // AMVDNEWMV
-#endif              // IMPROVED_AMVD
+#endif  // IMPROVED_AMVD
 #if !CONFIG_NEW_INTER_MODES
     NEARESTMV,  // NEAREST_NEARESTMV
-#endif          // !CONFIG_NEW_INTER_MODES
-    NEARMV,     // NEAR_NEARMV
+#endif  // !CONFIG_NEW_INTER_MODES
+    NEARMV,  // NEAR_NEARMV
 #if !CONFIG_NEW_INTER_MODES
     NEWMV,      // NEAREST_NEWMV
     NEARESTMV,  // NEW_NEARESTMV
-#endif          // !CONFIG_NEW_INTER_MODES
-    NEWMV,      // NEAR_NEWMV
-    NEARMV,     // NEW_NEARMV
-    GLOBALMV,   // GLOBAL_GLOBALMV
-    NEWMV,      // NEW_NEWMV
+#endif  // !CONFIG_NEW_INTER_MODES
+    NEWMV,     // NEAR_NEWMV
+    NEARMV,    // NEW_NEARMV
+    GLOBALMV,  // GLOBAL_GLOBALMV
+    NEWMV,     // NEW_NEWMV
 #if CONFIG_JOINT_MVD
     NEARMV,  // JOINT_NEWMV
-#endif       // CONFIG_JOINT_MVD
+#endif  // CONFIG_JOINT_MVD
 #if CONFIG_OPTFLOW_REFINEMENT
     NEARMV,  // NEAR_NEARMV_OPTFLOW
     NEWMV,   // NEAR_NEWMV_OPTFLOW
@@ -177,8 +177,8 @@ static INLINE PREDICTION_MODE compound_ref1_mode(PREDICTION_MODE mode) {
     NEWMV,   // NEW_NEWMV_OPTFLOW
 #if CONFIG_JOINT_MVD
     NEARMV,  // JOINT_NEWMV_OPTFLOW
-#endif       // CONFIG_JOINT_MVD
-#endif       // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_JOINT_MVD
+#endif  // CONFIG_OPTFLOW_REFINEMENT
   };
   assert(NELEMENTS(lut) == MB_MODE_COUNT);
   assert(is_inter_compound_mode(mode));
@@ -649,11 +649,7 @@ typedef struct macroblockd_plane {
   // The dequantizers below are true dequantizers used only in the
   // dequantization process.  They have the same coefficient
   // shift/scale as TX.
-#if CONFIG_EXTQUANT
   int32_t seg_dequant_QTX[MAX_SEGMENTS][2];
-#else
-  int16_t seg_dequant_QTX[MAX_SEGMENTS][2];
-#endif
   // Pointer to color index map of:
   // - Current coding block, on encoder side.
   // - Current superblock, on decoder side.

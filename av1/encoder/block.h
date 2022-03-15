@@ -126,7 +126,7 @@ typedef struct macroblock_plane {
    */
   /**@{*/
   //! Quantization step size used by AV1_XFORM_QUANT_FP.
-#if CONFIG_EXTQUANT
+
   const int32_t *quant_fp_QTX;
   //! Offset used for rounding in the quantizer process by AV1_XFORM_QUANT_FP.
   const int32_t *round_fp_QTX;
@@ -140,21 +140,6 @@ typedef struct macroblock_plane {
   const int32_t *zbin_QTX;
   //! Dequantizer
   const int32_t *dequant_QTX;
-#else
-  const int16_t *quant_fp_QTX;
-  //! Offset used for rounding in the quantizer process by AV1_XFORM_QUANT_FP.
-  const int16_t *round_fp_QTX;
-  //! Quantization step size used by AV1_XFORM_QUANT_B.
-  const int16_t *quant_QTX;
-  //! Offset used for rounding in the quantizer process by AV1_XFORM_QUANT_B.
-  const int16_t *round_QTX;
-  //! Scale factor to shift coefficients toward zero. Only used by QUANT_B.
-  const int16_t *quant_shift_QTX;
-  //! Size of the quantization bin around 0. Only Used by QUANT_B
-  const int16_t *zbin_QTX;
-  //! Dequantizer
-  const int16_t *dequant_QTX;
-#endif  // CONFIG_EXTQUANT
   /**@}*/
 } MACROBLOCK_PLANE;
 
@@ -812,7 +797,7 @@ typedef struct {
   int inter_2way_txfm_partition_cost[2];
   //! inter_2way_rect_txfm_partition_cost
   int inter_2way_rect_txfm_partition_cost[2];
-#else   // CONFIG_NEW_TX_PARTITION
+#else  // CONFIG_NEW_TX_PARTITION
   //! tx_size_cost
   int tx_size_cost[TX_SIZES - 1][TX_SIZE_CONTEXTS][TX_SIZES];
   //! txfm_partition_cost

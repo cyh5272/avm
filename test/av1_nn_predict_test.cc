@@ -211,14 +211,4 @@ TEST_P(NnPredictTest, DISABLED_Speed) {
   RunNnPredictSpeedTest_all(shapes, sizeof(shapes) / sizeof(*shapes), 10000000);
 }
 
-#if HAVE_SSE3 && !CONFIG_EXCLUDE_SIMD_MISMATCH
-INSTANTIATE_TEST_SUITE_P(SSE3, NnPredictTest,
-                         ::testing::Values(av1_nn_predict_sse3));
-#endif
-
-#if HAVE_NEON && !CONFIG_EXCLUDE_SIMD_MISMATCH
-INSTANTIATE_TEST_SUITE_P(NEON, NnPredictTest,
-                         ::testing::Values(av1_nn_predict_neon));
-#endif
-
 }  // namespace
