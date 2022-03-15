@@ -1468,18 +1468,15 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
            (1 << num_pels_log2_lookup[cpi->common.seq_params.sb_size]));
 #endif
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-    bool already_initialized_txk_skip = false;
+    int start_plane = 0;
+    int end_plane = av1_num_planes(&cpi->common);
 #if CONFIG_SDP
-    // SDP inappropriately calls this routine, encode_b, twice for luma then for
-    // chroma with dry_run = 0. Any initialization thinking this block level
-    // call with dry_run = 0 will lead to the block's final output is hence
-    // compromised.
-    if(xd->tree_type == CHROMA_PART)
-      already_initialized_txk_skip = true;  // Do not reinitialize.
+    start_plane = (xd->tree_type == CHROMA_PART);
+    end_plane = (xd->tree_type == LUMA_PART) ? 1 : av1_num_planes(&cpi->common);
 #endif // CONFIG_SDP
-    if(!already_initialized_txk_skip)
-      av1_init_txk_skip_array(&cpi->common, mbmi, mi_row, mi_col, bsize, 0,
-                              xd->is_chroma_ref, cpi->common.mi_params.fEncTxSkipLog);
+
+    av1_init_txk_skip_array(&cpi->common, mbmi, mi_row, mi_col, bsize, 0,
+                              xd->is_chroma_ref, start_plane, end_plane, cpi->common.mi_params.fEncTxSkipLog);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   }
 

@@ -751,8 +751,10 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
 #else
     int sb_type = mbmi->sb_type;
 #endif
+    int start_plane = 0;
+    int end_plane = av1_num_planes(cm);
     av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, sb_type, 1,
-                            xd->is_chroma_ref, cm->mi_params.fEncTxSkipLog);
+                            xd->is_chroma_ref, start_plane, end_plane, cm->mi_params.fEncTxSkipLog);
   }
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   if (x->txfm_search_info.skip_txfm) return;
