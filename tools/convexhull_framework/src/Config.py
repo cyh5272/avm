@@ -84,6 +84,7 @@ AOMDEC = os.path.join(BinPath, 'aomdec.exe')
 AV1ENC = os.path.join(BinPath, 'av1enc.exe')
 AV1DEC = os.path.join(BinPath, 'av1dec.exe')
 HMENC = os.path.join(BinPath, "TAppEncoderStatic.exe")
+VMAF = os.path.join(BinPath, 'vmaf')
 HEVCCfgFile = os.path.join(BinPath, "s2-hm-01.cfg")
 
 if CTC_VERSION == '2.0' or CTC_VERSION == "2.1":
@@ -117,8 +118,8 @@ AS_DOWNSCALE_ON_THE_FLY = False
 
 ######################## quality evalution config #############################
 QualityList = ['PSNR_Y','PSNR_U','PSNR_V','SSIM_Y(dB)','MS-SSIM_Y(dB)','VMAF_Y',
-               'VMAF_Y-NEG','PSNR-HVS','CIEDE2000','APSNR_Y','APSNR_U','APSNR_V']
-VMAF = os.path.join(BinPath, 'vmaf.exe')
+               'VMAF_Y-NEG','PSNR-HVS','CIEDE2000','APSNR_Y','APSNR_U','APSNR_V','CAMBI']
+
 CalcBDRateInExcel = True
 EnablePreInterpolation = True
 UsePCHIPInterpolation = False
