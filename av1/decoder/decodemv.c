@@ -641,7 +641,7 @@ static void read_palette_colors_y(MACROBLOCKD *const xd, int bit_depth,
       }
     }
   }
-  // Sort palette
+  // Sort Y palette
   for (int i = 0; i < n; i++) {
     for (int j = 1; j < n - i; j++) {
       if (pmi->palette_colors[j - 1] > pmi->palette_colors[j]) {
@@ -710,7 +710,7 @@ static void read_palette_colors_uv(MACROBLOCKD *const xd, int bit_depth,
       }
     }
   }
-  // Sort palette
+  // Sort U palette
   for (int i = 0; i < n; i++) {
     for (int j = 1; j < n - i; j++) {
       if (pmi->palette_colors[PALETTE_MAX_SIZE + j - 1] >
