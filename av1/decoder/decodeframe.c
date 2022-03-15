@@ -1171,15 +1171,17 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   DecoderCodingBlock *const dcb = &td->dcb;
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *mbmi = xd->mi[0];
-#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-  av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
-                          xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
-#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
   xd->mi[0]->partition = partition;
   const int plane_start = get_partition_plane_start(xd->tree_type);
   const int plane_end =
       get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+  av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 0,
+                          xd->is_chroma_ref, plane_start, plane_end,
+                          cm->mi_params.fDecTxSkipLog);
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+
   if (!is_inter_block(mbmi, xd->tree_type)) {
     int row, col;
     assert(bsize == get_plane_block_size(bsize, xd->plane[0].subsampling_x,
@@ -1279,7 +1281,8 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     else {
       av1_init_txk_skip_array(cm, mbmi, xd->mi_row, xd->mi_col, bsize, 1,
-                              xd->is_chroma_ref, cm->mi_params.fDecTxSkipLog);
+                              xd->is_chroma_ref, plane_start, plane_end,
+                              cm->mi_params.fDecTxSkipLog);
     }
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
     td->cfl_store_inter_block_visit(cm, xd);
