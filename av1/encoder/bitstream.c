@@ -2673,14 +2673,10 @@ static AOM_INLINE void encode_quantization(
     const CommonQuantParams *const quant_params, int num_planes,
     aom_bit_depth_t bit_depth, bool separate_uv_delta_q,
     struct aom_write_bit_buffer *wb) {
-#if CONFIG_EXTQUANT
   aom_wb_write_literal(
       wb, quant_params->base_qindex,
       bit_depth == AOM_BITS_8 ? QINDEX_BITS_UNEXT : QINDEX_BITS);
-#else
-  (void)bit_depth;
-  aom_wb_write_literal(wb, quant_params->base_qindex, QINDEX_BITS);
-#endif
+
   write_delta_q(wb, quant_params->y_dc_delta_q);
   if (num_planes > 1) {
     int diff_uv_delta =
@@ -3074,7 +3070,7 @@ static AOM_INLINE void write_color_config(
     }
     aom_wb_write_bit(wb, seq_params->separate_uv_delta_q);
   }
-#if CONFIG_EXTQUANT
+
   assert(seq_params->base_y_dc_delta_q <= DELTA_DCQUANT_MAX);
   aom_wb_write_unsigned_literal(
       wb, seq_params->base_y_dc_delta_q - DELTA_DCQUANT_MIN,
@@ -3085,7 +3081,6 @@ static AOM_INLINE void write_color_config(
         wb, seq_params->base_uv_dc_delta_q - DELTA_DCQUANT_MIN,
         DELTA_DCQUANT_BITS);
   }
-#endif  // CONFIG_EXTQUANT
 }
 
 static AOM_INLINE void write_timing_info_header(
@@ -3478,7 +3473,7 @@ static int check_frame_refs_short_signaling(AV1_COMMON *const cm) {
     }
   }
 
-#if 0   // For debug
+#if 0  // For debug
   printf("\nFrame=%d: \n", cm->current_frame.frame_number);
   printf("***frame_refs_short_signaling=%d\n", frame_refs_short_signaling);
   for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {

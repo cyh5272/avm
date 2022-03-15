@@ -63,11 +63,9 @@ extern "C" {
 #define FRAME_ID_LENGTH 15
 #define DELTA_FRAME_ID_LENGTH 14
 
-#if CONFIG_EXTQUANT
 #define DELTA_DCQUANT_BITS 5
 #define DELTA_DCQUANT_MAX (1 << (DELTA_DCQUANT_BITS - 2))
 #define DELTA_DCQUANT_MIN (DELTA_DCQUANT_MAX - (1 << DELTA_DCQUANT_BITS) + 1)
-#endif  // CONFIG_EXTQUANT
 
 #define DEBUG_EXTQUANT 0
 
@@ -312,8 +310,8 @@ typedef struct SequenceHeader {
   uint8_t enable_sdp;   // enables/disables semi-decoupled partitioning
   uint8_t enable_mrls;  // enables/disables multiple reference line selection
 #if CONFIG_FORWARDSKIP
-  uint8_t enable_fsc;                // enables/disables forward skip coding
-#endif                               // CONFIG_FORWARDSKIP
+  uint8_t enable_fsc;  // enables/disables forward skip coding
+#endif  // CONFIG_FORWARDSKIP
   uint8_t enable_filter_intra;       // enables/disables filterintra
   uint8_t enable_intra_edge_filter;  // enables/disables edge upsampling
 
@@ -328,16 +326,16 @@ typedef struct SequenceHeader {
 #endif
 #if CONFIG_ADAPTIVE_MVD
   uint8_t enable_adaptive_mvd;  // enables/disables adaptive MVD resolution
-#endif                          // CONFIG_ADAPTIVE_MVD
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-  uint8_t enable_joint_mvd;            // enables/disables joint MVD coding
-#endif                                 // CONFIG_JOINT_MVD
+  uint8_t enable_joint_mvd;  // enables/disables joint MVD coding
+#endif  // CONFIG_JOINT_MVD
   uint8_t enable_interintra_compound;  // enables/disables interintra_compound
   uint8_t enable_masked_compound;      // enables/disables masked compound
 #if CONFIG_OPTFLOW_REFINEMENT
   aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type for
                                             // this frame
-#endif                           // 1 - enable vert/horz filter selection
+#endif  // 1 - enable vert/horz filter selection
   uint8_t enable_warped_motion;  // 0 - disable warp for the sequence
                                  // 1 - enable warp for the sequence
   uint8_t enable_superres;       // 0 - Disable superres for the sequence
@@ -352,7 +350,7 @@ typedef struct SequenceHeader {
 #endif
 #if CONFIG_REF_MV_BANK
   uint8_t enable_refmvbank;  // To turn on/off Ref MV Bank
-#endif                       // CONFIG_REF_MV_BANK
+#endif  // CONFIG_REF_MV_BANK
   BITSTREAM_PROFILE profile;
 
   // Color config.
@@ -368,10 +366,8 @@ typedef struct SequenceHeader {
   int subsampling_y;  // Chroma subsampling for y
   aom_chroma_sample_position_t chroma_sample_position;
   uint8_t separate_uv_delta_q;
-#if CONFIG_EXTQUANT
   int8_t base_y_dc_delta_q;
   int8_t base_uv_dc_delta_q;
-#endif  // CONFIG_EXTQUANT
   uint8_t film_grain_params_present;
 
   // Operating point info.
@@ -443,8 +439,8 @@ typedef struct {
                                global search range. */
   bool allow_local_intrabc;  /*!< If true, intra block copy tool may use the
                               local  search range. */
-#endif                       // CONFIG_IBC_SR_EXT
-  bool allow_warped_motion;  /*!< If true, frame may use warped motion mode. */
+#endif  // CONFIG_IBC_SR_EXT
+  bool allow_warped_motion; /*!< If true, frame may use warped motion mode. */
   /*!
    * If true, using previous frames' motion vectors for prediction is allowed.
    */
@@ -734,15 +730,9 @@ struct CommonQuantParams {
    * shift/scale as TX.
    */
   /**@{*/
-#if CONFIG_EXTQUANT
   int32_t y_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for Y plane */
   int32_t u_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for U plane */
   int32_t v_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for V plane */
-#else
-  int16_t y_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for Y plane */
-  int16_t u_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for U plane */
-  int16_t v_dequant_QTX[MAX_SEGMENTS][2]; /*!< Dequant for V plane */
-#endif
   /**@}*/
 
   /**

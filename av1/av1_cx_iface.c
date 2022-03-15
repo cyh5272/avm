@@ -116,23 +116,23 @@ struct av1_extracfg {
   int enable_mrls;  // enable multiple reference line selection
 #if CONFIG_FORWARDSKIP
   int enable_fsc;  // enable forward skip coding
-#endif             // CONFIG_FORWARDSKIP
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   int enable_orip;  // enable ORIP
-#endif              // CONFIG_ORIP
+#endif  // CONFIG_ORIP
 #if CONFIG_IST
   int enable_ist;  // enable intra secondary transform
-#endif             // CONFIG_IST
+#endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
   int enable_ibp;  // enable intra bi-prediction
-#endif             // CONFIG_IBP_DC or CONFIG_IBP_DIR
+#endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
   int enable_adaptive_mvd;  // enable adaptive MVD resolution
-#endif                      // CONFIG_ADAPTIVE_MVD
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-  int enable_joint_mvd;          // enable joint MVD coding
-#endif                           // CONFIG_ADAPTIVE_MVD
+  int enable_joint_mvd;  // enable joint MVD coding
+#endif  // CONFIG_ADAPTIVE_MVD
   int min_partition_size;        // min partition size [4,8,16,32,64,128]
   int max_partition_size;        // max partition size [4,8,16,32,64,128]
   int enable_intra_edge_filter;  // enable intra-edge filter for sequence
@@ -163,12 +163,12 @@ struct av1_extracfg {
   int enable_intrabc;
 #if CONFIG_IBC_SR_EXT
   int enable_intrabc_ext;  // enable search range extension for intrabc
-#endif                     // CONFIG_IBC_SR_EXT
+#endif  // CONFIG_IBC_SR_EXT
   int enable_angle_delta;
 #if CONFIG_OPTFLOW_REFINEMENT
   aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type
                                             // for sequence
-#endif                                      // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_DENOISE
   float noise_level;
   int noise_block_size;
@@ -405,23 +405,23 @@ static struct av1_extracfg default_extra_cfg = {
   1,                            // enable semi-decoupled partitioning
   1,                            // enable multiple reference line selection
 #if CONFIG_FORWARDSKIP
-  1,    // enable forward skip coding
+  1,  // enable forward skip coding
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
-  1,    // enable ORIP
+  1,  // enable ORIP
 #endif  // CONFIG_ORIP
 #if CONFIG_IST
-  1,    // enable intra secondary transform
+  1,  // enable intra secondary transform
 #endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  1,    // enable intra bi-prediction
+  1,  // enable intra bi-prediction
 #endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
-  1,    // enable adaptive mvd resolution
+  1,  // enable adaptive mvd resolution
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
-  1,    // enable joint mvd coding
+  1,  // enable joint mvd coding
 #endif  // CONFIG_JOINT_MVD
   4,    // min_partition_size
   128,  // max_partition_size
@@ -453,9 +453,9 @@ static struct av1_extracfg default_extra_cfg = {
   1,                       // enable palette
   !CONFIG_SHARP_SETTINGS,  // enable intrabc
 #if CONFIG_IBC_SR_EXT
-  1,    // enable search range extension for intrabc
+  1,  // enable search range extension for intrabc
 #endif  // CONFIG_IBC_SR_EXT
-  1,    // enable angle delta
+  1,  // enable angle delta
 #if CONFIG_OPTFLOW_REFINEMENT
   1,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -489,10 +489,10 @@ static struct av1_extracfg default_extra_cfg = {
   0,            // sb_multipass_unit_test
   0,            // enable_subgop_stats
 #if CONFIG_NEW_INTER_MODES
-  0,    // max_drl_refmvs
+  0,  // max_drl_refmvs
 #endif  // CONFIG_NEW_INTER_MODES
 #if CONFIG_REF_MV_BANK
-  1,    // enable_refmvbank
+  1,  // enable_refmvbank
 #endif  // CONFIG_REF_MV_BANK
 };
 
@@ -588,17 +588,13 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
 
   RANGE_CHECK(cfg, g_bit_depth, AOM_BITS_8, AOM_BITS_12);
   RANGE_CHECK(cfg, g_input_bit_depth, AOM_BITS_8, AOM_BITS_12);
-#if CONFIG_EXTQUANT
+
   const int min_quantizer =
       (-(int)(cfg->g_bit_depth - AOM_BITS_8) * MAXQ_OFFSET);
   RANGE_CHECK(cfg, rc_max_quantizer, min_quantizer, 255);
   RANGE_CHECK(cfg, rc_min_quantizer, min_quantizer, 255);
   RANGE_CHECK(extra_cfg, qp, min_quantizer, 255);
-#else
-  RANGE_CHECK(cfg, rc_max_quantizer, 0, 255);
-  RANGE_CHECK(cfg, rc_min_quantizer, 0, 255);
-  RANGE_CHECK(extra_cfg, qp, 0, 255);
-#endif  // CONFIG_EXTQUANT
+
   RANGE_CHECK_HI(cfg, rc_min_quantizer, cfg->rc_max_quantizer);
   RANGE_CHECK_BOOL(extra_cfg, lossless);
   RANGE_CHECK_HI(extra_cfg, aq_mode, AQ_MODE_COUNT - 1);
@@ -1024,13 +1020,10 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth) {
   if (q_based_qp_offsets) {
     // At higher end of QP the slope of quant step-size grows exponentially,
     // captured by qp_threshold.
-#if CONFIG_EXTQUANT
+
     const int max_q = (bit_depth == AOM_BITS_8)    ? MAXQ_8_BITS
                       : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS
                                                    : MAXQ;
-#else
-    const int max_q = MAXQ;
-#endif  // CONFIG_EXTQUANT
 
     const int qp_threshold = (max_q * 7) / 10;
     if (qp < qp_threshold) {
@@ -1168,18 +1161,12 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   rc_cfg->mode = cfg->rc_end_usage;
   rc_cfg->min_cr = extra_cfg->min_cr;
 
-#if CONFIG_EXTQUANT
   const int offset_qp = (cfg->g_bit_depth - AOM_BITS_8) * MAXQ_OFFSET;
   rc_cfg->best_allowed_q =
       extra_cfg->lossless ? 0 : cfg->rc_min_quantizer + offset_qp;
   rc_cfg->worst_allowed_q =
       extra_cfg->lossless ? 0 : cfg->rc_max_quantizer + offset_qp;
   rc_cfg->qp = extra_cfg->qp + offset_qp;
-#else
-  rc_cfg->best_allowed_q = extra_cfg->lossless ? 0 : cfg->rc_min_quantizer;
-  rc_cfg->worst_allowed_q = extra_cfg->lossless ? 0 : cfg->rc_max_quantizer;
-  rc_cfg->qp = extra_cfg->qp;
-#endif
 
   rc_cfg->under_shoot_pct = cfg->rc_undershoot_pct;
   rc_cfg->over_shoot_pct = cfg->rc_overshoot_pct;
@@ -1478,7 +1465,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
         (uint8_t)cfg->rc_superres_kf_denominator;
     superres_cfg->superres_qthresh = cfg->rc_superres_qthresh;
     superres_cfg->superres_kf_qthresh = cfg->rc_superres_kf_qthresh;
-#if CONFIG_EXTQUANT
+
     int offset_superres_qthresh;
     int offset_superres_kf_qthresh;
     switch (cfg->g_bit_depth) {
@@ -1505,7 +1492,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
     }
     superres_cfg->superres_qthresh += offset_superres_qthresh;
     superres_cfg->superres_kf_qthresh += offset_superres_kf_qthresh;
-#endif
+
     if (superres_cfg->superres_mode == AOM_SUPERRES_FIXED &&
         superres_cfg->superres_scale_denominator == SCALE_NUMERATOR &&
         superres_cfg->superres_kf_scale_denominator == SCALE_NUMERATOR) {
