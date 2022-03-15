@@ -1549,7 +1549,8 @@ void av1_reset_txk_skip_array(AV1_COMMON *cm);
 void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params);
 void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                              int mi_row, int mi_col, BLOCK_SIZE bsize,
-                             uint8_t value, bool is_chroma_ref, FILE *fLog);
+                             uint8_t value, bool is_chroma_ref, int plane_start,
+                             int plane_end, FILE *fLog);
 void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
                                int plane, int blk_row, int blk_col,
                                TX_SIZE tx_size, FILE *fLog);
