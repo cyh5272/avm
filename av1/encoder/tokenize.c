@@ -55,7 +55,7 @@ static int cost_and_tokenize_map(Av1ColorMapParam *param, TokenExtra **t,
           color_map[y * plane_block_width + x])
         identity_row_flag = 0;
     }
-    int ctx = y == 0 ? 2 : prev_identity_row_flag;
+    const int ctx = y == 0 ? 2 : prev_identity_row_flag;
     for (int x = 0; x < cols; x++) {
       if (x == 0 && y == 0) {
         if (!calc_rate) {
@@ -157,7 +157,7 @@ static int cost_and_tokenize_map(Av1ColorMapParam *param, TokenExtra **t,
   if (calc_rate) return this_rate;
   return 0;
 }
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
 static void get_palette_params(const MACROBLOCK *const x, int plane,
                                BLOCK_SIZE bsize, Av1ColorMapParam *params) {
@@ -172,7 +172,7 @@ static void get_palette_params(const MACROBLOCK *const x, int plane,
                                    : xd->tile_ctx->identity_row_cdf_y;
   params->identity_row_cost = plane ? &x->mode_costs.palette_uv_row_flag_cost
                                     : &x->mode_costs.palette_y_row_flag_cost;
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   params->color_cost = plane ? &x->mode_costs.palette_uv_color_cost
                              : &x->mode_costs.palette_y_color_cost;
   params->n_colors = pmi->palette_size[plane];
@@ -208,7 +208,7 @@ int av1_cost_color_map(const MACROBLOCK *const x, int plane, BLOCK_SIZE bsize,
 #else
   return cost_and_tokenize_map(&color_map_params, NULL, plane, 1, 0, NULL,
                                map_pb_cdf);
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 }
 
 void av1_tokenize_color_map(const MACROBLOCK *const x, int plane,
@@ -234,7 +234,7 @@ void av1_tokenize_color_map(const MACROBLOCK *const x, int plane,
                             : x->tile_pb_ctx->palette_y_color_index_cdf;
   cost_and_tokenize_map(&color_map_params, t, plane, 0, allow_update_cdf,
                         counts, map_pb_cdf);
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 }
 
 static void tokenize_vartx(ThreadData *td, TX_SIZE tx_size,

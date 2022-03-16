@@ -514,7 +514,7 @@ static AOM_INLINE void pack_map_tokens(aom_writer *w, const TokenExtra **tp,
   }
   *tp = p;
 }
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
 static AOM_INLINE void pack_txb_tokens(
     aom_writer *w, AV1_COMMON *cm, MACROBLOCK *const x, const TokenExtra **tp,
@@ -2083,7 +2083,7 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
       pack_map_tokens(w, tok, palette_size_plane, cols, rows);
 #else
       pack_map_tokens(w, tok, palette_size_plane, rows * cols);
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
     }
   }
 

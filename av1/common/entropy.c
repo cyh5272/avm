@@ -162,7 +162,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #if CONFIG_NEW_COLOR_MAP_CODING
   RESET_CDF_COUNTER(fc->identity_row_cdf_y, 2);
   RESET_CDF_COUNTER(fc->identity_row_cdf_uv, 2);
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   for (int j = 0; j < PALETTE_SIZES; j++) {
     int nsymbs = j + PALETTE_MIN_SIZE;
     RESET_CDF_COUNTER_STRIDE(fc->palette_y_color_index_cdf[j], nsymbs,

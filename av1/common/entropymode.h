@@ -43,7 +43,7 @@ extern "C" {
 #define PALETTE_ROW_FLAG_CONTEXTS 3
 #else
 #define PALETTE_COLOR_INDEX_CONTEXTS 5
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
 // Palette Y mode context for a block is determined by number of neighboring
 // blocks (top and/or left) using a palette for Y plane. So, possible Y mode'
@@ -148,7 +148,7 @@ typedef struct frame_contexts {
 #if CONFIG_NEW_COLOR_MAP_CODING
   aom_cdf_prob identity_row_cdf_y[PALETTE_ROW_FLAG_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob identity_row_cdf_uv[PALETTE_ROW_FLAG_CONTEXTS][CDF_SIZE(2)];
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   aom_cdf_prob palette_y_color_index_cdf[PALETTE_SIZES]
                                         [PALETTE_COLOR_INDEX_CONTEXTS]
                                         [CDF_SIZE(PALETTE_COLORS)];

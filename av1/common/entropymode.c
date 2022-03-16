@@ -1311,7 +1311,7 @@ static const aom_cdf_prob default_palette_uv_color_index_cdf
           { AOM_CDF8(31190, 31329, 31516, 31679, 31825, 32026, 32322) },
       },
     };
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
 #if CONFIG_NEW_TX_PARTITION
 static const aom_cdf_prob default_inter_4way_txfm_partition_cdf
@@ -1501,7 +1501,7 @@ int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
                                         int row_flag, int prev_row_flag) {
 #else
                                         uint8_t *color_order, int *color_idx) {
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   assert(palette_size <= PALETTE_MAX_SIZE);
   assert(r > 0 || c > 0);
 
@@ -1562,7 +1562,7 @@ int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
 #if CONFIG_NEW_COLOR_MAP_CODING
   if (c == 0 && row_flag && prev_row_flag)
     return PALETTE_COLOR_INDEX_CONTEXTS - 1;
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
   // Get hash value of context.
   int color_index_ctx_hash = 0;
@@ -1587,7 +1587,7 @@ int av1_fast_palette_color_index_context(const uint8_t *color_map, int stride,
                                          int row_flag, int prev_row_flag) {
 #else
                                          int r, int c, int *color_idx) {
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   assert(r > 0 || c > 0);
 
   // This goes in the order of left, top, and top-left. This has the advantage
@@ -1679,7 +1679,7 @@ int av1_fast_palette_color_index_context(const uint8_t *color_map, int stride,
 #if CONFIG_NEW_COLOR_MAP_CODING
   if (c == 0 && row_flag && prev_row_flag)
     return PALETTE_COLOR_INDEX_CONTEXTS - 1;
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
   // Get hash value of context.
   int color_index_ctx_hash = 0;
@@ -1708,7 +1708,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #if CONFIG_NEW_COLOR_MAP_CODING
   av1_copy(fc->identity_row_cdf_y, default_identity_row_cdf_y);
   av1_copy(fc->identity_row_cdf_uv, default_identity_row_cdf_uv);
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   av1_copy(fc->palette_y_color_index_cdf, default_palette_y_color_index_cdf);
   av1_copy(fc->palette_uv_color_index_cdf, default_palette_uv_color_index_cdf);
 #if !CONFIG_AIMC

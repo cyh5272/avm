@@ -1927,7 +1927,7 @@ typedef const int (*ColorCost)[PALETTE_SIZES][PALETTE_COLOR_INDEX_CONTEXTS]
 #if CONFIG_NEW_COLOR_MAP_CODING
 typedef aom_cdf_prob (*IdentityRowCdf)[CDF_SIZE(2)];
 typedef const int (*IdentityRowCost)[PALETTE_ROW_FLAG_CONTEXTS][2];
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 
 typedef struct {
   int rows;
@@ -1941,7 +1941,7 @@ typedef struct {
 #if CONFIG_NEW_COLOR_MAP_CODING
   IdentityRowCdf identity_row_cdf;
   IdentityRowCost identity_row_cost;
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 } Av1ColorMapParam;
 
 static INLINE int is_nontrans_global_motion(const MACROBLOCKD *xd,

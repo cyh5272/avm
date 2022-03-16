@@ -672,7 +672,7 @@ typedef struct {
 #if CONFIG_NEW_COLOR_MAP_CODING
   int palette_y_row_flag_cost[PALETTE_ROW_FLAG_CONTEXTS][2];
   int palette_uv_row_flag_cost[PALETTE_ROW_FLAG_CONTEXTS][2];
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
   /**@}*/
 
   /*****************************************************************************

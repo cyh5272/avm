@@ -27,7 +27,7 @@ typedef struct {
 #if CONFIG_NEW_COLOR_MAP_CODING
   aom_cdf_prob *identity_row_cdf;
   uint8_t identity_row_flag;
-#endif
+#endif  // CONFIG_NEW_COLOR_MAP_CODING
 } TokenExtra;
 
 typedef struct {
