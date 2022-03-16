@@ -827,7 +827,7 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
 #if CONFIG_NEW_REF_SIGNALING
     for (idx = 0; idx < cm->ref_frames_info.n_total_refs; ++idx) {
       const MV_REFERENCE_FRAME refs[2] = { idx, INVALID_IDX };
-      if (prune_ref_by_selective_ref_frame_nrs(cpi, NULL, refs)) {
+      if (prune_ref_by_selective_ref_frame(cpi, NULL, refs)) {
 #else
     for (idx = 0; idx < INTER_REFS_PER_FRAME; ++idx) {
       const MV_REFERENCE_FRAME refs[2] = { idx + 1, NONE_FRAME };

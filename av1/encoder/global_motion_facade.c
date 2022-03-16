@@ -291,7 +291,7 @@ static int compare_distance(const void *a, const void *b) {
 // Function to decide if we can skip the global motion parameter computation
 // for a particular ref frame.
 #if CONFIG_NEW_REF_SIGNALING
-static AOM_INLINE int skip_gm_frame_nrs(AV1_COMMON *const cm, int refrank) {
+static AOM_INLINE int skip_gm_frame(AV1_COMMON *const cm, int refrank) {
   const RefCntBuffer *const refbuf = get_ref_frame_buf(cm, refrank);
   if (refbuf == NULL) return 1;
   const int d0 = get_dir_rank(cm, refrank, NULL);
@@ -309,7 +309,7 @@ static AOM_INLINE int skip_gm_frame_nrs(AV1_COMMON *const cm, int refrank) {
 
 // Prunes reference frames for global motion estimation based on the speed
 // feature 'gm_search_type'.
-static int do_gm_search_logic_nrs(SPEED_FEATURES *const sf, int refrank) {
+static int do_gm_search_logic(SPEED_FEATURES *const sf, int refrank) {
   switch (sf->gm_sf.gm_search_type) {
     case GM_FULL_SEARCH: return 1;
     case GM_REDUCED_REF_SEARCH_SKIP_LEV2:
@@ -395,7 +395,7 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
 #if CONFIG_NEW_REF_SIGNALING
     int prune_ref_frames =
         ref_pruning_enabled &&
-        prune_ref_by_selective_ref_frame_nrs(cpi, NULL, ref_frame);
+        prune_ref_by_selective_ref_frame(cpi, NULL, ref_frame);
 #else
     int prune_ref_frames =
         ref_pruning_enabled &&
@@ -406,9 +406,8 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
     if (ref_buf[frame]->y_crop_width == cpi->source->y_crop_width &&
         ref_buf[frame]->y_crop_height == cpi->source->y_crop_height &&
 #if CONFIG_NEW_REF_SIGNALING
-        do_gm_search_logic_nrs(&cpi->sf, ref_frame[0]) &&
-        !(cpi->sf.gm_sf.selective_ref_gm &&
-          skip_gm_frame_nrs(cm, ref_frame[0])) &&
+        do_gm_search_logic(&cpi->sf, ref_frame[0]) &&
+        !(cpi->sf.gm_sf.selective_ref_gm && skip_gm_frame(cm, ref_frame[0])) &&
 #else
         do_gm_search_logic(&cpi->sf, frame) &&
         !(cpi->sf.gm_sf.selective_ref_gm && skip_gm_frame(cm, frame)) &&

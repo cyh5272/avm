@@ -1135,7 +1135,7 @@ static AOM_INLINE void estimate_ref_frame_costs(
     const int n_refs = cm->ref_frames_info.n_total_refs;
     for (int i = 0; i < n_refs; i++) {
       for (int j = 0; j <= AOMMIN(i, n_refs - 2); j++) {
-        aom_cdf_prob ctx = av1_get_ref_pred_context_nrs(xd, j, n_refs);
+        aom_cdf_prob ctx = av1_get_ref_pred_context(xd, j, n_refs);
         const int bit = i == j;
         ref_costs_single[i] += mode_costs->single_ref_cost[ctx][j][bit];
       }
@@ -1204,7 +1204,7 @@ static AOM_INLINE void estimate_ref_frame_costs(
           if (j <= i) {
             if (n_refs == 2) continue;  // No bits need to be sent in this case
             // Keep track of the cost to encode the first reference
-            aom_cdf_prob ctx = av1_get_ref_pred_context_nrs(xd, j, n_refs);
+            aom_cdf_prob ctx = av1_get_ref_pred_context(xd, j, n_refs);
             const int bit = i == j;
             if (j < n_refs - 2 && j < RANKED_REF0_TO_PRUNE - 1)
               prev_cost += mode_costs->comp_ref0_cost[ctx][j][bit];
@@ -1213,7 +1213,7 @@ static AOM_INLINE void estimate_ref_frame_costs(
             ref_costs_comp[i][j] = prev_cost;
             ref_costs_comp[j][i] = prev_cost;
             if (j < n_refs - 1) {
-              aom_cdf_prob ctx = av1_get_ref_pred_context_nrs(xd, j, n_refs);
+              aom_cdf_prob ctx = av1_get_ref_pred_context(xd, j, n_refs);
               const int bit_type =
                   av1_get_compound_ref_bit_type(&cm->ref_frames_info, i, j);
               ref_costs_comp[i][j] +=
@@ -4602,8 +4602,8 @@ static const MV_REFERENCE_FRAME reduced_ref_combos[][2] = {
   { 2, 3 },
 };
 
-static void set_mask_combo_bit_nrs(bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
-                                   const MV_REFERENCE_FRAME *refs, bool val) {
+static void set_mask_combo_bit(bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
+                               const MV_REFERENCE_FRAME *refs, bool val) {
   const MV_REFERENCE_FRAME r0 =
       (refs[0] == INTRA_FRAME_NRS ? INTER_REFS_PER_FRAME : refs[0]);
   const MV_REFERENCE_FRAME r1 =
@@ -4611,9 +4611,8 @@ static void set_mask_combo_bit_nrs(bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
   ref_combo[r0][r1 + 1] = val;
 }
 
-static bool get_mask_combo_bit_nrs(
-    const bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
-    const MV_REFERENCE_FRAME *refs) {
+static bool get_mask_combo_bit(const bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
+                               const MV_REFERENCE_FRAME *refs) {
   const MV_REFERENCE_FRAME r0 =
       (refs[0] == INTRA_FRAME_NRS ? INTER_REFS_PER_FRAME : refs[0]);
   const MV_REFERENCE_FRAME r1 =
@@ -4683,7 +4682,7 @@ static AOM_INLINE void default_skip_mask(mode_skip_mask_t *mask,
     for (int i = 0; i < num_ref_combos; ++i) {
       const MV_REFERENCE_FRAME *const this_combo = ref_set_combos[i];
 #if CONFIG_NEW_REF_SIGNALING
-      set_mask_combo_bit_nrs(mask->ref_combo, this_combo, false);
+      set_mask_combo_bit(mask->ref_combo, this_combo, false);
 #else
       mask->ref_combo[this_combo[0]][this_combo[1] + 1] = false;
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -4873,7 +4872,7 @@ static AOM_INLINE int prune_ref_frame(const AV1_COMP *cpi, const MACROBLOCK *x,
     }
   }
 
-  if (prune_ref_by_selective_ref_frame_nrs(cpi, x, rf)) {
+  if (prune_ref_by_selective_ref_frame(cpi, x, rf)) {
     return 1;
   }
 
@@ -5190,7 +5189,7 @@ static bool mask_says_skip(const mode_skip_mask_t *mode_skip_mask,
   }
 
 #if CONFIG_NEW_REF_SIGNALING
-  return get_mask_combo_bit_nrs(mode_skip_mask->ref_combo, ref_frame);
+  return get_mask_combo_bit(mode_skip_mask->ref_combo, ref_frame);
 #else
   return mode_skip_mask->ref_combo[ref_frame[0]][ref_frame[1] + 1];
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -6358,7 +6357,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
          frame++) {
       const MV_REFERENCE_FRAME refs[2] = { frame, INVALID_IDX };
       valid_refs[frame] = x->tpl_keep_ref_frame[frame] ||
-                          !prune_ref_by_selective_ref_frame_nrs(cpi, x, refs);
+                          !prune_ref_by_selective_ref_frame(cpi, x, refs);
     }
 #else
     for (MV_REFERENCE_FRAME frame = LAST_FRAME; frame < REF_FRAMES; frame++) {

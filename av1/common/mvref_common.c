@@ -1587,7 +1587,7 @@ static int motion_field_projection(AV1_COMMON *cm,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-static INLINE int is_ref_overlay_nrs(const AV1_COMMON *const cm, int ref) {
+static INLINE int is_ref_overlay(const AV1_COMMON *const cm, int ref) {
   const OrderHintInfo *const order_hint_info = &cm->seq_params.order_hint_info;
   if (!order_hint_info->enable_order_hint) return -1;
   const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref);
@@ -1702,7 +1702,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
   for (int ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
        ref_frame++) {
     const int dir = cm->ref_frame_side[ref_frame];
-    if (dir == -1 || is_ref_overlay_nrs(cm, ref_frame) ||
+    if (dir == -1 || is_ref_overlay(cm, ref_frame) ||
         !is_ref_motion_field_eligible(cm, ref_buf[ref_frame]))
       continue;
     const int absdist = abs(cm->ref_frames_info.ref_frame_distance[ref_frame]);

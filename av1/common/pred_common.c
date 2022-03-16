@@ -632,8 +632,8 @@ int av1_get_reference_mode_context(const AV1_COMMON *cm,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-int av1_get_ref_pred_context_nrs(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
-                                 int n_total_refs) {
+int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
+                             int n_total_refs) {
   assert((ref + 1) < n_total_refs);
   const uint8_t *const ref_counts = &xd->neighbors_ref_counts[0];
   const int this_ref_count = ref_counts[ref];

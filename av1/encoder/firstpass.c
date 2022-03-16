@@ -926,6 +926,9 @@ static void first_pass_tiles(AV1_COMP *cpi) {
 }
 
 #if CONFIG_NEW_REF_SIGNALING
+// First pass inter prediction relies on last and golden frames as reference
+// frames. In new reference framework, references with rank 0 and 2 are used
+// as their proxies.
 #define LAST_FRAME_PROXY 0
 #define GOLDEN_FRAME_PROXY 2  // Any proxy index will do
 #endif                        // CONFIG_NEW_REF_SIGNALING

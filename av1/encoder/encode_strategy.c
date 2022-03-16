@@ -65,7 +65,6 @@ const SubGOPStepCfg *get_subgop_step(const GF_GROUP *const gf_group,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-// Encoder-only version for the reference mapping
 void av1_get_ref_frames_enc(AV1_COMMON *cm, int cur_frame_disp,
                             RefFrameMapPair *ref_frame_map_pairs) {
   assert(cm->seq_params.explicit_ref_frame_map);

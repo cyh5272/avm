@@ -710,7 +710,7 @@ static AOM_INLINE void write_segment_id(AV1_COMP *cpi,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-static AOM_INLINE void write_single_ref_nrs(
+static AOM_INLINE void write_single_ref(
     const MACROBLOCKD *xd, const RefFramesInfo *const ref_frames_info,
     aom_writer *w) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -719,13 +719,13 @@ static AOM_INLINE void write_single_ref_nrs(
   assert(ref < n_refs);
   for (int i = 0; i < n_refs - 1; i++) {
     const int bit = ref == i;
-    aom_write_symbol(w, bit, av1_get_pred_cdf_single_ref_nrs(xd, i, n_refs), 2);
+    aom_write_symbol(w, bit, av1_get_pred_cdf_single_ref(xd, i, n_refs), 2);
     if (bit) return;
   }
   assert(ref == (n_refs - 1));
 }
 
-static AOM_INLINE void write_compound_ref_nrs(
+static AOM_INLINE void write_compound_ref(
     const MACROBLOCKD *xd, const RefFramesInfo *const ref_frames_info,
     aom_writer *w) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -745,8 +745,7 @@ static AOM_INLINE void write_compound_ref_nrs(
     if (n_bits > 0 || i < RANKED_REF0_TO_PRUNE - 1) {
       aom_write_symbol(
           w, bit,
-          av1_get_pred_cdf_compound_ref_nrs(xd, i, n_bits, bit_type, n_refs),
-          2);
+          av1_get_pred_cdf_compound_ref(xd, i, n_bits, bit_type, n_refs), 2);
     }
     n_bits += bit;
   }
@@ -794,7 +793,7 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
 
     if (is_compound) {
 #if CONFIG_NEW_REF_SIGNALING
-      write_compound_ref_nrs(xd, &cm->ref_frames_info, w);
+      write_compound_ref(xd, &cm->ref_frames_info, w);
 #else
       const COMP_REFERENCE_TYPE comp_ref_type = has_uni_comp_refs(mbmi)
                                                     ? UNIDIR_COMP_REFERENCE
@@ -846,7 +845,7 @@ static AOM_INLINE void write_ref_frames(const AV1_COMMON *cm,
 
     } else {
 #if CONFIG_NEW_REF_SIGNALING
-      write_single_ref_nrs(xd, &cm->ref_frames_info, w);
+      write_single_ref(xd, &cm->ref_frames_info, w);
 #else
       const int bit0 = (mbmi->ref_frame[0] <= ALTREF_FRAME &&
                         mbmi->ref_frame[0] >= BWDREF_FRAME);

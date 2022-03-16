@@ -992,7 +992,7 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     int_mv nearestmv, nearmv;
 
 #if CONFIG_NEW_REF_SIGNALING
-    // TODO(kslu): Rework av1_find_mv_refs_nrs to avoid having this big array
+    // TODO(kslu): Rework av1_find_mv_refs to avoid having this big array
     // ref_mvs
     int_mv ref_mvs[INTRA_FRAME_NRS + 1][MAX_MV_REF_CANDIDATES];
     av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME_NRS, dcb->ref_mv_count,
@@ -1389,13 +1389,13 @@ static REFERENCE_MODE read_block_reference_mode(AV1_COMMON *cm,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-static AOM_INLINE void read_single_ref_nrs(
+static AOM_INLINE void read_single_ref(
     MACROBLOCKD *const xd, MV_REFERENCE_FRAME ref_frame[2],
     const RefFramesInfo *const ref_frames_info, aom_reader *r) {
   const int n_refs = ref_frames_info->n_total_refs;
   for (int i = 0; i < n_refs - 1; i++) {
     const int bit = aom_read_symbol(
-        r, av1_get_pred_cdf_single_ref_nrs(xd, i, n_refs), 2, ACCT_STR);
+        r, av1_get_pred_cdf_single_ref(xd, i, n_refs), 2, ACCT_STR);
     if (bit) {
       ref_frame[0] = i;
       return;
@@ -1404,7 +1404,7 @@ static AOM_INLINE void read_single_ref_nrs(
   ref_frame[0] = n_refs - 1;
 }
 
-static AOM_INLINE void read_compound_ref_nrs(
+static AOM_INLINE void read_compound_ref(
     const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref_frame[2],
     const RefFramesInfo *const ref_frames_info, aom_reader *r) {
   const int n_refs = ref_frames_info->n_total_refs;
@@ -1418,7 +1418,7 @@ static AOM_INLINE void read_compound_ref_nrs(
     const int bit = (n_bits == 0 && i >= RANKED_REF0_TO_PRUNE - 1)
                         ? 1
                         : aom_read_symbol(r,
-                                          av1_get_pred_cdf_compound_ref_nrs(
+                                          av1_get_pred_cdf_compound_ref(
                                               xd, i, n_bits, bit_type, n_refs),
                                           2, ACCT_STR);
     if (bit) {
@@ -1482,7 +1482,7 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
 
     if (mode == COMPOUND_REFERENCE) {
 #if CONFIG_NEW_REF_SIGNALING
-      read_compound_ref_nrs(xd, ref_frame, &cm->ref_frames_info, r);
+      read_compound_ref(xd, ref_frame, &cm->ref_frames_info, r);
 #else
       const COMP_REFERENCE_TYPE comp_ref_type = read_comp_reference_type(xd, r);
 
@@ -1535,7 +1535,7 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
 #endif  // CONFIG_NEW_REF_SIGNALING
     } else if (mode == SINGLE_REFERENCE) {
 #if CONFIG_NEW_REF_SIGNALING
-      read_single_ref_nrs(xd, ref_frame, &cm->ref_frames_info, r);
+      read_single_ref(xd, ref_frame, &cm->ref_frames_info, r);
       ref_frame[1] = INVALID_IDX;
 #else
       const int bit0 = READ_REF_BIT(single_ref_p1);

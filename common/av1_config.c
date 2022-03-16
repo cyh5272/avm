@@ -237,17 +237,7 @@ int parse_sequence_header_beyond_av1(struct aom_read_bit_buffer *reader) {
   AV1C_READ_BIT_OR_RETURN_ERROR(enable_refmvbank);
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_NEW_REF_SIGNALING
-  int reduced_ref_frame_set = 0;
-  do {
-    reduced_ref_frame_set = aom_rb_read_bit(reader);
-    if (result == -1) {
-      fprintf(stderr,
-              "av1c: Error reading bit for \" reduced_ref_frame_set \", "
-              "value=%d result=%d.\n",
-              reduced_ref_frame_set, result);
-      return -1;
-    }
-  } while (0);
+  AV1C_READ_BIT_OR_RETURN_ERROR(reduced_ref_frame_set);
   if (reduced_ref_frame_set) {
     AV1C_READ_BITS_OR_RETURN_ERROR(max_reference_frames, 2);
   }

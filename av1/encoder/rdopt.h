@@ -179,7 +179,7 @@ static INLINE void av1_copy_usable_ref_mv_stack_and_weight(
 
 #if CONFIG_NEW_REF_SIGNALING
 #define PRUNE_SINGLE_REFS 0
-static INLINE int prune_ref_by_selective_ref_frame_nrs(
+static INLINE int prune_ref_by_selective_ref_frame(
     const AV1_COMP *const cpi, const MACROBLOCK *const x,
     const MV_REFERENCE_FRAME *const ref_frame) {
   (void)x;
