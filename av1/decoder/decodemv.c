@@ -690,11 +690,10 @@ static void read_palette_colors_uv(MACROBLOCKD *const xd, int bit_depth,
   // U channel colors.
   uint16_t color_cache[2 * PALETTE_MAX_SIZE];
   const int n_cache = av1_get_palette_cache(xd, 1, color_cache);
-  int idx = 0;
-  for (int i = 0; i < n_cache && idx < n; ++i)
+  int idx = PALETTE_MAX_SIZE;
+  for (int i = 0; i < n_cache && idx < PALETTE_MAX_SIZE + n; ++i)
     if (aom_read_bit(r, ACCT_STR)) pmi->palette_colors[idx++] = color_cache[i];
-  if (idx < n) {
-    idx += PALETTE_MAX_SIZE;
+  if (idx < PALETTE_MAX_SIZE + n) {
     pmi->palette_colors[idx++] = aom_read_literal(r, bit_depth, ACCT_STR);
     if (idx < PALETTE_MAX_SIZE + n) {
       const int min_bits = bit_depth - 3;
