@@ -374,23 +374,21 @@ static INLINE int opfl_get_comp_idx(int mode) {
 // The 'color_map' is a 2D array with the given 'stride'.
 int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
                                         int r, int c, int palette_size,
+                                        uint8_t *color_order, int *color_idx
 #if CONFIG_NEW_COLOR_MAP_CODING
-                                        uint8_t *color_order, int *color_idx,
-                                        int row_flag, int prev_row_flag);
-#else
-                                        uint8_t *color_order, int *color_idx);
+                                        ,
+                                        int row_flag, int prev_row_flag
 #endif
-
+);
 // A faster version of av1_get_palette_color_index_context used by the encoder
 // exploiting the fact that the encoder does not need to maintain a color order.
 int av1_fast_palette_color_index_context(const uint8_t *color_map, int stride,
+                                         int r, int c, int *color_idx
 #if CONFIG_NEW_COLOR_MAP_CODING
-                                         int r, int c, int *color_idx,
-                                         int row_flag, int prev_row_flag);
-#else
-                                         int r, int c, int *color_idx);
+                                         ,
+                                         int row_flag, int prev_row_flag
 #endif
-
+);
 #ifdef __cplusplus
 }  // extern "C"
 #endif
