@@ -188,7 +188,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
 
   if (!sf->inter_sf.selective_ref_frame) return 0;
   assert(ref_frame[0] != INVALID_IDX);
-  if (ref_frame[0] == INTRA_FRAME_NRS) return 0;
+  if (ref_frame[0] == INTRA_FRAME) return 0;
 
   const int comp_pred = is_inter_ref_frame(ref_frame[1]);
 

@@ -991,21 +991,13 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
     int_mv nearestmv, nearmv;
 
-#if CONFIG_NEW_REF_SIGNALING
     // TODO(kslu): Rework av1_find_mv_refs to avoid having this big array
     // ref_mvs
-    int_mv ref_mvs[INTRA_FRAME_NRS + 1][MAX_MV_REF_CANDIDATES];
-    av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME_NRS, dcb->ref_mv_count,
-                     xd->ref_mv_stack, xd->weight, ref_mvs,
-                     /*global_mvs=*/NULL, inter_mode_ctx);
-    av1_find_best_ref_mvs(0, ref_mvs[INTRA_FRAME_NRS], &nearestmv, &nearmv, 0);
-#else
     int_mv ref_mvs[INTRA_FRAME + 1][MAX_MV_REF_CANDIDATES];
     av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME, dcb->ref_mv_count,
                      xd->ref_mv_stack, xd->weight, ref_mvs, /*global_mvs=*/NULL,
                      inter_mode_ctx);
     av1_find_best_ref_mvs(0, ref_mvs[INTRA_FRAME], &nearestmv, &nearmv, 0);
-#endif  // CONFIG_NEW_REF_SIGNALING
 
     int_mv dv_ref = nearestmv.as_int == 0 ? nearmv : nearestmv;
     if (dv_ref.as_int == 0)
@@ -1155,11 +1147,10 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 
   mbmi->current_qindex = xd->current_base_qindex;
 
+  mbmi->ref_frame[0] = INTRA_FRAME;
 #if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[0] = INTRA_FRAME_NRS;
   mbmi->ref_frame[1] = INVALID_IDX;
 #else
-  mbmi->ref_frame[0] = INTRA_FRAME;
   mbmi->ref_frame[1] = NONE_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
   if (xd->tree_type != CHROMA_PART) mbmi->palette_mode_info.palette_size[0] = 0;
@@ -1598,11 +1589,10 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
                                        aom_reader *r) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
 
+  mbmi->ref_frame[0] = INTRA_FRAME;
 #if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[0] = INTRA_FRAME_NRS;
   mbmi->ref_frame[1] = INVALID_IDX;
 #else
-  mbmi->ref_frame[0] = INTRA_FRAME;
   mbmi->ref_frame[1] = NONE_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
 
@@ -2146,11 +2136,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     if (interintra) {
       const INTERINTRA_MODE interintra_mode =
           read_interintra_mode(xd, r, bsize_group);
-#if CONFIG_NEW_REF_SIGNALING
-      mbmi->ref_frame[1] = INTRA_FRAME_NRS;
-#else
       mbmi->ref_frame[1] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       mbmi->interintra_mode = interintra_mode;
       mbmi->angle_delta[PLANE_TYPE_Y] = 0;
       mbmi->angle_delta[PLANE_TYPE_UV] = 0;
@@ -2178,11 +2164,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
   }
   av1_count_overlappable_neighbors(cm, xd);
 
-#if CONFIG_NEW_REF_SIGNALING
-  if (mbmi->ref_frame[1] != INTRA_FRAME_NRS)
-#else
   if (mbmi->ref_frame[1] != INTRA_FRAME)
-#endif  // CONFIG_NEW_REF_SIGNALING
     mbmi->motion_mode = read_motion_mode(cm, xd, mbmi, r);
 
   // init
@@ -2329,11 +2311,10 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 
 #if CONFIG_IBC_SR_EXT
   if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+    mbmi->ref_frame[0] = INTRA_FRAME;
 #if CONFIG_NEW_REF_SIGNALING
-    mbmi->ref_frame[0] = INTRA_FRAME_NRS;
     mbmi->ref_frame[1] = INVALID_IDX;
 #else
-    mbmi->ref_frame[0] = INTRA_FRAME;
     mbmi->ref_frame[1] = NONE_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
     mbmi->palette_mode_info.palette_size[0] = 0;

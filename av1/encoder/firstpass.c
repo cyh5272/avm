@@ -349,11 +349,7 @@ static int firstpass_intra_prediction(
   xd->plane[2].dst.buf = this_frame->v_buffer + uv_offset;
   xd->left_available = (mb_col != 0);
   xd->mi[0]->sb_type[xd->tree_type == CHROMA_PART] = bsize;
-#if CONFIG_NEW_REF_SIGNALING
-  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
-#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
   set_mi_row_col(xd, tile, mb_row * mb_scale, mi_size_high[bsize],
                  mb_col * mb_scale, mi_size_wide[bsize], mi_params->mi_rows,
                  mi_params->mi_cols);

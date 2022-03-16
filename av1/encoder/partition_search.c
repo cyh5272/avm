@@ -1150,11 +1150,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
         const int bsize_group = size_group_lookup[bsize];
-#if CONFIG_NEW_REF_SIGNALING
-        if (mbmi->ref_frame[1] == INTRA_FRAME_NRS) {
-#else
         if (mbmi->ref_frame[1] == INTRA_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_ENTROPY_STATS
           counts->interintra[bsize_group][1]++;
 #endif
@@ -1191,11 +1187,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               ? motion_mode_allowed(xd->global_motion, xd, mbmi,
                                     cm->features.allow_warped_motion)
               : SIMPLE_TRANSLATION;
-#if CONFIG_NEW_REF_SIGNALING
-      if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
-#else
       if (mbmi->ref_frame[1] != INTRA_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
         if (motion_allowed == WARPED_CAUSAL) {
 #if CONFIG_ENTROPY_STATS
           counts->motion_mode[bsize][mbmi->motion_mode]++;
@@ -1545,11 +1537,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                                       cm->features.allow_warped_motion)
                 : SIMPLE_TRANSLATION;
 
-#if CONFIG_NEW_REF_SIGNALING
-        if (mbmi->ref_frame[1] != INTRA_FRAME_NRS) {
-#else
         if (mbmi->ref_frame[1] != INTRA_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
           if (motion_allowed >= OBMC_CAUSAL) {
             td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
           }

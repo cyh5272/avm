@@ -1926,7 +1926,7 @@ void av1_set_default_ref_deltas(int8_t *ref_deltas) {
   ref_deltas[4] = 0;
   ref_deltas[5] = 0;
   ref_deltas[6] = 0;
-  ref_deltas[INTRA_FRAME_INDEX_NRS] = 1;
+  ref_deltas[INTRA_FRAME_INDEX] = 1;
 #else
   ref_deltas[INTRA_FRAME] = 1;
   ref_deltas[LAST_FRAME] = 0;

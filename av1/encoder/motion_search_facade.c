@@ -84,8 +84,8 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     // max mv magnitude and that based on the best ref mvs of the current
     // block for the given reference.
 #if CONFIG_NEW_REF_SIGNALING
-    const MV_REFERENCE_FRAME rfn = COMPACT_INDEX0_NRS(ref);
-    step_param = (av1_init_search_range(x->max_mv_context[rfn]) +
+    const int ref_frame_idx = COMPACT_INDEX0_NRS(ref);
+    step_param = (av1_init_search_range(x->max_mv_context[ref_frame_idx]) +
                   mv_search_params->mv_step_param) /
                  2;
 #else

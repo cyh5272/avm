@@ -699,11 +699,7 @@ static int handle_wedge_inter_intra_mode(
       const int mi_col = xd->mi_col;
       av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, orig_dst, bsize,
                                     AOM_PLANE_Y, AOM_PLANE_Y);
-#if CONFIG_NEW_REF_SIGNALING
-      mbmi->ref_frame[1] = INTRA_FRAME_NRS;
-#else
       mbmi->ref_frame[1] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       av1_combine_interintra(xd, bsize, 0, xd->plane[AOM_PLANE_Y].dst.buf,
                              xd->plane[AOM_PLANE_Y].dst.stride, intrapred, bw);
       model_rd_sb_fn[MODELRD_TYPE_MASKED_COMPOUND](
@@ -770,11 +766,7 @@ int av1_handle_inter_intra_mode(const AV1_COMP *const cpi, MACROBLOCK *const x,
 
   // Restore the buffers for intra prediction
   restore_dst_buf(xd, *orig_dst, num_planes);
-#if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[1] = INTRA_FRAME_NRS;
-#else
   mbmi->ref_frame[1] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
   INTERINTRA_MODE best_interintra_mode =
       args->inter_intra_mode[mbmi->ref_frame[0]];
 

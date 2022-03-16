@@ -278,11 +278,7 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
   xd->mi[0]->motion_mode = SIMPLE_TRANSLATION;
 
   // Intra prediction search
-#if CONFIG_NEW_REF_SIGNALING
-  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
-#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
 
   // Pre-load the bottom left line.
   if (xd->left_available &&
@@ -319,11 +315,7 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
   }
 
   // Motion compensated prediction
-#if CONFIG_NEW_REF_SIGNALING
-  xd->mi[0]->ref_frame[0] = INTRA_FRAME_NRS;
-#else
   xd->mi[0]->ref_frame[0] = INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
 
   int best_rf_idx = -1;
   int_mv best_mv;

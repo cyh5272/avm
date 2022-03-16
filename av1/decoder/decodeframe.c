@@ -936,7 +936,7 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
   for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
     const MV_REFERENCE_FRAME frame = mbmi->ref_frame[ref];
 #if CONFIG_NEW_REF_SIGNALING
-    if (frame == INTRA_FRAME_NRS) {
+    if (frame == INTRA_FRAME) {
 #else
     if (frame < LAST_FRAME) {
       assert(frame == INTRA_FRAME);

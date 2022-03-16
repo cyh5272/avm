@@ -189,11 +189,7 @@ static AOM_INLINE void add_ref_mv_candidate(
 #if CONFIG_SMVP_IMPROVEMENT
       else if (add_more_mvs && is_inter_ref_frame(candidate->ref_frame[ref]) &&
 #if CONFIG_IBC_SR_EXT
-#if CONFIG_NEW_REF_SIGNALING
-               rf[0] != INTRA_FRAME_NRS &&
-#else
                rf[0] != INTRA_FRAME &&
-#endif  // CONFIG_NEW_REF_SIGNALING
 #endif  // CONFIG_IBC_SR_EXT
                cm->seq_params.order_hint_info.enable_order_hint) {
         const int cur_blk_ref_side = cm->ref_frame_side[rf[0]];
@@ -1208,11 +1204,7 @@ static AOM_INLINE void setup_ref_mv_list(
       AOMMIN(USABLE_REF_MV_STACK_SIZE, MAX_REF_MV_STACK_SIZE);
 #endif  // CONFIG_NEW_INTER_MODES
   // If open slots are available, fetch reference MVs from the ref mv banks.
-#if CONFIG_NEW_REF_SIGNALING
-  if (*refmv_count < ref_mv_limit && ref_frame != INTRA_FRAME_NRS) {
-#else
   if (*refmv_count < ref_mv_limit && ref_frame != INTRA_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     const REF_MV_BANK *ref_mv_bank = xd->ref_mv_bank_pt;
     const CANDIDATE_MV *queue = ref_mv_bank->rmb_buffer[ref_frame];
     const int count = ref_mv_bank->rmb_count[ref_frame];
@@ -1254,11 +1246,7 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   const int mi_col = xd->mi_col;
   int_mv gm_mv[2];
 
-#if CONFIG_NEW_REF_SIGNALING
-  if (ref_frame == INTRA_FRAME_NRS) {
-#else
   if (ref_frame == INTRA_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     gm_mv[0].as_int = gm_mv[1].as_int = 0;
     if (global_mvs != NULL) {
       global_mvs[ref_frame].as_int = INVALID_MV;

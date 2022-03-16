@@ -1755,11 +1755,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     if (cpi->common.current_frame.reference_mode != COMPOUND_REFERENCE &&
         cpi->common.seq_params.enable_interintra_compound &&
         is_interintra_allowed(mbmi)) {
-#if CONFIG_NEW_REF_SIGNALING
-      const int interintra = mbmi->ref_frame[1] == INTRA_FRAME_NRS;
-#else
       const int interintra = mbmi->ref_frame[1] == INTRA_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       const int bsize_group = size_group_lookup[bsize];
       aom_write_symbol(w, interintra, ec_ctx->interintra_cdf[bsize_group], 2);
       if (interintra) {
@@ -1777,12 +1773,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       }
     }
 
-#if CONFIG_NEW_REF_SIGNALING
-    if (mbmi->ref_frame[1] != INTRA_FRAME_NRS)
-#else
-    if (mbmi->ref_frame[1] != INTRA_FRAME)
-#endif  // CONFIG_NEW_REF_SIGNALING
-      write_motion_mode(cm, xd, mbmi, w);
+    if (mbmi->ref_frame[1] != INTRA_FRAME) write_motion_mode(cm, xd, mbmi, w);
 
     // First write idx to indicate current compound inter prediction mode
     // group Group A (0): dist_wtd_comp, compound_average Group B (1):

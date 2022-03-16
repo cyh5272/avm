@@ -204,8 +204,8 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
           const int scale = 1 << (lvl_seg >> 5);
 #if CONFIG_NEW_REF_SIGNALING
           const int intra_lvl =
-              lvl_seg + lf->ref_deltas[INTRA_FRAME_INDEX_NRS] * scale;
-          lfi->lvl[plane][seg_id][dir][INTRA_FRAME_INDEX_NRS][0] =
+              lvl_seg + lf->ref_deltas[INTRA_FRAME_INDEX] * scale;
+          lfi->lvl[plane][seg_id][dir][INTRA_FRAME_INDEX][0] =
               clamp(intra_lvl, 0, MAX_LOOP_FILTER);
           for (ref = 0; ref < INTER_REFS_PER_FRAME; ++ref) {
 #else

@@ -158,8 +158,7 @@ static INLINE int8_t av1_ref_frame_type(const MV_REFERENCE_FRAME *const rf) {
 
 static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
                                      MV_REFERENCE_FRAME ref_frame_type) {
-  if (ref_frame_type == INTRA_FRAME_NRS ||
-      ref_frame_type < INTER_REFS_PER_FRAME) {
+  if (ref_frame_type == INTRA_FRAME || ref_frame_type < INTER_REFS_PER_FRAME) {
     rf[0] = ref_frame_type;
     rf[1] = INVALID_IDX;
   } else {

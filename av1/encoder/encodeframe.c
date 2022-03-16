@@ -414,7 +414,7 @@ static void init_ref_frame_space(AV1_COMP *cpi, ThreadData *td, int mi_row,
   }
 
 #if CONFIG_NEW_REF_SIGNALING
-  x->tpl_keep_ref_frame[INTRA_FRAME_INDEX_NRS] = 1;
+  x->tpl_keep_ref_frame[INTRA_FRAME_INDEX] = 1;
   x->tpl_keep_ref_frame[0] = 1;
 #else
   x->tpl_keep_ref_frame[INTRA_FRAME] = 1;

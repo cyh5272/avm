@@ -779,10 +779,10 @@ typedef uint8_t TXFM_CONTEXT;
 #define REF_FRAMES (INTER_REFS_PER_FRAME + 1)
 #define MODE_CTX_REF_FRAMES \
   (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 1)
-#define INTRA_FRAME_NRS (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2)
+#define INTRA_FRAME (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2)
 // Used for indexing into arrays that contain reference data for
 // inter and intra.
-#define INTRA_FRAME_INDEX_NRS INTER_REFS_PER_FRAME
+#define INTRA_FRAME_INDEX INTER_REFS_PER_FRAME
 #define AOM_REFFRAME_ALL ((1 << INTER_REFS_PER_FRAME) - 1)
 #else
 // An enum for single reference types (and some derived values).
