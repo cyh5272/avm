@@ -104,7 +104,7 @@ static INLINE void lower_mv_precision(MV *mv, int allow_hp, int is_integer) {
 
 #if CONFIG_NEW_REF_SIGNALING
 // Converts a pair of distinct indices (rf) each in [0, n-1],
-// to an combined index in [0, n*(n-1)/2].
+// to a combined index in [0, n*(n-1)/2].
 // The order of the combined index is as follows:
 // (0, 1), (0, 2), (0, 3), ..., (0, n-1),
 //         (1, 2), (1, 3), ..., (1, n-1),

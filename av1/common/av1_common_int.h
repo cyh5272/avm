@@ -92,9 +92,17 @@ extern "C" {
 #define TXCOEFF_COST_TIMER 0
 
 #if CONFIG_NEW_REF_SIGNALING
+// Some arrays (e.g. x->pred_sse and yv12_mb) are defined such that their
+// indices 0-7 correspond to inter ref0, ref1,... ref6, and intra ref.
+// This macros maps the ref_frame indices to corresponding array indices,
+// where intra ref_frame index, INTRA_FRAME_NRS (28) is mapped to
+// INTRA_FRAME_INDEX_NRS (7).
 #define COMPACT_INDEX0_NRS(r) \
   (((r) == INTRA_FRAME_NRS) ? INTRA_FRAME_INDEX_NRS : (r))
 
+// This macro is similar to the previous one, but also maps INVALID_IDX
+// (ref_frame[1] for the single reference case) to 7, which typically
+// corresponds to an unused slot allocated for convenience.
 #define COMPACT_INDEX1_NRS(r) \
   (!is_inter_ref_frame((r)) ? INTRA_FRAME_INDEX_NRS : (r))
 #endif  // CONFIG_NEW_REF_SIGNALING

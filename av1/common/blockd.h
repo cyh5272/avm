@@ -552,13 +552,8 @@ static INLINE int is_inter_ref_frame(MV_REFERENCE_FRAME ref_frame) {
 }
 
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi, int tree_type) {
-#if CONFIG_NEW_REF_SIGNALING
-  return is_intrabc_block(mbmi, tree_type) ||
-         mbmi->ref_frame[0] != INTRA_FRAME_NRS;
-#else
   return is_intrabc_block(mbmi, tree_type) ||
          is_inter_ref_frame(mbmi->ref_frame[0]);
-#endif  // CONFIG_NEW_REF_SIGNALING
 }
 
 static INLINE int has_second_ref(const MB_MODE_INFO *mbmi) {

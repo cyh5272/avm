@@ -2935,11 +2935,11 @@ static AOM_INLINE int ref_match_found_in_nb_blocks(MB_MODE_INFO *cur_mbmi,
   const int is_cur_comp_pred = has_second_ref(cur_mbmi);
   int match_found = 0;
 
-  for (int i = 0; i < (is_cur_comp_pred + 1); i++) {
-    if ((cur_ref_frames[i] == nb_ref_frames[0]) ||
-        (cur_ref_frames[i] == nb_ref_frames[1]))
-      match_found = 1;
-  }
+  if (cur_ref_frames[0] == nb_ref_frames[0] ||
+      cur_ref_frames[0] == nb_ref_frames[1] ||
+      (is_cur_comp_pred && (cur_ref_frames[1] == nb_ref_frames[0] ||
+                            cur_ref_frames[1] == nb_ref_frames[1])))
+    match_found = 1;
   return match_found;
 }
 

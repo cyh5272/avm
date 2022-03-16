@@ -76,7 +76,7 @@ extern "C" {
 #define FSC_MODE_CONTEXTS 4
 #define FSC_BSIZE_CONTEXTS 5
 #endif  // CONFIG_FORWARDSKIP
-        //
+
 #if CONFIG_NEW_REF_SIGNALING
 #define COMPREF_BIT_TYPES 2
 #define RANKED_REF0_TO_PRUNE 3
