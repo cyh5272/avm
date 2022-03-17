@@ -1148,11 +1148,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   mbmi->current_qindex = xd->current_base_qindex;
 
   mbmi->ref_frame[0] = INTRA_FRAME;
-#if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[1] = INVALID_IDX;
-#else
   mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
   if (xd->tree_type != CHROMA_PART) mbmi->palette_mode_info.palette_size[0] = 0;
   mbmi->palette_mode_info.palette_size[1] = 0;
   if (xd->tree_type != CHROMA_PART)
@@ -1457,7 +1453,7 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
   if (segfeature_active(&cm->seg, segment_id, SEG_LVL_SKIP) ||
       segfeature_active(&cm->seg, segment_id, SEG_LVL_GLOBALMV)) {
     ref_frame[0] = get_closest_pastcur_ref_index(cm);
-    ref_frame[1] = INVALID_IDX;
+    ref_frame[1] = NONE_FRAME;
 #else
   if (segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME)) {
     ref_frame[0] = (MV_REFERENCE_FRAME)get_segdata(&cm->seg, segment_id,
@@ -1527,7 +1523,6 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
     } else if (mode == SINGLE_REFERENCE) {
 #if CONFIG_NEW_REF_SIGNALING
       read_single_ref(xd, ref_frame, &cm->ref_frames_info, r);
-      ref_frame[1] = INVALID_IDX;
 #else
       const int bit0 = READ_REF_BIT(single_ref_p1);
       if (bit0) {
@@ -1549,8 +1544,8 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
         }
       }
 
-      ref_frame[1] = NONE_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
+      ref_frame[1] = NONE_FRAME;
     } else {
       assert(0 && "Invalid prediction mode.");
     }
@@ -1590,11 +1585,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
 
   mbmi->ref_frame[0] = INTRA_FRAME;
-#if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[1] = INVALID_IDX;
-#else
   mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
 
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
@@ -2128,11 +2119,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     const int bsize_group = size_group_lookup[bsize];
     const int interintra =
         aom_read_symbol(r, ec_ctx->interintra_cdf[bsize_group], 2, ACCT_STR);
-#if CONFIG_NEW_REF_SIGNALING
-    assert(mbmi->ref_frame[1] == INVALID_IDX);
-#else
     assert(mbmi->ref_frame[1] == NONE_FRAME);
-#endif  // CONFIG_NEW_REF_SIGNALING
     if (interintra) {
       const INTERINTRA_MODE interintra_mode =
           read_interintra_mode(xd, r, bsize_group);
@@ -2312,11 +2299,7 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 #if CONFIG_IBC_SR_EXT
   if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
     mbmi->ref_frame[0] = INTRA_FRAME;
-#if CONFIG_NEW_REF_SIGNALING
-    mbmi->ref_frame[1] = INVALID_IDX;
-#else
     mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
     mbmi->palette_mode_info.palette_size[0] = 0;
     mbmi->palette_mode_info.palette_size[1] = 0;
     read_intrabc_info(cm, dcb, r);
@@ -2340,11 +2323,7 @@ static void intra_copy_frame_mvs(AV1_COMMON *const cm, int mi_row, int mi_col,
   for (int h = 0; h < y_mis; h++) {
     MV_REF *mv = frame_mvs;
     for (int w = 0; w < x_mis; w++) {
-#if CONFIG_NEW_REF_SIGNALING
-      mv->ref_frame = INVALID_IDX;
-#else
       mv->ref_frame = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       mv++;
     }
     frame_mvs += frame_mvs_stride;

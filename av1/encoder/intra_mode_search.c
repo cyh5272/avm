@@ -766,11 +766,7 @@ int av1_search_palette_mode(IntraModeSearchState *intra_search_state,
   mbmi->mode = DC_PRED;
   mbmi->uv_mode = UV_DC_PRED;
   mbmi->ref_frame[0] = INTRA_FRAME;
-#if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[1] = INVALID_IDX;
-#else
   mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
   RD_STATS rd_stats_y;
   av1_invalid_rd_stats(&rd_stats_y);
   av1_rd_pick_palette_intra_sby(

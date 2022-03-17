@@ -690,11 +690,7 @@ static int handle_wedge_inter_intra_mode(
       mbmi->mv[0].as_int = tmp_mv->as_int;
       // Set ref_frame[1] to NONE_FRAME temporarily so that the intra
       // predictor is not calculated again in av1_enc_build_inter_predictor().
-#if CONFIG_NEW_REF_SIGNALING
-      mbmi->ref_frame[1] = INVALID_IDX;
-#else
       mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       const int mi_row = xd->mi_row;
       const int mi_col = xd->mi_col;
       av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, orig_dst, bsize,
@@ -753,11 +749,7 @@ int av1_handle_inter_intra_mode(const AV1_COMP *const cpi, MACROBLOCK *const x,
   const int mi_col = xd->mi_col;
 
   // Single reference inter prediction
-#if CONFIG_NEW_REF_SIGNALING
-  mbmi->ref_frame[1] = INVALID_IDX;
-#else
   mbmi->ref_frame[1] = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
   xd->plane[0].dst.buf = tmp_buf;
   xd->plane[0].dst.stride = bw;
   av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize,

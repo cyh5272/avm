@@ -372,7 +372,7 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
 
 #if CONFIG_NEW_REF_SIGNALING
   for (int frame = cm->ref_frames_info.n_total_refs - 1; frame >= 0; --frame) {
-    const MV_REFERENCE_FRAME ref_frame[2] = { frame, INVALID_IDX };
+    const MV_REFERENCE_FRAME ref_frame[2] = { frame, NONE_FRAME };
     const int ref_disabled = !(cm->ref_frame_flags & (1 << frame));
 #else
   for (int frame = ALTREF_FRAME; frame >= LAST_FRAME; --frame) {

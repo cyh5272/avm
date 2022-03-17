@@ -1263,11 +1263,7 @@ void av1_get_entropy_contexts(BLOCK_SIZE plane_bsize,
 
 void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint8_t *ref_y_buffer,
                  int ref_y_stride, int ref_frame, BLOCK_SIZE block_size) {
-#if CONFIG_NEW_REF_SIGNALING
-  const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, INVALID_IDX };
-#else
   const MV_REFERENCE_FRAME ref_frames[2] = { ref_frame, NONE_FRAME };
-#endif  // CONFIG_NEW_REF_SIGNALING
   const int_mv ref_mv =
       av1_get_ref_mv_from_stack(0, ref_frames, 0, x->mbmi_ext);
   const int_mv ref_mv1 =

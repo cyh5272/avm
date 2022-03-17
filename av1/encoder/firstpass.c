@@ -679,11 +679,10 @@ static int firstpass_inter_prediction(
     xd->mi[0]->tx_size = TX_4X4;
 #if CONFIG_NEW_REF_SIGNALING
     xd->mi[0]->ref_frame[0] = get_closest_pastcur_ref_index(cm);
-    xd->mi[0]->ref_frame[1] = INVALID_IDX;
 #else
     xd->mi[0]->ref_frame[0] = LAST_FRAME;
-    xd->mi[0]->ref_frame[1] = NONE_FRAME;
 #endif  // CONFIG_NEW_REF_SIGNALING
+    xd->mi[0]->ref_frame[1] = NONE_FRAME;
     av1_enc_build_inter_predictor(cm, xd, mb_row * mb_scale, mb_col * mb_scale,
                                   NULL, bsize, AOM_PLANE_Y, AOM_PLANE_Y);
     av1_encode_sby_pass1(cpi, x, bsize);

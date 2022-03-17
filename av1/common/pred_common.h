@@ -91,7 +91,7 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
 
 // Find the reference that is furthest in the future
 static INLINE int get_furthest_future_ref_index(const AV1_COMMON *const cm) {
-  int index = INVALID_IDX;
+  int index = NONE_FRAME;
   int ref_disp_order = -1;
   for (int i = 0; i < cm->ref_frames_info.n_future_refs; i++) {
     const int ref = cm->ref_frames_info.future_refs[i];
@@ -106,7 +106,7 @@ static INLINE int get_furthest_future_ref_index(const AV1_COMMON *const cm) {
 }
 
 static INLINE int get_closest_ref_index(const AV1_COMMON *const cm) {
-  int index = INVALID_IDX;
+  int index = NONE_FRAME;
   int best_dist = INT_MAX;
   for (int ref = 0; ref < cm->ref_frames_info.n_total_refs; ref++) {
     const int dist = abs(cm->ref_frames_info.ref_frame_distance[ref]);
@@ -119,7 +119,7 @@ static INLINE int get_closest_ref_index(const AV1_COMMON *const cm) {
 }
 
 static INLINE int get_closest_past_ref_index(const AV1_COMMON *const cm) {
-  int index = INVALID_IDX;
+  int index = NONE_FRAME;
   int best_dist = INT_MAX;
   for (int i = 0; i < cm->ref_frames_info.n_past_refs; i++) {
     const int ref = cm->ref_frames_info.past_refs[i];

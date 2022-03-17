@@ -187,7 +187,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
   const SPEED_FEATURES *const sf = &cpi->sf;
 
   if (!sf->inter_sf.selective_ref_frame) return 0;
-  assert(ref_frame[0] != INVALID_IDX);
+  assert(ref_frame[0] != NONE_FRAME);
   if (ref_frame[0] == INTRA_FRAME) return 0;
 
   const int comp_pred = is_inter_ref_frame(ref_frame[1]);

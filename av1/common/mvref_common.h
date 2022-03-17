@@ -160,7 +160,7 @@ static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
                                      MV_REFERENCE_FRAME ref_frame_type) {
   if (ref_frame_type == INTRA_FRAME || ref_frame_type < INTER_REFS_PER_FRAME) {
     rf[0] = ref_frame_type;
-    rf[1] = INVALID_IDX;
+    rf[1] = NONE_FRAME;
   } else {
     comb2single(INTER_REFS_PER_FRAME, ref_frame_type - INTER_REFS_PER_FRAME,
                 rf);

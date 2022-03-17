@@ -2380,14 +2380,14 @@ static int encode_without_recode(AV1_COMP *cpi) {
 #if CONFIG_NEW_REF_SIGNALING
     const MV_REFERENCE_FRAME golden_frame = get_best_past_ref_index(cm);
     const MV_REFERENCE_FRAME altref_frame = get_furthest_future_ref_index(cm);
-    if (golden_frame != INVALID_IDX &&
+    if (golden_frame != NONE_FRAME &&
         cm->ref_frame_flags & (1 << golden_frame)) {
       const YV12_BUFFER_CONFIG *const ref =
           get_ref_frame_yv12_buf(cm, golden_frame);
       if (ref->y_crop_width != cm->width || ref->y_crop_height != cm->height)
         cm->ref_frame_flags ^= (1 << golden_frame);
     }
-    if (altref_frame != INVALID_IDX &&
+    if (altref_frame != NONE_FRAME &&
         cm->ref_frame_flags & (1 << altref_frame)) {
       const YV12_BUFFER_CONFIG *const ref =
           get_ref_frame_yv12_buf(cm, altref_frame);

@@ -37,21 +37,12 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
   for (h = 0; h < y_mis; h++) {
     MV_REF *mv = frame_mvs;
     for (w = 0; w < x_mis; w++) {
-#if CONFIG_NEW_REF_SIGNALING
-      mv->ref_frame = INVALID_IDX;
-#else
       mv->ref_frame = NONE_FRAME;
-#endif  // CONFIG_NEW_REF_SIGNALING
       mv->mv.as_int = 0;
 
 #if CONFIG_TMVP_IMPROVEMENT
-#if CONFIG_NEW_REF_SIGNALING
-      if (is_inter_ref_frame(mi->ref_frame[0]) &&
-          mi->ref_frame[1] == INVALID_IDX) {
-#else
       if (is_inter_ref_frame(mi->ref_frame[0]) &&
           mi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
         if ((abs(mi->mv[0].as_mv.row) <= REFMVS_LIMIT) &&
             (abs(mi->mv[0].as_mv.col) <= REFMVS_LIMIT)) {
           mv->ref_frame = mi->ref_frame[0];
@@ -92,11 +83,7 @@ static AOM_INLINE void fill_mvp_from_derived_smvp(
   int index = 0;
   int derived_idx = 0;
 
-#if CONFIG_NEW_REF_SIGNALING
-  if (rf[1] == INVALID_IDX) {
-#else
   if (rf[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     for (derived_idx = 0; derived_idx < derived_mv_count; ++derived_idx) {
       for (index = 0; index < *refmv_count; ++index) {
         if (ref_mv_stack[index].this_mv.as_int ==
@@ -158,11 +145,7 @@ static AOM_INLINE void add_ref_mv_candidate(
   assert(weight % 2 == 0);
   int index, ref;
 
-#if CONFIG_NEW_REF_SIGNALING
-  if (rf[1] == INVALID_IDX) {
-#else
   if (rf[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     // single reference frame
     for (ref = 0; ref < 2; ++ref) {
       if (candidate->ref_frame[ref] == rf[0]) {
@@ -623,11 +606,7 @@ static int add_tpl_ref_mv(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   lower_mv_precision(&this_refmv.as_mv, allow_high_precision_mv,
                      force_integer_mv);
 
-#if CONFIG_NEW_REF_SIGNALING
-  if (rf[1] == INVALID_IDX) {
-#else
   if (rf[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     if (blk_row == 0 && blk_col == 0) {
       if (abs(this_refmv.as_mv.row - gm_mv_candidates[0].as_mv.row) >= 16 ||
           abs(this_refmv.as_mv.col - gm_mv_candidates[0].as_mv.col) >= 16)
@@ -1066,11 +1045,7 @@ static AOM_INLINE void setup_ref_mv_list(
   int mi_height = AOMMIN(mi_size_high[BLOCK_64X64], xd->height);
   mi_height = AOMMIN(mi_height, cm->mi_params.mi_rows - mi_row);
   const int mi_size = AOMMIN(mi_width, mi_height);
-#if CONFIG_NEW_REF_SIGNALING
-  if (rf[1] > INVALID_IDX) {
-#else
   if (rf[1] > NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
     // TODO(jingning, yunqing): Refactor and consolidate the compound and
     // single reference frame modes. Reduce unnecessary redundancy.
     if (*refmv_count < MAX_MV_REF_CANDIDATES) {
@@ -1966,12 +1941,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-#if CONFIG_NEW_REF_SIGNALING
-      if (mbmi->ref_frame[0] == ref_frame &&
-          mbmi->ref_frame[1] == INVALID_IDX) {
-#else
       if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
         record_samples(mbmi, pts, pts_inref, 0, -1, col_offset, 1);
         pts += 2;
         pts_inref += 2;
@@ -1997,11 +1967,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
 #else
         if (mbmi->ref_frame[0] == ref_frame &&
-#if CONFIG_NEW_REF_SIGNALING
-            mbmi->ref_frame[1] == INVALID_IDX) {
-#else
             mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
           record_samples(mbmi, pts, pts_inref, 0, -1, i, 1);
           pts += 2;
           pts_inref += 2;
@@ -2039,12 +2005,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-#if CONFIG_NEW_REF_SIGNALING
-      if (mbmi->ref_frame[0] == ref_frame &&
-          mbmi->ref_frame[1] == INVALID_IDX) {
-#else
       if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
         record_samples(mbmi, pts, pts_inref, row_offset, 1, 0, -1);
         pts += 2;
         pts_inref += 2;
@@ -2071,11 +2032,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
 #else
         if (mbmi->ref_frame[0] == ref_frame &&
-#if CONFIG_NEW_REF_SIGNALING
-            mbmi->ref_frame[1] == INVALID_IDX) {
-#else
             mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
           record_samples(mbmi, pts, pts_inref, i, 1, 0, -1);
           pts += 2;
           pts_inref += 2;
@@ -2104,11 +2061,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
       }
     }
 #else
-#if CONFIG_NEW_REF_SIGNALING
-    if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == INVALID_IDX) {
-#else
     if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
       record_samples(mbmi, pts, pts_inref, 0, -1, 0, -1);
       pts += 2;
       pts_inref += 2;
@@ -2140,12 +2093,7 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-#if CONFIG_NEW_REF_SIGNALING
-      if (mbmi->ref_frame[0] == ref_frame &&
-          mbmi->ref_frame[1] == INVALID_IDX) {
-#else
       if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-#endif  // CONFIG_NEW_REF_SIGNALING
         record_samples(mbmi, pts, pts_inref, 0, -1, xd->width, 1);
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
