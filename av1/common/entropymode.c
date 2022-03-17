@@ -1496,12 +1496,12 @@ static const int palette_color_index_context_lookup[MAX_COLOR_CONTEXT_HASH +
 
 int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
                                         int r, int c, int palette_size,
+                                        uint8_t *color_order, int *color_idx
 #if CONFIG_NEW_COLOR_MAP_CODING
-                                        uint8_t *color_order, int *color_idx,
-                                        int row_flag, int prev_row_flag) {
-#else
-                                        uint8_t *color_order, int *color_idx) {
+                                        ,
+                                        int row_flag, int prev_row_flag
 #endif  // CONFIG_NEW_COLOR_MAP_CODING
+) {
   assert(palette_size <= PALETTE_MAX_SIZE);
   assert(r > 0 || c > 0);
 
@@ -1582,12 +1582,12 @@ int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
 }
 
 int av1_fast_palette_color_index_context(const uint8_t *color_map, int stride,
+                                         int r, int c, int *color_idx
 #if CONFIG_NEW_COLOR_MAP_CODING
-                                         int r, int c, int *color_idx,
-                                         int row_flag, int prev_row_flag) {
-#else
-                                         int r, int c, int *color_idx) {
+                                         ,
+                                         int row_flag, int prev_row_flag
 #endif  // CONFIG_NEW_COLOR_MAP_CODING
+) {
   assert(r > 0 || c > 0);
 
   // This goes in the order of left, top, and top-left. This has the advantage
