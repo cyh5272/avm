@@ -777,8 +777,15 @@ typedef uint8_t TXFM_CONTEXT;
 #if CONFIG_NEW_REF_SIGNALING
 #define INTER_REFS_PER_FRAME 7
 #define REF_FRAMES (INTER_REFS_PER_FRAME + 1)
+// NOTE: A limited number of unidirectional reference pairs can be signalled for
+//       compound prediction. The use of skip mode, on the other hand, makes it
+//       possible to have a reference pair not listed for explicit signaling.
 #define MODE_CTX_REF_FRAMES \
   (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 1)
+// With k=INTER_REFS_PER_FRAMES, indices 0 to k-1 represent rank 1 to rank k
+// references. The next k(k-1)/2 indices are left for compound reference types
+// (there are k choose 2 compound combinations). Then, index for intra frame is
+// defined as k+k(k-1)/2.
 #define INTRA_FRAME (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2)
 // Used for indexing into arrays that contain reference data for
 // inter and intra.

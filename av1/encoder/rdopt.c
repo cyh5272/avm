@@ -1132,7 +1132,7 @@ static AOM_INLINE void estimate_ref_frame_costs(
     for (int i = 0; i < INTER_REFS_PER_FRAME; ++i)
       ref_costs_single[i] = base_cost;
 
-    const int n_refs = cm->ref_frames_info.n_total_refs;
+    const int n_refs = cm->ref_frames_info.num_total_refs;
     for (int i = 0; i < n_refs; i++) {
       for (int j = 0; j <= AOMMIN(i, n_refs - 2); j++) {
         aom_cdf_prob ctx = av1_get_ref_pred_context(xd, j, n_refs);
@@ -2610,9 +2610,9 @@ static bool ref_mv_idx_early_breakout(
     if (sf->inter_sf.reduce_inter_modes >= 2 && !is_comp_pred &&
         have_newmv_in_inter_mode(mbmi->mode)) {
 #if CONFIG_NEW_REF_SIGNALING
-      if ((cm->ref_frames_info.n_future_refs == 0 ||
+      if ((cm->ref_frames_info.num_future_refs == 0 ||
            mbmi->ref_frame[0] != cm->ref_frames_info.future_refs[0]) &&
-          (cm->ref_frames_info.n_past_refs == 0 ||
+          (cm->ref_frames_info.num_past_refs == 0 ||
            mbmi->ref_frame[0] != cm->ref_frames_info.past_refs[0])) {
 #else
       if (mbmi->ref_frame[0] != ref_frame_dist_info->nearest_past_ref &&
@@ -4662,14 +4662,15 @@ static AOM_INLINE void init_mode_skip_mask(mode_skip_mask_t *mask,
   int min_pred_mv_sad = INT_MAX;
   MV_REFERENCE_FRAME ref_frame;
 #if CONFIG_NEW_REF_SIGNALING
-  for (ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs; ++ref_frame)
+  for (ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
+       ++ref_frame)
 #else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame)
 #endif  // CONFIG_NEW_REF_SIGNALING
     min_pred_mv_sad = AOMMIN(min_pred_mv_sad, x->pred_mv_sad[ref_frame]);
 
 #if CONFIG_NEW_REF_SIGNALING
-  for (ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
+  for (ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
        ++ref_frame) {
     if (!(cm->ref_frame_flags & (1 << ref_frame))) {
 #else
@@ -4923,8 +4924,8 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
 #if CONFIG_NEW_REF_SIGNALING
       MV_REFERENCE_FRAME rf[2];
       av1_set_ref_frame(rf, ref_frame);
-      if (rf[0] >= cm->ref_frames_info.n_total_refs ||
-          rf[1] >= cm->ref_frames_info.n_total_refs)
+      if (rf[0] >= cm->ref_frames_info.num_total_refs ||
+          rf[1] >= cm->ref_frames_info.num_total_refs)
         continue;
       if (!((cm->ref_frame_flags & (1 << rf[0])) &&
             (cm->ref_frame_flags & (1 << rf[1])))) {
@@ -5923,7 +5924,8 @@ static int skip_inter_mode(AV1_COMP *cpi, MACROBLOCK *x, const BLOCK_SIZE bsize,
     if (!args->prune_cpd_using_sr_stats_ready &&
 #if CONFIG_NEW_REF_SIGNALING
         *args->num_single_modes_processed ==
-            cpi->common.ref_frames_info.n_total_refs * SINGLE_INTER_MODE_NUM) {
+            cpi->common.ref_frames_info.num_total_refs *
+                SINGLE_INTER_MODE_NUM) {
 #else
         *args->num_single_modes_processed == NUM_SINGLE_REF_MODES) {
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -6270,8 +6272,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     // pruned ref frame.
     int valid_refs[INTER_REFS_PER_FRAME] = { 0 };
 #if CONFIG_NEW_REF_SIGNALING
-    for (MV_REFERENCE_FRAME frame = 0; frame < cm->ref_frames_info.n_total_refs;
-         frame++) {
+    for (MV_REFERENCE_FRAME frame = 0;
+         frame < cm->ref_frames_info.num_total_refs; frame++) {
       const MV_REFERENCE_FRAME refs[2] = { frame, NONE_FRAME };
       valid_refs[frame] = x->tpl_keep_ref_frame[frame] ||
                           !prune_ref_by_selective_ref_frame(cpi, x, refs);
@@ -6356,12 +6358,12 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_NEW_REF_SIGNALING
   for (PREDICTION_MODE this_mode = 0; this_mode < MB_MODE_COUNT; ++this_mode) {
     for (MV_REFERENCE_FRAME rf = NONE_FRAME;
-         rf < cm->ref_frames_info.n_total_refs; ++rf) {
+         rf < cm->ref_frames_info.num_total_refs; ++rf) {
       MV_REFERENCE_FRAME ref_frame = (rf == NONE_FRAME) ? INTRA_FRAME : rf;
       if (this_mode < INTRA_MODE_END && ref_frame != INTRA_FRAME) continue;
       if (this_mode >= INTRA_MODE_END && ref_frame == INTRA_FRAME) continue;
       for (MV_REFERENCE_FRAME second_rf = NONE_FRAME;
-           second_rf < cm->ref_frames_info.n_total_refs; ++second_rf) {
+           second_rf < cm->ref_frames_info.num_total_refs; ++second_rf) {
         MV_REFERENCE_FRAME second_ref_frame = second_rf;
         if (second_ref_frame != NONE_FRAME && this_mode < COMP_INTER_MODE_START)
           continue;

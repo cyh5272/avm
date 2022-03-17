@@ -1339,7 +1339,7 @@ void av1_setup_pred_block(const MACROBLOCKD *xd,
 YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const AV1_COMP *cpi,
                                              MV_REFERENCE_FRAME ref_frame) {
 #if CONFIG_NEW_REF_SIGNALING
-  assert(ref_frame < cpi->common.ref_frames_info.n_total_refs);
+  assert(ref_frame < cpi->common.ref_frames_info.num_total_refs);
   RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame];
 #else
   assert(ref_frame >= LAST_FRAME && ref_frame <= ALTREF_FRAME);

@@ -77,10 +77,16 @@ static INLINE void init_ref_map_pair(AV1_COMMON *cm,
 #if CONFIG_NEW_REF_SIGNALING
 /*!\cond */
 typedef struct {
+  // Scoring function for usefulness of references (the lower score, the more
+  // useful)
   int score;
+  // Index in the reference buffer
   int index;
+  // Temporal distance to the current frame
   int distance;
+  // Display order hint
   int disp_order;
+  // Quality of the reference frame
   int base_qindex;
 } RefScoreData;
 /*!\endcond */
@@ -93,7 +99,7 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
 static INLINE int get_furthest_future_ref_index(const AV1_COMMON *const cm) {
   int index = NONE_FRAME;
   int ref_disp_order = -1;
-  for (int i = 0; i < cm->ref_frames_info.n_future_refs; i++) {
+  for (int i = 0; i < cm->ref_frames_info.num_future_refs; i++) {
     const int ref = cm->ref_frames_info.future_refs[i];
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref);
     if (buf == NULL) continue;
@@ -105,23 +111,11 @@ static INLINE int get_furthest_future_ref_index(const AV1_COMMON *const cm) {
   return index;
 }
 
-static INLINE int get_closest_ref_index(const AV1_COMMON *const cm) {
-  int index = NONE_FRAME;
-  int best_dist = INT_MAX;
-  for (int ref = 0; ref < cm->ref_frames_info.n_total_refs; ref++) {
-    const int dist = abs(cm->ref_frames_info.ref_frame_distance[ref]);
-    if (dist < best_dist) {
-      index = ref;
-      best_dist = dist;
-    }
-  }
-  return index;
-}
-
+// Get the past reference that is temporally closest to the current frame
 static INLINE int get_closest_past_ref_index(const AV1_COMMON *const cm) {
   int index = NONE_FRAME;
   int best_dist = INT_MAX;
-  for (int i = 0; i < cm->ref_frames_info.n_past_refs; i++) {
+  for (int i = 0; i < cm->ref_frames_info.num_past_refs; i++) {
     const int ref = cm->ref_frames_info.past_refs[i];
     const int dist = cm->ref_frames_info.ref_frame_distance[ref];
     if (dist < best_dist) {
@@ -132,8 +126,10 @@ static INLINE int get_closest_past_ref_index(const AV1_COMMON *const cm) {
   return index;
 }
 
+// Get the current frame if it is available in the reference list. Otherwise
+// get the closest past reference
 static INLINE int get_closest_pastcur_ref_index(const AV1_COMMON *const cm) {
-  if (cm->ref_frames_info.n_cur_refs > 0)
+  if (cm->ref_frames_info.num_cur_refs > 0)
     return cm->ref_frames_info.cur_refs[0];
   return get_closest_past_ref_index(cm);
 }
@@ -150,18 +146,18 @@ static INLINE int get_best_past_ref_index(const AV1_COMMON *const cm) {
 static INLINE int get_dir_rank(const AV1_COMMON *const cm, int refrank,
                                int *dir_refrank) {
   if (!is_inter_ref_frame(refrank)) return -1;
-  assert(refrank < cm->ref_frames_info.n_total_refs);
+  assert(refrank < cm->ref_frames_info.num_total_refs);
   if (dir_refrank) {
     dir_refrank[0] = -1;
     dir_refrank[1] = -1;
   }
-  for (int i = 0; i < cm->ref_frames_info.n_past_refs; ++i) {
+  for (int i = 0; i < cm->ref_frames_info.num_past_refs; ++i) {
     if (cm->ref_frames_info.past_refs[i] == refrank) {
       if (dir_refrank) dir_refrank[0] = i;
       return 0;
     }
   }
-  for (int i = 0; i < cm->ref_frames_info.n_future_refs; ++i) {
+  for (int i = 0; i < cm->ref_frames_info.num_future_refs; ++i) {
     if (cm->ref_frames_info.future_refs[i] == refrank) {
       if (dir_refrank) dir_refrank[1] = i;
       return 1;
@@ -362,14 +358,14 @@ static INLINE aom_cdf_prob *av1_get_skip_txfm_cdf(const MACROBLOCKD *xd) {
 #if CONFIG_NEW_REF_SIGNALING
 // == Single contexts ==
 int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
-                             int n_total_refs);
+                             int num_total_refs);
 
 static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref(const MACROBLOCKD *xd,
                                                         MV_REFERENCE_FRAME ref,
-                                                        int n_total_refs) {
-  assert((ref + 1) < n_total_refs);
+                                                        int num_total_refs) {
+  assert((ref + 1) < num_total_refs);
   return xd->tile_ctx
-      ->single_ref_cdf[av1_get_ref_pred_context(xd, ref, n_total_refs)][ref];
+      ->single_ref_cdf[av1_get_ref_pred_context(xd, ref, num_total_refs)][ref];
 }
 
 // == Compound contexts ==
@@ -382,16 +378,16 @@ static INLINE int av1_get_compound_ref_bit_type(
 
 static INLINE aom_cdf_prob *av1_get_pred_cdf_compound_ref(
     const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref, int n_bits, int bit_type,
-    int n_total_refs) {
-  assert((ref + 1) < n_total_refs);
+    int num_total_refs) {
+  assert((ref + 1) < num_total_refs);
   assert(n_bits < 2);
-  assert(ref - n_bits < n_total_refs - 2);
+  assert(ref - n_bits < num_total_refs - 2);
   assert(bit_type < COMPREF_BIT_TYPES);
   assert(IMPLIES(n_bits == 0, ref < RANKED_REF0_TO_PRUNE - 1));
   return n_bits == 0 ? xd->tile_ctx->comp_ref0_cdf[av1_get_ref_pred_context(
-                           xd, ref, n_total_refs)][ref]
+                           xd, ref, num_total_refs)][ref]
                      : xd->tile_ctx->comp_ref1_cdf[av1_get_ref_pred_context(
-                           xd, ref, n_total_refs)][bit_type][ref - 1];
+                           xd, ref, num_total_refs)][bit_type][ref - 1];
 }
 #else
 int av1_get_comp_reference_type_context(const MACROBLOCKD *xd);

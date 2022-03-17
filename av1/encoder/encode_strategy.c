@@ -322,7 +322,7 @@ static int choose_primary_ref_frame(
 
   int primary_ref_frame = PRIMARY_REF_NONE;
 #if CONFIG_NEW_REF_SIGNALING
-  const int n_refs = cm->ref_frames_info.n_total_refs;
+  const int n_refs = cm->ref_frames_info.num_total_refs;
   for (int ref_frame = 0; ref_frame < n_refs; ref_frame++) {
     if (get_ref_frame_map_idx(cm, ref_frame) == wanted_fb) {
       primary_ref_frame = ref_frame;
@@ -1302,7 +1302,7 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
     // In NEW_REF_SIGNALING, ref_frame_flags is defined based on
     // the external flag max-reference-frames.
     frame_params.ref_frame_flags =
-        (1 << cpi->common.ref_frames_info.n_total_refs) - 1;
+        (1 << cpi->common.ref_frames_info.num_total_refs) - 1;
 #else
     // Work out which reference frame slots may be used.
     if (av1_check_keyframe_overlay(gf_group->index, gf_group,

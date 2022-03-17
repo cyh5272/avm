@@ -371,7 +371,8 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
       gf_group, cpi->sf.inter_sf.selective_ref_frame, 1, gf_group->index);
 
 #if CONFIG_NEW_REF_SIGNALING
-  for (int frame = cm->ref_frames_info.n_total_refs - 1; frame >= 0; --frame) {
+  for (int frame = cm->ref_frames_info.num_total_refs - 1; frame >= 0;
+       --frame) {
     const MV_REFERENCE_FRAME ref_frame[2] = { frame, NONE_FRAME };
     const int ref_disabled = !(cm->ref_frame_flags & (1 << frame));
 #else

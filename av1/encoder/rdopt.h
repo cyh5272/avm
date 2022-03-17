@@ -196,12 +196,12 @@ static INLINE int prune_ref_by_selective_ref_frame(
 
   // Prune refs 5-7 if all refs are distant past (distance > 4). This
   // typically happens when the current frame is altref.
-  const int n_refs = cm->ref_frames_info.n_total_refs;
+  const int n_refs = cm->ref_frames_info.num_total_refs;
 
   const int closest_past_idx = get_closest_past_ref_index(cm);
   const int closest_past_dist =
       cm->ref_frames_info.ref_frame_distance[closest_past_idx];
-  if (cm->ref_frames_info.n_past_refs == n_refs && closest_past_dist > 4 &&
+  if (cm->ref_frames_info.num_past_refs == n_refs && closest_past_dist > 4 &&
       (ref_frame[0] >= MAX_REFS_ARF || ref_frame[1] >= MAX_REFS_ARF))
     return 1;
 
@@ -243,7 +243,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
     case 0: return 0;
     case 1:
       if (comp_pred) {
-        if (one_sided_comp && cm->ref_frames_info.n_past_refs < n_refs) {
+        if (one_sided_comp && cm->ref_frames_info.num_past_refs < n_refs) {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;
         } else {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 3) return 1;
@@ -255,7 +255,7 @@ static INLINE int prune_ref_by_selective_ref_frame(
       break;
     case 2:
       if (comp_pred) {
-        if (one_sided_comp && cm->ref_frames_info.n_past_refs < n_refs) {
+        if (one_sided_comp && cm->ref_frames_info.num_past_refs < n_refs) {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 1) return 1;
         } else {
           if (AOMMIN(dir_refrank0[d0], dir_refrank1[d1]) > 2) return 1;

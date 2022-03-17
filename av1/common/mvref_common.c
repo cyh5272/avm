@@ -1279,7 +1279,7 @@ void av1_setup_frame_buf_refs(AV1_COMMON *cm) {
 #if CONFIG_NEW_REF_SIGNALING
   for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
-    if (buf != NULL && ref_frame < cm->ref_frames_info.n_total_refs) {
+    if (buf != NULL && ref_frame < cm->ref_frames_info.num_total_refs) {
       cm->cur_frame->ref_order_hints[ref_frame] = buf->order_hint;
       cm->cur_frame->ref_display_order_hint[ref_frame] =
           buf->display_order_hint;
@@ -1301,9 +1301,9 @@ void av1_setup_frame_buf_refs(AV1_COMMON *cm) {
 }
 
 void av1_setup_frame_sign_bias(AV1_COMMON *cm) {
-  memset(&cm->ref_frame_sign_bias, 0, sizeof(cm->ref_frame_sign_bias));
 #if CONFIG_NEW_REF_SIGNALING
-  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.n_future_refs;
+  memset(&cm->ref_frame_sign_bias, 0, sizeof(cm->ref_frame_sign_bias));
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_future_refs;
        ++ref_frame) {
     const int index = cm->ref_frames_info.future_refs[ref_frame];
     cm->ref_frame_sign_bias[index] = 1;
@@ -1550,6 +1550,8 @@ static int motion_field_projection(AV1_COMMON *cm,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
+// Check if a reference frame is an overlay frame (i.e., has the same
+// order_hint as the current frame).
 static INLINE int is_ref_overlay(const AV1_COMMON *const cm, int ref) {
   const OrderHintInfo *const order_hint_info = &cm->seq_params.order_hint_info;
   if (!order_hint_info->enable_order_hint) return -1;
@@ -1585,7 +1587,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
 
 #if CONFIG_NEW_REF_SIGNALING
   for (int i = 0; i < INTER_REFS_PER_FRAME; i++) ref_buf[i] = NULL;
-  for (int index = 0; index < cm->ref_frames_info.n_past_refs; index++) {
+  for (int index = 0; index < cm->ref_frames_info.num_past_refs; index++) {
     const int ref_frame = cm->ref_frames_info.past_refs[index];
     cm->ref_frame_side[ref_frame] = 0;
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
@@ -1595,7 +1597,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
         abs(cm->ref_frames_info.ref_frame_distance[ref_frame]);
 #endif  // CONFIG_SMVP_IMPROVEMENT || CONFIG_JOINT_MVD
   }
-  for (int index = 0; index < cm->ref_frames_info.n_future_refs; index++) {
+  for (int index = 0; index < cm->ref_frames_info.num_future_refs; index++) {
     const int ref_frame = cm->ref_frames_info.future_refs[index];
     cm->ref_frame_side[ref_frame] = 1;
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
@@ -1605,7 +1607,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
         abs(cm->ref_frames_info.ref_frame_distance[ref_frame]);
 #endif  // CONFIG_SMVP_IMPROVEMENT || CONFIG_JOINT_MVD
   }
-  for (int index = 0; index < cm->ref_frames_info.n_cur_refs; index++) {
+  for (int index = 0; index < cm->ref_frames_info.num_cur_refs; index++) {
     const int ref_frame = cm->ref_frames_info.cur_refs[index];
     cm->ref_frame_side[ref_frame] = -1;
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
@@ -1662,7 +1664,7 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
   // Find two closest past and future references
   int dist[2][2] = { { INT_MAX, INT_MAX }, { INT_MAX, INT_MAX } };
   int closest_ref[2][2] = { { -1, -1 }, { -1, -1 } };
-  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
        ref_frame++) {
     const int dir = cm->ref_frame_side[ref_frame];
     if (dir == -1 || is_ref_overlay(cm, ref_frame) ||
@@ -1812,7 +1814,7 @@ void av1_setup_ref_frame_sides(AV1_COMMON *cm) {
   const int cur_order_hint = cm->cur_frame->order_hint;
 
 #if CONFIG_NEW_REF_SIGNALING
-  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
        ref_frame++) {
 #else
   for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ref_frame++) {
@@ -2123,7 +2125,7 @@ void av1_setup_skip_mode_allowed(AV1_COMMON *cm) {
 
 #if CONFIG_NEW_REF_SIGNALING
   // Identify the top ranked forward and backward references.
-  for (int i = 0; i < cm->ref_frames_info.n_total_refs; ++i) {
+  for (int i = 0; i < cm->ref_frames_info.num_total_refs; ++i) {
     const RefCntBuffer *const buf = get_ref_frame_buf(cm, i);
 #else
   // Identify the nearest forward and backward references.

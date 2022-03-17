@@ -817,7 +817,7 @@ static AOM_INLINE void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
   // differ from the frames considered during RD search.
   if (ref_pruning_enabled && (frame_idx < gop_length)) {
 #if CONFIG_NEW_REF_SIGNALING
-    for (idx = 0; idx < cm->ref_frames_info.n_total_refs; ++idx) {
+    for (idx = 0; idx < cm->ref_frames_info.num_total_refs; ++idx) {
       const MV_REFERENCE_FRAME refs[2] = { idx, NONE_FRAME };
       if (prune_ref_by_selective_ref_frame(cpi, NULL, refs)) {
 #else

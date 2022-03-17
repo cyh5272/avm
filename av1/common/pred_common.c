@@ -51,6 +51,8 @@ static int is_in_ref_score(RefScoreData *map, int disp_order, int score,
   return 0;
 }
 
+// Only 7 out of 8 reference buffers will be used as reference frames. This
+// function applies heuristics to determine which one to be left out.
 static int get_unmapped_ref(RefScoreData *scores, int n_bufs) {
   if (n_bufs < INTER_REFS_PER_FRAME) return INVALID_IDX;
 
@@ -95,11 +97,12 @@ static int get_unmapped_ref(RefScoreData *scores, int n_bufs) {
   return INVALID_IDX;
 }
 
+// Obtain the lists of past/cur/future reference frames and their sizes.
 void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores) {
   int n_future = 0;
   int n_past = 0;
   int n_cur = 0;
-  for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+  for (int i = 0; i < cm->ref_frames_info.num_total_refs; i++) {
     if (scores[i].distance < 0) {
       cm->ref_frames_info.future_refs[n_future] = i;
       n_future++;
@@ -111,20 +114,20 @@ void av1_get_past_future_cur_ref_lists(AV1_COMMON *cm, RefScoreData *scores) {
       n_cur++;
     }
   }
-  cm->ref_frames_info.n_past_refs = n_past;
-  cm->ref_frames_info.n_future_refs = n_future;
-  cm->ref_frames_info.n_cur_refs = n_cur;
+  cm->ref_frames_info.num_past_refs = n_past;
+  cm->ref_frames_info.num_future_refs = n_future;
+  cm->ref_frames_info.num_cur_refs = n_cur;
 }
 
 #define DIST_WEIGHT_BITS 6
-#define USE_DECAYING_WEIGHTS_ONESIDED 1
-#define USE_CAPPED_DIST_ONESIDED 1
-#define TEMPORAL_DIST_CAP 3
 #define DECAY_DIST_CAP 6
+
 static const int temp_dist_score_lookup[7] = {
   0, 64, 96, 112, 120, 124, 126,
 };
 
+// Determine reference mapping by ranking the reference frames based on a
+// score function.
 void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
                         RefFrameMapPair *ref_frame_map_pairs) {
   RefScoreData scores[REF_FRAMES];
@@ -154,22 +157,12 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
     const int ref_base_qindex =
         cm->features.error_resilient_mode ? 0 : cur_ref.base_qindex;
     const int disp_diff = cur_frame_disp - ref_disp;
-#if USE_DECAYING_WEIGHTS_ONESIDED
     int tdist = abs(disp_diff);
     const int score =
         max_disp > cur_frame_disp
             ? ((tdist << DIST_WEIGHT_BITS) + ref_base_qindex)
             : temp_dist_score_lookup[AOMMIN(tdist, DECAY_DIST_CAP)] +
                   AOMMAX(tdist - DECAY_DIST_CAP, 0) + ref_base_qindex;
-#elif USE_CAPPED_DIST_ONESIDED
-    const int score =
-        max_disp > cur_frame_disp
-            ? ((abs(disp_diff) << DIST_WEIGHT_BITS) + ref_base_qindex)
-            : ((AOMMIN(TEMPORAL_DIST_CAP, abs(disp_diff)) << DIST_WEIGHT_BITS) +
-               AOMMAX(abs(disp_diff) - TEMPORAL_DIST_CAP, 0) + ref_base_qindex);
-#else
-    const int score = (abs(disp_diff) << DIST_WEIGHT_BITS) + ref_base_qindex;
-#endif
     if (is_in_ref_score(scores, ref_disp, score, n_ranked)) continue;
 
     scores[n_ranked].index = i;
@@ -187,9 +180,9 @@ void av1_get_ref_frames(AV1_COMMON *cm, int cur_frame_disp,
   // Sort the references according to their score
   bubble_sort_ref_scores(scores, n_ranked);
 
-  cm->ref_frames_info.n_total_refs =
+  cm->ref_frames_info.num_total_refs =
       AOMMIN(n_ranked, cm->seq_params.max_reference_frames);
-  for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+  for (int i = 0; i < cm->ref_frames_info.num_total_refs; i++) {
     cm->remapped_ref_idx[i] = scores[i].index;
     cm->ref_frames_info.ref_frame_distance[i] = scores[i].distance;
   }
@@ -633,13 +626,13 @@ int av1_get_reference_mode_context(const AV1_COMMON *cm,
 
 #if CONFIG_NEW_REF_SIGNALING
 int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
-                             int n_total_refs) {
-  assert((ref + 1) < n_total_refs);
+                             int num_total_refs) {
+  assert((ref + 1) < num_total_refs);
   const uint8_t *const ref_counts = &xd->neighbors_ref_counts[0];
   const int this_ref_count = ref_counts[ref];
   int next_refs_count = 0;
 
-  for (int i = ref + 1; i < n_total_refs; i++) {
+  for (int i = ref + 1; i < num_total_refs; i++) {
     next_refs_count += ref_counts[i];
   }
 

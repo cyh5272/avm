@@ -1379,7 +1379,7 @@ static REFERENCE_MODE read_block_reference_mode(AV1_COMMON *cm,
 static AOM_INLINE void read_single_ref(
     MACROBLOCKD *const xd, MV_REFERENCE_FRAME ref_frame[2],
     const RefFramesInfo *const ref_frames_info, aom_reader *r) {
-  const int n_refs = ref_frames_info->n_total_refs;
+  const int n_refs = ref_frames_info->num_total_refs;
   for (int i = 0; i < n_refs - 1; i++) {
     const int bit = aom_read_symbol(
         r, av1_get_pred_cdf_single_ref(xd, i, n_refs), 2, ACCT_STR);
@@ -1394,7 +1394,7 @@ static AOM_INLINE void read_single_ref(
 static AOM_INLINE void read_compound_ref(
     const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref_frame[2],
     const RefFramesInfo *const ref_frames_info, aom_reader *r) {
-  const int n_refs = ref_frames_info->n_total_refs;
+  const int n_refs = ref_frames_info->num_total_refs;
   assert(n_refs >= 2);
   int n_bits = 0;
   for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {

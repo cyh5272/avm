@@ -993,7 +993,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 
       if (has_second_ref(mbmi)) {
 #if CONFIG_NEW_REF_SIGNALING
-        const int n_refs = cm->ref_frames_info.n_total_refs;
+        const int n_refs = cm->ref_frames_info.num_total_refs;
         int n_bits = 0;
         assert(ref0 < ref1);
         for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
@@ -1090,7 +1090,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_NEW_REF_SIGNALING
       } else {
 #if CONFIG_NEW_REF_SIGNALING
-        const int n_refs = cm->ref_frames_info.n_total_refs;
+        const int n_refs = cm->ref_frames_info.num_total_refs;
         const MV_REFERENCE_FRAME ref0_nrs = mbmi->ref_frame[0];
         for (int i = 0; i < n_refs - 1; i++) {
           const int bit = ref0_nrs == i;

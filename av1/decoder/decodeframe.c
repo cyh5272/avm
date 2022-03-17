@@ -4708,6 +4708,9 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_NEW_REF_SIGNALING
   seq_params->explicit_ref_frame_map = aom_rb_read_bit(rb);
+  // A bit is sent here to indicate if the max number of references is 7. If
+  // this bit is 0, then two more bits are sent to indicate the exact number
+  // of references allowed (range: 3 to 6).
   if (aom_rb_read_bit(rb)) {
     seq_params->max_reference_frames = 3 + aom_rb_read_literal(rb, 2);
   } else {
@@ -4816,7 +4819,7 @@ static int read_global_motion_params(WarpedMotionParams *params,
 static AOM_INLINE void read_global_motion(AV1_COMMON *cm,
                                           struct aom_read_bit_buffer *rb) {
 #if CONFIG_NEW_REF_SIGNALING
-  for (int frame = 0; frame < cm->ref_frames_info.n_total_refs; ++frame) {
+  for (int frame = 0; frame < cm->ref_frames_info.num_total_refs; ++frame) {
 #else
   for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; ++frame) {
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -5406,7 +5409,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_NEW_REF_SIGNALING
-      for (int i = 0; i < cm->ref_frames_info.n_total_refs; ++i) {
+      for (int i = 0; i < cm->ref_frames_info.num_total_refs; ++i) {
         int ref = 0;
         // Reference rankings have been implicitly derived in
         // av1_get_ref_frames. However, if explicti_ref_frame_map is on, ref
@@ -5467,7 +5470,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
       if (seq_params->explicit_ref_frame_map) {
         RefScoreData scores[REF_FRAMES];
         for (int i = 0; i < REF_FRAMES; i++) scores[i].score = INT_MAX;
-        for (int i = 0; i < cm->ref_frames_info.n_total_refs; i++) {
+        for (int i = 0; i < cm->ref_frames_info.num_total_refs; i++) {
           scores[i].score = i;
           int ref = cm->remapped_ref_idx[i];
           scores[i].distance = current_frame->display_order_hint -

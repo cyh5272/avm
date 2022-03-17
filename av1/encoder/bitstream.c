@@ -715,7 +715,7 @@ static AOM_INLINE void write_single_ref(
     aom_writer *w) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   MV_REFERENCE_FRAME ref = mbmi->ref_frame[0];
-  const int n_refs = ref_frames_info->n_total_refs;
+  const int n_refs = ref_frames_info->num_total_refs;
   assert(ref < n_refs);
   for (int i = 0; i < n_refs - 1; i++) {
     const int bit = ref == i;
@@ -731,7 +731,7 @@ static AOM_INLINE void write_compound_ref(
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   MV_REFERENCE_FRAME ref0 = mbmi->ref_frame[0];
   MV_REFERENCE_FRAME ref1 = mbmi->ref_frame[1];
-  const int n_refs = ref_frames_info->n_total_refs;
+  const int n_refs = ref_frames_info->num_total_refs;
   assert(n_refs >= 2);
   assert(ref0 < ref1);
   int n_bits = 0;
@@ -3408,6 +3408,9 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_NEW_REF_SIGNALING
   aom_wb_write_bit(wb, seq_params->explicit_ref_frame_map);
+  // A bit is sent here to indicate if the max number of references is 7. If
+  // this bit is 0, then two more bits are sent to indicate the exact number
+  // of references allowed (range: 3 to 6).
   aom_wb_write_bit(wb, seq_params->max_reference_frames < 7);
   if (seq_params->max_reference_frames < 7)
     aom_wb_write_literal(wb, seq_params->max_reference_frames - 3, 2);
@@ -3496,7 +3499,7 @@ static AOM_INLINE void write_global_motion(AV1_COMP *cpi,
   AV1_COMMON *const cm = &cpi->common;
   int frame;
 #if CONFIG_NEW_REF_SIGNALING
-  for (frame = 0; frame < cm->ref_frames_info.n_total_refs; ++frame) {
+  for (frame = 0; frame < cm->ref_frames_info.num_total_refs; ++frame) {
 #else
   for (frame = LAST_FRAME; frame <= ALTREF_FRAME; ++frame) {
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -3817,7 +3820,7 @@ static AOM_INLINE void write_uncompressed_header_obu(
 #endif  // !CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_NEW_REF_SIGNALING
-      for (ref_frame = 0; ref_frame < cm->ref_frames_info.n_total_refs;
+      for (ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
            ++ref_frame) {
         assert(get_ref_frame_map_idx(cm, ref_frame) != INVALID_IDX);
         // By default, no need to signal ref mapping indices in NRS because

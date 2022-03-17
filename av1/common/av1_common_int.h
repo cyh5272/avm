@@ -889,7 +889,7 @@ typedef struct {
   /*!
    * Total number of reference buffers available to the current frame.
    */
-  int n_total_refs;
+  int num_total_refs;
   /*!
    * Contains the indices of the frames in ref_frame_map that are future
    * references.
@@ -898,7 +898,7 @@ typedef struct {
   /*!
    * Number of future references.
    */
-  int n_future_refs;
+  int num_future_refs;
   /*!
    * Contains the indices of the frames in ref_frame_map that are past
    * references.
@@ -907,7 +907,7 @@ typedef struct {
   /*!
    * Number of past references.
    */
-  int n_past_refs;
+  int num_past_refs;
   /*!
    * Contains the indices of the frames in ref_frame_map with same order hint
    * as current frame. -1 if unset.
@@ -916,7 +916,7 @@ typedef struct {
   /*!
    * Number of references with the same order hint.
    */
-  int n_cur_refs;
+  int num_cur_refs;
 } RefFramesInfo;
 #endif  // CONFIG_NEW_REF_SIGNALING
 

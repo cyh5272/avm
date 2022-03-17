@@ -996,9 +996,9 @@ static INLINE int refs_are_one_sided(const AV1_COMMON *cm) {
   assert(!frame_is_intra_only(cm));
 
 #if CONFIG_NEW_REF_SIGNALING
-  return (cm->ref_frames_info.n_past_refs == 0 &&
-          cm->ref_frames_info.n_cur_refs == 0) ||
-         cm->ref_frames_info.n_future_refs == 0;
+  return (cm->ref_frames_info.num_past_refs == 0 &&
+          cm->ref_frames_info.num_cur_refs == 0) ||
+         cm->ref_frames_info.num_future_refs == 0;
 #else
   int one_sided_refs = 1;
   const int cur_display_order_hint = cm->current_frame.display_order_hint;
