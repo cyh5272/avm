@@ -253,7 +253,7 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
   (void)cm;
   MB_MODE_INFO *mbmi = xd->mi[0];
 #if CONFIG_NEW_REF_SIGNALING
-  MV_REFERENCE_FRAME altref_frame = get_furthest_future_ref_index(cm);
+  MV_REFERENCE_FRAME furthest_future_ref = get_furthest_future_ref_index(cm);
 #endif  // CONFIG_NEW_REF_SIGNALING
   const RefCntBuffer *const bck_buf = get_ref_frame_buf(cm, mbmi->ref_frame[0]);
   const RefCntBuffer *const fwd_buf = get_ref_frame_buf(cm, mbmi->ref_frame[1]);
@@ -276,7 +276,7 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
   if (above_mi) {
     if (has_second_ref(above_mi)) above_ctx = above_mi->comp_group_idx;
 #if CONFIG_NEW_REF_SIGNALING
-    else if (above_mi->ref_frame[0] == altref_frame)
+    else if (above_mi->ref_frame[0] == furthest_future_ref)
 #else
     else if (above_mi->ref_frame[0] == ALTREF_FRAME)
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -285,7 +285,7 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
   if (left_mi) {
     if (has_second_ref(left_mi)) left_ctx = left_mi->comp_group_idx;
 #if CONFIG_NEW_REF_SIGNALING
-    else if (left_mi->ref_frame[0] == altref_frame)
+    else if (left_mi->ref_frame[0] == furthest_future_ref)
 #else
     else if (left_mi->ref_frame[0] == ALTREF_FRAME)
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -356,10 +356,10 @@ static INLINE aom_cdf_prob *av1_get_skip_txfm_cdf(const MACROBLOCKD *xd) {
 }
 
 #if CONFIG_NEW_REF_SIGNALING
-// == Single contexts ==
 int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
                              int num_total_refs);
 
+// Obtain cdf of reference frame for single prediction
 static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref(const MACROBLOCKD *xd,
                                                         MV_REFERENCE_FRAME ref,
                                                         int num_total_refs) {
@@ -368,7 +368,9 @@ static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref(const MACROBLOCKD *xd,
       ->single_ref_cdf[av1_get_ref_pred_context(xd, ref, num_total_refs)][ref];
 }
 
-// == Compound contexts ==
+// This function checks whether the previously coded reference frame is on the
+// same side as the frame to be coded. The returned value is used as the cdf
+// context.
 static INLINE int av1_get_compound_ref_bit_type(
     const RefFramesInfo *const ref_frames_info, int i, int j) {
   const int bit_type = (ref_frames_info->ref_frame_distance[i] >= 0) ^
@@ -376,6 +378,7 @@ static INLINE int av1_get_compound_ref_bit_type(
   return bit_type;
 }
 
+// Obtain cdf of reference frame for compound prediction
 static INLINE aom_cdf_prob *av1_get_pred_cdf_compound_ref(
     const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref, int n_bits, int bit_type,
     int num_total_refs) {

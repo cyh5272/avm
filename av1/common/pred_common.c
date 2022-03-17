@@ -625,6 +625,9 @@ int av1_get_reference_mode_context(const AV1_COMMON *cm,
 }
 
 #if CONFIG_NEW_REF_SIGNALING
+// The context for reference frame is defined by comparing A) the count of
+// rank n references and B) the count of rank > n references in the neighboring
+// blocks. Context will be 0 if A<B, 1 if A=B, and 2 if A>B.
 int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
                              int num_total_refs) {
   assert((ref + 1) < num_total_refs);
