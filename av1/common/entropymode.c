@@ -1560,6 +1560,8 @@ int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
     *color_idx = inverse_color_order[color_map[r * stride + c]];
 
 #if CONFIG_NEW_COLOR_MAP_CODING
+  // Special context value for the first (and only) index of an identity row and
+  // when the previous row is also an identity row.
   if (c == 0 && row_flag && prev_row_flag)
     return PALETTE_COLOR_INDEX_CONTEXTS - 1;
 #endif  // CONFIG_NEW_COLOR_MAP_CODING
@@ -1677,6 +1679,8 @@ int av1_fast_palette_color_index_context(const uint8_t *color_map, int stride,
   }
 
 #if CONFIG_NEW_COLOR_MAP_CODING
+  // Special context value for the first (and only) index of an identity row and
+  // when the previous row is also an identity row.
   if (c == 0 && row_flag && prev_row_flag)
     return PALETTE_COLOR_INDEX_CONTEXTS - 1;
 #endif  // CONFIG_NEW_COLOR_MAP_CODING
