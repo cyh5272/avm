@@ -4532,18 +4532,20 @@ typedef struct {
 // Update 'ref_combo' mask to disable given 'ref' in single and compound modes.
 static AOM_INLINE void disable_reference(
     MV_REFERENCE_FRAME ref, bool ref_combo[REF_FRAMES][REF_FRAMES + 1]) {
-  ref = (ref == INTRA_FRAME ? INTER_REFS_PER_FRAME : ref);
   for (MV_REFERENCE_FRAME ref2 = NONE_FRAME; ref2 < REF_FRAMES; ++ref2) {
-    ref_combo[ref][ref2 + 1] = true;
+    ref_combo[COMPACT_INDEX0_NRS(ref)][ref2 + 1] = true;
   }
 }
 
+// Disable rank 2 (indexed by 1) to rank 7 references.
 static AOM_INLINE void disable_inter_references_except_top(
     bool ref_combo[REF_FRAMES][REF_FRAMES + 1]) {
   for (MV_REFERENCE_FRAME ref = 1; ref < REF_FRAMES; ++ref)
     disable_reference(ref, ref_combo);
 }
 
+// Define single and compound reference combinations allowed in
+// "enable_reduced_reference_set" speed feature.
 static const MV_REFERENCE_FRAME reduced_ref_combos[][2] = {
   { 0, NONE_FRAME },  { 1, NONE_FRAME },  { 2, NONE_FRAME },
   { 3, NONE_FRAME },  { 4, NONE_FRAME },  { INTRA_FRAME, NONE_FRAME },
@@ -4552,24 +4554,6 @@ static const MV_REFERENCE_FRAME reduced_ref_combos[][2] = {
   { 0, 3 },           { 1, 2 },           { 1, 3 },
   { 2, 3 },
 };
-
-static void set_mask_combo_bit(bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
-                               const MV_REFERENCE_FRAME *refs, bool val) {
-  const MV_REFERENCE_FRAME r0 =
-      (refs[0] == INTRA_FRAME ? INTER_REFS_PER_FRAME : refs[0]);
-  const MV_REFERENCE_FRAME r1 =
-      (refs[1] == INTRA_FRAME ? INTER_REFS_PER_FRAME : refs[1]);
-  ref_combo[r0][r1 + 1] = val;
-}
-
-static bool get_mask_combo_bit(const bool ref_combo[REF_FRAMES][REF_FRAMES + 1],
-                               const MV_REFERENCE_FRAME *refs) {
-  const MV_REFERENCE_FRAME r0 =
-      (refs[0] == INTRA_FRAME ? INTER_REFS_PER_FRAME : refs[0]);
-  const MV_REFERENCE_FRAME r1 =
-      (refs[1] == INTRA_FRAME ? INTER_REFS_PER_FRAME : refs[1]);
-  return ref_combo[r0][r1 + 1];
-}
 #else
 // Update 'ref_combo' mask to disable given 'ref' in single and compound modes.
 static AOM_INLINE void disable_reference(
@@ -4590,6 +4574,8 @@ static AOM_INLINE void disable_inter_references_except_altref(
   disable_reference(ALTREF2_FRAME, ref_combo);
 }
 
+// Define single and compound reference combinations allowed in
+// "enable_reduced_reference_set" speed feature.
 static const MV_REFERENCE_FRAME reduced_ref_combos[][2] = {
   { LAST_FRAME, NONE_FRAME },     { ALTREF_FRAME, NONE_FRAME },
   { LAST_FRAME, ALTREF_FRAME },   { GOLDEN_FRAME, NONE_FRAME },
@@ -4633,7 +4619,8 @@ static AOM_INLINE void default_skip_mask(mode_skip_mask_t *mask,
     for (int i = 0; i < num_ref_combos; ++i) {
       const MV_REFERENCE_FRAME *const this_combo = ref_set_combos[i];
 #if CONFIG_NEW_REF_SIGNALING
-      set_mask_combo_bit(mask->ref_combo, this_combo, false);
+      mask->ref_combo[COMPACT_INDEX0_NRS(this_combo[0])]
+                     [COMPACT_INDEX0_NRS(this_combo[1]) + 1] = false;
 #else
       mask->ref_combo[this_combo[0]][this_combo[1] + 1] = false;
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -5127,7 +5114,8 @@ static bool mask_says_skip(const mode_skip_mask_t *mode_skip_mask,
   }
 
 #if CONFIG_NEW_REF_SIGNALING
-  return get_mask_combo_bit(mode_skip_mask->ref_combo, ref_frame);
+  return mode_skip_mask->ref_combo[COMPACT_INDEX0_NRS(ref_frame[0])]
+                                  [COMPACT_INDEX0_NRS(ref_frame[1]) + 1];
 #else
   return mode_skip_mask->ref_combo[ref_frame[0]][ref_frame[1] + 1];
 #endif  // CONFIG_NEW_REF_SIGNALING
