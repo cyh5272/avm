@@ -2481,7 +2481,7 @@ void av1_predict_intra_block(
 #if CONFIG_EXT_RECUR_PARTITIONS
                                 have_top_right ? px_top_right : 0,
 #else
-                                 have_top_right ? AOMMIN(txwpx, xr) : 0,
+                                have_top_right ? AOMMIN(txwpx, xr) : 0,
 #endif
                                 have_left ? AOMMIN(txhpx, yd + txhpx) : 0,
                                 have_bottom_left ? px_bottom_left : 0, plane
@@ -2512,7 +2512,7 @@ void av1_predict_intra_block(
 #if CONFIG_EXT_RECUR_PARTITIONS
                          have_top_right ? px_top_right : 0,
 #else
-                          have_top_right ? AOMMIN(txwpx, xr) : 0,
+                         have_top_right ? AOMMIN(txwpx, xr) : 0,
 #endif
                          have_left ? AOMMIN(txhpx, yd + txhpx) : 0,
                          have_bottom_left ? px_bottom_left : 0, plane
