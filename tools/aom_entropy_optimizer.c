@@ -260,10 +260,9 @@ static void optimize_cdf_table_var_modes_4d(aom_count_type *counts,
 
 // Like optimize_cdf_table_var_modes_3d, but the number of modes varies across
 // the context dimension.
-static void optimize_cdf_table_var_modes_3d_inner(aom_count_type *counts,
-                                            FILE *const probsfile,
-                                            int dim_of_cts, int *cts_each_dim,
-                                            int **modes_each_ctx, char *prefix) {
+static void optimize_cdf_table_var_modes_3d_inner(
+    aom_count_type *counts, FILE *const probsfile, int dim_of_cts,
+    int *cts_each_dim, int **modes_each_ctx, char *prefix) {
   aom_count_type *ct_ptr = counts;
 
   assert(dim_of_cts == 3);
@@ -296,10 +295,9 @@ static void optimize_cdf_table_var_modes_3d_inner(aom_count_type *counts,
 
 // Like optimize_cdf_table_var_modes_4d, but the number of modes varies across
 // the last dimension.
-static void optimize_cdf_table_var_modes_4d_inner(aom_count_type *counts,
-                                            FILE *const probsfile,
-                                            int dim_of_cts, int *cts_each_dim,
-                                            int *modes_each_ctx, char *prefix) {
+static void optimize_cdf_table_var_modes_4d_inner(
+    aom_count_type *counts, FILE *const probsfile, int dim_of_cts,
+    int *cts_each_dim, int *modes_each_ctx, char *prefix) {
   aom_count_type *ct_ptr = counts;
 
   assert(dim_of_cts == 4);
@@ -463,13 +461,35 @@ int main(int argc, const char **argv) {
 
   cts_each_dim[0] = PARTITION_CONTEXTS_REC;
   cts_each_dim[1] = PARTITION_TYPES_REC;
-  int part_types_each_ctx_rec[PARTITION_CONTEXTS_REC] = { 2, 2, 2, 2, 4, 4, 4,
-                                                          4, 4, 4, 4, 4, 4, 4,
-                                                          4, 4,
+  int part_types_each_ctx_rec[PARTITION_CONTEXTS_REC] = {
+    2,
+    2,
+    2,
+    2,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
 #if ERP_LIMIT_PARTITION3_128
-                                                          2, 2, 2, 2 };
+    2,
+    2,
+    2,
+    2
+  };
 #else
-                                                          3, 3, 3, 3 };
+    3,
+    3,
+    3,
+    3
+  };
 #endif
   optimize_cdf_table_var_modes_2d(
       &fc.partition_rec[0][0], probsfile, 2, cts_each_dim,
