@@ -93,7 +93,11 @@ struct loopfilter {
 
   // 0 = Intra, Last, Last2+Last3,
   // GF, BRF, ARF2, ARF
+#if CONFIG_TIP
+  int8_t ref_deltas[EXTREF_FRAME];
+#else
   int8_t ref_deltas[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   // 0 = ZERO_MV, MV
   int8_t mode_deltas[MAX_MODE_LF_DELTAS];
@@ -117,7 +121,11 @@ typedef struct {
 
 typedef struct {
   loop_filter_thresh lfthr[MAX_LOOP_FILTER + 1];
+#if CONFIG_TIP
+  uint8_t lvl[MAX_MB_PLANE][MAX_SEGMENTS][2][EXTREF_FRAME][MAX_MODE_LF_DELTAS];
+#else
   uint8_t lvl[MAX_MB_PLANE][MAX_SEGMENTS][2][REF_FRAMES][MAX_MODE_LF_DELTAS];
+#endif  // CONFIG_TIP
 } loop_filter_info_n;
 
 typedef struct LoopFilterWorkerData {

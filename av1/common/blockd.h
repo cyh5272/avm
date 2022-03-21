@@ -1035,7 +1035,11 @@ typedef struct macroblockd {
    * Counts of each reference frame in the above and left neighboring blocks.
    * NOTE: Take into account both single and comp references.
    */
+#if CONFIG_TIP
+  uint8_t neighbors_ref_counts[EXTREF_FRAME];
+#else
   uint8_t neighbors_ref_counts[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   /*!
    * Current CDFs of all the symbols for the current tile.
@@ -1775,7 +1779,11 @@ static INLINE int is_interintra_allowed_mode(const PREDICTION_MODE mode) {
 }
 
 static INLINE int is_interintra_allowed_ref(const MV_REFERENCE_FRAME rf[2]) {
+#if CONFIG_TIP
+  return (rf[0] > INTRA_FRAME && rf[0] != TIP_FRAME) && (rf[1] <= INTRA_FRAME);
+#else
   return (rf[0] > INTRA_FRAME) && (rf[1] <= INTRA_FRAME);
+#endif  // CONFIG_TIP
 }
 
 static INLINE int is_interintra_allowed(const MB_MODE_INFO *mbmi) {
@@ -1833,6 +1841,11 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
     const TransformationType gm_type = gm_params[mbmi->ref_frame[0]].wmtype;
     if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
   }
+
+#if CONFIG_TIP
+  if (mbmi->ref_frame[0] == TIP_FRAME) return SIMPLE_TRANSLATION;
+#endif  // CONFIG_TIP
+
   if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
       is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
       is_motion_variation_allowed_compound(mbmi)) {

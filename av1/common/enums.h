@@ -434,7 +434,12 @@ enum {
   AOM_BWD_FLAG = 1 << 4,
   AOM_ALT2_FLAG = 1 << 5,
   AOM_ALT_FLAG = 1 << 6,
+#if CONFIG_TIP
+  AOM_TIP_FLAG = 1 << 7,
+  AOM_REFFRAME_ALL = (1 << 8) - 1
+#else
   AOM_REFFRAME_ALL = (1 << 7) - 1
+#endif  // CONFIG_TIP
 } UENUM1BYTE(AOM_REFFRAME);
 
 enum {
@@ -771,6 +776,10 @@ enum {
 #endif  // CONFIG_NEW_TX_PARTITION
 typedef uint8_t TXFM_CONTEXT;
 
+#if CONFIG_TIP
+#define TIP_CONTEXTS 3
+#endif  // CONFIG_TIP
+
 // An enum for single reference types (and some derived values).
 enum {
   NONE_FRAME = -1,
@@ -782,12 +791,19 @@ enum {
   BWDREF_FRAME,
   ALTREF2_FRAME,
   ALTREF_FRAME,
+#if CONFIG_TIP
+  TIP_FRAME,
+  REF_FRAMES = ALTREF_FRAME - INTRA_FRAME + 1,
+
+  EXTREF_FRAME = TIP_FRAME - INTRA_FRAME + 1,
+#else
   REF_FRAMES,
 
   // Extra/scratch reference frame. It may be:
   // - used to update the ALTREF2_FRAME ref (see lshift_bwd_ref_frames()), or
   // - updated from ALTREF2_FRAME ref (see rshift_bwd_ref_frames()).
   EXTREF_FRAME = REF_FRAMES,
+#endif  // CONFIG_TIP
 
   // Number of inter (non-intra) reference types.
   INTER_REFS_PER_FRAME = ALTREF_FRAME - LAST_FRAME + 1,
@@ -834,7 +850,11 @@ enum {
 // NOTE: A limited number of unidirectional reference pairs can be signalled for
 //       compound prediction. The use of skip mode, on the other hand, makes it
 //       possible to have a reference pair not listed for explicit signaling.
+#if CONFIG_TIP
+#define MODE_CTX_REF_FRAMES (EXTREF_FRAME + TOTAL_COMP_REFS)
+#else
 #define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
+#endif  // CONFIG_TIP
 
 // Note: It includes single and compound references. So, it can take values from
 // NONE_FRAME to (MODE_CTX_REF_FRAMES - 1). Hence, it is not defined as an enum.

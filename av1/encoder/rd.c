@@ -302,6 +302,12 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       }
     }
 
+#if CONFIG_TIP
+    for (i = 0; i < TIP_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->tip_cost[i], fc->tip_cdf[i], NULL);
+    }
+#endif  // CONFIG_TIP
+
     for (i = 0; i < COMP_REF_TYPE_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_ref_type_cost[i],
                                fc->comp_ref_type_cdf[i], NULL);
@@ -1295,7 +1301,14 @@ void av1_setup_pred_block(const MACROBLOCKD *xd,
 
 YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const AV1_COMP *cpi,
                                              int ref_frame) {
+#if CONFIG_TIP
+  assert(ref_frame >= LAST_FRAME && ref_frame < EXTREF_FRAME);
+  if (ref_frame == TIP_FRAME) {
+    return NULL;
+  }
+#else
   assert(ref_frame >= LAST_FRAME && ref_frame <= ALTREF_FRAME);
+#endif  // CONFIG_TIP
   RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame - 1];
   const RefCntBuffer *const ref_buf =
       get_ref_frame_buf(&cpi->common, ref_frame);
@@ -1342,6 +1355,14 @@ void av1_set_rd_speed_thresholds(AV1_COMP *cpi) {
   rd->thresh_mult[THR_NEWA] = 1000;
   rd->thresh_mult[THR_NEWG] = 1000;
 #endif  // !CONFIG_NEW_INTER_MODES
+
+#if CONFIG_TIP
+#if !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[THR_NEAREST_TIP] = 0;
+#endif  // !CONFIG_NEW_INTER_MODES
+  rd->thresh_mult[THR_NEW_TIP] = 0;
+  rd->thresh_mult[THR_NEAR_TIP] = 0;
+#endif  // CONFIG_TIP
 
 #if CONFIG_NEW_INTER_MODES
   rd->thresh_mult[THR_NEARMV] = 0;

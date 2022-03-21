@@ -1579,7 +1579,17 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
     av1_collect_neighbors_ref_counts(xd);
 
+#if CONFIG_TIP
+    if (cm->features.tip_frame_mode) {
+      const int tip_ctx = get_tip_ctx(xd);
+      aom_write_symbol(w, mbmi->ref_frame[0] == TIP_FRAME,
+                       ec_ctx->tip_cdf[tip_ctx], 2);
+    }
+
+    if (mbmi->ref_frame[0] != TIP_FRAME) write_ref_frames(cm, xd, w);
+#else
     write_ref_frames(cm, xd, w);
+#endif  // CONFIG_TIP
 
     mode_ctx =
         mode_context_analyzer(mbmi_ext_frame->mode_context, mbmi->ref_frame);
@@ -2523,16 +2533,28 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
     return 0;
   }
   const RefCntBuffer *buf = get_primary_ref_frame_buf(cm);
+#if CONFIG_TIP
+  int8_t last_ref_deltas[EXTREF_FRAME];
+#else
   int8_t last_ref_deltas[REF_FRAMES];
+#endif  // CONFIG_TIP
   int8_t last_mode_deltas[MAX_MODE_LF_DELTAS];
   if (buf == NULL) {
     av1_set_default_ref_deltas(last_ref_deltas);
     av1_set_default_mode_deltas(last_mode_deltas);
   } else {
+#if CONFIG_TIP
+    memcpy(last_ref_deltas, buf->ref_deltas, EXTREF_FRAME);
+#else
     memcpy(last_ref_deltas, buf->ref_deltas, REF_FRAMES);
+#endif  // CONFIG_TIP
     memcpy(last_mode_deltas, buf->mode_deltas, MAX_MODE_LF_DELTAS);
   }
+#if CONFIG_TIP
+  for (int i = 0; i < EXTREF_FRAME; i++) {
+#else
   for (int i = 0; i < REF_FRAMES; i++) {
+#endif  // CONFIG_TIP
     if (lf->ref_deltas[i] != last_ref_deltas[i]) {
       return true;
     }
@@ -2574,16 +2596,30 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
   }
 
   const RefCntBuffer *buf = get_primary_ref_frame_buf(cm);
+#if CONFIG_TIP
+  int8_t last_ref_deltas[EXTREF_FRAME];
+#else
   int8_t last_ref_deltas[REF_FRAMES];
+#endif  // CONFIG_TIP
   int8_t last_mode_deltas[MAX_MODE_LF_DELTAS];
   if (buf == NULL) {
     av1_set_default_ref_deltas(last_ref_deltas);
     av1_set_default_mode_deltas(last_mode_deltas);
   } else {
+#if CONFIG_TIP
+    memcpy(last_ref_deltas, buf->ref_deltas, EXTREF_FRAME);
+#else
     memcpy(last_ref_deltas, buf->ref_deltas, REF_FRAMES);
+#endif  // CONFIG_TIP
     memcpy(last_mode_deltas, buf->mode_deltas, MAX_MODE_LF_DELTAS);
   }
+#if CONFIG_TIP
+  const int ref_frames_end_idx =
+      cm->features.tip_frame_mode ? EXTREF_FRAME : REF_FRAMES;
+  for (int i = 0; i < ref_frames_end_idx; i++) {
+#else
   for (int i = 0; i < REF_FRAMES; i++) {
+#endif  // CONFIG_TIP
     const int delta = lf->ref_deltas[i];
     const int changed = delta != last_ref_deltas[i];
     aom_wb_write_bit(wb, changed);
@@ -3311,6 +3347,12 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
   aom_wb_write_bit(wb, seq_params->enable_ist);
 #endif
   aom_wb_write_bit(wb, seq_params->enable_mrls);
+#if CONFIG_TIP
+  aom_wb_write_bit(wb, seq_params->enable_tip);
+  if (seq_params->enable_tip) {
+    aom_wb_write_bit(wb, seq_params->enable_tip_hole_fill);
+  }
+#endif  // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   aom_wb_write_bit(wb, seq_params->enable_fsc);
 #endif  // CONFIG_FORWARDSKIP
@@ -3754,6 +3796,14 @@ static AOM_INLINE void write_uncompressed_header_obu(
       } else {
         assert(features->allow_ref_frame_mvs == 0);
       }
+#if CONFIG_TIP
+      if (cm->seq_params.enable_tip) {
+        aom_wb_write_literal(wb, features->tip_frame_mode, 2);
+        if (features->tip_frame_mode && cm->seq_params.enable_tip_hole_fill) {
+          aom_wb_write_bit(wb, features->allow_tip_hole_fill);
+        }
+      }
+#endif  // CONFIG_TIP
     }
   }
 
@@ -3766,6 +3816,10 @@ static AOM_INLINE void write_uncompressed_header_obu(
     aom_wb_write_bit(
         wb, features->refresh_frame_context == REFRESH_FRAME_CONTEXT_DISABLED);
   }
+
+#if CONFIG_TIP
+  if (features->tip_frame_mode == TIP_FRAME_AS_OUTPUT) return;
+#endif  // CONFIG_TIP
 
   write_tile_info(cm, saved_wb, wb);
   encode_quantization(quant_params, av1_num_planes(cm),
@@ -4593,8 +4647,14 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
   // write metadata obus before the frame obu that has the show_frame flag set
   if (cm->show_frame) data += av1_write_metadata_array(cpi, data);
 
+#if CONFIG_TIP
+  const int write_frame_header =
+      (cpi->num_tg > 1 || encode_show_existing_frame(cm) ||
+       (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT));
+#else
   const int write_frame_header =
       (cpi->num_tg > 1 || encode_show_existing_frame(cm));
+#endif  // CONFIG_TIP
   struct aom_write_bit_buffer saved_wb = { NULL, 0 };
   size_t length_field = 0;
   if (write_frame_header) {
@@ -4616,7 +4676,12 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
     data += fh_info.total_length;
   }
 
+#if CONFIG_TIP
+  if (encode_show_existing_frame(cm) ||
+      (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT)) {
+#else
   if (encode_show_existing_frame(cm)) {
+#endif  // CONFIG_TIP
     data_size = 0;
   } else {
     // Since length_field is determined adaptively after frame header

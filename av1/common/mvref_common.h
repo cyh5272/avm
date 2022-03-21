@@ -37,6 +37,47 @@ typedef struct position {
   int col;
 } POSITION;
 
+#if CONFIG_TIP
+#define MAX_OFFSET_WIDTH 64
+#define MAX_OFFSET_HEIGHT 0
+#define MAX_OFFSET_HEIGHT_LOG2 (MAX_OFFSET_HEIGHT >> TMVP_MI_SZ_LOG2)
+#define MAX_OFFSET_WIDTH_LOG2 (MAX_OFFSET_WIDTH >> TMVP_MI_SZ_LOG2)
+static AOM_INLINE int get_block_position(AV1_COMMON *cm, int *mi_r, int *mi_c,
+                                         int blk_row, int blk_col, MV mv,
+                                         int sign_bias) {
+  const int base_blk_row = (blk_row >> TMVP_MI_SZ_LOG2) << TMVP_MI_SZ_LOG2;
+  const int base_blk_col = (blk_col >> TMVP_MI_SZ_LOG2) << TMVP_MI_SZ_LOG2;
+
+  // The motion vector in units of 1/8-pel
+  const int shift = (3 + TMVP_MI_SZ_LOG2);
+  const int row_offset =
+      (mv.row >= 0) ? (mv.row >> shift) : -((-mv.row) >> shift);
+
+  const int col_offset =
+      (mv.col >= 0) ? (mv.col >> shift) : -((-mv.col) >> shift);
+
+  const int row =
+      (sign_bias == 1) ? blk_row - row_offset : blk_row + row_offset;
+  const int col =
+      (sign_bias == 1) ? blk_col - col_offset : blk_col + col_offset;
+
+  if (row < 0 || row >= (cm->mi_params.mi_rows >> SHIFT_BITS) || col < 0 ||
+      col >= (cm->mi_params.mi_cols >> SHIFT_BITS))
+    return 0;
+
+  if (row < base_blk_row - MAX_OFFSET_HEIGHT_LOG2 ||
+      row >= base_blk_row + TMVP_MI_SIZE + MAX_OFFSET_HEIGHT_LOG2 ||
+      col < base_blk_col - MAX_OFFSET_WIDTH_LOG2 ||
+      col >= base_blk_col + TMVP_MI_SIZE + MAX_OFFSET_WIDTH_LOG2)
+    return 0;
+
+  *mi_r = row;
+  *mi_c = col;
+
+  return 1;
+}
+#endif  // CONFIG_TIP
+
 // clamp_mv_ref
 #define MV_BORDER (16 << 3)  // Allow 16 pels in 1/8th pel units
 
@@ -119,6 +160,16 @@ static INLINE int8_t get_uni_comp_ref_idx(const MV_REFERENCE_FRAME *const rf) {
 static INLINE int8_t av1_ref_frame_type(const MV_REFERENCE_FRAME *const rf) {
   if (rf[1] > INTRA_FRAME) {
     const int8_t uni_comp_ref_idx = get_uni_comp_ref_idx(rf);
+#if CONFIG_TIP
+    if (uni_comp_ref_idx >= 0) {
+      assert((EXTREF_FRAME + FWD_REFS * BWD_REFS + uni_comp_ref_idx) <
+             MODE_CTX_REF_FRAMES);
+      return EXTREF_FRAME + FWD_REFS * BWD_REFS + uni_comp_ref_idx;
+    } else {
+      return EXTREF_FRAME + FWD_RF_OFFSET(rf[0]) +
+             BWD_RF_OFFSET(rf[1]) * FWD_REFS;
+    }
+#else
     if (uni_comp_ref_idx >= 0) {
       assert((REF_FRAMES + FWD_REFS * BWD_REFS + uni_comp_ref_idx) <
              MODE_CTX_REF_FRAMES);
@@ -127,6 +178,7 @@ static INLINE int8_t av1_ref_frame_type(const MV_REFERENCE_FRAME *const rf) {
       return REF_FRAMES + FWD_RF_OFFSET(rf[0]) +
              BWD_RF_OFFSET(rf[1]) * FWD_REFS;
     }
+#endif  // CONFIG_TIP
   }
 
   return rf[0];
@@ -155,6 +207,19 @@ static MV_REFERENCE_FRAME ref_frame_map[TOTAL_COMP_REFS][2] = {
 };
 // clang-format on
 
+#if CONFIG_TIP
+static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
+                                     MV_REFERENCE_FRAME ref_frame_type) {
+  if (ref_frame_type >= EXTREF_FRAME) {
+    rf[0] = ref_frame_map[ref_frame_type - EXTREF_FRAME][0];
+    rf[1] = ref_frame_map[ref_frame_type - EXTREF_FRAME][1];
+  } else {
+    assert(ref_frame_type > NONE_FRAME);
+    rf[0] = ref_frame_type;
+    rf[1] = NONE_FRAME;
+  }
+}
+#else
 static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
                                      MV_REFERENCE_FRAME ref_frame_type) {
   if (ref_frame_type >= REF_FRAMES) {
@@ -166,6 +231,7 @@ static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
     rf[1] = NONE_FRAME;
   }
 }
+#endif  // CONFIG_TIP
 
 static uint16_t compound_mode_ctx_map[3][COMP_NEWMV_CTXS] = {
   { 0, 1, 1, 1, 1 },

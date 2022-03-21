@@ -821,6 +821,10 @@ typedef struct {
   // Indicates if joint mvd coding should be enabled.
   bool enable_joint_mvd;
 #endif  // CONFIG_JOINT_MVD
+#if CONFIG_TIP
+  // enable temporal interpolated projection
+  bool enable_tip;
+#endif  // CONFIG_TIP
   // When enabled, video mode should be used even for single frame input.
   bool force_video_mode;
   // Indicates if the error resiliency features should be enabled.
@@ -1246,6 +1250,9 @@ typedef struct FRAME_COUNTS {
 #else
   unsigned int intra_inter[INTRA_INTER_CONTEXTS][2];
 #endif
+#if CONFIG_TIP
+  unsigned int tip_ref[TIP_CONTEXTS][2];
+#endif  // CONFIG_TIP
   unsigned int comp_inter[COMP_INTER_CONTEXTS][2];
   unsigned int comp_ref_type[COMP_REF_TYPE_CONTEXTS][2];
   unsigned int uni_comp_ref[UNI_COMP_REF_CONTEXTS][UNIDIR_COMP_REFS - 1][2];
@@ -1493,7 +1500,11 @@ typedef struct TileDataEnc {
 typedef struct RD_COUNTS {
   int64_t comp_pred_diff[REFERENCE_MODES];
   // Stores number of 4x4 blocks using global motion per reference frame.
+#if CONFIG_TIP
+  int global_motion_used[EXTREF_FRAME];
+#else
   int global_motion_used[REF_FRAMES];
+#endif  // CONFIG_TIP
   int compound_ref_used_flag;
   int skip_mode_used_flag;
   int tx_type_used[TX_SIZES_ALL][TX_TYPES];
@@ -1744,6 +1755,9 @@ enum {
   av1_encode_frame_time,
   av1_compute_global_motion_time,
   av1_setup_motion_field_time,
+#if CONFIG_TIP
+  av1_enc_setup_tip_frame_time,
+#endif  // CONFIG_TIP
   encode_sb_time,
   rd_pick_partition_time,
   rd_pick_sb_modes_time,
@@ -1771,6 +1785,9 @@ static INLINE char const *get_component_name(int index) {
     case av1_compute_global_motion_time:
       return "av1_compute_global_motion_time";
     case av1_setup_motion_field_time: return "av1_setup_motion_field_time";
+#if CONFIG_TIP
+    case av1_enc_setup_tip_frame_time: return "av1_enc_setup_tip_frame_time";
+#endif  // CONFIG_TIP
     case encode_sb_time: return "encode_sb_time";
     case rd_pick_partition_time: return "rd_pick_partition_time";
     case rd_pick_sb_modes_time: return "rd_pick_sb_modes_time";
@@ -2969,8 +2986,13 @@ int av1_convert_sect5obus_to_annexb(uint8_t *buffer, size_t *input_size);
 // However, the estimation is not accurate and may misclassify videos.
 // A slower but more accurate approach that determines whether to use screen
 // content tools is employed later. See av1_determine_sc_tools_with_encoding().
+#if CONFIG_TIP
+void av1_set_screen_content_options(struct AV1_COMP *cpi,
+                                    FeatureFlags *features);
+#else
 void av1_set_screen_content_options(const struct AV1_COMP *cpi,
                                     FeatureFlags *features);
+#endif  // CONFIG_TIP
 
 typedef struct {
   int pyr_level;
@@ -3237,6 +3259,19 @@ static INLINE BLOCK_SIZE find_partition_size(BLOCK_SIZE bsize, int rows_left,
   return (BLOCK_SIZE)int_size;
 }
 
+#if CONFIG_TIP
+static const uint8_t av1_ref_frame_flag_list[EXTREF_FRAME] = {
+  0,
+  AOM_LAST_FLAG,
+  AOM_LAST2_FLAG,
+  AOM_LAST3_FLAG,
+  AOM_GOLD_FLAG,
+  AOM_BWD_FLAG,
+  AOM_ALT2_FLAG,
+  AOM_ALT_FLAG,
+  AOM_TIP_FLAG,
+};
+#else
 static const uint8_t av1_ref_frame_flag_list[REF_FRAMES] = { 0,
                                                              AOM_LAST_FLAG,
                                                              AOM_LAST2_FLAG,
@@ -3245,6 +3280,7 @@ static const uint8_t av1_ref_frame_flag_list[REF_FRAMES] = { 0,
                                                              AOM_BWD_FLAG,
                                                              AOM_ALT2_FLAG,
                                                              AOM_ALT_FLAG };
+#endif  // CONFIG_TIP
 
 // When more than 'max_allowed_refs' are available, we reduce the number of
 // reference frames one at a time based on this order.

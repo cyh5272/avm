@@ -43,6 +43,9 @@
 #include "av1/common/reconintra.h"
 #include "av1/common/resize.h"
 #include "av1/common/tile_common.h"
+#if CONFIG_TIP
+#include "av1/common/tip.h"
+#endif  // CONFIG_TIP
 
 #include "av1/encoder/aq_complexity.h"
 #include "av1/encoder/aq_cyclicrefresh.h"
@@ -444,6 +447,18 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #if CONFIG_OPTFLOW_REFINEMENT
   seq->enable_opfl_refine = tool_cfg->enable_opfl_refine;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_TIP
+  if (!seq->use_highbitdepth) {
+    seq->enable_tip = 0;
+  } else {
+    seq->enable_tip = tool_cfg->enable_tip;
+  }
+
+  if (oxcf->superres_cfg.superres_mode != AOM_SUPERRES_NONE) {
+    seq->enable_tip = 0;
+  }
+  seq->enable_tip_hole_fill = seq->enable_tip ? 1 : 0;
+#endif  // CONFIG_TIP
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
   seq->enable_masked_compound = oxcf->comp_type_cfg.enable_masked_comp;
@@ -714,6 +729,15 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   cpi->superres_mode = oxcf->superres_cfg.superres_mode == AOM_SUPERRES_AUTO
                            ? AOM_SUPERRES_NONE
                            : oxcf->superres_cfg.superres_mode;  // default
+#if CONFIG_TIP
+  if (cpi->superres_mode != AOM_SUPERRES_NONE) {
+    seq_params->enable_tip = 0;
+  }
+
+  if (!seq_params->use_highbitdepth) {
+    seq_params->enable_tip = 0;
+  }
+#endif  // CONFIG_TIP
   x->e_mbd.bd = (int)seq_params->bit_depth;
   x->e_mbd.global_motion = cm->global_motion;
 
@@ -919,6 +943,17 @@ static INLINE void init_frame_info(FRAME_INFO *frame_info,
   frame_info->subsampling_x = seq_params->subsampling_x;
   frame_info->subsampling_y = seq_params->subsampling_y;
 }
+
+#if CONFIG_TIP
+static INLINE void init_tip_ref_frame(AV1_COMMON *const cm) {
+  cm->tip_ref.tip_frame = aom_calloc(1, sizeof(RefCntBuffer));
+}
+
+static INLINE void free_tip_ref_frame(AV1_COMMON *const cm) {
+  aom_free_frame_buffer(&cm->tip_ref.tip_frame->buf);
+  aom_free(cm->tip_ref.tip_frame);
+}
+#endif  // CONFIG_TIP
 
 AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
                                 FIRSTPASS_STATS *frame_stats_buf,
@@ -1394,6 +1429,10 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
   cm->superres_upscaled_height = oxcf->frm_dim_cfg.height;
   av1_loop_restoration_precal();
 
+#if CONFIG_TIP
+  init_tip_ref_frame(cm);
+#endif  // CONFIG_TIP
+
   cm->error.setjmp = 0;
 
   return cpi;
@@ -1599,6 +1638,10 @@ void av1_remove_compressor(AV1_COMP *cpi) {
   cpi->ssim_vars = NULL;
 #endif  // CONFIG_INTERNAL_STATS
 
+#if CONFIG_TIP
+  free_tip_ref_frame(cm);
+#endif  // CONFIG_TIP
+
   av1_remove_common(cm);
   av1_free_ref_frame_buffers(cm->buffer_pool);
 
@@ -1751,8 +1794,43 @@ static void set_mv_search_params(AV1_COMP *cpi) {
   }
 }
 
+#if CONFIG_TIP
+// counts_1: Counts of blocks with no more than color_thresh colors.
+// counts_2: Counts of blocks with no more than color_thresh colors and
+// variance larger than var_thresh.
+static void set_hole_fill_decision(AV1_COMP *cpi, int width, int height,
+                                   int blk_w, int blk_h, int counts_1,
+                                   int counts_2) {
+  AV1_COMMON *const cm = &cpi->common;
+  const bool is_720p_or_larger = AOMMIN(cm->width, cm->height) >= 720;
+  const bool is_4k_or_larger = AOMMIN(cm->width, cm->height) >= 2160;
+  if (is_4k_or_larger) {
+    cm->seq_params.enable_tip_hole_fill = 1;
+  } else if (!is_720p_or_larger) {
+    cm->seq_params.enable_tip_hole_fill = 0;
+  } else {
+    const int a[4] = { 168, -555, -7690, 25007 };
+    const int norm = (width * height) / (blk_h * blk_w);
+    const int64_t decision =
+        a[0] + (int64_t)a[1] * counts_1 / norm +
+        (int64_t)a[2] * counts_2 / norm +
+        (int64_t)a[3] * counts_1 * counts_2 / (norm * norm);
+    if (decision > 0) {
+      cm->seq_params.enable_tip_hole_fill = 1;
+    } else {
+      cm->seq_params.enable_tip_hole_fill = 0;
+    }
+  }
+}
+#endif  // CONFIG_TIP
+
+#if CONFIG_TIP
+void av1_set_screen_content_options(AV1_COMP *cpi, FeatureFlags *features) {
+#else
 void av1_set_screen_content_options(const AV1_COMP *cpi,
                                     FeatureFlags *features) {
+#endif  // CONFIG_TIP
+
   const AV1_COMMON *const cm = &cpi->common;
 
   if (cm->seq_params.force_screen_content_tools != 2) {
@@ -1821,6 +1899,14 @@ void av1_set_screen_content_options(const AV1_COMP *cpi,
   features->allow_intrabc =
       features->allow_screen_content_tools &&
       counts_2 * blk_h * blk_w * var_factor > width * height;
+
+#if CONFIG_TIP
+  if (frame_is_intra_only(cm) && cm->seq_params.enable_tip) {
+    set_hole_fill_decision(cpi, width, height, blk_w, blk_h, counts_1,
+                           counts_2);
+  }
+#endif  // CONFIG_TIP
+
   /*
   printf("allow_screen_content_tools = %d, allow_intrabc = %d\n",
          features->allow_screen_content_tools, features->allow_intrabc);
@@ -2037,7 +2123,11 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   if (!is_stat_generation_stage(cpi)) alloc_util_frame_buffers(cpi);
   init_motion_estimation(cpi);
 
+#if CONFIG_TIP
+  for (ref_frame = LAST_FRAME; ref_frame < EXTREF_FRAME; ++ref_frame) {
+#else
   for (ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
+#endif  // CONFIG_TIP
     RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
     if (buf != NULL) {
       struct scale_factors *sf = get_ref_scale_factors(cm, ref_frame);
@@ -2047,6 +2137,15 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
       if (av1_is_scaled(sf)) aom_extend_frame_borders(&buf->buf, num_planes);
     }
   }
+
+#if CONFIG_TIP
+  RefCntBuffer *const buf = get_ref_frame_buf(cm, TIP_FRAME);
+  if (buf != NULL) {
+    struct scale_factors *sf = get_ref_scale_factors(cm, TIP_FRAME);
+    av1_setup_scale_factors_for_frame(sf, cm->width, cm->height, cm->width,
+                                      cm->height);
+  }
+#endif  // CONFIG_TIP
 
   av1_setup_scale_factors_for_frame(&cm->sf_identity, cm->width, cm->height,
                                     cm->width, cm->height);
@@ -2676,6 +2775,114 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
   return AOM_CODEC_OK;
 }
 
+#if CONFIG_TIP
+static INLINE bool allow_tip_mode(AV1_COMMON *const cm) {
+  if (!frame_is_intra_only(cm) && !encode_show_existing_frame(cm) &&
+      cm->features.tip_frame_mode) {
+    return true;
+  }
+
+  return false;
+}
+
+static INLINE int compute_tip_direct_output_mode_RD(AV1_COMP *cpi,
+                                                    uint8_t *dest, size_t *size,
+                                                    int64_t *sse, int64_t *rate,
+                                                    int *largest_tile_id) {
+  AV1_COMMON *const cm = &cpi->common;
+
+  if (allow_tip_mode(cm)) {
+    cm->features.tip_frame_mode = TIP_FRAME_AS_OUTPUT;
+    av1_finalize_encoded_frame(cpi);
+    if (av1_pack_bitstream(cpi, dest, size, largest_tile_id) != AOM_CODEC_OK)
+      return AOM_CODEC_ERROR;
+
+    // Compute sse and rate.
+    *sse = (cm->seq_params.use_highbitdepth)
+               ? aom_highbd_get_y_sse(cpi->source, &cm->tip_ref.tip_frame->buf)
+               : aom_get_y_sse(cpi->source, &cm->tip_ref.tip_frame->buf);
+
+    const int64_t bits = (*size << 3);
+    *rate = (bits << 5);  // To match scale.
+    cm->features.tip_frame_mode = TIP_FRAME_AS_REF;
+  }
+
+  return AOM_CODEC_OK;
+}
+
+static INLINE int finalize_tip_mode(AV1_COMP *cpi, uint8_t *dest, size_t *size,
+                                    int64_t *sse, int64_t *rate,
+                                    int64_t tip_as_output_sse,
+                                    int64_t tip_as_output_rate,
+                                    int *largest_tile_id) {
+  AV1_COMMON *const cm = &cpi->common;
+
+  int64_t tip_as_ref_sse = INT64_MAX;
+  int64_t tip_as_ref_rate = INT64_MAX;
+  if (sse != NULL && rate != NULL) {
+    tip_as_ref_sse = *sse;
+    tip_as_ref_rate = *rate;
+  } else {
+    tip_as_ref_sse =
+        (cm->seq_params.use_highbitdepth)
+            ? aom_highbd_get_y_sse(cpi->source, &cm->cur_frame->buf)
+            : aom_get_y_sse(cpi->source, &cm->cur_frame->buf);
+
+    const int64_t bits = (*size << 3);
+    tip_as_ref_rate = (bits << 5);  // To match scale.
+  }
+
+  const int64_t rdmult =
+      av1_compute_rd_mult_based_on_qindex(cpi, cm->quant_params.base_qindex);
+
+  const double normal_coding_rdcost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      rdmult, tip_as_ref_rate, tip_as_ref_sse, cm->seq_params.bit_depth);
+  const double tip_direct_output_rdcost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+      rdmult, tip_as_output_rate, tip_as_output_sse, cm->seq_params.bit_depth);
+  if (tip_direct_output_rdcost < normal_coding_rdcost) {
+    cm->features.tip_frame_mode = TIP_FRAME_AS_OUTPUT;
+    const int num_planes = av1_num_planes(cm);
+    av1_copy_tip_frame_tmvp_mvs(cm);
+    aom_yv12_copy_frame(&cm->tip_ref.tip_frame->buf, &cm->cur_frame->buf,
+                        num_planes);
+
+    cm->lf.filter_level[0] = 0;
+    cm->lf.filter_level[1] = 0;
+    cm->cdef_info.cdef_bits = 0;
+    cm->cdef_info.cdef_strengths[0] = 0;
+    cm->cdef_info.nb_cdef_strengths = 1;
+    cm->cdef_info.cdef_uv_strengths[0] = 0;
+    cm->rst_info[0].frame_restoration_type = RESTORE_NONE;
+    cm->rst_info[1].frame_restoration_type = RESTORE_NONE;
+    cm->rst_info[2].frame_restoration_type = RESTORE_NONE;
+
+    for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+      cm->global_motion[i] = default_warp_params;
+      cm->cur_frame->global_motion[i] = default_warp_params;
+    }
+    cpi->gm_info.search_done = 0;
+    av1_setup_past_independence(cm);
+    if (!cm->tiles.large_scale) {
+      cm->cur_frame->frame_context = *cm->fc;
+    }
+
+    av1_finalize_encoded_frame(cpi);
+    if (av1_pack_bitstream(cpi, dest, size, largest_tile_id) != AOM_CODEC_OK)
+      return AOM_CODEC_ERROR;
+
+    if (sse != NULL) {
+      *sse = tip_as_output_sse;
+    }
+    if (rate != NULL) {
+      *rate = tip_as_output_rate;
+    }
+    cm->features.tip_frame_mode = TIP_FRAME_AS_REF;
+  }
+
+  return AOM_CODEC_OK;
+}
+#endif  // CONFIG_TIP
+
 /*!\brief Recode loop or a single loop for encoding one frame, followed by
  * in-loop deblocking filters, CDEF filters, and restoration filters.
  *
@@ -2762,6 +2969,13 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
     cm->rst_info[2].frame_restoration_type = RESTORE_NONE;
   }
 
+#if CONFIG_TIP
+  int64_t tip_as_output_sse = INT64_MAX;
+  int64_t tip_as_output_rate = INT64_MAX;
+  compute_tip_direct_output_mode_RD(cpi, dest, size, &tip_as_output_sse,
+                                    &tip_as_output_rate, largest_tile_id);
+#endif  // CONFIG_TIP
+
   // TODO(debargha): Fix mv search range on encoder side
   // aom_extend_frame_inner_borders(&cm->cur_frame->buf, av1_num_planes(cm));
   aom_extend_frame_borders(&cm->cur_frame->buf, av1_num_planes(cm));
@@ -2791,6 +3005,14 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
     const int64_t bits = (*size << 3);
     *rate = (bits << 5);  // To match scale.
   }
+
+#if CONFIG_TIP
+  if (allow_tip_mode(cm)) {
+    finalize_tip_mode(cpi, dest, size, sse, rate, tip_as_output_sse,
+                      tip_as_output_rate, largest_tile_id);
+  }
+#endif  // CONFIG_TIP
+
   return AOM_CODEC_OK;
 }
 

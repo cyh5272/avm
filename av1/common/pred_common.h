@@ -22,6 +22,27 @@
 extern "C" {
 #endif
 
+#if CONFIG_TIP
+static INLINE int get_tip_ctx(const MACROBLOCKD *xd) {
+  int ctx;
+  const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
+  const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
+  const int has_above = xd->up_available;
+  const int has_left = xd->left_available;
+
+  if (has_above && has_left) {
+    ctx = (above_mbmi->ref_frame[0] == TIP_FRAME) +
+          (left_mbmi->ref_frame[0] == TIP_FRAME);
+  } else if (has_above || has_left) {
+    const MB_MODE_INFO *edge_mbmi = has_above ? above_mbmi : left_mbmi;
+    ctx = (edge_mbmi->ref_frame[0] == TIP_FRAME) * 2;
+  } else {
+    ctx = 0;
+  }
+  return ctx;
+}
+#endif  // CONFIG_TIP
+
 static INLINE int get_segment_id(const CommonModeInfoParams *const mi_params,
                                  const uint8_t *segment_ids, BLOCK_SIZE bsize,
                                  int mi_row, int mi_col) {

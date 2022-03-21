@@ -980,6 +980,12 @@ static const aom_cdf_prob default_intra_inter_cdf[INTRA_INTER_CONTEXTS]
                                                  };
 #endif  // CONFIG_CONTEXT_DERIVATION
 
+#if CONFIG_TIP
+static const aom_cdf_prob default_tip_cdf[TIP_CONTEXTS][CDF_SIZE(2)] = {
+  { AOM_CDF2(23040) }, { AOM_CDF2(15360) }, { AOM_CDF2(10240) }
+};
+#endif  // CONFIG_TIP
+
 static const aom_cdf_prob default_comp_inter_cdf[COMP_INTER_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(26828) },
             { AOM_CDF2(24035) },
@@ -1562,6 +1568,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->angle_delta_cdf, default_angle_delta_cdf);
 #endif  // !CONFIG_AIMC
   av1_copy(fc->comp_inter_cdf, default_comp_inter_cdf);
+#if CONFIG_TIP
+  av1_copy(fc->tip_cdf, default_tip_cdf);
+#endif  // CONFIG_TIP
   av1_copy(fc->comp_ref_type_cdf, default_comp_ref_type_cdf);
   av1_copy(fc->uni_comp_ref_cdf, default_uni_comp_ref_cdf);
   av1_copy(fc->palette_y_mode_cdf, default_palette_y_mode_cdf);
@@ -1688,6 +1697,9 @@ void av1_set_default_ref_deltas(int8_t *ref_deltas) {
   ref_deltas[GOLDEN_FRAME] = -1;
   ref_deltas[ALTREF2_FRAME] = -1;
   ref_deltas[ALTREF_FRAME] = -1;
+#if CONFIG_TIP
+  ref_deltas[TIP_FRAME] = 0;
+#endif  // CONFIG_TIP
 }
 
 void av1_set_default_mode_deltas(int8_t *mode_deltas) {

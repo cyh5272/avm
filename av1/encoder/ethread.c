@@ -27,7 +27,11 @@ static AOM_INLINE void accumulate_rd_opt(ThreadData *td, ThreadData *td_t) {
   for (int i = 0; i < REFERENCE_MODES; i++)
     td->rd_counts.comp_pred_diff[i] += td_t->rd_counts.comp_pred_diff[i];
 
+#if CONFIG_TIP
+  for (int i = 0; i < EXTREF_FRAME; i++)
+#else
   for (int i = 0; i < REF_FRAMES; i++)
+#endif  // CONFIG_TIP
     td->rd_counts.global_motion_used[i] +=
         td_t->rd_counts.global_motion_used[i];
 

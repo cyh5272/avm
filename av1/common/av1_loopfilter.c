@@ -194,7 +194,11 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
           lfi->lvl[plane][seg_id][dir][INTRA_FRAME][0] =
               clamp(intra_lvl, 0, MAX_LOOP_FILTER);
 
+#if CONFIG_TIP
+          for (ref = LAST_FRAME; ref < EXTREF_FRAME; ++ref) {
+#else
           for (ref = LAST_FRAME; ref < REF_FRAMES; ++ref) {
+#endif  // CONFIG_TIP
             for (mode = 0; mode < MAX_MODE_LF_DELTAS; ++mode) {
               const int inter_lvl = lvl_seg + lf->ref_deltas[ref] * scale +
                                     lf->mode_deltas[mode] * scale;

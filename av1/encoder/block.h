@@ -225,7 +225,11 @@ typedef struct {
   //! Number of ref mvs in the drl.
   uint8_t ref_mv_count[MODE_CTX_REF_FRAMES];
   //! Global mvs
+#if CONFIG_TIP
+  int_mv global_mvs[EXTREF_FRAME];
+#else
   int_mv global_mvs[REF_FRAMES];
+#endif  // CONFIG_TIP
   //! Context used to encode the current mode.
   int16_t mode_context[MODE_CTX_REF_FRAMES];
 } MB_MODE_INFO_EXT;
@@ -245,7 +249,11 @@ typedef struct {
   uint8_t ref_mv_count;
   // TODO(Ravi/Remya): Reduce the buffer size of global_mvs
   //! \copydoc MB_MODE_INFO_EXT::global_mvs
+#if CONFIG_TIP
+  int_mv global_mvs[EXTREF_FRAME];
+#else
   int_mv global_mvs[REF_FRAMES];
+#endif  // CONFIG_TIP
   //! \copydoc MB_MODE_INFO_EXT::mode_context
   int16_t mode_context;
   //! Offset of current coding block's coeff buffer relative to the sb.
@@ -718,6 +726,11 @@ typedef struct {
    * Includes ALTREF_FRAME, ALTREF2_FRAME, and BWDREF_FRAME.
    */
   int comp_bwdref_cost[REF_CONTEXTS][BWD_REFS - 1][2];
+
+#if CONFIG_TIP
+  //! tip_cost
+  int tip_cost[TIP_CONTEXTS][CDF_SIZE(2)];
+#endif  // CONFIG_TIP
   /**@}*/
 
   /*****************************************************************************
@@ -1062,7 +1075,11 @@ typedef struct macroblock {
    *
    * This is used to measure how viable a reference frame is.
    */
+#if CONFIG_TIP
+  int pred_mv_sad[EXTREF_FRAME];
+#else
   int pred_mv_sad[REF_FRAMES];
+#endif  // CONFIG_TIP
   //! The minimum of \ref pred_mv_sad.
   int best_pred_mv_sad;
 
@@ -1072,7 +1089,11 @@ typedef struct macroblock {
    * model. If so, this stops selective_ref frame from pruning the given ref
    * frame at block level.
    */
+#if CONFIG_TIP
+  uint8_t tpl_keep_ref_frame[EXTREF_FRAME];
+#else
   uint8_t tpl_keep_ref_frame[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   /*! \brief Reference frames picked by the square subblocks in a superblock.
    *
@@ -1191,7 +1212,11 @@ typedef struct macroblock {
    * This context is defined as the \f$l_\inf\f$ norm of the best ref_mvs for
    * each frame.
    */
+#if CONFIG_TIP
+  unsigned int max_mv_context[EXTREF_FRAME];
+#else
   unsigned int max_mv_context[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   /*! \brief Limit for the range of motion vectors.
    *
@@ -1227,7 +1252,11 @@ typedef struct macroblock {
   //! Variance of the source frame.
   unsigned int source_variance;
   //! SSE of the current predictor.
+#if CONFIG_TIP
+  unsigned int pred_sse[EXTREF_FRAME];
+#else
   unsigned int pred_sse[REF_FRAMES];
+#endif  // CONFIG_TIP
   /**@}*/
 } MACROBLOCK;
 #undef SINGLE_REF_MODES

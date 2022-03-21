@@ -800,7 +800,11 @@ int av1_recode_loop_test_global_motion(WarpedMotionParams *const global_motion,
                                        int *const gm_params_cost) {
   int i;
   int recode = 0;
+#if CONFIG_TIP
+  for (i = LAST_FRAME; i < EXTREF_FRAME; ++i) {
+#else
   for (i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+#endif  // CONFIG_TIP
     if (global_motion[i].wmtype != IDENTITY &&
         global_motion_used[i] * GM_RECODE_LOOP_NUM4X4_FACTOR <
             gm_params_cost[i]) {

@@ -330,6 +330,9 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
                                     MB_MODE_INFO *mbmi, aom_reader *r) {
   if (cm->features.switchable_motion_mode == 0) return SIMPLE_TRANSLATION;
   if (mbmi->skip_mode) return SIMPLE_TRANSLATION;
+#if CONFIG_TIP
+  if (mbmi->ref_frame[0] == TIP_FRAME) return SIMPLE_TRANSLATION;
+#endif  // CONFIG_TIP
 
   const MOTION_MODE last_motion_mode_allowed = motion_mode_allowed(
       xd->global_motion, xd, mbmi, cm->features.allow_warped_motion);
@@ -1322,6 +1325,19 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
     return;
   }
 
+#if CONFIG_TIP
+  ref_frame[0] = NONE_FRAME;
+  ref_frame[1] = NONE_FRAME;
+  if (cm->features.tip_frame_mode) {
+    const int tip_ctx = get_tip_ctx(xd);
+    if (aom_read_symbol(r, xd->tile_ctx->tip_cdf[tip_ctx], 2, ACCT_STR)) {
+      ref_frame[0] = TIP_FRAME;
+    }
+  }
+
+  if (ref_frame[0] == TIP_FRAME) return;
+#endif  // CONFIG_TIP
+
   if (segfeature_active(&cm->seg, segment_id, SEG_LVL_REF_FRAME)) {
     ref_frame[0] = (MV_REFERENCE_FRAME)get_segdata(&cm->seg, segment_id,
                                                    SEG_LVL_REF_FRAME);
@@ -2002,6 +2018,9 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 
   mbmi->motion_mode = SIMPLE_TRANSLATION;
   if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
+#if CONFIG_TIP
+      mbmi->ref_frame[0] != TIP_FRAME &&
+#endif  // CONFIG_TIP
       !mbmi->skip_mode && !has_second_ref(mbmi)) {
     mbmi->num_proj_ref = av1_findSamples(cm, xd, pts, pts_inref);
   }
@@ -2168,6 +2187,28 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
     read_intra_block_mode_info(cm, xd, mbmi, r);
 }
 
+#if CONFIG_TIP
+static void intra_copy_frame_mvs(AV1_COMMON *const cm, int mi_row, int mi_col,
+                                 int x_mis, int y_mis) {
+  const int mi_cols = ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, SHIFT_BITS);
+
+  MV_REF *frame_mvs = cm->cur_frame->mvs + (mi_row >> SHIFT_BITS) * mi_cols +
+                      (mi_col >> SHIFT_BITS);
+  x_mis = ROUND_POWER_OF_TWO(x_mis, SHIFT_BITS);
+  y_mis = ROUND_POWER_OF_TWO(y_mis, SHIFT_BITS);
+
+  for (int h = 0; h < y_mis; h++) {
+    MV_REF *mv = frame_mvs;
+    for (int w = 0; w < x_mis; w++) {
+      for (int idx = 0; idx < 2; ++idx) {
+        mv->ref_frame[idx] = NONE_FRAME;
+      }
+      mv++;
+    }
+    frame_mvs += mi_cols;
+  }
+}
+#else
 static void intra_copy_frame_mvs(AV1_COMMON *const cm, int mi_row, int mi_col,
                                  int x_mis, int y_mis) {
   const int frame_mvs_stride = ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, 1);
@@ -2185,6 +2226,7 @@ static void intra_copy_frame_mvs(AV1_COMMON *const cm, int mi_row, int mi_col,
     frame_mvs += frame_mvs_stride;
   }
 }
+#endif  // CONFIG_TIP
 
 void av1_read_mode_info(AV1Decoder *const pbi, DecoderCodingBlock *dcb,
                         aom_reader *r, int x_mis, int y_mis) {

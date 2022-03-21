@@ -91,6 +91,17 @@ extern "C" {
 #define TXCOEFF_TIMER 0
 #define TXCOEFF_COST_TIMER 0
 
+#if CONFIG_TIP
+// MI unit is 4x4, TMVP unit is 8x8, so there is 1 shift
+// between TMVP unit and MI unit
+#define SHIFT_BITS 1
+// TMVP unit size
+#define TMVP_MI_SZ_LOG2 (MI_SIZE_LOG2 + SHIFT_BITS)
+#define TMVP_MI_SIZE (1 << TMVP_MI_SZ_LOG2)
+// TIP MV search range constraint in TMVP unit
+#define TIP_MV_SEARCH_RANGE 4
+#endif  // CONFIG_TIP
+
 /*!\cond */
 
 enum {
@@ -112,16 +123,44 @@ enum {
   REFRESH_FRAME_CONTEXT_BACKWARD,
 } UENUM1BYTE(REFRESH_FRAME_CONTEXT_MODE);
 
+#if CONFIG_TIP
+enum {
+  /**
+   * TIP frame generation is disabled
+   */
+  TIP_FRAME_DISABLED = 0,
+  /**
+   * TIP frame is used as a reference frame
+   */
+  TIP_FRAME_AS_REF,
+  /**
+   * TIP frame is directly output for displaying
+   */
+  TIP_FRAME_AS_OUTPUT,
+  /**
+   * TIP frame maximum mode
+   */
+  TIP_FRAME_MAX_MODE,
+} UENUM1BYTE(TIP_FRAME_MODE);
+#endif  // CONFIG_TIP
+
 #define MFMV_STACK_SIZE 3
 typedef struct {
   int_mv mfmv0;
   uint8_t ref_frame_offset;
 } TPL_MV_REF;
 
+#if CONFIG_TIP
+typedef struct {
+  int_mv mv[2];
+  MV_REFERENCE_FRAME ref_frame[2];
+} MV_REF;
+#else
 typedef struct {
   int_mv mv;
   MV_REFERENCE_FRAME ref_frame;
 } MV_REF;
+#endif  // CONFIG_TIP
 
 typedef struct RefCntBuffer {
   // For a RefCntBuffer, the following are reference-holding variables:
@@ -160,7 +199,11 @@ typedef struct RefCntBuffer {
   // the sizes that can be derived from the buf structure)
   int width;
   int height;
+#if CONFIG_TIP
+  WarpedMotionParams global_motion[EXTREF_FRAME];
+#else
   WarpedMotionParams global_motion[REF_FRAMES];
+#endif                 // CONFIG_TIP
   int showable_frame;  // frame can be used as show existing frame in future
   uint8_t film_grain_params_present;
   aom_film_grain_t film_grain_params;
@@ -173,7 +216,11 @@ typedef struct RefCntBuffer {
   int interp_filter_selected[SWITCHABLE];
 
   // Inter frame reference frame delta for loop filter
+#if CONFIG_TIP
+  int8_t ref_deltas[EXTREF_FRAME];
+#else
   int8_t ref_deltas[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   // 0 = ZERO_MV, MV
   int8_t mode_deltas[MAX_MODE_LF_DELTAS];
@@ -309,6 +356,10 @@ typedef struct SequenceHeader {
                                        // 2 - adaptive
   uint8_t enable_sdp;   // enables/disables semi-decoupled partitioning
   uint8_t enable_mrls;  // enables/disables multiple reference line selection
+#if CONFIG_TIP
+  uint8_t enable_tip;  // enables/disables temporal interpolated projection
+  uint8_t enable_tip_hole_fill;  // enables/disables hole fill for TIP
+#endif                           // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   uint8_t enable_fsc;                // enables/disables forward skip coding
 #endif                               // CONFIG_FORWARDSKIP
@@ -498,6 +549,16 @@ typedef struct {
    */
   OPTFLOW_REFINE_TYPE opfl_refine_type;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
+#if CONFIG_TIP
+  /*!
+   * TIP mode.
+   */
+  TIP_FRAME_MODE tip_frame_mode;
+  /*!
+   * Enables/disables hole fill for TIP
+   */
+  bool allow_tip_hole_fill;
+#endif  // CONFIG_TIP
 } FeatureFlags;
 
 /*!
@@ -843,6 +904,85 @@ struct total_sym_stats {
 };
 #endif  // CONFIG_THROUGHPUT_ANALYSIS
 
+#if CONFIG_TIP
+/*!
+ * \brief Structure used for storing tip reconstruct and prediction
+ */
+typedef struct {
+  /** dst buffer */
+  struct buf_2d dst;
+  /** pred buffer */
+  struct buf_2d pred[2];
+} TIP_PLANE;
+
+/*!
+ * \brief Structure used for tip
+ */
+typedef struct TIP_Buffer {
+  /*!
+   * Buffer into which the interpolated tip frame will be stored and other
+   * related info.
+   */
+  RefCntBuffer *tip_frame;
+  /*!
+   * Info specific to each plane.
+   */
+  TIP_PLANE tip_plane[MAX_MB_PLANE];
+  /*!
+   * Offset of TIP frame to its reference frame.
+   */
+  int ref_offset[2];
+  /*!
+   * Order hint of TIP's reference frames.
+   */
+  int ref_order_hint[2];
+  /*!
+   * Reference frame type of TIP's reference frames.
+   */
+  MV_REFERENCE_FRAME ref_frame[2];
+  /*!
+   * Buffer where TIP's reference frame is stored.
+   */
+  RefCntBuffer *ref_frame_buffer[2];
+  /*!
+   * Temporal scaling factor of the frame offset between current frame to one of
+   * TIP's reference frame with respect to the frame offset between TIP's two
+   * reference frames.
+   */
+  int ref_frames_offset_sf[2];
+  /*!
+   * Frame offset between TIP's two reference frames.
+   */
+  int ref_frames_offset;
+  /*!
+   * Scale factors of the reference frame with respect to the current frame.
+   * This is required for generating inter prediction and will be non-identity
+   * for a reference frame, if it has different dimensions than the coded
+   * dimensions of the current frame.
+   */
+  const struct scale_factors *ref_scale_factor[2];
+  /*!
+   * Scale factors of tip frame.
+   */
+  struct scale_factors scale_factor;
+  /*!
+   * Buffer into which the scaled interpolated tip frame will be stored and
+   * other related info. This is required for generating inter prediction and
+   * will be non-identity for a reference frame, if it has different dimensions
+   * than the coded dimensions of the current frame.
+   */
+  RefCntBuffer *scaled_tip_frame;
+  /*!
+   * Check a block is already interpolated
+   */
+  int *available_flag;
+  /*!
+   * Check the motion field of TIP block is within the frame
+   */
+  int *mf_need_clamp;
+} TIP;
+#endif  // CONFIG_TIP
+
 /*!
  * \brief Top level common structure used by both encoder and decoder.
  */
@@ -1083,7 +1223,11 @@ typedef struct AV1Common {
   /*!
    * Global motion parameters for each reference frame.
    */
+#if CONFIG_TIP
+  WarpedMotionParams global_motion[EXTREF_FRAME];
+#else
   WarpedMotionParams global_motion[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   /*!
    * Elements part of the sequence header, that are applicable for all the
@@ -1150,12 +1294,20 @@ typedef struct AV1Common {
    * current frame is positive, -1 if relative distance is 0; and 0 otherwise.
    * TODO(jingning): This can be combined with sign_bias later.
    */
+#if CONFIG_TIP
+  int8_t ref_frame_side[EXTREF_FRAME];
+#else
   int8_t ref_frame_side[REF_FRAMES];
+#endif  // CONFIG_TIP
 #if CONFIG_SMVP_IMPROVEMENT || CONFIG_JOINT_MVD
   /*!
    * relative distance between reference 'k' and current frame.
    */
+#if CONFIG_TIP
+  int8_t ref_frame_relative_dist[EXTREF_FRAME];
+#else
   int8_t ref_frame_relative_dist[REF_FRAMES];
+#endif  // CONFIG_TIP
 #endif  // CONFIG_SMVP_IMPROVEMENT || CONFIG_JOINT_MVD
   /*!
    * Number of temporal layers: may be > 1 for SVC (scalable vector coding).
@@ -1204,6 +1356,17 @@ typedef struct AV1Common {
   FILE *fEncCoeffLog;
   FILE *fDecCoeffLog;
 #endif
+
+#if CONFIG_TIP
+  /*!
+   * Flag to indicate if current frame has backward ref frame
+   */
+  int has_bwd_ref;
+  /*!
+   * TIP reference frame
+   */
+  TIP tip_ref;
+#endif  // CONFIG_TIP
 } AV1_COMMON;
 
 /*!\cond */
@@ -1227,6 +1390,9 @@ static void unlock_buffer_pool(BufferPool *const pool) {
 }
 
 static INLINE YV12_BUFFER_CONFIG *get_ref_frame(AV1_COMMON *cm, int index) {
+#if CONFIG_TIP
+  if (index == TIP_FRAME) return &cm->tip_ref.tip_frame->buf;
+#endif  // CONFIG_TIP
   if (index < 0 || index >= REF_FRAMES) return NULL;
   if (cm->ref_frame_map[index] == NULL) return NULL;
   return &cm->ref_frame_map[index]->buf;
@@ -1312,13 +1478,24 @@ static INLINE int frame_is_sframe(const AV1_COMMON *cm) {
 // previously used by the frame_refs[] array.
 static INLINE int get_ref_frame_map_idx(const AV1_COMMON *const cm,
                                         const MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_TIP
+  return (ref_frame >= LAST_FRAME && ref_frame <= REF_FRAMES)
+             ? cm->remapped_ref_idx[ref_frame - LAST_FRAME]
+             : INVALID_IDX;
+#else
   return (ref_frame >= LAST_FRAME && ref_frame <= EXTREF_FRAME)
              ? cm->remapped_ref_idx[ref_frame - LAST_FRAME]
              : INVALID_IDX;
+#endif  // CONFIG_TIP
 }
 
 static INLINE RefCntBuffer *get_ref_frame_buf(
     const AV1_COMMON *const cm, const MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_TIP
+  if (ref_frame == TIP_FRAME) {
+    return cm->tip_ref.tip_frame;
+  }
+#endif  // CONFIG_TIP
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
@@ -1327,12 +1504,22 @@ static INLINE RefCntBuffer *get_ref_frame_buf(
 // can be used with a const AV1_COMMON if needed.
 static INLINE const struct scale_factors *get_ref_scale_factors_const(
     const AV1_COMMON *const cm, const MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_TIP
+  if (ref_frame == TIP_FRAME) {
+    return &cm->tip_ref.scale_factor;
+  }
+#endif  // CONFIG_TIP
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? &cm->ref_scale_factors[map_idx] : NULL;
 }
 
 static INLINE struct scale_factors *get_ref_scale_factors(
     AV1_COMMON *const cm, const MV_REFERENCE_FRAME ref_frame) {
+#if CONFIG_TIP
+  if (ref_frame == TIP_FRAME) {
+    return &cm->tip_ref.scale_factor;
+  }
+#endif  // CONFIG_TIP
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? &cm->ref_scale_factors[map_idx] : NULL;
 }
@@ -1341,6 +1528,11 @@ static INLINE RefCntBuffer *get_primary_ref_frame_buf(
     const AV1_COMMON *const cm) {
   const int primary_ref_frame = cm->features.primary_ref_frame;
   if (primary_ref_frame == PRIMARY_REF_NONE) return NULL;
+#if CONFIG_TIP
+  if (primary_ref_frame + 1 == TIP_FRAME) {
+    return cm->tip_ref.tip_frame;
+  }
+#endif  // CONFIG_TIP
   const int map_idx = get_ref_frame_map_idx(cm, primary_ref_frame + 1);
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
@@ -1364,15 +1556,26 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
   const int buf_cols = buf->mi_cols;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
 
+#if CONFIG_TIP
+  const int tpl_rows = ROUND_POWER_OF_TWO(mi_params->mi_rows, SHIFT_BITS);
+  const int tpl_cols = ROUND_POWER_OF_TWO(mi_params->mi_cols, SHIFT_BITS);
+  const int mem_size = tpl_rows * tpl_cols;
+#endif  // CONFIG_TIP
+
   if (buf->mvs == NULL || buf_rows != mi_params->mi_rows ||
       buf_cols != mi_params->mi_cols) {
     aom_free(buf->mvs);
     buf->mi_rows = mi_params->mi_rows;
     buf->mi_cols = mi_params->mi_cols;
+#if CONFIG_TIP
+    CHECK_MEM_ERROR(cm, buf->mvs,
+                    (MV_REF *)aom_calloc(mem_size, sizeof(*buf->mvs)));
+#else
     CHECK_MEM_ERROR(cm, buf->mvs,
                     (MV_REF *)aom_calloc(((mi_params->mi_rows + 1) >> 1) *
                                              ((mi_params->mi_cols + 1) >> 1),
                                          sizeof(*buf->mvs)));
+#endif  // CONFIG_TIP
     aom_free(buf->seg_map);
     CHECK_MEM_ERROR(
         cm, buf->seg_map,
@@ -1380,8 +1583,10 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
                               sizeof(*buf->seg_map)));
   }
 
+#if !CONFIG_TIP
   const int mem_size =
       ((mi_params->mi_rows + MAX_MIB_SIZE) >> 1) * (mi_params->mi_stride >> 1);
+#endif  // !CONFIG_TIP
   int realloc = cm->tpl_mvs == NULL;
   if (cm->tpl_mvs) realloc |= cm->tpl_mvs_mem_size < mem_size;
 
@@ -1391,6 +1596,30 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
                     (TPL_MV_REF *)aom_calloc(mem_size, sizeof(*cm->tpl_mvs)));
     cm->tpl_mvs_mem_size = mem_size;
   }
+
+#if CONFIG_TIP
+  realloc = cm->tip_ref.available_flag == NULL;
+  if (cm->tip_ref.available_flag) {
+    realloc |= cm->tpl_mvs_mem_size < mem_size;
+  }
+  if (realloc) {
+    aom_free(cm->tip_ref.available_flag);
+    CHECK_MEM_ERROR(
+        cm, cm->tip_ref.available_flag,
+        (int *)aom_calloc(mem_size, sizeof(*cm->tip_ref.available_flag)));
+  }
+
+  realloc = cm->tip_ref.mf_need_clamp == NULL;
+  if (cm->tip_ref.mf_need_clamp) {
+    realloc |= cm->tpl_mvs_mem_size < mem_size;
+  }
+  if (realloc) {
+    aom_free(cm->tip_ref.mf_need_clamp);
+    CHECK_MEM_ERROR(
+        cm, cm->tip_ref.mf_need_clamp,
+        (int *)aom_calloc(mem_size, sizeof(*cm->tip_ref.mf_need_clamp)));
+  }
+#endif  // CONFIG_TIP
 }
 
 void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params);

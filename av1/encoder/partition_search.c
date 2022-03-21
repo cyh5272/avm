@@ -976,7 +976,23 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
     if (inter_block) {
       const MV_REFERENCE_FRAME ref0 = mbmi->ref_frame[0];
       const MV_REFERENCE_FRAME ref1 = mbmi->ref_frame[1];
+
+#if CONFIG_TIP
+      if (cm->features.tip_frame_mode) {
+        const int tip_ctx = get_tip_ctx(xd);
+        update_cdf(fc->tip_cdf[tip_ctx], ref0 == TIP_FRAME, 2);
+#if CONFIG_ENTROPY_STATS
+        ++counts->tip_ref[tip_ctx][ref0 == TIP_FRAME];
+#endif
+      }
+#endif  // CONFIG_TIP
+
+#if CONFIG_TIP
+      if (current_frame->reference_mode == REFERENCE_MODE_SELECT &&
+          ref0 != TIP_FRAME) {
+#else
       if (current_frame->reference_mode == REFERENCE_MODE_SELECT) {
+#endif  // CONFIG_TIP
         if (is_comp_ref_allowed(bsize)) {
 #if CONFIG_ENTROPY_STATS
           counts->comp_inter[av1_get_reference_mode_context(xd)]
@@ -1056,7 +1072,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
           }
         }
+#if CONFIG_TIP
+      } else if (ref0 != TIP_FRAME) {
+#else
       } else {
+#endif  // CONFIG_TIP
         const int bit = (ref0 >= BWDREF_FRAME);
         update_cdf(av1_get_pred_cdf_single_ref_p1(xd), bit, 2);
 #if CONFIG_ENTROPY_STATS
