@@ -166,8 +166,8 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
             mv->ref_frame[0] = ref_frame;
             mv->mv[0].as_int = mi->mv[idx].as_int;
 #else
-            mv->ref_frame = ref_frame;
-            mv->mv.as_int = mi->mv[idx].as_int;
+          mv->ref_frame = ref_frame;
+          mv->mv.as_int = mi->mv[idx].as_int;
 #endif  // CONFIG_TIP
           }
         }

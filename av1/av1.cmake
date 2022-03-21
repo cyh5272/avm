@@ -105,11 +105,10 @@ if(CONFIG_CCSO)
        "${AOM_ROOT}/av1/encoder/pickccso.h")
 endif()
 
-if (CONFIG_TIP)
-  list(APPEND AOM_AV1_COMMON_SOURCES
-              "${AOM_ROOT}/av1/common/tip.c"
-              "${AOM_ROOT}/av1/common/tip.h")
-endif ()
+if(CONFIG_TIP)
+  list(APPEND AOM_AV1_COMMON_SOURCES "${AOM_ROOT}/av1/common/tip.c"
+       "${AOM_ROOT}/av1/common/tip.h")
+endif()
 
 list(
   APPEND
