@@ -301,7 +301,7 @@ static const aom_cdf_prob
                                       { AOM_CDF3(2715, 30175) },
                                       { AOM_CDF3(2286, 20850) },
                                   } };
-#else  // !ERP_LIMIT_PARTITION3_128
+#else   // !ERP_LIMIT_PARTITION3_128
 static const aom_cdf_prob
     default_partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS][CDF_SIZE(
         EXT_PARTITION_TYPES)] = { {
@@ -703,7 +703,7 @@ static const aom_cdf_prob
                                { AOM_CDF2(8532) },
                                { AOM_CDF2(8532) },
                              };
-#else  // !ERP_LIMIT_PARTITION3_128
+#else   // !ERP_LIMIT_PARTITION3_128
 static const aom_cdf_prob
     default_partition_rec_cdf[PARTITION_CONTEXTS_REC]
                              [CDF_SIZE(PARTITION_TYPES_REC)] = {
