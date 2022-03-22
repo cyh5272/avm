@@ -127,6 +127,7 @@ TEST_P(FFT2DTest, Correct) {
 TEST_P(FFT2DTest, Benchmark) {
   int n = GetParam().n;
   float sum = 0;
+  (void)sum;
   for (int i = 0; i < 1000 * (64 - n); ++i) {
     input_[i % (n * n)] = 1;
     GetParam().fft(&input_[0], &temp_[0], &output_[0]);
@@ -222,6 +223,7 @@ TEST_P(IFFT2DTest, Correctness) {
 TEST_P(IFFT2DTest, Benchmark) {
   int n = GetParam().n;
   float sum = 0;
+  (void)sum;
   for (int i = 0; i < 1000 * (64 - n); ++i) {
     input_[i % (n * n)] = 1;
     GetParam().ifft(&input_[0], &temp_[0], &output_[0]);
