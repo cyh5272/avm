@@ -603,6 +603,11 @@ typedef struct INTER_MODE_SPEED_FEATURES {
   // flag to skip NEWMV mode in drl if the motion search result is the same
   int skip_repeated_newmv;
 
+#if IMPROVED_JMVD
+  // flag to early terminate jmvd scaling factors
+  int early_terminate_jmvd_scale_factor;
+#endif  // IMPROVED_JMVD
+
   // Skip the current ref_mv in NEW_MV mode if we have already encountered
   // another ref_mv in the drl such that:
   //  1. The other drl has the same fullpel_mv during the SIMPLE_TRANSLATION

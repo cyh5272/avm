@@ -243,6 +243,34 @@ static INLINE int is_joint_amvd_coding_mode(PREDICTION_MODE mode) {
 }
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
 
+#if IMPROVED_JMVD
+// Scale the MVD for joint MVD coding mode based on the jmvd_scale_mode
+static INLINE void scale_other_mvd(MV *other_mvd, int jmvd_scaled_mode,
+                                   PREDICTION_MODE mode) {
+  // This scaling factor is only applied to joint mvd coding mode
+  if (!is_joint_mvd_coding_mode(mode)) return;
+  if (is_joint_amvd_coding_mode(mode)) {
+    if (jmvd_scaled_mode == 1) {
+      other_mvd->row = other_mvd->row * 2;
+      other_mvd->col = other_mvd->col * 2;
+    } else if (jmvd_scaled_mode == 2) {
+      other_mvd->row = other_mvd->row / 2;
+      other_mvd->col = other_mvd->col / 2;
+    }
+  } else {
+    if (jmvd_scaled_mode == 1) {
+      other_mvd->row = other_mvd->row * 2;
+    } else if (jmvd_scaled_mode == 2) {
+      other_mvd->col = other_mvd->col * 2;
+    } else if (jmvd_scaled_mode == 3) {
+      other_mvd->row = other_mvd->row / 2;
+    } else if (jmvd_scaled_mode == 4) {
+      other_mvd->col = other_mvd->col / 2;
+    }
+  }
+}
+#endif  // IMPROVED_JMVD
+
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
 #if IMPROVED_AMVD
@@ -354,6 +382,10 @@ typedef struct MB_MODE_INFO {
   PARTITION_TYPE partition;
   /*! \brief The prediction mode used */
   PREDICTION_MODE mode;
+#if IMPROVED_JMVD
+  /*! \brief The JMVD scaling mode for the current coding block. */
+  int jmvd_scale_mode;
+#endif  // IMPROVED_JMVD
 #if CONFIG_FORWARDSKIP
   /*! \brief The forward skip mode for the current coding block. */
   uint8_t fsc_mode[2];
