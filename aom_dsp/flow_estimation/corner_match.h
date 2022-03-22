@@ -9,12 +9,19 @@
  * source code in the PATENTS file, you can obtain it at
  * aomedia.org/license/patent-license/.
  */
-#ifndef AOM_AV1_ENCODER_CORNER_MATCH_H_
-#define AOM_AV1_ENCODER_CORNER_MATCH_H_
+#ifndef AOM_FLOW_ESTIMATION_CORNER_MATCH_H_
+#define AOM_FLOW_ESTIMATION_CORNER_MATCH_H_
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+
+#include "aom_dsp/flow_estimation/flow_estimation.h"
+#include "aom_scale/yv12config.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MATCH_SZ 13
 #define MATCH_SZ_BY2 ((MATCH_SZ - 1) / 2)
@@ -25,10 +32,20 @@ typedef struct {
   int rx, ry;
 } Correspondence;
 
-int av1_determine_correspondence(unsigned char *src, int *src_corners,
+int aom_determine_correspondence(unsigned char *src, int *src_corners,
                                  int num_src_corners, unsigned char *ref,
                                  int *ref_corners, int num_ref_corners,
                                  int width, int height, int src_stride,
                                  int ref_stride, int *correspondence_pts);
 
-#endif  // AOM_AV1_ENCODER_CORNER_MATCH_H_
+int aom_compute_global_motion_feature_based(
+    TransformationType type, unsigned char *src_buffer, int src_width,
+    int src_height, int src_stride, int *src_corners, int num_src_corners,
+    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
+    MotionModel *params_by_motion, int num_motions);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // AOM_FLOW_ESTIMATION_CORNER_MATCH_H_

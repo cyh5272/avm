@@ -13,10 +13,13 @@
 #include "aom_dsp/binary_codes_writer.h"
 #include "aom_ports/system_state.h"
 
+#include "aom_dsp/flow_estimation/flow_estimation.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
+#include "aom_dsp/flow_estimation/util.h"
+
 #if CONFIG_FLEX_MVRES
 #include "av1/common/mv.h"
 #endif
-#include "av1/encoder/corner_detect.h"
 #include "av1/encoder/encoder.h"
 #include "av1/encoder/ethread.h"
 #include "av1/encoder/rdopt.h"
@@ -142,7 +145,7 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       params_by_motion[i].num_inliers = 0;
     }
 
-    av1_compute_global_motion(model, src_buffer, src_width, src_height,
+    aom_compute_global_motion(model, src_buffer, src_width, src_height,
                               src_stride, src_corners, num_src_corners,
                               ref_buf[frame], cpi->common.seq_params.bit_depth,
                               gm_estimation_type, inliers_by_motion,
@@ -424,7 +427,7 @@ static AOM_INLINE void setup_global_motion_info_params(AV1_COMP *cpi) {
     // The source buffer is 16-bit, so we need to convert to 8 bits for the
     // following code. We cache the result until the source frame is released.
     gm_info->src_buffer =
-        av1_downconvert_frame(source, cpi->common.seq_params.bit_depth);
+        aom_downconvert_frame(source, cpi->common.seq_params.bit_depth);
   }
 
   gm_info->segment_map_w =
@@ -454,7 +457,7 @@ static AOM_INLINE void setup_global_motion_info_params(AV1_COMP *cpi) {
   // If atleast one valid reference frame exists in past/future directions,
   // compute interest points of source frame using FAST features.
   if (gm_info->num_ref_frames[0] > 0 || gm_info->num_ref_frames[1] > 0) {
-    gm_info->num_src_corners = av1_fast_corner_detect(
+    gm_info->num_src_corners = aom_fast_corner_detect(
         gm_info->src_buffer, source->y_width, source->y_height,
         source->y_stride, gm_info->src_corners, MAX_CORNERS);
   }

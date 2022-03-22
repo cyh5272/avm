@@ -14,10 +14,14 @@
 #include <memory.h>
 #include <math.h>
 
-#include "config/av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "aom_ports/system_state.h"
-#include "av1/encoder/corner_match.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
+#include "aom_dsp/flow_estimation/corner_match.h"
+#include "aom_dsp/flow_estimation/ransac.h"
+#include "aom_dsp/flow_estimation/util.h"
+#include "aom_mem/aom_mem.h"
 
 #define SEARCH_SZ 9
 #define SEARCH_SZ_BY2 ((SEARCH_SZ - 1) / 2)
@@ -46,7 +50,7 @@ static double compute_variance(unsigned char *im, int stride, int x, int y) {
    correlation/standard deviation are taken over MATCH_SZ by MATCH_SZ windows
    of each image, centered at (x1, y1) and (x2, y2) respectively.
 */
-double av1_compute_cross_correlation_c(unsigned char *im1, int stride1, int x1,
+double aom_compute_cross_correlation_c(unsigned char *im1, int stride1, int x1,
                                        int y1, unsigned char *im2, int stride2,
                                        int x2, int y2) {
   int v1, v2;
@@ -102,7 +106,7 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
                                   correspondences[i].rx + x,
                                   correspondences[i].ry + y, width, height))
           continue;
-        match_ncc = av1_compute_cross_correlation(
+        match_ncc = aom_compute_cross_correlation(
             frm, frm_stride, correspondences[i].x, correspondences[i].y, ref,
             ref_stride, correspondences[i].rx + x, correspondences[i].ry + y);
         if (match_ncc > best_match_ncc) {
@@ -128,7 +132,7 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
                 correspondences[i].x + x, correspondences[i].y + y,
                 correspondences[i].rx, correspondences[i].ry, width, height))
           continue;
-        match_ncc = av1_compute_cross_correlation(
+        match_ncc = aom_compute_cross_correlation(
             ref, ref_stride, correspondences[i].rx, correspondences[i].ry, frm,
             frm_stride, correspondences[i].x + x, correspondences[i].y + y);
         if (match_ncc > best_match_ncc) {
@@ -142,7 +146,7 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
   }
 }
 
-int av1_determine_correspondence(unsigned char *src, int *src_corners,
+int aom_determine_correspondence(unsigned char *src, int *src_corners,
                                  int num_src_corners, unsigned char *ref,
                                  int *ref_corners, int num_ref_corners,
                                  int width, int height, int src_stride,
@@ -167,7 +171,7 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
                                 ref_corners[2 * j], ref_corners[2 * j + 1],
                                 width, height))
         continue;
-      match_ncc = av1_compute_cross_correlation(
+      match_ncc = aom_compute_cross_correlation(
           src, src_stride, src_corners[2 * i], src_corners[2 * i + 1], ref,
           ref_stride, ref_corners[2 * j], ref_corners[2 * j + 1]);
       if (match_ncc > best_match_ncc) {
@@ -177,7 +181,7 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
     }
     // Note: We want to test if the best correlation is >= THRESHOLD_NCC,
     // but need to account for the normalization in
-    // av1_compute_cross_correlation.
+    // aom_compute_cross_correlation.
     template_norm = compute_variance(src, src_stride, src_corners[2 * i],
                                      src_corners[2 * i + 1]);
     if (best_match_ncc > THRESHOLD_NCC * sqrt(template_norm)) {
@@ -192,4 +196,69 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
   improve_correspondence(src, ref, width, height, src_stride, ref_stride,
                          correspondences, num_correspondences);
   return num_correspondences;
+}
+
+static void get_inliers_from_indices(MotionModel *params,
+                                     int *correspondences) {
+  int *inliers_tmp = (int *)aom_malloc(2 * MAX_CORNERS * sizeof(*inliers_tmp));
+  memset(inliers_tmp, 0, 2 * MAX_CORNERS * sizeof(*inliers_tmp));
+
+  for (int i = 0; i < params->num_inliers; i++) {
+    int index = params->inliers[i];
+    inliers_tmp[2 * i] = correspondences[4 * index];
+    inliers_tmp[2 * i + 1] = correspondences[4 * index + 1];
+  }
+  memcpy(params->inliers, inliers_tmp, sizeof(*inliers_tmp) * 2 * MAX_CORNERS);
+  aom_free(inliers_tmp);
+}
+
+int aom_compute_global_motion_feature_based(
+    TransformationType type, unsigned char *src_buffer, int src_width,
+    int src_height, int src_stride, int *src_corners, int num_src_corners,
+    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
+    MotionModel *params_by_motion, int num_motions) {
+  int i;
+  int num_ref_corners;
+  int num_correspondences;
+  int *correspondences;
+  int ref_corners[2 * MAX_CORNERS];
+  unsigned char *ref_buffer = ref->y_buffer;
+  RansacFunc ransac = aom_get_ransac_type(type);
+
+  if (ref->flags & YV12_FLAG_HIGHBITDEPTH) {
+    ref_buffer = aom_downconvert_frame(ref, bit_depth);
+  }
+
+  num_ref_corners =
+      aom_fast_corner_detect(ref_buffer, ref->y_width, ref->y_height,
+                             ref->y_stride, ref_corners, MAX_CORNERS);
+
+  // find correspondences between the two images
+  correspondences =
+      (int *)malloc(num_src_corners * 4 * sizeof(*correspondences));
+  num_correspondences = aom_determine_correspondence(
+      src_buffer, (int *)src_corners, num_src_corners, ref_buffer,
+      (int *)ref_corners, num_ref_corners, src_width, src_height, src_stride,
+      ref->y_stride, correspondences);
+
+  ransac(correspondences, num_correspondences, num_inliers_by_motion,
+         params_by_motion, num_motions);
+
+  // Set num_inliers = 0 for motions with too few inliers so they are ignored.
+  for (i = 0; i < num_motions; ++i) {
+    if (num_inliers_by_motion[i] < MIN_INLIER_PROB * num_correspondences ||
+        num_correspondences == 0) {
+      num_inliers_by_motion[i] = 0;
+    } else {
+      get_inliers_from_indices(&params_by_motion[i], correspondences);
+    }
+  }
+
+  free(correspondences);
+
+  // Return true if any one of the motions has inliers.
+  for (i = 0; i < num_motions; ++i) {
+    if (num_inliers_by_motion[i] > 0) return 1;
+  }
+  return 0;
 }

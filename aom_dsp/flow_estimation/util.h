@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2022, Alliance for Open Media. All rights reserved
  *
  * This source code is subject to the terms of the BSD 3-Clause Clear License
  * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
@@ -10,14 +10,19 @@
  * aomedia.org/license/patent-license/.
  */
 
-#ifndef AOM_AV1_ENCODER_CORNER_DETECT_H_
-#define AOM_AV1_ENCODER_CORNER_DETECT_H_
+#ifndef AOM_FLOW_ESTIMATION_UTIL_H_
+#define AOM_FLOW_ESTIMATION_UTIL_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <memory.h>
+#include "aom_scale/yv12config.h"
 
-int av1_fast_corner_detect(unsigned char *buf, int width, int height,
-                           int stride, int *points, int max_points);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#endif  // AOM_AV1_ENCODER_CORNER_DETECT_H_
+unsigned char *aom_downconvert_frame(YV12_BUFFER_CONFIG *frm, int bit_depth);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // AOM_FLOW_ESTIMATION_UTIL_H_

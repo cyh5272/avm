@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "aom_dsp/aom_dsp_common.h"
+
 static const double TINY_NEAR_ZERO = 1.0E-16;
 
 // Solves Ax = b, where x and b are column vectors of size nx1 and A is nxn

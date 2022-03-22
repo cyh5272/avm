@@ -11,7 +11,7 @@
  */
 #include <tuple>
 
-#include "config/av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 #include "test/acm_random.h"
@@ -19,7 +19,7 @@
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
 
-#include "av1/encoder/corner_match.h"
+#include "aom_dsp/flow_estimation/corner_match.h"
 
 namespace test_libaom {
 
@@ -92,13 +92,13 @@ void AV1CornerMatchTest::RunCheckOutput(int run_times) {
     int y2 = MATCH_SZ_BY2 + rnd_.PseudoUniform(h - 2 * MATCH_SZ_BY2);
 
     double res_c =
-        av1_compute_cross_correlation_c(input1, w, x1, y1, input2, w, x2, y2);
+        aom_compute_cross_correlation_c(input1, w, x1, y1, input2, w, x2, y2);
     double res_simd = target_func(input1, w, x1, y1, input2, w, x2, y2);
 
     if (run_times > 1) {
       aom_usec_timer_start(&ref_timer);
       for (j = 0; j < run_times; j++) {
-        av1_compute_cross_correlation_c(input1, w, x1, y1, input2, w, x2, y2);
+        aom_compute_cross_correlation_c(input1, w, x1, y1, input2, w, x2, y2);
       }
       aom_usec_timer_mark(&ref_timer);
       const int elapsed_time_c =
@@ -131,15 +131,15 @@ TEST_P(AV1CornerMatchTest, DISABLED_Speed) { RunCheckOutput(100000); }
 #if HAVE_SSE4_1
 INSTANTIATE_TEST_SUITE_P(
     SSE4_1, AV1CornerMatchTest,
-    ::testing::Values(make_tuple(0, &av1_compute_cross_correlation_sse4_1),
-                      make_tuple(1, &av1_compute_cross_correlation_sse4_1)));
+    ::testing::Values(make_tuple(0, &aom_compute_cross_correlation_sse4_1),
+                      make_tuple(1, &aom_compute_cross_correlation_sse4_1)));
 #endif
 
 #if HAVE_AVX2
 INSTANTIATE_TEST_SUITE_P(
     AVX2, AV1CornerMatchTest,
-    ::testing::Values(make_tuple(0, &av1_compute_cross_correlation_avx2),
-                      make_tuple(1, &av1_compute_cross_correlation_avx2)));
+    ::testing::Values(make_tuple(0, &aom_compute_cross_correlation_avx2),
+                      make_tuple(1, &aom_compute_cross_correlation_avx2)));
 #endif
 }  // namespace AV1CornerMatch
 

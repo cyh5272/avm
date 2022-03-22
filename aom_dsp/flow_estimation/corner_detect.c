@@ -18,11 +18,11 @@
 
 #include "third_party/fastfeat/fast.h"
 
-#include "av1/encoder/corner_detect.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
 
 // Fast_9 wrapper
 #define FAST_BARRIER 18
-int av1_fast_corner_detect(unsigned char *buf, int width, int height,
+int aom_fast_corner_detect(unsigned char *buf, int width, int height,
                            int stride, int *points, int max_points) {
   int num_points;
   xy *const frm_corners_xy = aom_fast9_detect_nonmax(buf, width, height, stride,
