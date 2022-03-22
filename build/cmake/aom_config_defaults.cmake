@@ -238,6 +238,16 @@ set_aom_config_var(CONFIG_TEMPORAL_GLOBAL_MV 0
                    "AV2 experiment flag for temporal global MV")
 set_aom_config_var(CONFIG_IMPROVED_WARP 1
                    "AV2 experiment flag on warp storage reduction")
+set_aom_config_var(
+  CONFIG_GM_USE_DISFLOW
+  0
+  "Encoder only: Use disflow method for flow estimation, rather than corner matching"
+)
+set_aom_config_var(
+  CONFIG_GM_USE_SRC_FRAMES
+  0
+  "Encoder-only: Compute flow using source frames rather than reconstructed frames"
+)
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1

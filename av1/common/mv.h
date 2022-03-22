@@ -16,6 +16,7 @@
 #include "av1/common/common.h"
 #include "av1/common/common_data.h"
 #include "aom_dsp/aom_filter.h"
+#include "aom_dsp/flow_estimation/flow_estimation.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -288,31 +289,10 @@ static INLINE void full_pel_lower_mv_precision_one_comp(
 
 #define WARPEDDIFF_PREC_BITS (WARPEDMODEL_PREC_BITS - WARPEDPIXEL_PREC_BITS)
 
-/* clang-format off */
-enum {
-  IDENTITY = 0,      // identity transformation, 0-parameter
-  TRANSLATION = 1,   // translational motion 2-parameter
-  ROTZOOM = 2,       // simplified affine with rotation + zoom only, 4-parameter
-  AFFINE = 3,        // affine, 6-parameter
-  TRANS_TYPES,
-} UENUM1BYTE(TransformationType);
-/* clang-format on */
-
-// Number of types used for global motion (must be >= 3 and <= TRANS_TYPES)
-// The following can be useful:
-// GLOBAL_TRANS_TYPES 3 - up to rotation-zoom
-// GLOBAL_TRANS_TYPES 4 - up to affine
-// GLOBAL_TRANS_TYPES 6 - up to hor/ver trapezoids
-// GLOBAL_TRANS_TYPES 7 - up to full homography
-#define GLOBAL_TRANS_TYPES 4
-
 typedef struct {
   int global_warp_allowed;
   int local_warp_allowed;
 } WarpTypesAllowed;
-
-// number of parameters used by each transformation in TransformationTypes
-static const int trans_model_params[TRANS_TYPES] = { 0, 2, 4, 6 };
 
 // The order of values in the wmmat matrix below is best described
 // by the homography:
@@ -320,7 +300,7 @@ static const int trans_model_params[TRANS_TYPES] = { 0, 2, 4, 6 };
 //  z .  y'  =   m4 m5 m1 *  y
 //       1]      m6 m7 1)    1]
 typedef struct {
-  int32_t wmmat[8];
+  int32_t wmmat[MAX_PARAMDIM - 1];
   int16_t alpha, beta, gamma, delta;
   TransformationType wmtype;
   int8_t invalid;

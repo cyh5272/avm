@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include "aom/internal/aom_image_internal.h"
+#include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/mem.h"
 #include "aom_scale/yv12config.h"
@@ -32,7 +33,14 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
     if (ybf->buffer_alloc_sz > 0) {
       aom_free(ybf->buffer_alloc);
     }
-    if (ybf->y_buffer_8bit) aom_free(ybf->y_buffer_8bit);
+#if CONFIG_AV1_ENCODER
+    if (ybf->y_pyramid) {
+      aom_free_pyramid(ybf->y_pyramid);
+    }
+    if (ybf->corners) {
+      aom_free(ybf->corners);
+    }
+#endif  // CONFIG_AV1_ENCODER
     aom_remove_metadata_from_frame_buffer(ybf);
     /* buffer_alloc isn't accessed by most functions.  Rather y_buffer,
       u_buffer and v_buffer point to buffer_alloc and are used.  Clear out
@@ -43,6 +51,25 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
 
   return AOM_CODEC_MEM_ERROR;
 }
+
+#if CONFIG_AV1_ENCODER
+// Discard global motion data
+// This should be called whenever a frame buffer is reused for a new frame,
+// to avoid using stale data
+void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf) {
+  // TODO(rachelbarker): Erase data but keep allocations
+  // This requires appropriate resizing logic
+  if (ybf->y_pyramid) {
+    aom_free_pyramid(ybf->y_pyramid);
+    ybf->y_pyramid = NULL;
+  }
+  if (ybf->corners) {
+    aom_free(ybf->corners);
+    ybf->corners = NULL;
+  }
+  ybf->num_corners = 0;
+}
+#endif  // CONFIG_AV1_ENCODER
 
 static int realloc_frame_buffer_aligned(
     YV12_BUFFER_CONFIG *ybf, int width, int height, int ss_x, int ss_y,
@@ -61,8 +88,7 @@ static int realloc_frame_buffer_aligned(
 #if defined AOM_MAX_ALLOCABLE_MEMORY
     // The size of ybf->buffer_alloc.
     uint64_t alloc_size = frame_size;
-    // The size of ybf->y_buffer_8bit.
-    alloc_size += yplane_size;
+
     // The decoder may allocate REF_FRAMES frame buffers in the frame buffer
     // pool. Bound the total amount of allocated memory as if these REF_FRAMES
     // frame buffers were allocated in a single allocation.
@@ -147,12 +173,11 @@ static int realloc_frame_buffer_aligned(
 
     ybf->use_external_reference_buffers = 0;
 
-    if (ybf->y_buffer_8bit) aom_free(ybf->y_buffer_8bit);
-    ybf->y_buffer_8bit = (uint8_t *)aom_memalign(32, (size_t)yplane_size);
-    if (!ybf->y_buffer_8bit) return AOM_CODEC_MEM_ERROR;
-    // y_buffer_8bit may have been allocated above, but it has not been filled
-    // in yet. So, mark it as invalid.
-    ybf->buf_8bit_valid = 0;
+#if CONFIG_AV1_ENCODER
+    // Discard global motion data, so that stale data is not used
+    aom_invalidate_gm_data(ybf);
+#endif  // CONFIG_AV1_ENCODER
+
     ybf->corrupted = 0; /* assume not corrupted by errors */
     return 0;
   }

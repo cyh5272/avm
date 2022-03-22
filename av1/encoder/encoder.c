@@ -62,6 +62,7 @@
 #include "av1/encoder/encodetxb.h"
 #include "av1/encoder/ethread.h"
 #include "av1/encoder/firstpass.h"
+#include "av1/encoder/global_motion_facade.h"
 #include "av1/encoder/hash_motion.h"
 #include "av1/encoder/intra_mode_search.h"
 #include "av1/encoder/mv_prec.h"
@@ -2384,7 +2385,7 @@ static int encode_without_recode(AV1_COMP *cpi) {
   int phase_scaler = 0;
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_gm_data(cpi->source);
   av1_setup_frame_size(cpi);
   av1_set_size_dependent_vars(cpi, &q, &bottom_index, &top_index);
 
@@ -2559,7 +2560,7 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
   assert(IMPLIES(oxcf->rc_cfg.min_cr > 0, allow_recode));
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_gm_data(cpi->source);
 
   av1_setup_frame_size(cpi);
 
@@ -3492,6 +3493,37 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
   // NOTE: Save the new show frame buffer index for --test-code=warn, i.e.,
   //       for the purpose to verify no mismatch between encoder and decoder.
   if (cm->show_frame) cpi->last_show_frame_buf = cm->cur_frame;
+
+  av1_free_flow_fields(cpi);
+
+#if CONFIG_GM_USE_SRC_FRAMES
+  // Before storing the reconstructed frame (cm->cur_frame) into the reference
+  // buffers, transfer the original frame's (cpi->source's) global motion
+  // information to it.
+  //
+  // This means that, when this frame is used as a reference, all of the
+  // global motion estimation functions will use the pyramid and corner
+  // list which were constructed from the original frame, not from
+  // the reconstructed frame.
+  //
+  // Note: key/intra frames will not have computed the pyramid yet,
+  // so we need to do that before we discard the source frame.
+  // We do not need to compute the corner list, as this will be derived
+  // from the pyramid when needed.
+  if (!cpi->source->y_pyramid) {
+    cpi->source->y_pyramid = aom_compute_pyramid(
+        cpi->source, cm->seq_params.bit_depth, MAX_PYRAMID_LEVELS);
+    assert(cpi->source->y_pyramid);
+  }
+
+  cm->cur_frame->buf.y_pyramid = cpi->source->y_pyramid;
+  cm->cur_frame->buf.corners = cpi->source->corners;
+  cm->cur_frame->buf.num_corners = cpi->source->num_corners;
+
+  cpi->source->y_pyramid = NULL;
+  cpi->source->corners = NULL;
+  cpi->source->num_corners = 0;
+#endif  // CONFIG_GM_USE_SRC_FRAMES
 
   refresh_reference_frames(cpi);
 

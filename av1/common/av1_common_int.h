@@ -1771,7 +1771,9 @@ static INLINE RefCntBuffer *assign_cur_frame_new_fb(AV1_COMMON *const cm) {
   if (new_fb_idx == INVALID_IDX) return NULL;
 
   cm->cur_frame = &cm->buffer_pool->frame_bufs[new_fb_idx];
-  cm->cur_frame->buf.buf_8bit_valid = 0;
+#if CONFIG_AV1_ENCODER
+  aom_invalidate_gm_data(&cm->cur_frame->buf);
+#endif  // CONFIG_AV1_ENCODER
   av1_zero(cm->cur_frame->interp_filter_selected);
   av1_zero(cm->cur_frame->raw_frame_hash);
   av1_zero(cm->cur_frame->grain_frame_hash);

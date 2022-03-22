@@ -21,7 +21,7 @@
 
 #include "aom_ports/mem.h"
 #include "aom_ports/system_state.h"
-#include "av1/encoder/corner_match.h"
+#include "aom_dsp/flow_estimation/corner_match.h"
 
 DECLARE_ALIGNED(16, static const uint8_t,
                 byte_mask[16]) = { 255, 255, 255, 255, 255, 255, 255, 255,
@@ -34,7 +34,7 @@ DECLARE_ALIGNED(16, static const uint8_t,
    correlation/standard deviation are taken over MATCH_SZ by MATCH_SZ windows
    of each image, centered at (x1, y1) and (x2, y2) respectively.
 */
-double av1_compute_cross_correlation_sse4_1(unsigned char *im1, int stride1,
+double aom_compute_cross_correlation_sse4_1(unsigned char *im1, int stride1,
                                             int x1, int y1, unsigned char *im2,
                                             int stride2, int x2, int y2) {
   int i;
