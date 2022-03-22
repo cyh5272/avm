@@ -1970,6 +1970,7 @@ int main(int argc, const char **argv_) {
   int stream_cnt = 0;
   int res = 0;
   int profile_updated = 0;
+  (void)cx_time;
 
   memset(&input, 0, sizeof(input));
   exec_name = argv_[0];

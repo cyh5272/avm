@@ -5378,7 +5378,8 @@ BEGIN_PARTITION_SEARCH:
 #endif
     goto BEGIN_PARTITION_SEARCH;
   }
-#if CONFIG_EXT_RECUR_PARTITIONS && !NDEBUG
+#ifndef NDEBUG
+#if CONFIG_EXT_RECUR_PARTITIONS
   if (template_tree && template_tree->partition != PARTITION_INVALID &&
       pc_tree->partitioning != template_tree->partition) {
     assert(0);
@@ -5386,7 +5387,8 @@ BEGIN_PARTITION_SEARCH:
            cm->current_frame.order_hint, mi_row, mi_col, block_size_wide[bsize],
            block_size_high[bsize]);
   }
-#endif  // CONFIG_EXT_RECUR_PARTITIONS && !NDEBUG
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+#endif  // NDEBUG
 
   // Store the final rd cost
   *rd_cost = best_rdc;

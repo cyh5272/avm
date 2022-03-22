@@ -1234,12 +1234,6 @@ typedef struct macroblockd {
   int mi_row; /*!< Row position in mi units. */
   int mi_col; /*!< Column position in mi units. */
   /**@}*/
-#if CONFIG_IBC_SR_EXT
-  /*! An array for recording whether an mi(4x4) is coded. Reset at sb level */
-  uint8_t is_mi_coded[1024];
-  /*! Stride for `is_mi_coded` array. */
-  int is_mi_coded_stride;
-#endif  // CONFIG_IBC_SR_EXT
 
   /*!
    * Same as cm->mi_params.mi_stride, copied here for convenience.
@@ -2563,11 +2557,6 @@ static INLINE int av1_get_max_eob(TX_SIZE tx_size) {
   return tx_size_2d[tx_size];
 }
 
-void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride);
-void av1_mark_block_as_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
-                             BLOCK_SIZE bsize, BLOCK_SIZE sb_size);
-void av1_mark_block_as_not_coded(MACROBLOCKD *xd, int mi_row, int mi_col,
-                                 BLOCK_SIZE bsize, BLOCK_SIZE sb_size);
 #if CONFIG_EXT_RECUR_PARTITIONS
 static AOM_INLINE const PARTITION_TREE *get_partition_subtree_const(
     const PARTITION_TREE *partition_tree, int idx) {
