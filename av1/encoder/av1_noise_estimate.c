@@ -153,6 +153,8 @@ void av1_update_noise_estimate(AV1_COMP *const cpi) {
     const int last_src_ystride = last_source->y_stride;
     const uint8_t *src_u = cpi->source->u_buffer;
     const uint8_t *src_v = cpi->source->v_buffer;
+    (void)src_u;
+    (void)src_v;
     const int src_uvstride = cpi->source->uv_stride;
     int mi_row, mi_col;
     int num_low_motion = 0;

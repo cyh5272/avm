@@ -1535,9 +1535,7 @@ static AOM_INLINE void parse_decode_block(AV1Decoder *const pbi,
       }
     }
   }
-#if CONFIG_IBC_SR_EXT
-  av1_mark_block_as_coded(xd, bsize, cm->seq_params.sb_size);
-#endif  // CONFIG_IBC_SR_EXT
+  // av1_mark_block_as_coded(xd, bsize, cm->seq_params.sb_size);
 }
 
 static AOM_INLINE void set_offsets_for_pred_and_recon(
@@ -1583,9 +1581,6 @@ static AOM_INLINE void decode_block(AV1Decoder *const pbi, ThreadData *const td,
   (void)partition;
   set_offsets_for_pred_and_recon(pbi, td, mi_row, mi_col, bsize, parent, index);
   decode_token_recon_block(pbi, td, r, partition, bsize);
-#if CONFIG_IBC_SR_EXT
-  av1_mark_block_as_coded(&td->dcb.xd, bsize, pbi->common.seq_params.sb_size);
-#endif  // CONFIG_IBC_SR_EXT
 }
 
 static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
@@ -1629,21 +1624,19 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
     if (!has_rows && has_cols) return PARTITION_HORZ;
     if (has_rows && !has_cols) return PARTITION_VERT;
     if (!has_rows && !has_cols) return PARTITION_HORZ;
-
+    assert(has_rows && has_cols);
     assert(ctx >= 0);
-    if (has_rows && has_cols) {
-      aom_cdf_prob *partition_cdf = ec_ctx->partition_cdf[plane][ctx];
+    aom_cdf_prob *partition_cdf = ec_ctx->partition_cdf[plane][ctx];
 
-      if (limit_rect_split) {
-        const int dir_index = parent_partition == PARTITION_HORZ_3 ? 0 : 1;
-        partition_cdf = ec_ctx->limited_partition_cdf[plane][dir_index][ctx];
-        const int symbol = aom_read_symbol(
-            r, partition_cdf, limited_partition_cdf_length(bsize), ACCT_STR);
-        return get_limited_partition_from_symbol(symbol, parent_partition);
-      } else {
-        return (PARTITION_TYPE)aom_read_symbol(
-            r, partition_cdf, partition_cdf_length(bsize), ACCT_STR);
-      }
+    if (limit_rect_split) {
+      const int dir_index = parent_partition == PARTITION_HORZ_3 ? 0 : 1;
+      partition_cdf = ec_ctx->limited_partition_cdf[plane][dir_index][ctx];
+      const int symbol = aom_read_symbol(
+          r, partition_cdf, limited_partition_cdf_length(bsize), ACCT_STR);
+      return get_limited_partition_from_symbol(symbol, parent_partition);
+    } else {
+      return (PARTITION_TYPE)aom_read_symbol(
+          r, partition_cdf, partition_cdf_length(bsize), ACCT_STR);
     }
   } else {
     // Handle boundary
