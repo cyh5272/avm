@@ -704,18 +704,21 @@ typedef struct {
    * \name Partition Costs
    ****************************************************************************/
   /**@{*/
-  //! Cost for coding the partition.
 #if CONFIG_SDP
+  //! Cost for coding the partition.
   int partition_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                     [EXT_PARTITION_TYPES];
 #if CONFIG_EXT_RECUR_PARTITIONS
+  //! Cost for coding the limited partition.
   int limited_partition_cost[PARTITION_STRUCTURE_NUM]
                             [NUM_LIMITED_PARTITION_PARENTS][PARTITION_CONTEXTS]
                             [EXT_PARTITION_TYPES];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #else
+  //! Cost for coding the partition.
   int partition_cost[PARTITION_CONTEXTS][EXT_PARTITION_TYPES];
 #if CONFIG_EXT_RECUR_PARTITIONS
+  //! Cost for coding the limited partition.
   int limited_partition_cost[NUM_LIMITED_PARTITION_PARENTS][PARTITION_CONTEXTS]
                             [EXT_PARTITION_TYPES];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
