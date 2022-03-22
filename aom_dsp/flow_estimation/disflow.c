@@ -425,18 +425,41 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
   aom_free(v_upscale);
 }
 
-int aom_compute_global_motion_disflow_based(
-    TransformationType type, unsigned char *frm_buffer, int frm_width,
-    int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
-    MotionModel *params_by_motion, int num_motions) {
+FlowField *aom_alloc_flow_field(int width, int height, int stride) {
+  FlowField *flow = (FlowField *)aom_malloc(sizeof(FlowField));
+  if (flow == NULL) return NULL;
+
+  flow->width = width;
+  flow->height = height;
+  flow->stride = stride;
+
+  size_t flow_size = stride * (size_t)height;
+  flow->u = aom_calloc(flow_size, sizeof(double));
+  flow->v = aom_calloc(flow_size, sizeof(double));
+
+  if (flow->u == NULL || flow->v == NULL) {
+    aom_free(flow->u);
+    aom_free(flow->v);
+    aom_free(flow);
+    return NULL;
+  }
+
+  return flow;
+}
+
+void aom_free_flow_field(FlowField *flow) {
+  aom_free(flow->u);
+  aom_free(flow->v);
+  aom_free(flow);
+}
+
+FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
+                                  int frm_height, int frm_stride,
+                                  YV12_BUFFER_CONFIG *ref, int bit_depth) {
   unsigned char *ref_buffer = ref->y_buffer;
   const int ref_width = ref->y_width;
   const int ref_height = ref->y_height;
   const int pad_size = AOMMAX(PATCH_SIZE, MIN_PAD);
-  int num_correspondences;
-  double *correspondences;
-  RansacFuncDouble ransac = aom_get_ransac_double_prec_type(type);
   assert(frm_width == ref_width);
   assert(frm_height == ref_height);
 
@@ -468,31 +491,34 @@ int aom_compute_global_motion_disflow_based(
   compute_flow_pyramids(ref_buffer, ref_width, ref_height, ref->y_stride,
                         n_levels, pad_size, compute_gradient, ref_pyr);
 
-  double *flow_u =
-      aom_malloc(frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_u));
-  double *flow_v =
-      aom_malloc(frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_v));
+  FlowField *flow =
+      aom_alloc_flow_field(frm_width, frm_height, frm_pyr->strides[0]);
 
-  memset(flow_u, 0,
-         frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_u));
-  memset(flow_v, 0,
-         frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_v));
+  compute_flow_field(frm_pyr, ref_pyr, flow->u, flow->v);
 
-  compute_flow_field(frm_pyr, ref_pyr, flow_u, flow_v);
+  aom_free_pyramid(frm_pyr);
+  aom_free_pyramid(ref_pyr);
+  return flow;
+}
+
+int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
+                                int *frm_corners, int num_frm_corners,
+                                int *num_inliers_by_motion,
+                                MotionModel *params_by_motion,
+                                int num_motions) {
+  int num_correspondences;
+  double *correspondences;
+  RansacFuncDouble ransac = aom_get_ransac_double_prec_type(type);
 
   // find correspondences between the two images using the flow field
   correspondences = aom_malloc(num_frm_corners * 4 * sizeof(*correspondences));
   num_correspondences = determine_disflow_correspondence(
-      frm_corners, num_frm_corners, flow_u, flow_v, frm_width, frm_height,
-      frm_pyr->strides[0], correspondences);
+      frm_corners, num_frm_corners, flow->u, flow->v, flow->width, flow->height,
+      flow->stride, correspondences);
   ransac(correspondences, num_correspondences, num_inliers_by_motion,
          params_by_motion, num_motions);
 
-  aom_free_pyramid(frm_pyr);
-  aom_free_pyramid(ref_pyr);
   aom_free(correspondences);
-  aom_free(flow_u);
-  aom_free(flow_v);
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
   for (int i = 0; i < num_motions; ++i) {
     if (num_inliers_by_motion[i] < MIN_INLIER_PROB * num_correspondences) {
@@ -505,4 +531,19 @@ int aom_compute_global_motion_disflow_based(
     if (num_inliers_by_motion[i] > 0) return 1;
   }
   return 0;
+}
+
+int aom_compute_global_motion_disflow_based(
+    TransformationType type, unsigned char *frm_buffer, int frm_width,
+    int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
+    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
+    MotionModel *params_by_motion, int num_motions) {
+  FlowField *flow = aom_compute_flow_field(frm_buffer, frm_width, frm_height,
+                                           frm_stride, ref, bit_depth);
+  int result = aom_fit_model_to_flow_field(
+      flow, type, frm_corners, num_frm_corners, num_inliers_by_motion,
+      params_by_motion, num_motions);
+  aom_free_flow_field(flow);
+
+  return result;
 }
