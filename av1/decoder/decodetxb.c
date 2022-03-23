@@ -647,6 +647,12 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
           av1_read_coeffs_txb(cm, dcb, r, row, col, plane, &txb_ctx, tx_size);
     }
   }
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+  else {
+    av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, row, col,
+                              tx_size, cm->mi_params.fDecTxSkipLog);
+  }
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 #else
   get_txb_ctx(plane_bsize, tx_size, plane, pd->above_entropy_context + col,
               pd->left_entropy_context + row, &txb_ctx);
