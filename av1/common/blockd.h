@@ -473,7 +473,7 @@ typedef struct MB_MODE_INFO {
   uint8_t skip_mode : 2;
 #else
   uint8_t skip_mode : 1;
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
   /*! \brief Whether intrabc is used. */
   uint8_t use_intrabc[PARTITION_STRUCTURE_NUM];
   /*! \brief Indicates if masked compound is used(1) or not (0). */

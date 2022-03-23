@@ -324,7 +324,7 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
   return ctx_idx;
 #else
   return above_skip_txfm + left_skip_txfm;
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 }
 
 int av1_get_pred_context_switchable_interp(const MACROBLOCKD *xd, int dir);

@@ -707,7 +707,7 @@ enum {
 #define SKIP_CONTEXTS 6
 #else
 #define SKIP_CONTEXTS 3
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 #define SKIP_MODE_CONTEXTS 3
 
 #define COMP_GROUP_IDX_CONTEXTS 12

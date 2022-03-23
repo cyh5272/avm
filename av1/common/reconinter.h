@@ -592,7 +592,7 @@ static INLINE void set_default_interp_filters(
     mbmi->interp_fltr = MULTITAP_SHARP;
     return;
   }
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 #if CONFIG_OPTFLOW_REFINEMENT
   mbmi->interp_fltr =
       (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))

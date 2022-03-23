@@ -2190,7 +2190,6 @@ static int64_t motion_mode_rd(
         }
         continue;
       }
-
       const int64_t curr_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
       if (curr_rd < ref_best_rd) {
         ref_best_rd = curr_rd;
@@ -2298,7 +2297,7 @@ static int64_t skip_mode_rd(RD_STATS *rd_stats, const AV1_COMP *const cpi,
   restore_dst_buf(xd, *orig_dst, num_planes);
   return 0;
 }
-#endif
+#endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
 
 #if CONFIG_NEW_INTER_MODES
 // Check NEARMV and GLOBALMV ref mvs for duplicate and skip the relevant mode
@@ -4164,6 +4163,7 @@ static AOM_INLINE void calc_target_weighted_pred(
     int left_stride);
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
+// Search for the best skip mode, and compare the existing best mode
 static AOM_INLINE void rd_pick_motion_copy_mode(
     InterModeSearchState *search_state, const AV1_COMP *cpi, MACROBLOCK *x,
     BLOCK_SIZE bsize, struct buf_2d yv12_mb[REF_FRAMES][MAX_MB_PLANE],
@@ -7050,7 +7050,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
                              rd_cost);
 #else
     rd_pick_skip_mode(rd_cost, &search_state, cpi, x, bsize, yv12_mb);
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 #else
     const struct segmentation *const seg = &cm->seg;
     unsigned char segment_id = mbmi->segment_id;
@@ -7060,7 +7060,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
                                rd_cost);
 #else
       rd_pick_skip_mode(rd_cost, &search_state, cpi, x, bsize, yv12_mb);
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
     }
 #endif  // CONFIG_NEW_REF_SIGNALING
   }

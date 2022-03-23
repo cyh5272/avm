@@ -286,7 +286,7 @@ static void read_drl_idx(int max_drl_bits, const int16_t mode_ctx,
   mbmi->ref_mv_idx = 0;
 #if !CONFIG_SKIP_MODE_ENHANCEMENT
   assert(!mbmi->skip_mode);
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
   for (int idx = 0; idx < max_drl_bits; ++idx) {
     aom_cdf_prob *drl_cdf =
         av1_get_drl_cdf(ec_ctx, xd->weight[ref_frame_type], mode_ctx, idx);
@@ -1127,7 +1127,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
   mbmi->skip_mode = 0;
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   mbmi->skip_txfm[xd->tree_type == CHROMA_PART] =
       read_skip_txfm(cm, xd, mbmi->segment_id, r);
@@ -1995,7 +1995,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         (cm->features.opfl_refine_type ? NEAR_NEARMV_OPTFLOW : NEAR_NEARMV);
 #else
     mbmi->mode = NEAR_NEARMV;
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT && CONFIG_OPTFLOW_REFINEMENT
 #else
     mbmi->mode = NEAREST_NEARESTMV;
 #endif  // !CONFIG_NEW_INTER_MODES
@@ -2009,7 +2009,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         ec_ctx, dcb, mbmi, r);
 #else
     mbmi->ref_mv_idx = 0;
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   } else {
     if (segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP) ||
@@ -2124,14 +2124,15 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if CONFIG_NEW_INTER_MODES
   if (mbmi->skip_mode) {
 #if CONFIG_SKIP_MODE_ENHANCEMENT && CONFIG_OPTFLOW_REFINEMENT
-    assert(mbmi->mode == NEAR_NEARMV_OPTFLOW);
+    assert(mbmi->mode ==
+           (cm->features.opfl_refine_type ? NEAR_NEARMV_OPTFLOW : NEAR_NEARMV));
 #else
     assert(mbmi->mode == NEAR_NEARMV);
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT && CONFIG_OPTFLOW_REFINEMENT
 
 #if !CONFIG_SKIP_MODE_ENHANCEMENT
     assert(mbmi->ref_mv_idx == 0);
-#endif
+#endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
   }
 #else
   if (mbmi->skip_mode) assert(mbmi->mode == NEAREST_NEARESTMV);
@@ -2292,7 +2293,7 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
   if (mbmi->skip_mode)
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
   else
-#endif  //! CONFIG_SKIP_MODE_ENHANCEMENT
+#endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] =
         read_skip_txfm(cm, xd, mbmi->segment_id, r);
 

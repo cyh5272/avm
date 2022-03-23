@@ -511,7 +511,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       !(mbmi->skip_mode == 1)) {
 #else
       !mbmi->skip_mode) {
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
     tx_type = av1_get_tx_type(xd, pd->plane_type, blk_row, blk_col, tx_size,
                               cm->features.reduced_tx_set_used);
     TxfmParam txfm_param;
@@ -810,7 +810,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
           0) {  // trick to avoid reset the skip_txfm for skip mode
     mbmi->skip_mode = 2;
   }
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
   if (x->txfm_search_info.skip_txfm) return;
@@ -820,7 +820,6 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     cpi,  x,    &ctx,    &mbmi->skip_txfm[xd->tree_type == CHROMA_PART],
     NULL, NULL, dry_run, cpi->optimize_seg_arr[mbmi->segment_id]
   };
-
   for (int plane = plane_start; plane < plane_end; ++plane) {
     const struct macroblockd_plane *const pd = &xd->plane[plane];
     const int subsampling_x = pd->subsampling_x;
@@ -870,7 +869,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
       2) {  // trick to avoid reset the skip_txfm for skip mode
     mbmi->skip_mode = 1;
   }
-#endif
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 }
 
 static void encode_block_intra_and_set_context(int plane, int block,
