@@ -667,8 +667,8 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
   }
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   else {
-    av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, row,
-                              col, tx_size, cm->mi_params.fDecTxSkipLog);
+    av1_update_txk_skip_array(cm, xd->mi_row, xd->mi_col, plane, row, col,
+                              tx_size, cm->mi_params.fDecTxSkipLog);
   }
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 #else
