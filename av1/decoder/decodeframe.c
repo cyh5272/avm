@@ -1000,104 +1000,75 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
   const int plane_start = get_partition_plane_start(xd->tree_type);
   const int plane_end =
       get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
-  if (!is_inter_block(mbmi, xd->tree_type)) {
-    int row, col;
+
+  int row, col;
+  const int max_blocks_wide = max_block_wide(xd, bsize, 0);
+  const int max_blocks_high = max_block_high(xd, bsize, 0);
+  const BLOCK_SIZE max_unit_bsize = BLOCK_64X64;
+  int mu_blocks_wide = mi_size_wide[max_unit_bsize];
+  int mu_blocks_high = mi_size_high[max_unit_bsize];
+  mu_blocks_wide = AOMMIN(max_blocks_wide, mu_blocks_wide);
+  mu_blocks_high = AOMMIN(max_blocks_high, mu_blocks_high);
+
+  const int is_inter = is_inter_block(mbmi, xd->tree_type);
+  if (!is_inter) {
     assert(bsize == get_plane_block_size(bsize, xd->plane[0].subsampling_x,
                                          xd->plane[0].subsampling_y));
-    const int max_blocks_wide = max_block_wide(xd, bsize, 0);
-    const int max_blocks_high = max_block_high(xd, bsize, 0);
-    const BLOCK_SIZE max_unit_bsize = BLOCK_64X64;
-    int mu_blocks_wide = mi_size_wide[max_unit_bsize];
-    int mu_blocks_high = mi_size_high[max_unit_bsize];
-    mu_blocks_wide = AOMMIN(max_blocks_wide, mu_blocks_wide);
-    mu_blocks_high = AOMMIN(max_blocks_high, mu_blocks_high);
+  } else {
+    td->predict_inter_block_visit(cm, dcb, bsize);
+    if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART])
+      assert(max_unit_bsize ==
+             get_plane_block_size(BLOCK_64X64, xd->plane[0].subsampling_x,
+                                  xd->plane[0].subsampling_y));
+  }
 
-    for (row = 0; row < max_blocks_high; row += mu_blocks_high) {
-      for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
-        for (int plane = plane_start; plane < plane_end; ++plane) {
-          if (plane && !xd->is_chroma_ref) break;
-          const struct macroblockd_plane *const pd = &xd->plane[plane];
-          const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
-          const int stepr = tx_size_high_unit[tx_size];
-          const int stepc = tx_size_wide_unit[tx_size];
+  for (row = 0; row < max_blocks_high; row += mu_blocks_high) {
+    for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
+      for (int plane = plane_start; plane < plane_end; ++plane) {
+        if (plane && !xd->is_chroma_ref) break;
+        const struct macroblockd_plane *const pd = &xd->plane[plane];
+        const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
+        const int ss_x = pd->subsampling_x;
+        const int ss_y = pd->subsampling_y;
+        const int unit_height = ROUND_POWER_OF_TWO(
+            AOMMIN(mu_blocks_high + row, max_blocks_high), ss_y);
+        const int unit_width = ROUND_POWER_OF_TWO(
+            AOMMIN(mu_blocks_wide + col, max_blocks_wide), ss_x);
 
-          const int unit_height = ROUND_POWER_OF_TWO(
-              AOMMIN(mu_blocks_high + row, max_blocks_high), pd->subsampling_y);
-          const int unit_width = ROUND_POWER_OF_TWO(
-              AOMMIN(mu_blocks_wide + col, max_blocks_wide), pd->subsampling_x);
-
-          for (int blk_row = row >> pd->subsampling_y; blk_row < unit_height;
-               blk_row += stepr) {
-            for (int blk_col = col >> pd->subsampling_x; blk_col < unit_width;
-                 blk_col += stepc) {
+        const BLOCK_SIZE plane_bsize = get_plane_block_size(bsize, ss_x, ss_y);
+        const TX_SIZE max_tx_size =
+            get_vartx_max_txsize(xd, plane_bsize, plane);
+        const int stepr = is_inter ? tx_size_high_unit[max_tx_size]
+                                   : tx_size_high_unit[tx_size];
+        const int stepc = is_inter ? tx_size_wide_unit[max_tx_size]
+                                   : tx_size_wide_unit[tx_size];
+        int eobtotal = 0;
+        int block = 0;
+        for (int blk_row = row >> ss_y; blk_row < unit_height;
+             blk_row += stepr) {
+          for (int blk_col = col >> ss_x; blk_col < unit_width;
+               blk_col += stepc) {
+            if (!is_inter) {
               td->read_coeffs_tx_intra_block_visit(cm, dcb, r, plane, blk_row,
                                                    blk_col, tx_size);
               td->predict_and_recon_intra_block_visit(
                   cm, dcb, r, plane, blk_row, blk_col, tx_size);
               set_cb_buffer_offsets(dcb, tx_size, plane);
-            }
-          }
-        }
-      }
-    }
-  } else {
-    td->predict_inter_block_visit(cm, dcb, bsize);
-    // Reconstruction
-    if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
-      int eobtotal = 0;
-
-      const int max_blocks_wide = max_block_wide(xd, bsize, 0);
-      const int max_blocks_high = max_block_high(xd, bsize, 0);
-      int row, col;
-
-      const BLOCK_SIZE max_unit_bsize = BLOCK_64X64;
-      assert(max_unit_bsize ==
-             get_plane_block_size(BLOCK_64X64, xd->plane[0].subsampling_x,
-                                  xd->plane[0].subsampling_y));
-      int mu_blocks_wide = mi_size_wide[max_unit_bsize];
-      int mu_blocks_high = mi_size_high[max_unit_bsize];
-
-      mu_blocks_wide = AOMMIN(max_blocks_wide, mu_blocks_wide);
-      mu_blocks_high = AOMMIN(max_blocks_high, mu_blocks_high);
-
-      for (row = 0; row < max_blocks_high; row += mu_blocks_high) {
-        for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
-          for (int plane = plane_start; plane < plane_end; ++plane) {
-            if (plane && !xd->is_chroma_ref) break;
-            const struct macroblockd_plane *const pd = &xd->plane[plane];
-            const int ss_x = pd->subsampling_x;
-            const int ss_y = pd->subsampling_y;
-            const BLOCK_SIZE plane_bsize =
-                get_plane_block_size(bsize, ss_x, ss_y);
-            const TX_SIZE max_tx_size =
-                get_vartx_max_txsize(xd, plane_bsize, plane);
-            const int bh_var_tx = tx_size_high_unit[max_tx_size];
-            const int bw_var_tx = tx_size_wide_unit[max_tx_size];
-            int block = 0;
-            int step =
-                tx_size_wide_unit[max_tx_size] * tx_size_high_unit[max_tx_size];
-            int blk_row, blk_col;
-            const int unit_height = ROUND_POWER_OF_TWO(
-                AOMMIN(mu_blocks_high + row, max_blocks_high), ss_y);
-            const int unit_width = ROUND_POWER_OF_TWO(
-                AOMMIN(mu_blocks_wide + col, max_blocks_wide), ss_x);
-
-            for (blk_row = row >> ss_y; blk_row < unit_height;
-                 blk_row += bh_var_tx) {
-              for (blk_col = col >> ss_x; blk_col < unit_width;
-                   blk_col += bw_var_tx) {
+            } else {
+              // Reconstruction
+              if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
                 decode_reconstruct_tx(cm, td, r, mbmi, plane, plane_bsize,
                                       blk_row, blk_col, block, max_tx_size,
                                       &eobtotal);
-                block += step;
+                block += stepr * stepc;
               }
             }
           }
         }
       }
     }
-    td->cfl_store_inter_block_visit(cm, xd);
   }
+  if (is_inter) td->cfl_store_inter_block_visit(cm, xd);
 
   av1_visit_palette(pbi, xd, r, set_color_index_map_offset);
 }
