@@ -2288,7 +2288,6 @@ static int64_t skip_mode_rd(RD_STATS *rd_stats, const AV1_COMP *const cpi,
 
     total_sse += sse;
   }
-
   const int skip_mode_ctx = av1_get_skip_mode_context(xd);
   rd_stats->dist = rd_stats->sse = total_sse;
   rd_stats->rate = x->mode_costs.skip_mode_cost[skip_mode_ctx][1];
@@ -4163,7 +4162,15 @@ static AOM_INLINE void calc_target_weighted_pred(
     int left_stride);
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
-// Search for the best skip mode, and compare the existing best mode
+/*!\brief Search for the best skip mode
+ *
+ * \ingroup av1_rd_pick_inter_mode_sb
+ *
+ * This function performs a rate distortion search to find the best skip mode
+ * and compare the existing best mode
+ *
+ * Nothing is returned. The best mode is saved within the funtion
+ */
 static AOM_INLINE void rd_pick_motion_copy_mode(
     InterModeSearchState *search_state, const AV1_COMP *cpi, MACROBLOCK *x,
     BLOCK_SIZE bsize, struct buf_2d yv12_mb[REF_FRAMES][MAX_MB_PLANE],
