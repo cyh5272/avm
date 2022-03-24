@@ -55,6 +55,8 @@ list(
   "${AOM_ROOT}/av1/common/filter.h"
   "${AOM_ROOT}/av1/common/frame_buffers.c"
   "${AOM_ROOT}/av1/common/frame_buffers.h"
+  "${AOM_ROOT}/av1/common/guided_quadtree.c"
+  "${AOM_ROOT}/av1/common/guided_quadtree.h"
   "${AOM_ROOT}/av1/common/idct.c"
   "${AOM_ROOT}/av1/common/idct.h"
   "${AOM_ROOT}/av1/common/mv.h"
@@ -513,6 +515,26 @@ if(CONFIG_CNN_RESTORATION)
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/sr2by1ai_1_tflite.h"
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/sr2by1ai_2_tflite.h"
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/sr2by1ai_3_tflite.h")
+  endif()
+
+  if(CONFIG_CNN_GUIDED_QUADTREE)
+    list(
+      APPEND
+      AOM_AV1_COMMON_SOURCES
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp85_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp85_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp110_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp110_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp135_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp135_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp160_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp160_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp185_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp185_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp210_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp210_quadtree.h"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp235_quadtree.cc"
+      "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp235_quadtree.h")
   endif()
 endif()
 

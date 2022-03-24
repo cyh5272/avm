@@ -462,6 +462,55 @@ void av1_free_restoration_struct(RestorationInfo *rst_info) {
   rst_info->unit_info = NULL;
 }
 
+#if CONFIG_CNN_GUIDED_QUADTREE
+void av1_alloc_quadtree_struct(struct AV1Common *cm, QUADInfo *quad_info) {
+  int split_size;
+  int A_size;
+  const int quadtree_unit_size = 512 >> cm->use_quad_level;
+  // cm->cur_quad_info->unit_size = quadtree_unit_size;
+  // cm->postcnn_quad_info->unit_size = quadtree_unit_size;
+
+  // int quadtree_unit_size = cm->cur_quad_info->unit_size;
+  YV12_BUFFER_CONFIG *pcPicYuvRec = &cm->cur_frame->buf;
+  int height = pcPicYuvRec->y_height;
+  int width = pcPicYuvRec->y_width;
+  int regular_height_num = (int)floor(((float)height) / quadtree_unit_size);
+  int regular_width_num = (int)floor(((float)width) / quadtree_unit_size);
+  int all_num = (int)ceil(((float)width) / quadtree_unit_size) *
+                (int)ceil(((float)height) / quadtree_unit_size);
+  int regularblock_num = regular_height_num * regular_width_num;
+  int un_regularblock_num = all_num - regularblock_num;
+
+  split_size = regularblock_num * 2;  // every split way need two bits
+
+  CHECK_MEM_ERROR(cm, quad_info->split_info,
+                  (QUADSplitInfo *)aom_memalign(
+                      16, sizeof(*quad_info->split_info) * split_size));
+
+  A_size = regularblock_num * 4 + un_regularblock_num;
+
+  CHECK_MEM_ERROR(
+      cm, quad_info->unit_info,
+      (QUADUnitInfo *)aom_memalign(16, sizeof(*quad_info->unit_info) * A_size));
+}
+void av1_free_quadtree_struct(QUADInfo *quad_info) {
+  if (quad_info->unit_info != NULL) {
+    aom_free(quad_info->unit_info);
+    quad_info->unit_info = NULL;
+  }
+  if (quad_info->split_info != NULL) {
+    aom_free(quad_info->split_info);
+    quad_info->split_info = NULL;
+  }
+  quad_info->unit_size = 0;
+  quad_info->is_write = 0;
+  quad_info->split_info_length = 0;
+  quad_info->unit_info_length = 0;
+  quad_info->split_info_index = 0;
+  quad_info->unit_info_index = 0;
+}
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 #if 0
 // Pair of values for each sgrproj parameter:
 // Index 0 corresponds to r[0], e[0]

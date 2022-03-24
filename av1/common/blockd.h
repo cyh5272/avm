@@ -690,6 +690,15 @@ typedef struct {
   int xqd[2];
 } SgrprojInfo;
 
+#if CONFIG_CNN_GUIDED_QUADTREE
+typedef struct {
+  int xqd[2];
+} QUADUnitInfo;
+typedef struct {
+  int split;
+} QUADSplitInfo;
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 #if CONFIG_WIENER_NONSEP
 #define WIENERNS_YUV_MAX 32
 /*!
