@@ -819,6 +819,17 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     cpi,  x,    &ctx,    &mbmi->skip_txfm[xd->tree_type == CHROMA_PART],
     NULL, NULL, dry_run, cpi->optimize_seg_arr[mbmi->segment_id]
   };
+#if CONFIG_CROSS_CHROMA_TX
+  // Subtract first, so both U and V residues will be available when U component
+  // is being transformed and quantized.
+  for (int plane = plane_start; plane < plane_end; ++plane) {
+    const struct macroblockd_plane *const pd = &xd->plane[plane];
+    if (plane && !xd->is_chroma_ref) break;
+    const BLOCK_SIZE plane_bsize =
+        get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+    av1_subtract_plane(x, plane_bsize, plane);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
   for (int plane = plane_start; plane < plane_end; ++plane) {
     const struct macroblockd_plane *const pd = &xd->plane[plane];
     const int subsampling_x = pd->subsampling_x;
@@ -837,7 +848,10 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     const int step =
         tx_size_wide_unit[max_tx_size] * tx_size_high_unit[max_tx_size];
     av1_get_entropy_contexts(plane_bsize, pd, ctx.ta[plane], ctx.tl[plane]);
+#if !CONFIG_CROSS_CHROMA_TX
     av1_subtract_plane(x, plane_bsize, plane);
+#endif  // !CONFIG_CROSS_CHROMA_TX
+
     arg.ta = ctx.ta[plane];
     arg.tl = ctx.tl[plane];
     const BLOCK_SIZE max_unit_bsize =
