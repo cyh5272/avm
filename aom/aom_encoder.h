@@ -267,6 +267,12 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_mrls;
+#if CONFIG_TIP
+  /*!\brief enable temporal interpolated projection
+   *
+   */
+  unsigned int enable_tip;
+#endif  // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   /*!\brief enable Forward skip coding
    *

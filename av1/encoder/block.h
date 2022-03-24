@@ -750,6 +750,10 @@ typedef struct {
 #endif  // CONFIG_NEW_REF_SIGNALING
   //! comp_inter_cost
   int comp_inter_cost[COMP_INTER_CONTEXTS][2];
+#if CONFIG_TIP
+  //! tip_cost
+  int tip_cost[TIP_CONTEXTS][CDF_SIZE(2)];
+#endif  // CONFIG_TIP
   /**@}*/
 
   /*****************************************************************************
@@ -1094,7 +1098,11 @@ typedef struct macroblock {
    *
    * This is used to measure how viable a reference frame is.
    */
+#if CONFIG_TIP
+  int pred_mv_sad[EXTREF_FRAMES];
+#else
   int pred_mv_sad[REF_FRAMES];
+#endif  // CONFIG_TIP
   //! The minimum of \ref pred_mv_sad.
   int best_pred_mv_sad;
 
@@ -1227,7 +1235,11 @@ typedef struct macroblock {
    * This context is defined as the \f$l_\inf\f$ norm of the best ref_mvs for
    * each frame.
    */
+#if CONFIG_TIP
+  unsigned int max_mv_context[EXTREF_FRAMES];
+#else
   unsigned int max_mv_context[REF_FRAMES];
+#endif  // CONFIG_TIP
 
   /*! \brief Limit for the range of motion vectors.
    *
@@ -1263,7 +1275,11 @@ typedef struct macroblock {
   //! Variance of the source frame.
   unsigned int source_variance;
   //! SSE of the current predictor.
+#if CONFIG_TIP
+  unsigned int pred_sse[EXTREF_FRAMES];
+#else
   unsigned int pred_sse[REF_FRAMES];
+#endif  // CONFIG_TIP
   /**@}*/
 } MACROBLOCK;
 #undef SINGLE_REF_MODES

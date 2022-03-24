@@ -970,7 +970,12 @@ int aom_decode_frame_from_obus(struct AV1Decoder *pbi, const uint8_t *data,
         decoded_payload_size = frame_header_size;
         pbi->frame_header_size = frame_header_size;
 
+#if CONFIG_TIP
+        if (cm->show_existing_frame ||
+            cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT) {
+#else
         if (cm->show_existing_frame) {
+#endif  // CONFIG_TIP
           if (obu_header.type == OBU_FRAME) {
             cm->error.error_code = AOM_CODEC_UNSUP_BITSTREAM;
             return -1;
