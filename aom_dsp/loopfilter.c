@@ -18,6 +18,288 @@
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_ports/mem.h"
 
+#if CONFIG_NEW_DF
+
+#define DF_SPARSE 1
+#define DF_GEN_ELEM 0
+
+#define DF_FILT26 1
+#define DF_8_THRESH 3
+#define DF_6_THRESH 4
+#define FILT_8_THRESH_SHIFT 3
+#define DF_SHORT_DEC 1
+#define NO_BOUNDARY 0
+#define NO_END_THR 0
+
+#define EDGE_DECISION 0
+
+static INLINE uint16_t unsigned_char_clamp_high(int t, int bd) {
+  switch (bd) {
+    case 10: return (int16_t)clamp(t, 0, 256 * 4 - 1);
+    case 12: return (int16_t)clamp(t, 0, 256 * 16 - 1);
+    case 8:
+    default: return (int16_t)clamp(t, 0, 256 - 1);
+  }
+}
+
+#define DF_SHIFT 8
+static const int w_mult[] = { 85, 51, 37, 28, 23, 20, 17, 15, 13, 12, 11, 10 };
+static const int q_thresh_mults[12] = { 32, 25, 19, 19, 18, 18,
+                                        17, 17, 17, 16, 16, 16 };
+
+static INLINE void filt_generic(int q_threshold, int width, uint16_t *s,
+                                const int pitch, int bd) {
+  if (width < 1) return;
+
+  int deltaM2 = (3 * (s[0] - s[-1 * pitch]) - (s[pitch] - s[-2 * pitch])) * 4;
+
+  int q_thresh_clamp = q_threshold * q_thresh_mults[width - 1];
+  deltaM2 = clamp(deltaM2, -q_thresh_clamp, q_thresh_clamp);
+
+  deltaM2 *= w_mult[width - 1];
+
+  for (int i = 0; i < width; i++) {
+    s[(-i - 1) * pitch] = unsigned_char_clamp_high(
+        s[(-i - 1) * pitch] +
+            ROUND_POWER_OF_TWO(deltaM2 * (width - i), 3 + DF_SHIFT),
+        bd);
+    s[i * pitch] = unsigned_char_clamp_high(
+        s[i * pitch] - ROUND_POWER_OF_TWO(deltaM2 * (width - i), 3 + DF_SHIFT),
+        bd);
+  }
+}
+
+#define DF_SIDE_SUM_SHIFT 5
+int side_sum[9] = { 5, 6, 6, 6, 5, 5, 6, 6, 6 };
+
+#define DF_SIDE_FIRST_SHIFT 6
+int side_first[9] = { 7, 7, 6, 5, 4, 4, 4, 4, 4 };
+
+#define DF_Q_THRESH_SHIFT 4
+int q_first[9] = { 45, 43, 40, 35, 32, 32, 32, 32, 32 };
+
+static INLINE int filt_choice(uint16_t *s, int pitch, int max_filt,
+                              uint16_t q_thresh, uint16_t side_thresh) {
+  if (!q_thresh || !side_thresh) return 0;
+
+  int max_samples = max_filt / 2 - 1;
+
+#if DF_FILT26
+  int16_t second_derivs_buf[26];
+  int16_t *second_deriv = &second_derivs_buf[13];
+#else
+  int16_t second_derivs_buf[14];
+  int16_t *second_deriv = &second_derivs_buf[7];
+#endif
+
+  int8_t mask = 0;
+
+  // Testing for 1 sample modification
+  //-----------------------------------------------
+  second_deriv[-2] = abs(s[-3 * pitch] - (s[-2 * pitch] << 1) + s[-pitch]);
+  second_deriv[1] = abs(s[0] - (s[pitch] << 1) + s[2 * pitch]);
+
+  mask |= (second_deriv[-2] > side_thresh) * -1;
+  mask |= (second_deriv[1] > side_thresh) * -1;
+
+  if (mask) return 0;
+
+  if (max_samples == 1) return 1;
+
+  // Testing for 2 sample modification
+  //-----------------------------------------------
+  int side_thresh2 = side_thresh >> 2;
+
+  mask |= (second_deriv[-2] > side_thresh2) * -1;
+  mask |= (second_deriv[1] > side_thresh2) * -1;
+
+  second_deriv[-1] = abs(s[-2 * pitch] - (s[-pitch] << 1) + s[0]);
+  second_deriv[0] = abs(s[-1 * pitch] - (s[0] << 1) + s[pitch]);
+
+  mask |= ((second_deriv[-1] + second_deriv[0]) > q_thresh * DF_6_THRESH) * -1;
+
+  if (mask) return 1;
+
+  if (max_samples == 2) return 2;
+
+  // Testing 3 sample modification
+  //-----------------------------------------------
+  int side_thresh3 = side_thresh >> FILT_8_THRESH_SHIFT;
+
+  mask |= (second_deriv[-2] > side_thresh3) * -1;
+  mask |= (second_deriv[1] > side_thresh3) * -1;
+
+#if !DF_SHORT_DEC
+  second_deriv[-3] = abs(s[-4 * pitch] - (s[-3 * pitch] << 1) + s[-2 * pitch]);
+  second_deriv[2] = abs(s[pitch] - (s[2 * pitch] << 1) + s[3 * pitch]);
+
+  mask |= (second_deriv[-3] > side_thresh3) * -1;
+  mask |= (second_deriv[2] > side_thresh3) * -1;
+#endif
+
+  mask |= ((second_deriv[-1] + second_deriv[0]) > q_thresh * DF_8_THRESH) * -1;
+
+//    mask |= ( abs( s[-4*pitch] - s[-1*pitch] - s[0] + s[3*pitch]) >
+//    (side_thresh>>1) ) * -1;
+#if !NO_END_THR
+  int end_dir_thresh = (side_thresh * 3) >> 4;
+  mask |= (abs((s[-1 * pitch] - s[(-3 - 1) * pitch]) -
+               3 * (s[-1 * pitch] - s[-2 * pitch])) > end_dir_thresh) *
+          -1;
+  mask |= (abs((s[0] - s[3 * pitch]) - 3 * (s[0] - s[1 * pitch])) >
+           end_dir_thresh) *
+          -1;
+#endif
+
+  if (mask) return 2;
+
+  if (max_samples == 3) return 3;
+
+    // Testing  4 sample modification and above
+    //-----------------------------------------------
+#if !DF_SHORT_DEC
+#if DF_SPARSE
+  int p_deriv_sum = 0;
+  int q_deriv_sum = 0;
+#else
+  int p_deriv_sum = second_deriv[-3] << DF_SIDE_SUM_SHIFT;
+  int q_deriv_sum = second_deriv[2] << DF_SIDE_SUM_SHIFT;
+#endif
+#endif
+#if NO_BOUNDARY && !DF_SHORT_DEC
+  p_deriv_sum = second_deriv[-2] << DF_SIDE_SUM_SHIFT;
+  q_deriv_sum = second_deriv[1] << DF_SIDE_SUM_SHIFT;
+#endif
+
+  int p_first_deriv_scaled = second_deriv[-2] << DF_SIDE_FIRST_SHIFT;
+  int q_first_deriv_scaled = second_deriv[1] << DF_SIDE_FIRST_SHIFT;
+
+  int transition = (second_deriv[-1] + second_deriv[0]) << DF_Q_THRESH_SHIFT;
+
+#if DF_SPARSE
+  for (int dist = 4; dist < 13; dist += 2) {
+#if !DF_SHORT_DEC
+    second_deriv[-(dist - 1)] =
+        abs(s[-(dist)*pitch] - (s[-(dist - 1) * pitch] << 1) +
+            s[-(dist - 2) * pitch]);
+    second_deriv[dist - 2] =
+        abs(s[(dist - 3) * pitch] - (s[(dist - 2) * pitch] << 1) +
+            s[(dist - 1) * pitch]);
+
+    p_deriv_sum += (second_deriv[-(dist - 1)] << DF_SIDE_SUM_SHIFT);
+    q_deriv_sum += (second_deriv[dist - 2] << DF_SIDE_SUM_SHIFT);
+#endif
+#else
+  for (int dist = 4; dist < 13; ++dist) {
+#endif
+
+    second_deriv[-dist] = abs(s[(-dist - 1) * pitch] - (s[-dist * pitch] << 1) +
+                              s[(-dist + 1) * pitch]);
+    second_deriv[dist - 1] = abs(
+        s[(dist - 2) * pitch] - (s[(dist - 1) * pitch] << 1) + s[dist * pitch]);
+#if !DF_SHORT_DEC
+    p_deriv_sum += (second_deriv[-dist] << DF_SIDE_SUM_SHIFT);
+    q_deriv_sum += (second_deriv[dist - 1] << DF_SIDE_SUM_SHIFT);
+
+    int sum_side_thresh4 = side_thresh * side_sum[dist - 4];
+#endif
+
+#if !NO_BOUNDARY
+    int side_thresh4 = side_thresh * side_first[dist - 4];
+#endif
+    int q_thresh4 = q_thresh * q_first[dist - 4];
+#if !DF_SHORT_DEC
+    mask |= (p_deriv_sum > sum_side_thresh4) * -1;
+    mask |= (q_deriv_sum > sum_side_thresh4) * -1;
+#endif
+#if !NO_BOUNDARY
+    mask |= (p_first_deriv_scaled > side_thresh4) * -1;
+    mask |= (q_first_deriv_scaled > side_thresh4) * -1;
+#endif
+    mask |= (transition > q_thresh4) * -1;
+
+#if !NO_END_THR
+    end_dir_thresh = (side_thresh * dist) >> 4;
+    mask |= (abs((s[-1 * pitch] - s[(-dist - 1) * pitch]) -
+                 dist * (s[-1 * pitch] - s[-2 * pitch])) > end_dir_thresh) *
+            -1;
+    mask |= (abs((s[0] - s[dist * pitch]) - dist * (s[0] - s[1 * pitch])) >
+             end_dir_thresh) *
+            -1;
+#endif
+#if DF_SPARSE
+    if (mask) return dist - 2;
+    if (max_samples <= dist) return ((dist >> 1) << 1);
+#else
+    if (mask) return dist - 1;
+    if (max_samples == dist) return dist;
+#endif
+  }
+  return 12;
+}
+
+void aom_highbd_lpf_horizontal_generic_c(uint16_t *s, int p /* pitch */,
+                                         int filt_width,
+                                         const uint16_t *q_thresh,
+                                         const uint16_t *side_thresh, int bd) {
+  int i;
+  int count = 4;
+
+#if EDGE_DECISION
+
+  int filter0 = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+  s += count - 1;
+  int filter3 = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+  s -= count - 1;
+
+  int filter = AOMMIN(filter0, filter3);
+#endif
+  // loop filter designed to work using chars so that we can make maximum use
+  // of 8 bit simd instructions.
+  for (i = 0; i < count; ++i) {
+#if !EDGE_DECISION
+    int filter = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+#endif
+
+    filt_generic(*q_thresh, filter, s, p, bd);
+
+    ++s;
+  }
+}
+
+void aom_highbd_lpf_vertical_generic_c(uint16_t *s, int pitch, int filt_width,
+                                       const uint16_t *q_thresh,
+                                       const uint16_t *side_thresh, int bd) {
+  /*
+  aom_highbd_lpf_vertical_4(CONVERT_TO_SHORTPTR(p), dst_stride,
+                            params.mblim, params.lim, params.hev_thr,
+                            bit_depth);
+   */
+  int i;
+  int count = 4;
+
+#if EDGE_DECISION
+  int filter0 = filt_choice(s, 1, filt_width, *q_thresh, *side_thresh);
+  int filter3 = filt_choice(s + (count - 1) * pitch, 1, filt_width, *q_thresh,
+                            *side_thresh);
+  int filter = AOMMIN(filter0, filter3);
+#endif
+
+  // loop filter designed to work using chars so that we can make maximum use
+  // of 8 bit simd instructions.
+  for (i = 0; i < count; ++i) {
+#if !EDGE_DECISION
+    int filter = filt_choice(s, 1, filt_width, *q_thresh, *side_thresh);
+#endif
+
+    filt_generic(*q_thresh, filter, s, 1, bd);
+
+    s += pitch;
+  }
+}
+
+#else  // !CONFIG_NEW_DF
+
 static INLINE int8_t signed_char_clamp(int t) {
   return (int8_t)clamp(t, -128, 127);
 }
@@ -924,3 +1206,5 @@ void aom_highbd_lpf_vertical_14_dual_c(
   highbd_mb_lpf_vertical_edge_w(s + 4 * pitch, pitch, blimit1, limit1, thresh1,
                                 4, bd);
 }
+
+#endif  // !CONFIG_NEW_DF
