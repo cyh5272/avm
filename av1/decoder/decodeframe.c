@@ -299,6 +299,9 @@ static AOM_INLINE void decode_reconstruct_tx(
     AV1_COMMON *cm, ThreadData *const td, aom_reader *r,
     MB_MODE_INFO *const mbmi, int plane, BLOCK_SIZE plane_bsize, int blk_row,
     int blk_col, int block, TX_SIZE tx_size, int *eob_total) {
+#if CONFIG_CROSS_CHROMA_TX
+  if (plane == AOM_PLANE_U) return;
+#endif  // CONFIG_CROSS_CHROMA_TX
   DecoderCodingBlock *const dcb = &td->dcb;
   MACROBLOCKD *const xd = &dcb->xd;
   const struct macroblockd_plane *const pd = &xd->plane[plane];
@@ -316,6 +319,39 @@ static AOM_INLINE void decode_reconstruct_tx(
   if (blk_row >= max_blocks_high || blk_col >= max_blocks_wide) return;
 
   if (tx_size == plane_tx_size || plane) {
+#if CONFIG_CROSS_CHROMA_TX
+    switch (plane) {
+      case AOM_PLANE_Y:
+        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row,
+                                             blk_col, tx_size);
+
+        td->inverse_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
+                                         tx_size);
+        eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
+        *eob_total += eob_data->eob;
+        set_cb_buffer_offsets(dcb, tx_size, plane);
+        break;
+      case AOM_PLANE_V:
+        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
+                                             blk_col, tx_size);
+        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
+                                             blk_col, tx_size);
+        // TODO(kslu): apply inv cctx here
+        td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
+                                         blk_col, tx_size);
+        td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
+                                         blk_col, tx_size);
+        eob_info *eob_data_u =
+            dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+        eob_info *eob_data_v =
+            dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
+        *eob_total += eob_data_u->eob + eob_data_v->eob;
+        set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
+        set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
+        break;
+      case AOM_PLANE_U: assert(0); break;
+    }
+#else
     td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
                                          tx_size);
 
@@ -324,6 +360,7 @@ static AOM_INLINE void decode_reconstruct_tx(
     eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
     *eob_total += eob_data->eob;
     set_cb_buffer_offsets(dcb, tx_size, plane);
+#endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_NEW_TX_PARTITION
     TX_SIZE sub_txs[MAX_TX_PARTITIONS] = { 0 };
@@ -1051,9 +1088,28 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
             if (!is_inter) {
               td->read_coeffs_tx_intra_block_visit(cm, dcb, r, plane, blk_row,
                                                    blk_col, tx_size);
+#if CONFIG_CROSS_CHROMA_TX
+              switch (plane) {
+                case AOM_PLANE_Y:
+                  td->predict_and_recon_intra_block_visit(
+                      cm, dcb, r, AOM_PLANE_Y, blk_row, blk_col, tx_size);
+                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_Y);
+                  break;
+                case AOM_PLANE_U: break;
+                case AOM_PLANE_V:
+                  td->predict_and_recon_intra_block_visit(
+                      cm, dcb, r, AOM_PLANE_U, blk_row, blk_col, tx_size);
+                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
+                  td->predict_and_recon_intra_block_visit(
+                      cm, dcb, r, AOM_PLANE_V, blk_row, blk_col, tx_size);
+                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
+                  break;
+              }
+#else
               td->predict_and_recon_intra_block_visit(
                   cm, dcb, r, plane, blk_row, blk_col, tx_size);
               set_cb_buffer_offsets(dcb, tx_size, plane);
+#endif  // CONFIG_CROSS_CHROMA_TX
             } else {
               // Reconstruction
               if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
