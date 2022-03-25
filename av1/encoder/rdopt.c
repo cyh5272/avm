@@ -3047,6 +3047,7 @@ static int get_drl_refmv_count(int max_drl_bits, const MACROBLOCK *const x,
   if (x->e_mbd.mi[0]->skip_mode)
     ref_mv_count = mbmi_ext->skip_mvp_candidate_list.ref_mv_count;
 #endif //CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+
   return AOMMIN(max_drl_bits + 1, ref_mv_count);
 }
 

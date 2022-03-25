@@ -785,6 +785,7 @@ static const aom_cdf_prob default_skip_drl_cdf[3][CDF_SIZE(2)] = {
   { AOM_CDF2(21474) },
 };
 #endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+
 #if CONFIG_OPTFLOW_REFINEMENT
 static const aom_cdf_prob
     default_use_optflow_cdf[INTER_COMPOUND_MODE_CONTEXTS][CDF_SIZE(2)] = {
