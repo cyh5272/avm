@@ -2007,8 +2007,6 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         av1_mode_context_pristine(inter_mode_ctx, mbmi->ref_frame),
 #endif  // CONFIG_NEW_INTER_MODES
         ec_ctx, dcb, mbmi, r);
-#else
-    mbmi->ref_mv_idx = 0;
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   } else {

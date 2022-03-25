@@ -806,8 +806,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
   // Temporally set the skip_mode to 2, for the encoding trick to not skip the
   // residual coding at RD stage. To be further refined
   if (mbmi->skip_mode == 1 &&
-      mbmi->skip_txfm[xd->tree_type == CHROMA_PART] ==
-          0) {  // trick to avoid reset the skip_txfm for skip mode
+      mbmi->skip_txfm[xd->tree_type == CHROMA_PART] == 0) {
     mbmi->skip_mode = 2;
   }
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
@@ -865,8 +864,8 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
   }
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
-  if (mbmi->skip_mode ==
-      2) {  // trick to avoid reset the skip_txfm for skip mode
+  // trick to avoid reset the skip_txfm for skip mode
+  if (mbmi->skip_mode == 2) {
     mbmi->skip_mode = 1;
   }
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT

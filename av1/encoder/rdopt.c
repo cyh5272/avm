@@ -4183,9 +4183,6 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
   TxfmSearchInfo *txfm_info = &x->txfm_search_info;
   const TxfmSearchParams *txfm_params = &x->txfm_search_params;
 
-  //  RD_STATS skip_mode_rd_stats;
-  //  av1_invalid_rd_stats(&skip_mode_rd_stats);
-
   if (skip_mode_info->ref_frame_idx_0 == INVALID_IDX ||
       skip_mode_info->ref_frame_idx_1 == INVALID_IDX) {
     return;
