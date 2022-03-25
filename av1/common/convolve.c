@@ -1407,6 +1407,101 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
   }
 }
 
+#define SUBTRACT_CENTER 1
+
+// Convolves a block of pixels with origin-symmetric, non-separable filters.
+// This routine is intended as a starting point for SIMD and other acceleration
+// work. The filters are assumed to have num_sym_taps unique taps if they sum to
+// zero. Otherwise num_sym_taps + 1 unique taps where the extra tap is the
+// unconstrained center tap.
+//
+// Usage:
+// - For CONFIG_WIENER_NONSEP filters sum to zero. This constrains the
+// center-tap. Call with
+//   singleton_tap = (1 << filter_config->prec_bits) and
+//   num_sym_taps = filter_config->num_pixels / 2
+// - For CONFIG_PC_WIENER center tap is unconstrained.
+// Call with,
+//   const int singleton_tap_index =
+//        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+//   singleton_tap = (1 << filter_config->prec_bits)
+//                     + filter[singleton_tap_index] and
+//   num_sym_taps = (filter_config->num_pixels - 1) / 2.
+//
+// Implementation Notes:
+// - The filter taps have precision < 16 bits but the filter multiply
+// filter[pos] * compute_buffer[k] has to be 32-bit, i.e., the result will not
+// fit into a 16-bit register. Any acceleration code needs to ensure the
+// multiply is carried out in 32-bits. The filter tap precisions should
+// guarantee that the result of the convolution, i.e., the result of the entire
+// multiply-add fits into 32-bits prior to down-shit and round.
+// - The calling filters can be adjusted for SUBTRACT_CENTER = 0.
+// SUBTRACT_CENTER = 1 case allows passing the difference through a
+// nonlinearity if one wishes to do so.
+// - TODO(oguleryuz): CONFIG_PC_WIENER filters have to be adjusted to support
+// SUBTRACT_CENTER = 1.
+// - Current NonsepFilterConfig supports arbitrary filters and hence the loop
+// over every other tap, e.g., filter_config->config[2 * k].
+void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
+                                   const NonsepFilterConfig *filter_config,
+                                   const int16_t *filter, uint16_t *dst,
+                                   int dst_stride, int bit_depth,
+                                   int block_row_begin, int block_row_end,
+                                   int block_col_begin, int block_col_end,
+                                   int num_sym_taps, int32_t singleton_tap) {
+  // Begin compute conveniences.
+  // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
+  // Once finalized, inline this routine.
+  assert(num_sym_taps <= 24);
+  int16_t compute_buffer[24];
+  int pixel_offset_diffs[24];
+  for (int k = 0; k < num_sym_taps; ++k) {
+    const int r = filter_config->config[2 * k][NONSEP_ROW_ID];
+    const int c = filter_config->config[2 * k][NONSEP_COL_ID];
+    const int diff = r * stride + c;
+    pixel_offset_diffs[k] = diff;
+  }
+  // End compute conveniences.
+
+  for (int r = block_row_begin; r < block_row_end; ++r) {
+    for (int c = block_col_begin; c < block_col_end; ++c) {
+      int dgd_id = r * stride + c;
+
+      // Two loops for a potential data cache miss.
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+#if SUBTRACT_CENTER
+        const int16_t tmp_sum = dgd[dgd_id - diff] - dgd[dgd_id];
+#else
+        const int16_t tmp_sum = dgd[dgd_id - diff];
+#endif                                // SUBTRACT_CENTER
+        compute_buffer[k] = tmp_sum;  // 16-bit
+      }
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+#if SUBTRACT_CENTER
+        const int16_t tmp_sum = dgd[dgd_id + diff] - dgd[dgd_id];
+#else
+        const int16_t tmp_sum = dgd[dgd_id + diff];
+#endif                                 // SUBTRACT_CENTER
+        compute_buffer[k] += tmp_sum;  // 16-bit arithmetic.
+      }
+
+      // Handle singleton tap.
+      int32_t tmp = singleton_tap * dgd[dgd_id];
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
+        tmp += (int32_t)filter[pos] * compute_buffer[k];  // 32-bit arithmetic.
+      }
+
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
+
+      int dst_id = r * dst_stride + c;
+      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
+    }
+  }
+}
+
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *nsfilter,
                               const int16_t *filter, uint8_t *dst,
