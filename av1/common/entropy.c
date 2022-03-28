@@ -291,12 +291,20 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #endif
 
   for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
+#if ADAPTIVE_PRECISION_SETS
+    int num_precisions = NUMBER_OF_SUPPORTED_PRECISIONS;
+#endif
+
     for (int j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j) {
       RESET_CDF_COUNTER_STRIDE(
           fc->pb_mv_precision_cdf[j][p - MV_PRECISION_HALF_PEL],
+#if ADAPTIVE_PRECISION_SETS
+          num_precisions - 1
+#else
           p
 #if !SIGNAL_MOST_PROBABLE_PRECISION
               + 1
+#endif
 #endif
           ,
           CDF_SIZE(FLEX_MV_COSTS_SIZE));

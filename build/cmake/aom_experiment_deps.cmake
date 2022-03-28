@@ -65,9 +65,4 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_CCSO_EXT AND CONFIG_CCSO)
     change_config_and_warn(CONFIG_CCSO_EXT 0 !CONFIG_CCSO)
   endif()
-
-  if(CONFIG_FLEX_MVRES AND CONFIG_ADAPTIVE_MVD)
-    change_config_and_warn(CONFIG_FLEX_MVRES 0 CONFIG_ADAPTIVE_MVD)
-  endif()
-
 endmacro()

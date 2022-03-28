@@ -1403,7 +1403,7 @@ static const aom_cdf_prob default_stx_cdf[TX_SIZES][CDF_SIZE(STX_TYPES)] = {
 #if CONFIG_FLEX_MVRES
 static const aom_cdf_prob
     default_sb_mv_precision_cdf[NUM_PB_FLEX_QUALIFIED_MAX_PREC][CDF_SIZE(
-        FLEX_MV_COSTS_SIZE)] = {
+        FLEX_MV_COSTS_SB_SIZE)] = {
       { AOM_CDF4(24000, 29000, 31000) },
       { AOM_CDF5(22980, 25479, 27781, 29986) },
       { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
@@ -1420,6 +1420,86 @@ static const aom_cdf_prob
 #endif
 
 #if SIGNAL_MOST_PROBABLE_PRECISION
+#if ADAPTIVE_PRECISION_SETS
+#if BLOCK_BASED_PRECISION_ADAPTATION
+static const aom_cdf_prob default_pb_mv_precision_cdf
+    [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+    [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+      {
+          { AOM_CDF3(24000, 29000) },
+          { AOM_CDF3(24000, 29000) },
+          { AOM_CDF3(24000, 29000) },
+      },
+      {
+          { AOM_CDF3(24000, 29000) },
+          { AOM_CDF3(24000, 29000) },
+          { AOM_CDF3(24000, 29000) },
+      },
+
+      {
+          { AOM_CDF4(24000, 29000, 31000) },
+          { AOM_CDF5(22980, 25479, 27781, 29986) },
+          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+
+      },
+      {
+          { AOM_CDF4(24000, 29000, 31000) },
+          { AOM_CDF5(22980, 25479, 27781, 29986) },
+          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
+
+      }
+    };
+#elif NUMBER_OF_SUPPORTED_PRECISIONS == 4
+static const aom_cdf_prob
+    default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
+                               [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+                               [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+                                 {
+                                     { AOM_CDF3(24000, 29000) },
+                                     { AOM_CDF3(24000, 29000) },
+                                     { AOM_CDF3(24000, 29000) },
+                                 },
+                                 {
+                                     { AOM_CDF3(24000, 29000) },
+                                     { AOM_CDF3(24000, 29000) },
+                                     { AOM_CDF3(24000, 29000) },
+                                 },
+                               };
+#elif NUMBER_OF_SUPPORTED_PRECISIONS == 5
+static const aom_cdf_prob
+    default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
+                               [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+                               [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+                                 {
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                 },
+                                 {
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                     { AOM_CDF4(24000, 29000, 31000) },
+                                 },
+                               };
+#elif NUMBER_OF_SUPPORTED_PRECISIONS == 3
+static const aom_cdf_prob
+    default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
+                               [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+                               [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
+                                 {
+                                     { AOM_CDF2(24320) },
+                                     { AOM_CDF2(24320) },
+                                     { AOM_CDF2(24320) },
+                                 },
+                                 {
+                                     { AOM_CDF2(24320) },
+                                     { AOM_CDF2(24320) },
+                                     { AOM_CDF2(24320) },
+                                 },
+                               };
+#endif
+#else
+
 static const aom_cdf_prob default_pb_mv_precision_cdf
     [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
     [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
@@ -1436,6 +1516,8 @@ static const aom_cdf_prob default_pb_mv_precision_cdf
 
       },
     };
+#endif
+
 #else
 static const aom_cdf_prob default_pb_mv_precision_cdf
     [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]

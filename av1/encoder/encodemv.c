@@ -23,6 +23,9 @@
 #if CONFIG_FLEX_MVRES
 #include "av1/common/reconinter.h"
 #endif
+#if CONFIG_PRECISION_STATS
+presStatistics flex_mv_statistics;
+#endif
 
 #if CONFIG_FLEX_MVRES
 static void update_mv_component_stats_lower_precision(
@@ -74,6 +77,7 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
 
 #if CONFIG_FLEX_MVRES
   if (precision < MV_PRECISION_ONE_PEL) {
+    assert(!is_adaptive_mvd);
     update_mv_component_stats_lower_precision(comp, mvcomp, precision);
     return;
   }
@@ -114,7 +118,11 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
   int use_integer_mv = 1;
   if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || d > 0)) {
     assert(fr == 3 && hp == 1);
+#if CONFIG_FLEX_MVRES
+    precision = MV_PRECISION_ONE_PEL;
+#else
     precision = MV_SUBPEL_NONE;
+#endif
   }
   if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_integer_mv = 0;
   if (use_integer_mv) {
@@ -168,6 +176,9 @@ if (precision > MV_SUBPEL_LOW_PRECISION) {
   }
 #if CONFIG_FLEX_MVRES
   void av1_update_mv_stats(MV mv, MV ref, nmv_context * mvctx,
+#if CONFIG_ADAPTIVE_MVD
+                           int is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                            MvSubpelPrecision precision) {
 #if CONFIG_FLEX_MVRES
     lower_mv_precision(&ref, precision);
@@ -186,8 +197,15 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 #if CONFIG_ADAPTIVE_MVD
     if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
+#if CONFIG_FLEX_MVRES
+#if DISABLE_EIGHTSPEL_FOR_AMVD
+    if (is_adaptive_mvd && precision > MV_PRECISION_QTR_PEL)
+      precision = MV_PRECISION_QTR_PEL;
+#endif
+#else
     if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
       precision = MV_SUBPEL_LOW_PRECISION;
+#endif
 #endif  // IMPROVED_AMVD
     if (is_adaptive_mvd)
       update_cdf(mvctx->amvd_joints_cdf, j, MV_JOINTS);
@@ -220,6 +238,10 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     assert(mag_int_mv >= 0);
     const int mv_class = av1_get_mv_class_low_precision(mag_int_mv, &offset);
     int has_offset = (mv_class >= min_class_with_offset[precision]);
+
+#if CONFIG_PRECISION_STATS
+    flex_mv_statistics.mvdclass[mv_class][precision]++;
+#endif
 
     int start_lsb = MV_PRECISION_ONE_PEL - precision;
     int mv_class_coded_value = mv_class;
@@ -280,6 +302,9 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     assert(comp != 0);
 #if CONFIG_FLEX_MVRES
     if (precision < MV_PRECISION_ONE_PEL) {
+#if CONFIG_ADAPTIVE_MVD
+      assert(!is_adaptive_mvd);
+#endif
       encode_mv_component_low_precisions(w, comp, mvcomp, precision);
       return;
     }
@@ -293,6 +318,10 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     const int fr = (offset >> 1) & 3;  // fractional mv data
     const int hp = offset & 1;         // high precision mv data
 
+#if CONFIG_PRECISION_STATS
+    flex_mv_statistics.mvdclass[mv_class][precision]++;
+#endif
+
     // Sign
     aom_write_symbol(w, sign, mvcomp->sign_cdf, 2);
 
@@ -300,7 +329,14 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     aom_write_symbol(
         w, mv_class,
 #if CONFIG_ADAPTIVE_MVD
-        is_adaptive_mvd ? mvcomp->amvd_classes_cdf : mvcomp->classes_cdf,
+        is_adaptive_mvd
+            ? mvcomp->amvd_classes_cdf
+            :
+#if CONFIG_FLEX_MVRES
+            mvcomp->classes_cdf[av1_get_mv_class_context(precision)],
+#else
+            mvcomp->classes_cdf,
+#endif
 #else
 #if CONFIG_FLEX_MVRES
       mvcomp->classes_cdf[av1_get_mv_class_context(precision)],
@@ -314,7 +350,11 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     int use_integer_mv = 1;
     if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || d > 0)) {
       assert(fr == 3 && hp == 1);
+#if CONFIG_FLEX_MVRES
+      precision = MV_PRECISION_ONE_PEL;
+#else
       precision = MV_SUBPEL_NONE;
+#endif
     }
     if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_integer_mv = 0;
     if (use_integer_mv) {
@@ -434,6 +474,10 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
         int *mvcost, const nmv_component *const mvcomp,
 #if CONFIG_FLEX_MVRES
         MvSubpelPrecision pb_mv_precision
+#if CONFIG_ADAPTIVE_MVD
+        ,
+        int is_adaptive_mvd
+#endif
 #else
         MvSubpelPrecision precision
 #endif
@@ -442,6 +486,9 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
       int i, v;
       int sign_cost[2], class_cost[MV_CLASSES], class0_cost[CLASS0_SIZE];
       int bits_cost[MV_OFFSET_BITS][2];
+#if CONFIG_ADAPTIVE_MVD
+      int amvd_class_cost[MV_CLASSES];
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
       int class0_fp_cost[CLASS0_SIZE][3][2], fp_cost[3][2];
 #else
@@ -457,6 +504,10 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 #else
       av1_cost_tokens_from_cdf(class_cost, mvcomp->classes_cdf, NULL);
 #endif
+
+#if CONFIG_ADAPTIVE_MVD
+      av1_cost_tokens_from_cdf(amvd_class_cost, mvcomp->amvd_classes_cdf, NULL);
+#endif  // CONFIG_ADAPTIVE_MVD
       av1_cost_tokens_from_cdf(class0_cost, mvcomp->class0_cdf, NULL);
       for (i = 0; i < MV_OFFSET_BITS; ++i) {
         av1_cost_tokens_from_cdf(bits_cost[i], mvcomp->bits_cdf[i], NULL);
@@ -503,17 +554,34 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 #endif  // CONFIG_DEBUG && CONFIG_FLEX_MVRES
         z = v - 1;
         c = av1_get_mv_class(z, &o);
+#if CONFIG_ADAPTIVE_MVD
+        cost += is_adaptive_mvd ? amvd_class_cost[c] : class_cost[c];
+#else
         cost += class_cost[c];
+#endif
         d = (o >> 3);     /* int mv data */
         f = (o >> 1) & 3; /* fractional pel mv data */
         e = (o & 1);      /* high precision mv data */
 
-        if (c == MV_CLASS_0) {
-          cost += class0_cost[d];
-        } else {
-          const int b = c + CLASS0_BITS - 1; /* number of bits */
-          for (i = 0; i < b; ++i) cost += bits_cost[i][((d >> i) & 1)];
+#if CONFIG_ADAPTIVE_MVD
+        int use_integer_mv = 1;
+        if (is_adaptive_mvd && (c != MV_CLASS_0 || d > 0)) {
+          pb_mv_precision = MV_PRECISION_ONE_PEL;
         }
+        if (c > MV_CLASS_0 && is_adaptive_mvd) use_integer_mv = 0;
+        if (use_integer_mv) {
+#endif
+
+          if (c == MV_CLASS_0) {
+            cost += class0_cost[d];
+          } else {
+            const int b = c + CLASS0_BITS - 1; /* number of bits */
+            for (i = 0; i < b; ++i) cost += bits_cost[i][((d >> i) & 1)];
+          }
+#if CONFIG_ADAPTIVE_MVD
+        }
+#endif
+
 #if !CONFIG_FLEX_MVRES
         if (precision > MV_SUBPEL_NONE) {
 #else
@@ -680,6 +748,13 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
 #endif
 
 #if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+#if CONFIG_ADAPTIVE_MVD
+      error_check_flexmv(
+          is_adaptive_mvd &&
+              is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]),
+          &cpi->common.error,
+          " AMVD and flex MV cannnot be enabled for same block");
+#endif
       error_check_flexmv(cpi->common.features.cur_frame_force_integer_mv &&
                              (pb_mv_precision != MV_PRECISION_ONE_PEL),
                          &cpi->common.error, " wrong mv precision value");
@@ -709,7 +784,14 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
       if (is_adaptive_mvd) {
         assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
+#if CONFIG_FLEX_MVRES
+#if DISABLE_EIGHTSPEL_FOR_AMVD
+        if (pb_mv_precision > MV_PRECISION_QTR_PEL)
+          pb_mv_precision = MV_PRECISION_QTR_PEL;
+#endif
+#else
         if (usehp > MV_SUBPEL_NONE) usehp = MV_SUBPEL_LOW_PRECISION;
+#endif
 #endif  // IMPROVED_AMVD
       }
       if (is_adaptive_mvd)
@@ -789,13 +871,25 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
     }
 
     void av1_build_nmv_cost_table(int *mvjoint,
-#if CONFIG_ADAPTIVE_MVD
+#if CONFIG_ADAPTIVE_MVD && !CONFIG_FLEX_MVRES
                                   int *amvd_mvjoint, int *amvd_mvcost[2],
 #endif  // CONFIG_ADAPTIVE_MVD
                                   int *mvcost[2], const nmv_context *ctx,
-                                  MvSubpelPrecision precision) {
-      av1_cost_tokens_from_cdf(mvjoint, ctx->joints_cdf, NULL);
-#if CONFIG_ADAPTIVE_MVD
+                                  MvSubpelPrecision precision
+#if CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
+                                  ,
+                                  int is_adaptive_mvd
+#endif
+    ) {
+#if CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
+      av1_cost_tokens_from_cdf(
+          mvjoint, is_adaptive_mvd ? ctx->amvd_joints_cdf : ctx->joints_cdf,
+          NULL);
+#else
+  av1_cost_tokens_from_cdf(mvjoint, ctx->joints_cdf, NULL);
+#endif
+
+#if CONFIG_ADAPTIVE_MVD && !CONFIG_FLEX_MVRES
       av1_cost_tokens_from_cdf(amvd_mvjoint, ctx->amvd_joints_cdf, NULL);
       build_nmv_component_cost_table(mvcost[0], amvd_mvcost[0], &ctx->comps[0],
                                      precision);
@@ -804,6 +898,9 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
 #else
 #if CONFIG_FLEX_MVRES
   if (precision < MV_PRECISION_ONE_PEL) {
+#if CONFIG_ADAPTIVE_MVD
+    assert(!is_adaptive_mvd);
+#endif
     build_nmv_component_cost_table_low_precision(mvcost[0], &ctx->comps[0],
                                                  precision);
     build_nmv_component_cost_table_low_precision(mvcost[1], &ctx->comps[1],
@@ -811,8 +908,18 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
   } else {
 #endif
 
-    build_nmv_component_cost_table(mvcost[0], &ctx->comps[0], precision);
-    build_nmv_component_cost_table(mvcost[1], &ctx->comps[1], precision);
+    build_nmv_component_cost_table(mvcost[0], &ctx->comps[0], precision
+#if CONFIG_ADAPTIVE_MVD
+                                   ,
+                                   is_adaptive_mvd
+#endif
+    );
+    build_nmv_component_cost_table(mvcost[1], &ctx->comps[1], precision
+#if CONFIG_ADAPTIVE_MVD
+                                   ,
+                                   is_adaptive_mvd
+#endif
+    );
 #if CONFIG_FLEX_MVRES
   }
 #endif

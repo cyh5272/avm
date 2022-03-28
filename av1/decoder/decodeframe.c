@@ -5493,8 +5493,12 @@ static int read_uncompressed_header(AV1Decoder *pbi,
                                         ? MV_PRECISION_ONE_EIGHTH_PEL
                                         : MV_PRECISION_QTR_PEL;
 #if SIGNAL_MOST_PROBABLE_PRECISION
+#if SET_HALF_PRECISION_AS_MPP
+        features->most_probable_fr_mv_precision = MV_PRECISION_HALF_PEL;
+#else
         features->most_probable_fr_mv_precision =
             features->fr_mv_precision;  // aom_rb_read_literal(rb, 3);
+#endif
 #endif
       }
       if (features->fr_mv_precision == MV_PRECISION_ONE_PEL) {

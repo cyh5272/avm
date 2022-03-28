@@ -24,6 +24,9 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, MV mv, MV ref,
                    nmv_context *mvctx, MvSubpelPrecision pb_mv_precision,
                    MvSubpelPrecision max_mv_precision);
 void av1_update_mv_stats(MV mv, MV ref, nmv_context *mvctx,
+#if CONFIG_ADAPTIVE_MVD
+                         int is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                          MvSubpelPrecision precision);
 #else
 void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
@@ -36,11 +39,16 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 #endif
 
 void av1_build_nmv_cost_table(int *mvjoint,
-#if CONFIG_ADAPTIVE_MVD
+#if CONFIG_ADAPTIVE_MVD && !CONFIG_FLEX_MVRES
                               int *amvd_mvjoint, int *amvd_mvcost[2],
 #endif  // CONFIG_ADAPTIVE_MVD
                               int *mvcost[2], const nmv_context *mvctx,
-                              MvSubpelPrecision precision);
+                              MvSubpelPrecision precision
+#if CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
+                              ,
+                              int is_adaptive_mvd
+#endif
+);
 
 void av1_update_mv_count(ThreadData *td);
 
@@ -131,7 +139,10 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
   const PREDICTION_MODE this_mode = mbmi->mode;
 #if CONFIG_FLEX_MVRES
   const MvSubpelPrecision precision = mbmi->pb_mv_precision;
-#endif  // CONFIG_FLEX_MVRES
+  if (is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]))
+    return 1;  // When flex MV tool is enabled it is possible to have JOINTMV
+               // value equal to 0
+#endif         // CONFIG_FLEX_MVRES
 #if CONFIG_OPTFLOW_REFINEMENT
   if (this_mode == NEW_NEWMV || this_mode == NEW_NEWMV_OPTFLOW) {
 #else
@@ -221,7 +232,7 @@ static inline int check_mv_precision(const AV1_COMMON *cm,
 #endif
 
   const PREDICTION_MODE mode = mbmi->mode;
-  if (have_newmv_in_inter_mode(mode)) {
+  if (is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y])) {
     if (mode == NEWMV || mode == NEW_NEWMV
 #if CONFIG_OPTFLOW_REFINEMENT
         || mode == NEW_NEWMV_OPTFLOW

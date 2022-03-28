@@ -888,10 +888,25 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv,
         &mv_costs->nmv_costs_alloc[pb_mv_prec][1][MV_MAX];
     av1_build_nmv_cost_table(mv_costs->nmv_joint_cost,
                              mv_costs->nmv_costs[pb_mv_prec], &fc->nmvc,
-                             pb_mv_prec);
+                             pb_mv_prec
+#if CONFIG_ADAPTIVE_MVD
+                             ,
+                             0
+#endif
+    );
     (void)integer_mv;
+#if !CONFIG_ADAPTIVE_MVD
     (void)fr_mv_precision;
+#endif
   }
+
+#if CONFIG_ADAPTIVE_MVD
+  mv_costs->amvd_nmv_cost[0] = &mv_costs->amvd_nmv_cost_alloc[0][MV_MAX];
+  mv_costs->amvd_nmv_cost[1] = &mv_costs->amvd_nmv_cost_alloc[1][MV_MAX];
+  av1_build_nmv_cost_table(mv_costs->amvd_nmv_joint_cost,
+                           mv_costs->amvd_nmv_cost, &fc->nmvc, fr_mv_precision,
+                           1);
+#endif
 }
 #else
 void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
@@ -940,7 +955,12 @@ static INLINE void fill_dv_costs(IntraBCMvCosts *dv_costs,
   dv_costs->dv_costs[0] = &dv_costs->dv_costs_alloc[0][MV_MAX];
   dv_costs->dv_costs[1] = &dv_costs->dv_costs_alloc[1][MV_MAX];
   av1_build_nmv_cost_table(dv_costs->joint_mv, dv_costs->dv_costs, &fc->ndvc,
-                           MV_PRECISION_ONE_PEL);
+                           MV_PRECISION_ONE_PEL
+#if CONFIG_ADAPTIVE_MVD
+                           ,
+                           0
+#endif
+  );
 }
 #endif
 

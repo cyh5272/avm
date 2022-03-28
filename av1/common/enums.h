@@ -19,6 +19,10 @@
 #include "aom/aom_integer.h"
 #include "aom_ports/mem.h"
 
+#if CONFIG_PRECISION_STATS
+#include <stdio.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,20 +36,70 @@ extern "C" {
 #if CONFIG_FLEX_MVRES
 #define DEBUG_FLEX_MV 0
 #define SIGNAL_MOST_PROBABLE_PRECISION 1
+
 #define FAST_ALGORITHMS 1
+#define DISABLE_EIGHTSPEL_FOR_AMVD 0
+#define ENABLE_FLEX_MV_FOR_NEW_NEAR 0
+#define REFACTOR_MODEL_RD 0
+#define SKIP_NEW_MV_ET 0  // Disabled by default
+#define FAST_ALGORITHMS 1
+#define NEWMV_BUG_FIX 0  // For 7 precisions may be enabled by default.
+#define ENABLE_SKIP_NEW_MV_FOR_HIGH_PRECISIONS \
+  0  // For 7 precisions may be enabled by default
+#define SET_HALF_PRECISION_AS_MPP 0
 
 #if FAST_ALGORITHMS
-#define REUSE_PREV_MV 1
-#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 1
-#define EANBLE_EARLY_TERMINATION 0
-#define ET_TEST_NUMBER 4
-#define DISABLE_MOTION_MODE_LOW_PRECISION 1
+#define REUSE_PREV_MV 2  // 1 for partial MV reuse, 2 for full MV reuse
+#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV \
+  1  //  1 for int mv, 2 for all precisions except maximum
+
+#define DISABLE_MOTION_MODE_LOW_PRECISION 1  // 1 by default
+#define FAST_OBMC_REFINEMENT 1
+#define DISABLE_MOTION_MODE_FOR_NEW_MV 0  //  May be enabled by default
+
+#define ADAPTIVE_PRECISION_SETS 0  // 1 means enable 4 precisions
+#define MODEL_RDO_BASED_SEARCH 0
+
+#if REUSE_PREV_MV == 2
+#define REUSE_PREV_PRECISIONS 1
+#define FAST_MV_REFINEMENT \
+  0  // 1 means only less than int pel; 2 means 1 + all precisions in the single
+     // ref mode; 3 means 1 + 2 + all
+#endif
+
+#if ADAPTIVE_PRECISION_SETS
+#define BLOCK_BASED_PRECISION_ADAPTATION 0
+#if BLOCK_BASED_PRECISION_ADAPTATION
+#define NUMBER_OF_SUPPORTED_PRECISIONS 7
+#else
+#define NUMBER_OF_SUPPORTED_PRECISIONS 4
+#endif
+#define REF_MV_BASED_PRECISION_SETS 0
+
+#if NUMBER_OF_SUPPORTED_PRECISIONS == 4
+#define FOUR_PRECISION_TEST_ID 0
+#elif NUMBER_OF_SUPPORTED_PRECISIONS == 3
+#define THREE_PRECISION_TEST_ID 0
+#endif
+
+#if REF_MV_BASED_PRECISION_SETS
+#define NUMBER_OF_PRECISION_SETS 3
+#elif BLOCK_BASED_PRECISION_ADAPTATION
+#define NUMBER_OF_PRECISION_SETS 2
+#else
+#define NUMBER_OF_PRECISION_SETS 1
+#endif
+
+#endif
+
 #else
 #define REUSE_PREV_MV 0
 #define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 0
-#define EANBLE_EARLY_TERMINATION 0
-#define ET_TEST_NUMBER 0
 #define DISABLE_MOTION_MODE_LOW_PRECISION 0
+#define FAST_OBMC_REFINEMENT 0
+#define ADAPTIVE_PRECISION_SETS 0
+#define MODEL_RDO_BASED_SEARCH 0
+
 #endif
 
 #if DEBUG_FLEX_MV
@@ -56,8 +110,10 @@ extern "C" {
   }
 #endif
 #else
-#define JOINT_MODE_BUG_FIX 0
 #define REUSE_PREV_MV 0
+#define MODEL_RDO_BASED_SEARCH 0
+#define REFACTOR_MODEL_RD 0
+#define SKIP_NEW_MV_ET 0
 #endif  // CONFIG_FLEX_MVRES
 
 // Cross-Component Sample Offset (CCSO)
@@ -922,6 +978,29 @@ enum {
 #define DIR_MODES_0_90 17
 #define IBP_WEIGHT_SHIFT 8
 #define IBP_WEIGHT_MAX 255
+#endif
+
+#if CONFIG_PRECISION_STATS
+typedef struct presStatistics {
+  // overall
+  FILE *overall_stats_file;
+  int64_t overallstats[8];
+
+  FILE *bsize_stats_file;
+  int64_t blockstats[BLOCK_SIZES_ALL][8];
+
+  FILE *mvdclass_stats_file;
+  int64_t mvdclass[12][8];
+
+  FILE *refmvclass_stats_file;
+  int64_t refmvclass[12][8];
+
+  FILE *mode_stats_file;
+  int64_t modestats[MB_MODE_COUNT][8];
+
+  FILE *all_stats_file;
+
+} presStatistics;
 #endif
 
 /*!\endcond */

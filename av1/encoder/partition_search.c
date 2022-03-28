@@ -1352,6 +1352,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 
 #if CONFIG_FLEX_MVRES
       if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
+#if CONFIG_ADAPTIVE_MVD
+        assert(!is_adaptive_mvd);
+#endif
 #if SIGNAL_MOST_PROBABLE_PRECISION
         assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
         const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
@@ -1360,11 +1363,18 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         update_cdf(fc->pb_mv_mpp_flag_cdf[mpp_flag_context], mpp_flag, 2);
 
         if (!mpp_flag) {
+#if ADAPTIVE_PRECISION_SETS
+          const PRECISION_SET *precision_def =
+              &av1_mv_precision_sets[mbmi->mb_precision_set];
+          int down = av1_get_pb_mv_precision_index(mbmi);
+          int nsymbs = precision_def->num_precisions - 1;
+#else
           int down = mbmi->max_mv_precision - mbmi->pb_mv_precision;
           int nsymbs = mbmi->max_mv_precision;
           int down_mpp =
               mbmi->max_mv_precision - mbmi->most_probable_pb_mv_precision;
           if (down > down_mpp) down--;
+#endif
 #endif
 
           const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
@@ -1389,6 +1399,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 
 #if CONFIG_FLEX_MVRES
           av1_update_mv_stats(mbmi->mv[ref].as_mv, ref_mv.as_mv, &fc->nmvc,
+#if CONFIG_ADAPTIVE_MVD
+                              is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                               pb_mv_precision);
 #else
           av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,
@@ -1417,6 +1430,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         const int_mv ref_mv = av1_get_ref_mv(x, ref);
 #if CONFIG_FLEX_MVRES
         av1_update_mv_stats(mbmi->mv[ref].as_mv, ref_mv.as_mv, &fc->nmvc,
+#if CONFIG_ADAPTIVE_MVD
+                            is_adaptive_mvd,
+#endif  // CONFIG_ADAPTIVE_MVD
                             pb_mv_precision);
 #else
         av1_update_mv_stats(&mbmi->mv[ref].as_mv, &ref_mv.as_mv, &fc->nmvc,

@@ -207,6 +207,13 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
 static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
                                                  const MB_MODE_INFO *mbmi) {
   const int mode = mbmi->mode;
+
+#if CONFIG_FLEX_MVRES && ENABLE_FLEX_MV_FOR_NEW_NEAR
+  if (mode == NEAR_NEWMV || mode == NEW_NEARMV || mode == NEAR_NEWMV_OPTFLOW ||
+      mode == NEW_NEARMV_OPTFLOW)
+    return 0;
+#endif
+
   return (mode == NEAR_NEWMV || mode == NEW_NEARMV
 #if CONFIG_OPTFLOW_REFINEMENT
           || mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW
@@ -603,9 +610,15 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
                                        const MACROBLOCKD *const xd) {
   (void)cm;
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-#if CONFIG_FLEX_MVRES && DISABLE_INTERPOLATION_FILTER_FOR_INT_MV
+
+#if CONFIG_FLEX_MVRES
+#if DISABLE_INTERPOLATION_FILTER_FOR_INT_MV == 1
   if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return 0;
+#elif DISABLE_INTERPOLATION_FILTER_FOR_INT_MV == 2
+  if (mbmi->pb_mv_precision != mbmi->max_mv_precision) return 0;
 #endif
+#endif
+
   if (mbmi->skip_mode) return 0;
 #if CONFIG_OPTFLOW_REFINEMENT
   // No interpolation filter search when optical flow MV refinement is used.
@@ -690,7 +703,19 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
 #endif
 
-void set_max_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+#if ADAPTIVE_PRECISION_SETS
+void set_default_precision_set(const AV1_COMMON *const cm, MB_MODE_INFO *mbmi,
+                               const BLOCK_SIZE bsize);
+void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
+                       MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize,
+                       uint8_t ref_mv_idx);
+int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi);
+MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
+                                               int precision_idx_coded_value);
+#endif
+
+void set_default_max_mv_precision(MB_MODE_INFO *mbmi,
+                                  MvSubpelPrecision precision);
 MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
                                                 const SB_INFO *sbi,
                                                 const MB_MODE_INFO *mbmi);

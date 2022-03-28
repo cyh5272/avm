@@ -94,6 +94,24 @@ typedef struct {
   THR_MODES mode_index;
 } WinnerModeStats;
 
+#if CONFIG_FLEX_MVRES
+typedef struct {
+  //! The best mbmi mode.
+  MB_MODE_INFO best_mbmi;
+  //! The best model rd for this precision.
+  int64_t model_rd;
+  //! The best mode index of this precision.
+  int rate_mv;
+  //! The skip his precision for full RDO or not
+  uint8_t skip_this_precision;
+
+  //! The best mv value
+  int_mv cur_mv[2];
+  //! The return value of motion search
+  int64_t newmv_ret_val;
+} PrecisionStats;
+#endif
+
 /*! \brief Each source plane of the current macroblock
  *
  * This struct also stores the txfm buffers and quantizer settings.
@@ -878,6 +896,20 @@ typedef struct {
   int nmv_costs_alloc[NUM_MV_PRECISIONS][2][MV_VALS];
   /*! Points to the middle of \ref nmv_costs_alloc. */
   int *nmv_costs[NUM_MV_PRECISIONS][2];
+
+#if CONFIG_ADAPTIVE_MVD
+  //! Costs for coding the zero components when adaptive MVD resolution is
+  //! applied
+  int amvd_nmv_joint_cost[MV_JOINTS];
+
+  //! Allocates memory for 1/4-pel motion vector costs when adaptive MVD
+  //! resolution is applied
+  int amvd_nmv_cost_alloc[2][MV_VALS];
+
+  //! Points to the middle of \ref amvd_nmv_cost_alloc
+  int *amvd_nmv_cost[2];
+#endif  // CONFIG_ADAPTIVE_MVD
+
 #else
   /*****************************************************************************
    * \name Encoding Costs

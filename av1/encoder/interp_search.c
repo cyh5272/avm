@@ -498,8 +498,15 @@ int64_t av1_interpolation_filter_search(
       MV_REFERENCE_FRAME *refs = mbmi->ref_frame;
       const int mode0 = compound_ref0_mode(mbmi->mode);
       const int mode1 = compound_ref1_mode(mbmi->mode);
+#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
+      const int64_t mrd = AOMMIN(
+          args->modelled_rd[mode0][mbmi->pb_mv_precision][ref_mv_idx][refs[0]],
+          args->modelled_rd[mode1][mbmi->pb_mv_precision][ref_mv_idx][refs[1]]);
+#else
       const int64_t mrd = AOMMIN(args->modelled_rd[mode0][ref_mv_idx][refs[0]],
                                  args->modelled_rd[mode1][ref_mv_idx][refs[1]]);
+#endif
+
       if ((*rd >> 1) > mrd && ref_best_rd < INT64_MAX) {
         return INT64_MAX;
       }

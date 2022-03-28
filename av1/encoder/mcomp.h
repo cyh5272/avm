@@ -90,13 +90,22 @@ typedef struct {
   // and the diff cost.
   const MvCosts *mv_costs;
   MvSubpelPrecision pb_mv_precision;
+#if CONFIG_ADAPTIVE_MVD
+  int is_adaptive_mvd;
+#endif  // CONFIG_ADAPTIVE_MVD
+
 #endif
 
 } MV_COST_PARAMS;
 #if CONFIG_FLEX_MVRES
 int av1_mv_bit_cost(const MV *mv, const MV *ref_mv,
                     const MvSubpelPrecision pb_mv_precision,
-                    const MvCosts *mv_costs, int weight);
+                    const MvCosts *mv_costs, int weight
+#if CONFIG_ADAPTIVE_MVD
+                    ,
+                    const int is_adaptive_mvd
+#endif
+);
 
 int av1_intrabc_mv_bit_cost(const MV *mv, const MV *ref_mv,
                             const IntraBCMvCosts *mv_costs, int weight);
@@ -321,7 +330,12 @@ unsigned int av1_int_pro_motion_estimation(const struct AV1_COMP *cpi,
                                            const MV *ref_mv);
 
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv);
+                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+                             ,
+                             const int fast_mv_refinement
+#endif
+);
 #if CONFIG_FLEX_MVRES
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
