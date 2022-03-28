@@ -19,10 +19,6 @@
 #include "aom/aom_integer.h"
 #include "aom_ports/mem.h"
 
-#if CONFIG_PRECISION_STATS
-#include <stdio.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -978,29 +974,6 @@ enum {
 #define DIR_MODES_0_90 17
 #define IBP_WEIGHT_SHIFT 8
 #define IBP_WEIGHT_MAX 255
-#endif
-
-#if CONFIG_PRECISION_STATS
-typedef struct presStatistics {
-  // overall
-  FILE *overall_stats_file;
-  int64_t overallstats[8];
-
-  FILE *bsize_stats_file;
-  int64_t blockstats[BLOCK_SIZES_ALL][8];
-
-  FILE *mvdclass_stats_file;
-  int64_t mvdclass[12][8];
-
-  FILE *refmvclass_stats_file;
-  int64_t refmvclass[12][8];
-
-  FILE *mode_stats_file;
-  int64_t modestats[MB_MODE_COUNT][8];
-
-  FILE *all_stats_file;
-
-} presStatistics;
 #endif
 
 /*!\endcond */

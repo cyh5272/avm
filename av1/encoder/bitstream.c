@@ -53,10 +53,6 @@
 
 #define ENC_MISMATCH_DEBUG 0
 
-#if CONFIG_PRECISION_STATS
-extern presStatistics flex_mv_statistics;
-#endif
-
 static INLINE void write_uniform(aom_writer *w, int n, int v) {
   const int l = get_unsigned_bits(n);
   const int m = (1 << l) - n;

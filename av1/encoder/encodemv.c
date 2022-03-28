@@ -23,9 +23,6 @@
 #if CONFIG_FLEX_MVRES
 #include "av1/common/reconinter.h"
 #endif
-#if CONFIG_PRECISION_STATS
-presStatistics flex_mv_statistics;
-#endif
 
 #if CONFIG_FLEX_MVRES
 static void update_mv_component_stats_lower_precision(
@@ -239,10 +236,6 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     const int mv_class = av1_get_mv_class_low_precision(mag_int_mv, &offset);
     int has_offset = (mv_class >= min_class_with_offset[precision]);
 
-#if CONFIG_PRECISION_STATS
-    flex_mv_statistics.mvdclass[mv_class][precision]++;
-#endif
-
     int start_lsb = MV_PRECISION_ONE_PEL - precision;
     int mv_class_coded_value = mv_class;
     // There is no valid value of MV_CLASS_1 for MV_PRECISION_FOUR_PEL. So
@@ -317,10 +310,6 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     const int d = offset >> 3;         // int mv data
     const int fr = (offset >> 1) & 3;  // fractional mv data
     const int hp = offset & 1;         // high precision mv data
-
-#if CONFIG_PRECISION_STATS
-    flex_mv_statistics.mvdclass[mv_class][precision]++;
-#endif
 
     // Sign
     aom_write_symbol(w, sign, mvcomp->sign_cdf, 2);
