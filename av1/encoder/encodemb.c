@@ -278,11 +278,45 @@ void av1_xform_quant(
   const struct macroblock_plane *const p = &x->plane[plane];
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
 #endif  // CONFIG_FORWARDSKIP
+#if CONFIG_CROSS_CHROMA_TX
+  if (is_inter) {
+    switch (plane) {
+      case AOM_PLANE_Y:
 #if CONFIG_IST
-  av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param, 0);
+        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
+#else
+        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
+#endif
+        break;
+      case AOM_PLANE_U:
+#if CONFIG_IST
+        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
+        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
+#else
+        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
+        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
+#endif
+        // TODO(kslu): apply fwd cctx here (and maybe skip av1_setup_xform for
+        // V)
+        break;
+      case AOM_PLANE_V: break;
+    }
+  } else {
+#endif  // CONFIG_CROSS_CHROMA_TX
+#if CONFIG_IST
+    av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param, 0);
 #else
   av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param);
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 #if CONFIG_FORWARDSKIP
   const uint8_t fsc_mode =
       (mbmi->fsc_mode[xd->tree_type == CHROMA_PART] && plane == PLANE_TYPE_Y) ||
@@ -583,6 +617,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 
   if (p->eobs[block]) {
     *(args->skip) = 0;
+    // TODO(kslu) apply inv cctx for u plane
     av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, dst,
                                 pd->dst.stride, p->eobs[block],
                                 cm->features.reduced_tx_set_used);
@@ -1030,6 +1065,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   }
 
   if (*eob) {
+    // TODO(kslu) apply inv cctx for u plane
     av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, dst,
                                 dst_stride, *eob,
                                 cm->features.reduced_tx_set_used);
