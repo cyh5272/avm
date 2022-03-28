@@ -96,6 +96,7 @@ static const int mode_lf_lut[] = {
 };
 #endif  // CONFIG_NEW_INTER_MODES
 
+// Function obtains q_threshold from the quantization index.
 int df_quant_from_qindex(int q_index, int bit_depth) {
   int qstep = ROUND_POWER_OF_TWO(av1_ac_quant_QTX(q_index, 0, bit_depth),
                                  QUANT_TABLE_BITS);
@@ -104,6 +105,7 @@ int df_quant_from_qindex(int q_index, int bit_depth) {
   return q_threshold;
 }
 
+// Function obtains side_threshold from the quantization index.
 int df_side_from_qindex(int q_index, int bit_depth) {
   int q_ind = clamp(q_index - 24 * (bit_depth - 8), 0, MAX_SIDE_TABLE - 1);
 
@@ -137,13 +139,14 @@ static void update_sharpness(loop_filter_info_n *lfi, int sharpness_lvl) {
            SIMD_WIDTH);
   }
 }
-#endif
+#endif  // !CONFIG_NEW_DF
+
 #if CONFIG_NEW_DF
 uint16_t av1_get_filter_q(const loop_filter_info_n *lfi_n, const int dir_idx,
                           int plane, const MB_MODE_INFO *mbmi) {
   const int segment_id = mbmi->segment_id;
 
-  /*  // TBD Andrey: non-CTC condition
+  /*  // TODO(Andrey): non-CTC condition
     if (cm->delta_q_info.delta_lf_present_flag) {
       int8_t delta_lf;
       if (cm->delta_q_info.delta_lf_multi) {
@@ -178,14 +181,19 @@ uint16_t av1_get_filter_q(const loop_filter_info_n *lfi_n, const int dir_idx,
     } else
   */
   {
+#if CONFIG_NEW_REF_SIGNALING
+    return lfi_n->q_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
+        mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
+#else
     return lfi_n->q_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
                        [mode_lf_lut[mbmi->mode]];
+#endif
   }
 }
 uint16_t av1_get_filter_side(const loop_filter_info_n *lfi_n, const int dir_idx,
                              int plane, const MB_MODE_INFO *mbmi) {
   const int segment_id = mbmi->segment_id;
-  /*    // TBD Andrey: non-CTC condition
+  /*    // TODO(Andrey): non-CTC condition
     if (cm->delta_q_info.delta_lf_present_flag) {
       int8_t delta_lf;
       if (cm->delta_q_info.delta_lf_multi) {
@@ -220,8 +228,13 @@ uint16_t av1_get_filter_side(const loop_filter_info_n *lfi_n, const int dir_idx,
     } else
   */
   {
+#if CONFIG_NEW_REF_SIGNALING
+    return lfi_n->side_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
+        mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
+#else
     return lfi_n->side_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
                           [mode_lf_lut[mbmi->mode]];
+#endif  // CONFIG_NEW_REF_SIGNALING
   }
 }
 
@@ -278,7 +291,7 @@ uint8_t av1_get_filter_level(const AV1_COMMON *cm,
 #endif  // CONFIG_NEW_REF_SIGNALING
   }
 }
-#endif
+#endif  // CONFIG_NEW_DF
 
 void av1_loop_filter_init(AV1_COMMON *cm) {
   assert(MB_MODE_COUNT == NELEMENTS(mode_lf_lut));
@@ -286,7 +299,7 @@ void av1_loop_filter_init(AV1_COMMON *cm) {
 #if !CONFIG_NEW_DF
   loop_filter_info_n *lfi = &cm->lf_info;
   int lvl;
-#endif
+#endif  // !CONFIG_NEW_DF
 
   lf->combine_vert_horz_lf = 1;
 #if !CONFIG_NEW_DF
@@ -309,7 +322,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
       side_ind_r[MAX_MB_PLANE];
 #else
   int filt_lvl[MAX_MB_PLANE], filt_lvl_r[MAX_MB_PLANE];
-#endif
+#endif  // CONFIG_NEW_DF
   int plane;
   int seg_id;
   // n_shift is the multiplier for lf_deltas
@@ -330,7 +343,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
       cm->quant_params.base_qindex + cm->lf.delta_q_luma * DF_DELTA_SCALE;
   side_ind[0] =
       cm->quant_params.base_qindex + cm->lf.delta_side_luma * DF_DELTA_SCALE;
-#endif
+#endif  // DF_DUAL
   q_ind[1] = cm->quant_params.base_qindex + cm->quant_params.u_ac_delta_q +
              cm->lf.delta_q_u * DF_DELTA_SCALE;
   side_ind[1] = cm->quant_params.base_qindex + cm->quant_params.u_ac_delta_q +
@@ -350,7 +363,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
       cm->quant_params.base_qindex + cm->lf.delta_q_luma * DF_DELTA_SCALE;
   side_ind_r[0] =
       cm->quant_params.base_qindex + cm->lf.delta_side_luma * DF_DELTA_SCALE;
-#endif
+#endif  // DF_DUAL
   q_ind_r[1] = cm->quant_params.base_qindex + cm->quant_params.u_ac_delta_q +
                cm->lf.delta_q_u * DF_DELTA_SCALE;
   side_ind_r[1] = cm->quant_params.base_qindex + cm->quant_params.u_ac_delta_q +
@@ -371,7 +384,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
   filt_lvl_r[0] = cm->lf.filter_level[1];
   filt_lvl_r[1] = cm->lf.filter_level_u;
   filt_lvl_r[2] = cm->lf.filter_level_v;
-#endif
+#endif  // CONFIG_NEW_DF
 
   assert(plane_start >= AOM_PLANE_Y);
   assert(plane_end <= MAX_MB_PLANE);
@@ -392,7 +405,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
       continue;
     else if (plane == 2 && !filt_lvl[2])
       continue;
-#endif
+#endif  // CONFIG_NEW_DF
     for (seg_id = 0; seg_id < MAX_SEGMENTS; seg_id++) {
       for (int dir = 0; dir < 2; ++dir) {
 #if CONFIG_NEW_DF
@@ -401,7 +414,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
 
 #else
         int lvl_seg = (dir == 0) ? filt_lvl[plane] : filt_lvl_r[plane];
-#endif
+#endif  // CONFIG_NEW_DF
         const int seg_lf_feature_id = seg_lvl_lf_lut[plane][dir];
 
         if (segfeature_active(seg, seg_id, seg_lf_feature_id)) {
@@ -413,7 +426,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
           side_ind_seg += data;
 #else
           lvl_seg = clamp(lvl_seg + data, 0, MAX_LOOP_FILTER);
-#endif
+#endif  // CONFIG_NEW_DF
         }
 
         if (!lf->mode_ref_delta_enabled) {
@@ -438,7 +451,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
           lfi->side_thr[plane][seg_id][dir][INTRA_FRAME][0] = side_thr_seg;
 
           for (ref = LAST_FRAME; ref < REF_FRAMES; ++ref) {
-#endif
+#endif  // CONFIG_NEW_REF_SIGNALING
             for (mode = 0; mode < MAX_MODE_LF_DELTAS; ++mode) {
               lfi->q_thr[plane][seg_id][dir][ref][mode] = q_thr_seg;
               lfi->side_thr[plane][seg_id][dir][ref][mode] = side_thr_seg;
@@ -447,7 +460,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
 #else
           memset(lfi->lvl[plane][seg_id][dir], lvl_seg,
                  sizeof(lfi->lvl[plane][seg_id][dir]));
-#endif
+#endif  // CONFIG_NEW_DF
         } else {
 #if CONFIG_NEW_DF
 
@@ -476,7 +489,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
                   cm->seq_params.bit_depth);  // TODO: use a different delta?
 
           for (ref = LAST_FRAME; ref < REF_FRAMES; ++ref) {
-#endif
+#endif  // CONFIG_NEW_REF_SIGNALING
             for (mode = 0; mode < MAX_MODE_LF_DELTAS; ++mode) {
               lfi->q_thr[plane][seg_id][dir][ref][mode] =
                   df_quant_from_qindex(q_ind_seg + lf->ref_deltas[ref] * scale +
@@ -511,7 +524,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
                   clamp(inter_lvl, 0, MAX_LOOP_FILTER);
             }
           }
-#endif
+#endif  // CONFIG_NEW_DF
         }
       }
     }
@@ -596,7 +609,7 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
     }
   }
 }
-#endif
+#endif  // CONFIG_NEW_DF
 
 static TX_SIZE get_transform_size(const MACROBLOCKD *const xd,
                                   const AV1_COMMON *const cm,
@@ -645,7 +658,7 @@ typedef struct AV1_DEBLOCKING_PARAMETERS {
 #if CONFIG_NEW_DF
   uint16_t q_threshold;
   uint16_t side_threshold;
-#endif
+#endif  // CONFIG_NEW_DF
 } AV1_DEBLOCKING_PARAMETERS;
 
 // Return TX_SIZE from get_transform_size(), so it is plane and direction
@@ -699,7 +712,6 @@ static TX_SIZE set_lpf_parameters(
     // prepare outer edge parameters. deblock the edge if it's an edge of a TU
     {
 #if CONFIG_NEW_DF
-      const uint32_t curr_level = 1;
       const uint32_t curr_q =
           av1_get_filter_q(&cm->lf_info, edge_dir, plane, mbmi);
       const uint32_t curr_side =
@@ -707,11 +719,13 @@ static TX_SIZE set_lpf_parameters(
 #else
       const uint32_t curr_level =
           av1_get_filter_level(cm, &cm->lf_info, edge_dir, plane, mbmi);
-#endif
+#endif  // CONFIG_NEW_DF
 
       const int curr_skipped =
           mbmi->skip_txfm[plane_type] && is_inter_block(mbmi, xd->tree_type);
+#if !CONFIG_NEW_DF
       uint32_t level = curr_level;
+#endif  // !CONFIG_NEW_DF
       if (coord) {
         {
           const MB_MODE_INFO *const mi_prev = *(mi - mode_step);
@@ -724,7 +738,6 @@ static TX_SIZE set_lpf_parameters(
               xd, cm, mi_prev, edge_dir, pv_row, pv_col, plane, plane_ptr);
 
 #if CONFIG_NEW_DF
-          const uint32_t pv_lvl = 1;
           const uint32_t pv_q =
               av1_get_filter_q(&cm->lf_info, edge_dir, plane, mi_prev);
           const uint32_t pv_side =
@@ -732,7 +745,7 @@ static TX_SIZE set_lpf_parameters(
 #else
           const uint32_t pv_lvl =
               av1_get_filter_level(cm, &cm->lf_info, edge_dir, plane, mi_prev);
-#endif
+#endif  // CONFIG_NEW_DF
           const int pv_skip_txfm = mi_prev->skip_txfm[plane_type] &&
                                    is_inter_block(mi_prev, xd->tree_type);
 
@@ -765,7 +778,7 @@ static TX_SIZE set_lpf_parameters(
             }
           }
 
-#endif
+#endif  // DF_REDUCED_SB_EDGE
 #if DF_MVS
           // Check difference between MVs, may need consider cases with
           // inter-intra
@@ -817,8 +830,8 @@ static TX_SIZE set_lpf_parameters(
               }
             }
           }
-#endif
-#endif
+#endif  // DF_MVS
+#endif  // CONFIG_NEW_DF
 
 #if CONFIG_NEW_DF
           if (((curr_q && curr_side) || (pv_q && pv_side)) &&
@@ -848,7 +861,7 @@ static TX_SIZE set_lpf_parameters(
             const TX_SIZE min_ts = AOMMIN(clipped_ts, pv_ts);
 #else
             const TX_SIZE min_ts = AOMMIN(ts, pv_ts);
-#endif
+#endif  // CONFIG_NEW_DF
             if (TX_4X4 >= min_ts) {
               params->filter_length = 4;
             } else if (TX_8X8 == min_ts) {
@@ -856,7 +869,7 @@ static TX_SIZE set_lpf_parameters(
               if (plane != 0)
                 params->filter_length = 6;
               else
-#endif
+#endif  // !DF_CHROMA_WIDE
                 params->filter_length = 8;
 #if DF_FILT26
             } else if (TX_16X16 == min_ts) {
@@ -866,7 +879,7 @@ static TX_SIZE set_lpf_parameters(
               if (plane != 0) {
                 params->filter_length = 6;
               }
-#endif
+#endif  // !DF_CHROMA_WIDE
             } else {
 #if DF_REDUCED_SB_EDGE
               if (horz_superblock_edge || vert_tile_edge) {
@@ -875,7 +888,7 @@ static TX_SIZE set_lpf_parameters(
                 } else
                   params->filter_length = 14;
               } else
-#endif
+#endif  // DF_REDUCED_SB_EDGE
               {
                 params->filter_length = 22;
                 // No wide filtering for chroma plane
@@ -885,7 +898,7 @@ static TX_SIZE set_lpf_parameters(
                   params->filter_length = 10;
 #else
                   params->filter_length = 6;
-#endif
+#endif  // DF_CHROMA_WIDE
                 }
               }
             }
@@ -897,17 +910,18 @@ static TX_SIZE set_lpf_parameters(
                 params->filter_length = 6;
               }
             }
-#endif
+#endif  // DF_FILT26
 
 #if CONFIG_NEW_DF
             // update the level if the current block is skipped,
             // but the previous one is not
             params->q_threshold = (curr_q) ? (curr_q) : (pv_q);
             params->side_threshold = (curr_side) ? (curr_side) : (pv_side);
-#endif
+#else
             // update the level if the current block is skipped,
             // but the previous one is not
             level = (curr_level) ? (curr_level) : (pv_lvl);
+#endif  // CONFIG_NEW_DF
           }
         }
       }
@@ -919,7 +933,7 @@ static TX_SIZE set_lpf_parameters(
         params->mblim = limits->mblim;
         params->hev_thr = limits->hev_thr;
       }
-#endif
+#endif  // !CONFIG_NEW_DF
     }
   }
   return ts;

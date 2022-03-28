@@ -31,7 +31,7 @@
 #if CONFIG_NEW_DF
 #include <float.h>
 #define CHROMA_LAMBDA_MULT 6
-#endif
+#endif  // CONFIG_NEW_DF
 
 static void yv12_copy_plane(const YV12_BUFFER_CONFIG *src_bc,
                             YV12_BUFFER_CONFIG *dst_bc, int plane) {
@@ -67,7 +67,7 @@ static int64_t try_filter_frame(const YV12_BUFFER_CONFIG *sd,
   int filter_level[2] = { filt_level, filt_level };
   if (plane == 0 && dir == 0) filter_level[1] = cm->lf.filter_level[1];
   if (plane == 0 && dir == 1) filter_level[0] = cm->lf.filter_level[0];
-#endif
+#endif  // !CONFIG_NEW_DF
 #if CONFIG_NEW_DF
   // set base filters for use of av1_get_filter_level when in DELTA_LF mode
   switch (plane) {
@@ -87,7 +87,7 @@ static int64_t try_filter_frame(const YV12_BUFFER_CONFIG *sd,
 #else
       cm->lf.delta_q_luma = q_offset;
       cm->lf.delta_side_luma = side_offset;
-#endif
+#endif  // DF_DUAL
       break;
     case 1:
       cm->lf.delta_q_u = q_offset;
@@ -108,7 +108,7 @@ static int64_t try_filter_frame(const YV12_BUFFER_CONFIG *sd,
     case 1: cm->lf.filter_level_u = filter_level[0]; break;
     case 2: cm->lf.filter_level_v = filter_level[0]; break;
   }
-#endif
+#endif  // CONFIG_NEW_DF
   // TODO(any): please enable multi-thread and remove the flag when loop
   // filter mask is compatible with multi-thread.
   if (num_workers > 1)
@@ -195,7 +195,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
   offsets[0] = last_frame_offsets[plane << 1];
   offsets[1] = last_frame_offsets[(plane << 1) + 1];
-#endif
+#endif  // DF_DUAL
   int offset_mid =
       clamp(offsets[off_ind], min_filter_offset, max_filter_offset);
   //  int filter_step = abs(offset_mid) < 16 ? 8 : abs(offset_mid) / 2;  // is
@@ -215,7 +215,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
   temp_offsets[off_ind] = offset_mid;
 #else
   temp_offsets[0] = temp_offsets[1] = offset_mid;
-#endif
+#endif  // DF_TWO_PARAM
 
 #if DF_DUAL
   start_err = best_err = try_filter_frame(
@@ -223,7 +223,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
   start_err = best_err = try_filter_frame(
       sd, cpi, temp_offsets[0], temp_offsets[1], partial_frame, plane, 0);
-#endif
+#endif  // DF_DUAL
   offset_best = offset_mid;
   ss_err[offset_mid + ZERO_DF_OFFSET] = best_err;
 
@@ -243,7 +243,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
         temp_offsets[off_ind] = offset_low;
 #else
         temp_offsets[0] = temp_offsets[1] = offset_low;
-#endif
+#endif  // DF_TWO_PARAM
         ss_err[offset_low + ZERO_DF_OFFSET] =
 #if DF_DUAL
             try_filter_frame(sd, cpi, temp_offsets[0], temp_offsets[1],
@@ -251,7 +251,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
             try_filter_frame(sd, cpi, temp_offsets[0], temp_offsets[1],
                              partial_frame, plane, 0);
-#endif
+#endif  // DF_TWO_PARAM
       }
       // If value is close to the best so far then bias towards a lower loop
       // filter value.
@@ -271,7 +271,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
         temp_offsets[off_ind] = offset_high;
 #else
         temp_offsets[0] = temp_offsets[1] = offset_high;
-#endif
+#endif  // DF_TWO_PARAM
         ss_err[offset_high + ZERO_DF_OFFSET] =
 #if DF_DUAL
             try_filter_frame(sd, cpi, temp_offsets[0], temp_offsets[1],
@@ -279,7 +279,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
             try_filter_frame(sd, cpi, temp_offsets[0], temp_offsets[1],
                              partial_frame, plane, 0);
-#endif
+#endif  // DF_DUAL
       }
       // If value is significantly better than previous best, bias added against
       // raising filter value
@@ -336,7 +336,7 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
   double start_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult * chroma_lambda_mult, offsets[off_ind] ? DF_PAR_BITS : 0,
       start_err, cm->seq_params.bit_depth);
-#endif
+#endif  // DF_DUAL
 
   if (best_cost_ret) *best_cost_ret = AOMMIN(best_cost, start_cost);
 
@@ -445,7 +445,7 @@ static int search_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
         x->rdmult, 0, (best_err << 4), cm->seq_params.bit_depth);
   return filt_best;
 }
-#endif
+#endif  // CONFIG_NEW_DF
 
 #if CONFIG_NEW_DF
 void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
@@ -473,7 +473,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
     lf->delta_q_luma = lf->delta_q_u = lf->delta_q_v = 0;
     lf->delta_side_luma = lf->delta_side_u = lf->delta_side_v = 0;
-#endif
+#endif  // DF_DUAL
   } else {
     // To make sure the df filters are run
     lf->filter_level[0] = 1;
@@ -488,14 +488,14 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
     lf->delta_q_luma = lf->delta_q_u = lf->delta_q_v = 0;
     lf->delta_side_luma = lf->delta_side_u = lf->delta_side_v = 0;
-#endif
+#endif  // DF_DUAL
 #if DF_DUAL
     int last_frame_offsets[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #else
     int last_frame_offsets[6] = { 0, 0, 0, 0, 0, 0 };
-#endif
+#endif  // DF_DUAL
 
-    double best_cost[3] = { DBL_MAX, DBL_MAX, DBL_MAX };
+    //    double best_cost[3] = { DBL_MAX, DBL_MAX, DBL_MAX };
 
 #if DF_DUAL
     int dir = 0;
@@ -516,7 +516,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
 #else
     last_frame_offsets[0] = last_frame_offsets[2] = lf->delta_q_luma[0] =
         lf->delta_q_luma[1] = lf->delta_side_luma[0];
-#endif
+#endif  // DF_TWO_PARAM
     best_single_offsets[0] = last_frame_offsets[0];
     best_single_offsets[1] = last_frame_offsets[1];
     best_single_offsets[2] = last_frame_offsets[2];
@@ -531,7 +531,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                               last_frame_offsets, &best_dual_cost, 0, 0, 0);
 #else
     last_frame_offsets[0] = lf->delta_q_luma[0] = lf->delta_side_luma[0];
-#endif
+#endif  // DF_TWO_PARAM
 
     last_frame_offsets[3] = lf->delta_side_luma[1] =
         search_filter_offsets(sd, cpi, method == LPF_PICK_FROM_SUBIMAGE,
@@ -542,17 +542,17 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                               last_frame_offsets, &best_dual_cost, 0, 0, 1);
 #else
     last_frame_offsets[2] = lf->delta_q_luma[1] = lf->delta_side_luma[1];
-#endif
+#endif  // DF_TWO_PARAM
 
     if (best_single_cost < best_dual_cost) {
       lf->delta_q_luma[0] = last_frame_offsets[0] = best_single_offsets[0];
       lf->delta_side_luma[0] = last_frame_offsets[1] = best_single_offsets[1];
       lf->delta_q_luma[1] = last_frame_offsets[2] = best_single_offsets[2];
       lf->delta_side_luma[1] = last_frame_offsets[3] = best_single_offsets[3];
-      best_cost[0] = best_single_cost;
-    } else {
-      best_cost[0] = best_dual_cost;
-    }
+      //      best_cost[0] = best_single_cost;
+    }  // else {
+    //      best_cost[0] = best_dual_cost;
+    //    }
 
     if (num_planes > 1) {
       // Cb
@@ -565,7 +565,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                                 last_frame_offsets, NULL, 1, 0, dir);
 #else
       last_frame_offsets[4] = lf->delta_q_u = lf->delta_side_u;
-#endif
+#endif  // DF_TWO_PARAM
 
       last_frame_offsets[5] = lf->delta_side_u =
           search_filter_offsets(sd, cpi, method == LPF_PICK_FROM_SUBIMAGE,
@@ -576,7 +576,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                                 last_frame_offsets, NULL, 1, 0, dir);
 #else
       last_frame_offsets[4] = lf->delta_q_u = lf->delta_side_u;
-#endif
+#endif  // DF_TWO_PARAM
       // Cr
       last_frame_offsets[7] = lf->delta_side_v =
           search_filter_offsets(sd, cpi, method == LPF_PICK_FROM_SUBIMAGE,
@@ -587,7 +587,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                                 last_frame_offsets, NULL, 2, 0, dir);
 #else
       last_frame_offsets[6] = lf->delta_q_v = lf->delta_side_v;
-#endif
+#endif  // DF_TWO_PARAM
       last_frame_offsets[7] = lf->delta_side_v =
           search_filter_offsets(sd, cpi, method == LPF_PICK_FROM_SUBIMAGE,
                                 last_frame_offsets, NULL, 2, 1, dir);
@@ -597,7 +597,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
                                 last_frame_offsets, NULL, 2, 0, dir);
 #else
       last_frame_offsets[6] = lf->delta_q_v = lf->delta_side_v;
-#endif
+#endif  // DF_TWO_PARAM
 
       // to switch off filters if offsets are zero
       if (!df_quant_from_qindex(cm->quant_params.base_qindex +
@@ -666,7 +666,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
           &best_cost[plane], plane, 0);
 #else
       last_frame_offsets[plane << 1] = last_frame_offsets[(plane << 1) + 1];
-#endif
+#endif  // DF_TWO_PARAM
       last_frame_offsets[(plane << 1) + 1] = search_filter_offsets(
           sd, cpi, method == LPF_PICK_FROM_SUBIMAGE, last_frame_offsets,
           &best_cost[plane], plane, 1);
@@ -676,7 +676,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
           &best_cost[plane], plane, 0);
 #else
       last_frame_offsets[plane << 1] = last_frame_offsets[(plane << 1) + 1];
-#endif
+#endif  // DF_TWO_PARAM
     }
 
     lf->delta_q_luma = last_frame_offsets[0];
@@ -687,7 +687,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
       lf->delta_q_v = last_frame_offsets[4];
       lf->delta_side_v = last_frame_offsets[5];
     }
-#endif
+#endif  // DF_DUAL
   }
 }
 #else

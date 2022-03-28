@@ -2074,7 +2074,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   lf->filter_level[1] = aom_rb_read_bit(rb);
 #else
   lf->filter_level[1] = lf->filter_level[0];
-#endif
+#endif  // DF_DUAL
   if (num_planes > 1) {
     if (lf->filter_level[0] || lf->filter_level[1]) {
       lf->filter_level_u = aom_rb_read_bit(rb);
@@ -2104,7 +2104,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
     }
 #else
     lf->delta_side_luma[0] = lf->delta_q_luma[0];
-#endif
+#endif  // DF_TWO_PARAM
   } else {
     lf->delta_q_luma[0] = 0;
     lf->delta_side_luma[0] = 0;
@@ -2127,7 +2127,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
     }
 #else
     lf->delta_side_luma[1] = lf->delta_q_luma[1];
-#endif
+#endif  // DF_TWO_PARAM
   } else {
     lf->delta_q_luma[1] = 0;
     lf->delta_side_luma[1] = 0;
@@ -2150,12 +2150,12 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
     }
 #else
     lf->delta_side_luma = lf->delta_q_luma;
-#endif
+#endif  // DF_TWO_PARAM
   } else {
     lf->delta_q_luma = 0;
     lf->delta_side_luma = 0;
   }
-#endif
+#endif  // DF_DUAL
 
   if (lf->filter_level_u) {
     int u_delta_q = aom_rb_read_bit(rb);
@@ -2173,7 +2173,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
     }
 #else
     lf->delta_side_u = lf->delta_q_u;
-#endif
+#endif  // DF_TWO_PARAM
   } else {
     lf->delta_q_u = 0;
     lf->delta_side_u = 0;
@@ -2194,7 +2194,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
     }
 #else
     lf->delta_side_v = lf->delta_q_v;
-#endif
+#endif  // DF_TWO_PARAM
   } else {
     lf->delta_q_v = 0;
     lf->delta_side_v = 0;
@@ -2255,7 +2255,8 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   memcpy(cm->cur_frame->ref_deltas, lf->ref_deltas, REF_FRAMES);
   memcpy(cm->cur_frame->mode_deltas, lf->mode_deltas, MAX_MODE_LF_DELTAS);
 }
-#endif
+#endif  // CONFIG_NEW_DF
+
 static AOM_INLINE void setup_cdef(AV1_COMMON *cm,
                                   struct aom_read_bit_buffer *rb) {
   const int num_planes = av1_num_planes(cm);

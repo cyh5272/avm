@@ -115,14 +115,14 @@ struct loopfilter {
 #else
   int delta_q_luma;
   int delta_side_luma;
-#endif
+#endif  // DF_DUAL
   int delta_q_u;
   int delta_side_u;
   int delta_q_v;
   int delta_side_v;
-#endif
+#else
   int sharpness_level;
-
+#endif  // CONFIG_NEW_DF
   uint8_t mode_ref_delta_enabled;
   uint8_t mode_ref_delta_update;
 

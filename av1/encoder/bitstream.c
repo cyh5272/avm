@@ -2654,7 +2654,7 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
   }
   return false;
 }
-#endif
+#endif  // !CONFIG_NEW_DF
 #if CONFIG_NEW_DF
 static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
                                          struct aom_write_bit_buffer *wb) {
@@ -2692,7 +2692,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     }
 #else
     assert(lf->delta_q_luma[0] == lf->delta_side_luma[0]);
-#endif
+#endif  // DF_TWO_PARAM
   }
 
   if (lf->filter_level[1]) {
@@ -2712,7 +2712,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     }
 #else
     assert(lf->delta_q_luma[1] == lf->delta_side_luma[1]);
-#endif
+#endif  // DF_TWO_PARAM
   }
 #else
   if (lf->filter_level[0] || lf->filter_level[1]) {
@@ -2731,9 +2731,9 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     }
 #else
     assert(lf->delta_q_luma == lf->delta_side_luma);
-#endif
+#endif  // DF_TWO_PARAM
   }
-#endif
+#endif  // DF_DUAL
   if (lf->filter_level_u) {
     int u_delta_q_flag = lf->delta_q_u != 0;
 
@@ -2749,7 +2749,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     }
 #else
     assert(lf->delta_q_u == lf->delta_side_u);
-#endif
+#endif  // DF_TWO_PARAM
   }
 
   if (lf->filter_level_v) {
@@ -2767,7 +2767,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     }
 #else
     assert(lf->delta_q_v == lf->delta_side_v);
-#endif
+#endif  // DF_TWO_PARAM
   }
 }
 #else
@@ -2822,7 +2822,7 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
     if (changed) aom_wb_write_inv_signed_literal(wb, delta, 6);
   }
 }
-#endif
+#endif  // CONFIG_NEW_DF
 
 static AOM_INLINE void encode_cdef(const AV1_COMMON *cm,
                                    struct aom_write_bit_buffer *wb) {
