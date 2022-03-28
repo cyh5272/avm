@@ -1434,7 +1434,7 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 // fit into a 16-bit register. Any acceleration code needs to ensure the
 // multiply is carried out in 32-bits. The filter tap precisions should
 // guarantee that the result of the convolution, i.e., the result of the entire
-// multiply-add fits into 32-bits prior to down-shit and round.
+// multiply-add, fits into 32-bits prior to the down-shit and round.
 // - The calling filters can be adjusted for SUBTRACT_CENTER = 0.
 // SUBTRACT_CENTER = 1 case allows passing the difference through a
 // nonlinearity if one wishes to do so.
