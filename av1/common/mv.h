@@ -262,21 +262,10 @@ static INLINE void full_pel_lower_mv_precision_one_comp(
 
 #define WARPEDDIFF_PREC_BITS (WARPEDMODEL_PREC_BITS - WARPEDPIXEL_PREC_BITS)
 
-// Number of types used for global motion (must be >= 3 and <= TRANS_TYPES)
-// The following can be useful:
-// GLOBAL_TRANS_TYPES 3 - up to rotation-zoom
-// GLOBAL_TRANS_TYPES 4 - up to affine
-// GLOBAL_TRANS_TYPES 6 - up to hor/ver trapezoids
-// GLOBAL_TRANS_TYPES 7 - up to full homography
-#define GLOBAL_TRANS_TYPES 4
-
 typedef struct {
   int global_warp_allowed;
   int local_warp_allowed;
 } WarpTypesAllowed;
-
-// number of parameters used by each transformation in TransformationTypes
-static const int trans_model_params[TRANS_TYPES] = { 0, 2, 4, 6 };
 
 // The order of values in the wmmat matrix below is best described
 // by the homography:

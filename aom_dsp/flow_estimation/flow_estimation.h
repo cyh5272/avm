@@ -25,13 +25,26 @@ extern "C" {
 
 /* clang-format off */
 enum {
-  IDENTITY = 0,      // identity transformation, 0-parameter
-  TRANSLATION = 1,   // translational motion 2-parameter
-  ROTZOOM = 2,       // simplified affine with rotation + zoom only, 4-parameter
-  AFFINE = 3,        // affine, 6-parameter
+  IDENTITY = 0,       // identity transformation, 0-parameter
+  TRANSLATION = 1,    // translational motion 2-parameter
+  ROTATION = 2,       // rotation about some point, 3-parameter
+  ZOOM = 3,           // zoom in/out on some point, 3-parameter
+  VERTSHEAR = 4,      // translation + vertical shear, 3-parameter
+  HORZSHEAR = 5,      // translation + horizontal shear, 3-parameter
+  UZOOM = 6,          // unequal zoom, 4-parameter
+  ROTZOOM = 7,        // equal zoom, then rotate, 4-parameter
+  ROTUZOOM = 8,       // unequal zoom, then rotate, 5-parameter
+  AFFINE = 9,         // general affine, 6-parameter
+  VERTRAPEZOID = 10,  // vertical-only perspective, 6-parameter
+  HORTRAPEZOID = 11,  // horizontal-only perspective, 6-parameter
+  HOMOGRAPHY = 12,    // general perspective transformation, 8-parameter
   TRANS_TYPES,
 } UENUM1BYTE(TransformationType);
 /* clang-format on */
+
+// number of parameters used by each transformation in TransformationTypes
+static const int trans_model_params[TRANS_TYPES] = { 0, 2, 3, 3, 3, 3, 4,
+                                                     4, 5, 6, 6, 6, 8 };
 
 typedef enum {
   GLOBAL_MOTION_FEATURE_BASED,

@@ -20,6 +20,7 @@
 
 #include "av1/common/mv.h"
 #include "av1/common/warped_motion.h"
+#include "av1/encoder/cost.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +84,30 @@ typedef struct {
   // Number of workers for which thread_data is allocated.
   int8_t allocated_workers;
 } AV1GlobalMotionSync;
+
+// Cost (in bits) to signal a given global motion type
+// This is only the cost of signaling a given type, and does not
+// take into account the cost of the associated parameters.
+//
+// Unusable types are assigned a cost of 1000 bits here so that,
+// even if they somehow make it through the encoder, they are extremely
+// unlikely to be chosen
+#define GM_TYPE_UNUSABLE_COST (1000 << AV1_PROB_COST_SHIFT)
+static const int gm_type_cost[TRANS_TYPES] = {
+  1 << AV1_PROB_COST_SHIFT,  // IDENTITY
+  3 << AV1_PROB_COST_SHIFT,  // TRANSLATION
+  GM_TYPE_UNUSABLE_COST,     // ROTATION
+  GM_TYPE_UNUSABLE_COST,     // ZOOM
+  GM_TYPE_UNUSABLE_COST,     // VERTSHEAR
+  GM_TYPE_UNUSABLE_COST,     // HORZSHEAR
+  GM_TYPE_UNUSABLE_COST,     // UZOOM
+  2 << AV1_PROB_COST_SHIFT,  // ROTZOOM
+  GM_TYPE_UNUSABLE_COST,     // ROTUZOOM
+  3 << AV1_PROB_COST_SHIFT,  // AFFINE
+  GM_TYPE_UNUSABLE_COST,     // VERTRAPEZOID
+  GM_TYPE_UNUSABLE_COST,     // HORTRAPEZOID
+  GM_TYPE_UNUSABLE_COST,     // HOMOGRAPHY
+};
 
 void av1_convert_model_to_params(const double *params,
                                  WarpedMotionParams *model);

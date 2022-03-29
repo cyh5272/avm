@@ -39,8 +39,11 @@ const int npoints = 100;
 const double noise_level = 0.5;
 const int test_iters = 100;
 
-static const char *model_type_names[] = { "IDENTITY", "TRANSLATION", "ROTZOOM",
-                                          "AFFINE" };
+static const char *model_type_names[] = {
+  "IDENTITY",     "TRANSLATION",  "ROTATION",  "ZOOM",     "VERTSHEAR",
+  "HORZSHEAR",    "UZOOM",        "ROTZOOM",   "ROTUZOOM", "AFFINE",
+  "VERTRAPEZOID", "HORTRAPEZOID", "HOMOGRAPHY"
+};
 
 static double random_double(ACMRandom &rnd, double min_, double max_) {
   return min_ + (max_ - min_) * (rnd.Rand31() / (double)(1LL << 31));
@@ -59,6 +62,54 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[1] = random_double(rnd, -128.0, 128.0);
       break;
 
+    case ROTATION: {
+      double angle = random_double(rnd, -M_PI_4, M_PI_4);
+      double c = cos(angle);
+      double s = sin(angle);
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = c;
+      model[3] = s;
+      model[4] = -s;
+      model[5] = c;
+    } break;
+
+    case ZOOM:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[3] = 0;
+      model[4] = 0;
+      model[5] = model[2];
+      break;
+
+    case VERTSHEAR:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0;
+      model[3] = 0;
+      model[4] = random_double(rnd, -0.25, 0.25);
+      model[5] = 1.0;
+      break;
+
+    case HORZSHEAR:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0;
+      model[3] = random_double(rnd, -0.25, 0.25);
+      model[4] = 0;
+      model[5] = 1.0;
+      break;
+
+    case UZOOM:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[3] = 0;
+      model[4] = 0;
+      model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
+      break;
+
     case ROTZOOM:
       model[0] = random_double(rnd, -128.0, 128.0);
       model[1] = random_double(rnd, -128.0, 128.0);
@@ -68,6 +119,26 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[5] = model[2];
       break;
 
+    case ROTUZOOM: {
+      // ROTUZOOM models consist of a zoom followed by a rotation,
+      // which can be expressed as:
+      //
+      // ( c  s) * (a  0) = ( a*c  b*s)
+      // (-s  c)   (0  b)   (-a*s  b*c)
+      double zoom_x = 1.0 + random_double(rnd, -0.25, 0.25);
+      double zoom_y = 1.0 + random_double(rnd, -0.25, 0.25);
+      double angle = random_double(rnd, -M_PI_4, M_PI_4);
+      double c = cos(angle);
+      double s = sin(angle);
+
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = zoom_x * c;
+      model[3] = zoom_y * s;
+      model[4] = -zoom_x * s;
+      model[5] = zoom_y * c;
+    } break;
+
     case AFFINE:
       model[0] = random_double(rnd, -128.0, 128.0);
       model[1] = random_double(rnd, -128.0, 128.0);
@@ -75,6 +146,39 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[3] = random_double(rnd, -0.25, 0.25);
       model[4] = random_double(rnd, -0.25, 0.25);
       model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
+      break;
+
+    case VERTRAPEZOID:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[3] = 0.0;
+      model[4] = random_double(rnd, -0.25, 0.25);
+      model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[6] = random_double(rnd, -0.25, 0.25);
+      model[7] = 0.0;
+      break;
+
+    case HORTRAPEZOID:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[3] = random_double(rnd, -0.25, 0.25);
+      model[4] = 0.0;
+      model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[6] = 0.0;
+      model[7] = random_double(rnd, -0.25, 0.25);
+      break;
+
+    case HOMOGRAPHY:
+      model[0] = random_double(rnd, -128.0, 128.0);
+      model[1] = random_double(rnd, -128.0, 128.0);
+      model[2] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[3] = random_double(rnd, -0.25, 0.25);
+      model[4] = random_double(rnd, -0.25, 0.25);
+      model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
+      model[6] = random_double(rnd, -0.25, 0.25);
+      model[7] = random_double(rnd, -0.25, 0.25);
       break;
 
     default: assert(0); break;
@@ -197,7 +301,8 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
         printf("Fitted model:       ");
         print_model(fitted_model);
         printf("\n");
-        printf("RMS error: Ground truth = %f, fitted = %f\n", ground_truth_rms, fitted_rms);
+        printf("RMS error: Ground truth = %f, fitted = %f\n", ground_truth_rms,
+              fitted_rms);
       }
 #else
       // Suppress unused variable warnings
@@ -211,7 +316,19 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
       //
       // However, in practice, we want to allow a bit of leeway for numerical
       // imprecision.
-      ASSERT_LE(fitted_rms, 1.25 * ground_truth_rms)
+      //
+      // Note: The trapezoid and homography models seem to have an overall
+      // error which is very high, and grows greater-than-linearly with the
+      // noise level, whereas the other models' errors grow remain close to
+      // optimal. This has not been fully investigated yet, but suggests that
+      // the condition number of these problems is very high.
+      double relative_threshold;
+      if (type <= AFFINE) {
+        relative_threshold = 1.25;
+      } else {
+        relative_threshold = 15.0;
+      }
+      ASSERT_LE(fitted_rms, relative_threshold * ground_truth_rms)
           << "Fitted model for type = " << model_type_names[type]
           << ", iter = " << iter << " is worse than ground truth model";
     }
@@ -226,6 +343,12 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
 TEST_P(AomFlowEstimationTest, Test) { RunTest(); }
 
 INSTANTIATE_TEST_SUITE_P(C, AomFlowEstimationTest,
-                         ::testing::Values(TRANSLATION, ROTZOOM, AFFINE));
+                         ::testing::Values(TRANSLATION, ROTATION, ZOOM,
+                                           VERTSHEAR, HORZSHEAR, UZOOM, ROTZOOM,
+                                           ROTUZOOM, AFFINE
+                                           // VERTRAPEZOID,
+                                           // HORTRAPEZOID,
+                                           // HOMOGRAPHY
+                                           ));
 
 }  // namespace

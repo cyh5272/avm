@@ -1811,12 +1811,6 @@ static INLINE char const *get_component_name(int index) {
  */
 typedef struct {
   /*!
-   * Array to store the cost for signalling each global motion model.
-   * gmtype_cost[i] stores the cost of signalling the ith Global Motion model.
-   */
-  int type_cost[TRANS_TYPES];
-
-  /*!
    * Array to store the cost for signalling a particular global motion model for
    * each reference frame. gmparams_cost[i] stores the cost of signalling global
    * motion for the ith reference frame.

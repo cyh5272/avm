@@ -259,8 +259,7 @@ void av1_compute_gm_for_valid_ref_frames(
 #else
                          cm->features.fr_mv_precision) +
 #endif
-      gm_info->type_cost[cm->global_motion[frame].wmtype] -
-      gm_info->type_cost[IDENTITY];
+      gm_type_cost[cm->global_motion[frame].wmtype] - gm_type_cost[IDENTITY];
 }
 
 // Loops over valid reference frames and computes global motion estimation.
