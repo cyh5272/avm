@@ -1417,11 +1417,10 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 //
 // Usage:
 // - For CONFIG_WIENER_NONSEP filters sum to zero. This constrains the
-// center-tap. Call with
+// center-tap:
 //   singleton_tap = (1 << filter_config->prec_bits) and
 //   num_sym_taps = filter_config->num_pixels / 2
-// - For CONFIG_PC_WIENER center tap is unconstrained.
-// Call with,
+// - For CONFIG_PC_WIENER center tap is unconstrained:
 //   const int singleton_tap_index =
 //        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
 //   singleton_tap = (1 << filter_config->prec_bits)
@@ -1447,11 +1446,18 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
                                    const int16_t *filter, uint16_t *dst,
                                    int dst_stride, int bit_depth,
                                    int block_row_begin, int block_row_end,
-                                   int block_col_begin, int block_col_end,
-                                   int num_sym_taps, int32_t singleton_tap) {
+                                   int block_col_begin, int block_col_end) {
   // Begin compute conveniences.
   // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
   // Once finalized, inline this routine.
+  const int num_sym_taps = filter_config->num_pixels / 2;
+  int32_t singleton_tap = 1 << filter_config->prec_bits;
+  if (filter_config->num_pixels % 2) {
+    // Center-tap is unconstrained.
+    const int singleton_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    singleton_tap += filter[singleton_tap_index];
+  }
   assert(num_sym_taps <= 24);
   int16_t compute_buffer[24];
   int pixel_offset_diffs[24];
