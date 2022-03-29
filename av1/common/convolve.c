@@ -1447,9 +1447,6 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
                                    int dst_stride, int bit_depth,
                                    int block_row_begin, int block_row_end,
                                    int block_col_begin, int block_col_end) {
-  // Begin compute conveniences.
-  // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
-  // Once finalized, inline this routine.
   const int num_sym_taps = filter_config->num_pixels / 2;
   int32_t singleton_tap = 1 << filter_config->prec_bits;
   if (filter_config->num_pixels % 2) {
@@ -1458,6 +1455,10 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
         filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
     singleton_tap += filter[singleton_tap_index];
   }
+  
+  // Begin compute conveniences.
+  // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
+  // Once finalized, inline this routine.
   assert(num_sym_taps <= 24);
   int16_t compute_buffer[24];
   int pixel_offset_diffs[24];
