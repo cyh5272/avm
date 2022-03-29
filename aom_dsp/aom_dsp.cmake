@@ -185,6 +185,7 @@ if(CONFIG_AV1_ENCODER)
     "${AOM_ROOT}/aom_dsp/fwd_txfm.c"
     "${AOM_ROOT}/aom_dsp/grain_table.c"
     "${AOM_ROOT}/aom_dsp/grain_table.h"
+    "${AOM_ROOT}/aom_dsp/linalg.c"
     "${AOM_ROOT}/aom_dsp/noise_model.c"
     "${AOM_ROOT}/aom_dsp/noise_model.h"
     "${AOM_ROOT}/aom_dsp/noise_util.c"

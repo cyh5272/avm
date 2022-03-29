@@ -16,11 +16,11 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "aom_dsp/linalg.h"
 #include "aom_dsp/flow_estimation/ransac.h"
 #include "aom_mem/aom_mem.h"
 
 // TODO(rachelbarker): Remove dependence on code in av1/encoder/
-#include "av1/encoder/mathutils.h"
 #include "av1/encoder/random.h"
 
 #define MAX_MINPTS 4
