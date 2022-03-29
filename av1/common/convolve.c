@@ -1477,7 +1477,8 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
       for (int k = 0; k < num_sym_taps; ++k) {
         const int diff = pixel_offset_diffs[k];
 #if SUBTRACT_CENTER
-        const int16_t tmp_sum = dgd[dgd_id - diff] - dgd[dgd_id];
+        const int16_t tmp_sum = 
+            clip_base(dgd[dgd_id - diff] - dgd[dgd_id], bit_depth);
 #else
         const int16_t tmp_sum = dgd[dgd_id - diff];
 #endif                                // SUBTRACT_CENTER
@@ -1486,7 +1487,8 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
       for (int k = 0; k < num_sym_taps; ++k) {
         const int diff = pixel_offset_diffs[k];
 #if SUBTRACT_CENTER
-        const int16_t tmp_sum = dgd[dgd_id + diff] - dgd[dgd_id];
+        const int16_t tmp_sum = 
+            clip_base(dgd[dgd_id + diff] - dgd[dgd_id], bit_depth);
 #else
         const int16_t tmp_sum = dgd[dgd_id + diff];
 #endif                                 // SUBTRACT_CENTER
