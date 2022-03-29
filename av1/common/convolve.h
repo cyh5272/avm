@@ -59,6 +59,12 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd, int width, int height,
                                 int stride, const NonsepFilterConfig *config,
                                 const int16_t *filter, uint8_t *dst,
                                 int dst_stride, int bit_depth);
+void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
+                                   const NonsepFilterConfig *filter_config,
+                                   const int16_t *filter, uint16_t *dst,
+                                   int dst_stride, int bit_depth,
+                                   int block_row_begin, int block_row_end,
+                                   int block_col_begin, int block_col_end);
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *config,
                               const int16_t *filter, uint8_t *dst,
