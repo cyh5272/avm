@@ -1455,7 +1455,6 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
         filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
     singleton_tap += filter[singleton_tap_index];
   }
-  
   // Begin compute conveniences.
   // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
   // Once finalized, inline this routine.
