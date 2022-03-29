@@ -928,9 +928,7 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #if ADAPTIVE_PRECISION_SETS
     set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
     set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
 
     int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
@@ -1372,12 +1370,7 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
 #endif
   MV diff = kZeroMv;
 #if IMPROVED_AMVD && CONFIG_ADAPTIVE_MVD
-#if CONFIG_FLEX_MVRES
-#if DISABLE_EIGHTSPEL_FOR_AMVD
-  if (is_adaptive_mvd && precision > MV_PRECISION_QTR_PEL)
-    precision = MV_PRECISION_QTR_PEL;
-#endif
-#else
+#if !CONFIG_FLEX_MVRES
   if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
     precision = MV_SUBPEL_LOW_PRECISION;
 #endif
@@ -1596,9 +1589,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
 #if ADAPTIVE_PRECISION_SETS
   set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
   set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
 
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
@@ -2083,10 +2074,6 @@ MvSubpelPrecision av1_read_pb_mv_precision(AV1_COMMON *const cm,
   const MvSubpelPrecision max_precision = mbmi->max_mv_precision;
   const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
 
-#if !SIGNAL_MOST_PROBABLE_PRECISION
-  int nsymbs = max_precision + 1;
-#endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
   assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
   assert(mbmi->most_probable_pb_mv_precision ==
          cm->features.most_probable_fr_mv_precision);
@@ -2112,7 +2099,6 @@ MvSubpelPrecision av1_read_pb_mv_precision(AV1_COMMON *const cm,
   int nsymbs = mbmi->max_mv_precision;
   int down_mpp = mbmi->max_mv_precision - mbmi->most_probable_pb_mv_precision;
 #endif
-#endif
 
   int down = aom_read_symbol(
       r,
@@ -2122,9 +2108,7 @@ MvSubpelPrecision av1_read_pb_mv_precision(AV1_COMMON *const cm,
 #if ADAPTIVE_PRECISION_SETS
   return av1_get_precision_from_index(mbmi, down);
 #else
-#if SIGNAL_MOST_PROBABLE_PRECISION
   if (down >= down_mpp) down++;
-#endif
   return (MvSubpelPrecision)(max_precision - down);
 #endif
 }
@@ -2166,9 +2150,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if ADAPTIVE_PRECISION_SETS
   set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
   set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif  // CONFIG_FLEX_MVRES
 
   av1_collect_neighbors_ref_counts(xd);
@@ -2241,9 +2223,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if ADAPTIVE_PRECISION_SETS
         set_precision_set(cm, xd, mbmi, bsize, mbmi->ref_mv_idx);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
         set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
         mbmi->pb_mv_precision = av1_read_pb_mv_precision(cm, xd, r);
       }
 #endif  // CONFIG_FLEX_MVRES

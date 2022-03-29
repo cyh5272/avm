@@ -338,11 +338,8 @@ static AOM_INLINE void keep_one_mv_stat(
 #if CONFIG_FLEX_MVRES
     ,
     const MvSubpelPrecision max_mv_precision, const int allow_pb_mv_precision,
-    const MvSubpelPrecision pb_mv_precision
-#if SIGNAL_MOST_PROBABLE_PRECISION
-    ,
+    const MvSubpelPrecision pb_mv_precision,
     const int most_probable_pb_mv_precision
-#endif
 #if CONFIG_FLEX_MVRES
     ,
     const MB_MODE_INFO *mbmi
@@ -424,8 +421,6 @@ static AOM_INLINE void keep_one_mv_stat(
     update_cdf(joint_cdf, mv_joint, MV_JOINTS);
 
 #if CONFIG_FLEX_MVRES
-
-#if SIGNAL_MOST_PROBABLE_PRECISION
   int flex_mv_rate = 0;
   if (allow_pb_mv_precision) {
     const int mpp_flag = (pb_mv_precision == most_probable_pb_mv_precision);
@@ -450,21 +445,10 @@ static AOM_INLINE void keep_one_mv_stat(
       update_cdf(pb_mv_precision_cdf, down, nsymbs);
     }
 
-#if CONFIG_FLEX_MVRES && SIGNAL_MOST_PROBABLE_PRECISION
+#if CONFIG_FLEX_MVRES
     mv_stats->precision_count[pb_mv_precision]++;
 #endif
   }
-#else
-
-  const int flex_mv_rate =
-      allow_pb_mv_precision
-          ? get_symbol_cost(pb_mv_precision_cdf,
-                            (max_mv_precision - pb_mv_precision))
-          : 0;
-  if (allow_pb_mv_precision)
-    update_cdf(pb_mv_precision_cdf, (max_mv_precision - pb_mv_precision),
-               max_mv_precision + 1);
-#endif
 
   mv_stats->total_mv_rate += flex_mv_rate;
   mv_stats->hp_total_mv_rate += flex_mv_rate;
@@ -546,9 +530,7 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
       is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
   MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
   assert(pb_mv_precision == mbmi->pb_mv_precision);
-#if SIGNAL_MOST_PROBABLE_PRECISION
   const int most_probable_pb_mv_precision = mbmi->most_probable_pb_mv_precision;
-#endif
 #endif
 
   if (mode == NEWMV ||
@@ -567,15 +549,8 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
       keep_one_mv_stat(mv_stats, &ref_mv, &cur_mv, cpi
 #if CONFIG_FLEX_MVRES
                        ,
-                       max_mv_precision, allow_pb_mv_precision, pb_mv_precision
-#if SIGNAL_MOST_PROBABLE_PRECISION
-                       ,
-                       most_probable_pb_mv_precision
-#endif
-#if CONFIG_FLEX_MVRES
-                       ,
-                       mbmi
-#endif
+                       max_mv_precision, allow_pb_mv_precision, pb_mv_precision,
+                       most_probable_pb_mv_precision, mbmi
 #endif
 
       );
@@ -613,15 +588,8 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
     keep_one_mv_stat(mv_stats, &ref_mv, &cur_mv, cpi
 #if CONFIG_FLEX_MVRES
                      ,
-                     max_mv_precision, allow_pb_mv_precision, pb_mv_precision
-#if SIGNAL_MOST_PROBABLE_PRECISION
-                     ,
-                     most_probable_pb_mv_precision
-#endif
-#if CONFIG_FLEX_MVRES
-                     ,
-                     mbmi
-#endif
+                     max_mv_precision, allow_pb_mv_precision, pb_mv_precision,
+                     most_probable_pb_mv_precision, mbmi
 #endif
     );
   } else {
@@ -817,7 +785,7 @@ static AOM_INLINE int get_smart_mv_prec(AV1_COMP *cpi, const MV_STATS *mv_stats,
   return use_high_hp;
 }
 
-#if CONFIG_FLEX_MVRES && SIGNAL_MOST_PROBABLE_PRECISION
+#if CONFIG_FLEX_MVRES
 static AOM_INLINE int get_most_probable_mv_prec(AV1_COMP *cpi,
                                                 const MV_STATS *mv_stats,
                                                 int current_q) {
@@ -862,15 +830,8 @@ void av1_pick_and_set_high_precision_mv(AV1_COMP *cpi, int qindex) {
 #if CONFIG_FLEX_MVRES
   cpi->common.features.use_sb_mv_precision = 0;
   cpi->common.features.use_pb_mv_precision = 1;
-#if SIGNAL_MOST_PROBABLE_PRECISION
-#if SET_HALF_PRECISION_AS_MPP
-  cpi->common.features.most_probable_fr_mv_precision = MV_PRECISION_HALF_PEL;
-#else
   cpi->common.features.most_probable_fr_mv_precision =
       cpi->common.features.fr_mv_precision;
-#endif
-  // get_most_probable_mv_prec(cpi, &cpi->mv_stats, qindex);
-#endif
 
 #endif  // CONFIG_FLEX_MVRES
 #else

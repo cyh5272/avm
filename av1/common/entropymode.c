@@ -1409,7 +1409,6 @@ static const aom_cdf_prob
       { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
     };
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
 static const aom_cdf_prob
     default_pb_mv_most_probable_precision_cdf[NUM_MV_PREC_MPP_CONTEXT]
                                              [CDF_SIZE(2)] = {
@@ -1417,11 +1416,8 @@ static const aom_cdf_prob
                                                { AOM_CDF2(24320) },
                                                { AOM_CDF2(24320) },
                                              };
-#endif
-
-#if SIGNAL_MOST_PROBABLE_PRECISION
 #if ADAPTIVE_PRECISION_SETS
-#if BLOCK_BASED_PRECISION_ADAPTATION
+#if MODE_BASED_PRECISION_ADAPTATION
 static const aom_cdf_prob default_pb_mv_precision_cdf
     [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
     [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
@@ -1449,7 +1445,7 @@ static const aom_cdf_prob default_pb_mv_precision_cdf
 
       }
     };
-#elif NUMBER_OF_SUPPORTED_PRECISIONS == 4
+#elif MAX_NUM_OF_SUPPORTED_PRECISIONS == 4
 static const aom_cdf_prob
     default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
                                [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
@@ -1465,7 +1461,7 @@ static const aom_cdf_prob
                                      { AOM_CDF3(24000, 29000) },
                                  },
                                };
-#elif NUMBER_OF_SUPPORTED_PRECISIONS == 5
+#elif MAX_NUM_OF_SUPPORTED_PRECISIONS == 5
 static const aom_cdf_prob
     default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
                                [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
@@ -1481,7 +1477,7 @@ static const aom_cdf_prob
                                      { AOM_CDF4(24000, 29000, 31000) },
                                  },
                                };
-#elif NUMBER_OF_SUPPORTED_PRECISIONS == 3
+#elif MAX_NUM_OF_SUPPORTED_PRECISIONS == 3
 static const aom_cdf_prob
     default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
                                [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
@@ -1514,21 +1510,6 @@ static const aom_cdf_prob default_pb_mv_precision_cdf
           { AOM_CDF5(22980, 25479, 27781, 29986) },
           { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
 
-      },
-    };
-#endif
-
-#else
-static const aom_cdf_prob default_pb_mv_precision_cdf
-    [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
-    [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
-      { { AOM_CDF5(22980, 25479, 27781, 29986) },
-        { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
-        { AOM_CDF7(30988, 31204, 31479, 31734, 31983, 32325) } },
-      {
-          { AOM_CDF5(22980, 25479, 27781, 29986) },
-          { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
-          { AOM_CDF7(30988, 31204, 31479, 31734, 31983, 32325) },
       },
     };
 #endif
@@ -1853,9 +1834,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #if CONFIG_FLEX_MVRES
   av1_copy(fc->sb_mv_precision_cdf, default_sb_mv_precision_cdf);
   av1_copy(fc->pb_mv_precision_cdf, default_pb_mv_precision_cdf);
-#if SIGNAL_MOST_PROBABLE_PRECISION
   av1_copy(fc->pb_mv_mpp_flag_cdf, default_pb_mv_most_probable_precision_cdf);
-#endif
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_DERIVED_MV
   av1_copy(fc->use_derived_mv_cdf, default_use_derived_mv_cdf);

@@ -157,7 +157,7 @@ void av1_make_default_fullpel_ms_params(
   ms_params->fine_search_interval = fine_search_interval;
 
   ms_params->is_intra_mode = 0;
-#if CONFIG_FLEX_MVRES && FAST_OBMC_REFINEMENT
+#if CONFIG_FLEX_MVRES && REUSE_PREV_MV == 2
   ms_params->fast_obmc_search = (pb_mv_precision == mbmi->max_mv_precision)
                                     ? mv_sf->obmc_full_pixel_search_level
                                     : 1;
@@ -4216,15 +4216,7 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
       get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
 #if CONFIG_FLEX_MVRES
-#if DISABLE_EIGHTSPEL_FOR_AMVD
-      MvSubpelPrecision precision =
-          (mbmi->pb_mv_precision > MV_PRECISION_QTR_PEL)
-              ? MV_PRECISION_QTR_PEL
-              : mbmi->pb_mv_precision;
-      lower_mv_precision(&other_mvd, precision);
-#else
       lower_mv_precision(&other_mvd, mbmi->pb_mv_precision);
-#endif
 #else
       lower_mv_precision(&other_mvd, allow_hp_mvd,
                          cm->features.cur_frame_force_integer_mv);

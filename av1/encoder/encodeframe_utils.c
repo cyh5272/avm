@@ -1376,13 +1376,10 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #endif
 #if CONFIG_FLEX_MVRES
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
   for (int p = 0; p < NUM_MV_PREC_MPP_CONTEXT; ++p) {
     AVG_CDF_STRIDE(ctx_left->pb_mv_mpp_flag_cdf[p],
                    ctx_tr->pb_mv_mpp_flag_cdf[p], 2, CDF_SIZE(2));
   }
-#endif
-
   for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
 #if ADAPTIVE_PRECISION_SETS
     int mb_precision_set = (p == MV_PRECISION_QTR_PEL);
@@ -1400,9 +1397,6 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #else
 
           p
-#if !SIGNAL_MOST_PROBABLE_PRECISION
-              + 1
-#endif
 #endif
 
           ,

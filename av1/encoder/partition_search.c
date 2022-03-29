@@ -1355,7 +1355,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_ADAPTIVE_MVD
         assert(!is_adaptive_mvd);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
         assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
         const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
         const int mpp_flag =
@@ -1375,21 +1374,13 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
               mbmi->max_mv_precision - mbmi->most_probable_pb_mv_precision;
           if (down > down_mpp) down--;
 #endif
-#endif
 
           const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
 
-#if !SIGNAL_MOST_PROBABLE_PRECISION
-          int down = mbmi->max_mv_precision - mbmi->pb_mv_precision;
-          const int nsymbs = mbmi->max_mv_precision + 1;
-#endif
           update_cdf(fc->pb_mv_precision_cdf[down_ctx][mbmi->max_mv_precision -
                                                        MV_PRECISION_HALF_PEL],
                      down, nsymbs);
-
-#if SIGNAL_MOST_PROBABLE_PRECISION
         }
-#endif
       }
 #endif  // CONFIG_FLEX_MVRES
 

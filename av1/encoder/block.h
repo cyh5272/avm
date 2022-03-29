@@ -94,7 +94,7 @@ typedef struct {
   THR_MODES mode_index;
 } WinnerModeStats;
 
-#if CONFIG_FLEX_MVRES
+#if CONFIG_FLEX_MVRES && MODEL_RDO_BASED_SEARCH
 typedef struct {
   //! The best mbmi mode.
   MB_MODE_INFO best_mbmi;
@@ -727,10 +727,8 @@ typedef struct {
 #endif  // CONFIG_NEW_INTER_MODES
 
 #if CONFIG_FLEX_MVRES
-#if SIGNAL_MOST_PROBABLE_PRECISION
   /*! Costs for coding the most probable mv resolution. */
   int pb_block_mv_mpp_flag_costs[NUM_MV_PREC_MPP_CONTEXT][2];
-#endif
 
   /*! Costs for coding the mv resolution. */
   int pb_block_mv_precision_costs[MV_PREC_DOWN_CONTEXTS][FLEX_MV_COSTS_SIZE]

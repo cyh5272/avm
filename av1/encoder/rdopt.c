@@ -770,17 +770,9 @@ typedef struct InterModeSearchState {
   int single_newmv_valid[MAX_REF_MV_SEARCH][REF_FRAMES];
 #endif
 
-#if REFACTOR_MODEL_RD
-  int64_t modelled_rd[MB_MODE_COUNT][NUM_MV_PRECISIONS][MAX_REF_MV_SEARCH]
-                     [REF_FRAMES];
-  // The rd of simple translation in single inter modes
-  int64_t simple_rd[MB_MODE_COUNT][NUM_MV_PRECISIONS][MAX_REF_MV_SEARCH]
-                   [REF_FRAMES];
-#else
   int64_t modelled_rd[MB_MODE_COUNT][MAX_REF_MV_SEARCH][REF_FRAMES];
   // The rd of simple translation in single inter modes
   int64_t simple_rd[MB_MODE_COUNT][MAX_REF_MV_SEARCH][REF_FRAMES];
-#endif
 
   int64_t best_single_rd[REF_FRAMES];
   PREDICTION_MODE best_single_mode[REF_FRAMES];
@@ -1189,44 +1181,34 @@ static int cost_mv_ref(const ModeCosts *const mode_costs, PREDICTION_MODE mode,
 static int cost_mv_precision(const ModeCosts *const mode_costs,
                              MvSubpelPrecision max_mv_precision,
                              MvSubpelPrecision pb_mv_precision,
-                             const int down_ctx
-#if SIGNAL_MOST_PROBABLE_PRECISION
-                             ,
+                             const int down_ctx,
                              MvSubpelPrecision most_probable_pb_mv_precision,
                              const int mpp_flag_context
-#endif
 #if ADAPTIVE_PRECISION_SETS
                              ,
                              const MB_MODE_INFO *mbmi
 #endif
 ) {
   int flex_mv_cost = 0;
-#if SIGNAL_MOST_PROBABLE_PRECISION
   const int mpp_flag = (pb_mv_precision == most_probable_pb_mv_precision);
   flex_mv_cost +=
       (mode_costs->pb_block_mv_mpp_flag_costs[mpp_flag_context][mpp_flag]);
 
   if (!mpp_flag) {
-#endif
-
 #if ADAPTIVE_PRECISION_SETS
     int down = av1_get_pb_mv_precision_index(mbmi);
     assert(down >= 0);
 #else
-  int down = max_mv_precision - pb_mv_precision;
-#if SIGNAL_MOST_PROBABLE_PRECISION
-  int down_mpp = max_mv_precision - most_probable_pb_mv_precision;
-  if (down > down_mpp) down--;
-#endif
+    int down = max_mv_precision - pb_mv_precision;
+    int down_mpp = max_mv_precision - most_probable_pb_mv_precision;
+    if (down > down_mpp) down--;
 #endif
 
     flex_mv_cost +=
         (mode_costs->pb_block_mv_precision_costs[down_ctx]
                                                 [max_mv_precision -
                                                  MV_PRECISION_HALF_PEL][down]);
-#if SIGNAL_MOST_PROBABLE_PRECISION
   }
-#endif
 
   return flex_mv_cost;
 }
@@ -1527,21 +1509,13 @@ static int skip_repeated_mv(const AV1_COMMON *const cm,
   if (compare_mode == MB_MODE_COUNT) {
     return 0;
   }
-#if REFACTOR_MODEL_RD
-  const MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
-  if (search_state->modelled_rd[compare_mode][mbmi->pb_mv_precision][0]
-                               [ref_frames[0]] == INT64_MAX) {
-#else
   if (search_state->modelled_rd[compare_mode][0][ref_frames[0]] == INT64_MAX) {
-#endif
     return 0;
   }
   const int16_t mode_ctx =
       av1_mode_context_analyzer(mbmi_ext->mode_context, ref_frames);
 #if CONFIG_OPTFLOW_REFINEMENT
-#if !REFACTOR_MODEL_RD
   const MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
-#endif
   const int compare_cost =
       cost_mv_ref(&x->mode_costs, compare_mode, cm, mbmi, mode_ctx);
   const int this_cost =
@@ -1553,15 +1527,9 @@ static int skip_repeated_mv(const AV1_COMMON *const cm,
 
   // Only skip if the mode cost is larger than compare mode cost
   if (this_cost > compare_cost) {
-#if REFACTOR_MODEL_RD
-    search_state
-        ->modelled_rd[this_mode][mbmi->pb_mv_precision][0][ref_frames[0]] =
-        search_state->modelled_rd[compare_mode][mbmi->pb_mv_precision][0]
-                                 [ref_frames[0]];
-#else
     search_state->modelled_rd[this_mode][0][ref_frames[0]] =
         search_state->modelled_rd[compare_mode][0][ref_frames[0]];
-#endif
+
     return 1;
   }
   return 0;
@@ -1682,7 +1650,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 
   if (is_comp_pred) {
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
     int valid_mv0_found = 0;
     int valid_precision_mv0 = NUM_MV_PRECISIONS;
     for (int prev_mv_precision = pb_mv_precision;
@@ -1725,7 +1693,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
       if (valid_mv0) {
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
         cur_mv[0].as_int =
             args->single_newmv[valid_precision_mv0][ref_mv_idx][refs[0]].as_int;
 #else
@@ -1743,7 +1711,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
       if (valid_mv1) {
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
         cur_mv[1].as_int =
             args->single_newmv[valid_precision_mv1][ref_mv_idx][refs[1]].as_int;
 #else
@@ -1795,7 +1763,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 #endif  // CONFIG_NEW_INTER_MODES
       if (valid_mv1) {
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
         cur_mv[1].as_int =
             args->single_newmv[valid_precision_mv1][ref_mv_idx][refs[1]].as_int;
 #else
@@ -1812,7 +1780,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #if CONFIG_ADAPTIVE_MVD
       if (cm->seq_params.enable_adaptive_mvd) {
-#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV && !ENABLE_FLEX_MV_FOR_NEW_NEAR
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
         CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
                       " pb and max mv precision value should be same");
 #endif
@@ -1877,7 +1845,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       ) {
         cur_mv[jmvd_base_ref_list].as_int =
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
             args->single_newmv[jmvd_base_ref_list == 0 ? valid_precision_mv0
                                                        : valid_precision_mv1]
                               [ref_mv_idx][refs[jmvd_base_ref_list]]
@@ -1912,7 +1880,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 #endif  // CONFIG_NEW_INTER_MODES
       if (valid_mv0) {
 #if CONFIG_FLEX_MVRES
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
         cur_mv[0].as_int =
             args->single_newmv[valid_precision_mv0][ref_mv_idx][refs[0]].as_int;
 #else
@@ -1930,7 +1898,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #if CONFIG_ADAPTIVE_MVD
       if (cm->seq_params.enable_adaptive_mvd) {
-#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV && !ENABLE_FLEX_MV_FOR_NEW_NEAR
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
         CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
                       " pb and max mv precision value should be same");
 #endif
@@ -1994,7 +1962,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
     if (do_refine_ms) {
       // for (int prev_mv_precision = mbmi->max_mv_precision; prev_mv_precision
       // > pb_mv_precision; prev_mv_precision--) {
-#if REUSE_PREV_PRECISIONS
+#if REUSE_PREV_MV == 2
       for (int prev_mv_precision = pb_mv_precision;
            prev_mv_precision <= mbmi->max_mv_precision; prev_mv_precision++) {
 #else
@@ -2533,12 +2501,7 @@ static int64_t motion_mode_rd(
 
     const int64_t tmp_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
     if (mode_index == 0) {
-#if REFACTOR_MODEL_RD
-      args->simple_rd[this_mode][mbmi->pb_mv_precision][mbmi->ref_mv_idx]
-                     [mbmi->ref_frame[0]] = tmp_rd;
-#else
       args->simple_rd[this_mode][mbmi->ref_mv_idx][mbmi->ref_frame[0]] = tmp_rd;
-#endif
     }
     if (mode_index == 0 || tmp_rd < best_rd) {
       // Update best_rd data if this is the best motion mode so far
@@ -3565,19 +3528,11 @@ end:
         &cpi->common, x, best_mbmi, best_rd_stats, best_rd_stats_y,
         best_rd_stats_uv, mode_enum, NULL, bsize, *best_rd,
         cpi->sf.winner_mode_sf.multi_winner_mode_type, do_tx_search);
-#if REFACTOR_MODEL_RD
-    args->modelled_rd[this_mode][this_pb_mv_precision][ref_mv_idx][refs[0]] =
-        args->modelled_rd[this_mode][tmp_prev_pb_mv_precision]
-                         [tmp_prev_ref_mv_idx][refs[0]];
-    args->simple_rd[this_mode][this_pb_mv_precision][ref_mv_idx][refs[0]] =
-        args->simple_rd[this_mode][tmp_prev_pb_mv_precision]
-                       [tmp_prev_ref_mv_idx][refs[0]];
-#else
     args->modelled_rd[this_mode][ref_mv_idx][refs[0]] =
         args->modelled_rd[this_mode][tmp_prev_ref_mv_idx][refs[0]];
     args->simple_rd[this_mode][ref_mv_idx][refs[0]] =
         args->simple_rd[this_mode][tmp_prev_ref_mv_idx][refs[0]];
-#endif
+
     mode_info[this_pb_mv_precision][ref_mv_idx].rd =
         mode_info[tmp_prev_pb_mv_precision][tmp_prev_ref_mv_idx].rd;
     mode_info[this_pb_mv_precision][ref_mv_idx].rate_mv = this_rate_mv;
@@ -3703,17 +3658,10 @@ static int skip_repeated_newmv(
         &cpi->common, x, best_mbmi, best_rd_stats, best_rd_stats_y,
         best_rd_stats_uv, mode_enum, NULL, bsize, *best_rd,
         cpi->sf.winner_mode_sf.multi_winner_mode_type, do_tx_search);
-#if REFACTOR_MODEL_RD
-    args->modelled_rd[this_mode][pb_mv_precision][ref_mv_idx][refs[0]] =
-        args->modelled_rd[this_mode][pb_mv_precision][i][refs[0]];
-    args->simple_rd[this_mode][pb_mv_precision][ref_mv_idx][refs[0]] =
-        args->simple_rd[this_mode][pb_mv_precision][i][refs[0]];
-#else
     args->modelled_rd[this_mode][ref_mv_idx][refs[0]] =
         args->modelled_rd[this_mode][i][refs[0]];
     args->simple_rd[this_mode][ref_mv_idx][refs[0]] =
         args->simple_rd[this_mode][i][refs[0]];
-#endif
     mode_info[ref_mv_idx].rd = mode_info[i].rd;
     mode_info[ref_mv_idx].rate_mv = this_rate_mv;
     mode_info[ref_mv_idx].mv.as_int = mode_info[i].mv.as_int;
@@ -4180,7 +4128,7 @@ static int64_t handle_inter_mode(
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   MB_MODE_INFO best_mbmi = *mbmi;
   int best_xskip_txfm = 0;
-#if !MODEL_RDO_BASED_SEARCH
+#if !CONFIG_FLEX_MVRES || !MODEL_RDO_BASED_SEARCH
   int64_t newmv_ret_val = INT64_MAX;
 #endif
 #if CONFIG_FLEX_MVRES
@@ -4263,9 +4211,7 @@ static int64_t handle_inter_mode(
   int idx_mask[NUM_MV_PRECISIONS] = { 0, 0, 0, 0, 0, 0, 0 };
   if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
     const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
-#if SIGNAL_MOST_PROBABLE_PRECISION
     const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
-#endif
 #if ADAPTIVE_PRECISION_SETS
     set_precision_set(cm, xd, mbmi, bsize, 0);
     const PRECISION_SET *precision_def =
@@ -4283,11 +4229,8 @@ static int64_t handle_inter_mode(
 #endif
 
       flex_mv_cost[pb_mv_precision] = cost_mv_precision(
-          mode_costs, mbmi->max_mv_precision, pb_mv_precision, down_ctx
-#if SIGNAL_MOST_PROBABLE_PRECISION
-          ,
+          mode_costs, mbmi->max_mv_precision, pb_mv_precision, down_ctx,
           mbmi->most_probable_pb_mv_precision, mpp_flag_context
-#endif
 #if ADAPTIVE_PRECISION_SETS
           ,
           mbmi
@@ -4354,7 +4297,7 @@ static int64_t handle_inter_mode(
                      av1_ref_frame_type(mbmi->ref_frame));
 #endif  // CONFIG_NEW_INTER_MODES
 
-#if !MODEL_RDO_BASED_SEARCH
+#if CONFIG_FLEX_MVRES && !MODEL_RDO_BASED_SEARCH
 
 #if ADAPTIVE_PRECISION_SETS
     set_precision_set(cm, xd, mbmi, bsize, ref_mv_idx);
@@ -4431,7 +4374,7 @@ static int64_t handle_inter_mode(
         continue;
       }
 
-#if MODEL_RDO_BASED_SEARCH
+#if CONFIG_FLEX_MVRES && MODEL_RDO_BASED_SEARCH
       PrecisionStats pb_mv_precision_stats[NUM_MV_PRECISIONS];
       handle_all_mv_precisions(cpi, x, bsize, ref_mv_idx, &cur_mv[0], args,
                                mode_info, drl_cost, idx_mask,
@@ -4735,17 +4678,9 @@ static int64_t handle_inter_mode(
 #endif  // CONFIG_OPTFLOW_REFINEMENT
             const int mode0 = compound_ref0_mode(this_mode);
             const int mode1 = compound_ref1_mode(this_mode);
-#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
             const int64_t mrd =
-                AOMMIN(args->modelled_rd[mode0][mbmi->pb_mv_precision]
-                                        [ref_mv_idx][refs[0]],
-                       args->modelled_rd[mode1][mbmi->pb_mv_precision]
-                                        [ref_mv_idx][refs[1]]);
-#else
-        const int64_t mrd =
-            AOMMIN(args->modelled_rd[mode0][ref_mv_idx][refs[0]],
-                   args->modelled_rd[mode1][ref_mv_idx][refs[1]]);
-#endif
+                AOMMIN(args->modelled_rd[mode0][ref_mv_idx][refs[0]],
+                       args->modelled_rd[mode1][ref_mv_idx][refs[1]]);
 
             if ((rd >> 3) * 6 > mrd && ref_best_rd < INT64_MAX) {
               restore_dst_buf(xd, orig_dst, num_planes);
@@ -4888,9 +4823,7 @@ static int64_t handle_inter_mode(
 #if ADAPTIVE_PRECISION_SETS
     set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
     set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
 
     const int mi_row = xd->mi_row;
@@ -6289,27 +6222,12 @@ static int64_t handle_inter_mode(
         x, mbmi->ref_frame, this_mode);
 
     // Simple rd
-#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
-    int64_t simple_rd =
-        search_state
-            ->simple_rd[this_mode][mbmi->max_mv_precision][0][ref_frame];
-    for (int pb_mv_precision = mbmi->max_mv_precision; pb_mv_precision >= 0;
-         pb_mv_precision--) {
-      for (int ref_mv_idx = 0; ref_mv_idx < ref_set; ++ref_mv_idx) {
-        const int64_t rd =
-            search_state
-                ->simple_rd[this_mode][pb_mv_precision][ref_mv_idx][ref_frame];
-        if (rd < simple_rd) simple_rd = rd;
-      }
+    int64_t simple_rd = search_state->simple_rd[this_mode][0][ref_frame];
+    for (int ref_mv_idx = 1; ref_mv_idx < ref_set; ++ref_mv_idx) {
+      const int64_t rd =
+          search_state->simple_rd[this_mode][ref_mv_idx][ref_frame];
+      if (rd < simple_rd) simple_rd = rd;
     }
-#else
-  int64_t simple_rd = search_state->simple_rd[this_mode][0][ref_frame];
-  for (int ref_mv_idx = 1; ref_mv_idx < ref_set; ++ref_mv_idx) {
-    const int64_t rd =
-        search_state->simple_rd[this_mode][ref_mv_idx][ref_frame];
-    if (rd < simple_rd) simple_rd = rd;
-  }
-#endif
 
     // Insertion sort of single_state
     const SingleInterModeState this_state_s = { simple_rd, ref_frame, 1 };
@@ -6322,26 +6240,12 @@ static int64_t handle_inter_mode(
     search_state->single_state_cnt[dir][mode_offset]++;
 
     // Modelled rd
-#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
-    int64_t modelled_rd =
-        search_state
-            ->modelled_rd[this_mode][mbmi->max_mv_precision][0][ref_frame];
-    for (int pb_mv_precision = mbmi->max_mv_precision; pb_mv_precision >= 0;
-         pb_mv_precision--) {
-      for (int ref_mv_idx = 0; ref_mv_idx < ref_set; ++ref_mv_idx) {
-        const int64_t rd = search_state->modelled_rd[this_mode][pb_mv_precision]
-                                                    [ref_mv_idx][ref_frame];
-        if (rd < modelled_rd) modelled_rd = rd;
-      }
+    int64_t modelled_rd = search_state->modelled_rd[this_mode][0][ref_frame];
+    for (int ref_mv_idx = 1; ref_mv_idx < ref_set; ++ref_mv_idx) {
+      const int64_t rd =
+          search_state->modelled_rd[this_mode][ref_mv_idx][ref_frame];
+      if (rd < modelled_rd) modelled_rd = rd;
     }
-#else
-  int64_t modelled_rd = search_state->modelled_rd[this_mode][0][ref_frame];
-  for (int ref_mv_idx = 1; ref_mv_idx < ref_set; ++ref_mv_idx) {
-    const int64_t rd =
-        search_state->modelled_rd[this_mode][ref_mv_idx][ref_frame];
-    if (rd < modelled_rd) modelled_rd = rd;
-  }
-#endif
 
     // Insertion sort of single_state_modelled
     const SingleInterModeState this_state_m = { modelled_rd, ref_frame, 1 };
@@ -7173,9 +7077,7 @@ static int64_t handle_inter_mode(
 #if ADAPTIVE_PRECISION_SETS
     set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
     set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
     // init params, set frame modes, speed features
     set_params_rd_pick_inter_mode(cpi, x, &args, bsize, &mode_skip_mask,
@@ -7920,9 +7822,7 @@ static int64_t handle_inter_mode(
 #if ADAPTIVE_PRECISION_SETS
     set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
     set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
     av1_count_overlappable_neighbors(cm, xd);
     if (is_motion_variation_allowed_bsize(bsize) && !has_second_ref(mbmi)) {

@@ -412,10 +412,8 @@ typedef struct MB_MODE_INFO {
   MvSubpelPrecision max_mv_precision;
   /*! The mv_precision used by the given partition block. */
   MvSubpelPrecision pb_mv_precision;
-#if SIGNAL_MOST_PROBABLE_PRECISION
   /*! The most probable mv_precision used by the given partition block. */
   MvSubpelPrecision most_probable_pb_mv_precision;
-#endif
 #if ADAPTIVE_PRECISION_SETS
   /*!
    * The precision_set of the current frame.

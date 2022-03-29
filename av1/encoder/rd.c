@@ -400,13 +400,10 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_FLEX_MVRES
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
     for (j = 0; j < NUM_MV_PREC_MPP_CONTEXT; ++j) {
       av1_cost_tokens_from_cdf(mode_costs->pb_block_mv_mpp_flag_costs[j],
                                fc->pb_mv_mpp_flag_cdf[j], NULL);
     }
-#endif
-
     for (i = MV_PRECISION_HALF_PEL; i < NUM_MV_PRECISIONS; ++i) {
       for (j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j)
         av1_cost_tokens_from_cdf(

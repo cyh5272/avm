@@ -194,12 +194,7 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
 #if CONFIG_ADAPTIVE_MVD
     if (is_adaptive_mvd) assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
-#if CONFIG_FLEX_MVRES
-#if DISABLE_EIGHTSPEL_FOR_AMVD
-    if (is_adaptive_mvd && precision > MV_PRECISION_QTR_PEL)
-      precision = MV_PRECISION_QTR_PEL;
-#endif
-#else
+#if !CONFIG_FLEX_MVRES
     if (is_adaptive_mvd && precision > MV_SUBPEL_NONE)
       precision = MV_SUBPEL_LOW_PRECISION;
 #endif
@@ -773,12 +768,7 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
       if (is_adaptive_mvd) {
         assert(j < MV_JOINTS - 1);
 #if IMPROVED_AMVD
-#if CONFIG_FLEX_MVRES
-#if DISABLE_EIGHTSPEL_FOR_AMVD
-        if (pb_mv_precision > MV_PRECISION_QTR_PEL)
-          pb_mv_precision = MV_PRECISION_QTR_PEL;
-#endif
-#else
+#if !CONFIG_FLEX_MVRES
         if (usehp > MV_SUBPEL_NONE) usehp = MV_SUBPEL_LOW_PRECISION;
 #endif
 #endif  // IMPROVED_AMVD

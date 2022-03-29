@@ -429,7 +429,7 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
                                              inter_mode_info *mode_info,
                                              const int_mv *start_mv,
                                              int_mv *best_mv) {
-#if !NEWMV_BUG_FIX
+#if !SKIP_REPEATED_FULL_NEW_MV
   (void)mode_info;
 #endif
   MACROBLOCKD *xd = &x->e_mbd;
@@ -505,7 +505,7 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
       " Error in MV precision value after integer search 1");
 #endif
 
-#if NEWMV_BUG_FIX
+#if SKIP_REPEATED_FULL_NEW_MV
 
   // Terminate search with the current ref_idx if we have already encountered
   // another ref_mv in the drl such that:
@@ -1366,9 +1366,7 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
 #if ADAPTIVE_PRECISION_SETS
   set_default_precision_set(cm, mbmi, bsize);
 #endif
-#if SIGNAL_MOST_PROBABLE_PRECISION
   set_most_probable_mv_precision(cm, mbmi, bsize);
-#endif
 #endif
   const YV12_BUFFER_CONFIG *yv12 = get_ref_frame_yv12_buf(cm, ref);
   const YV12_BUFFER_CONFIG *scaled_ref_frame =

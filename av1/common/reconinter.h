@@ -208,12 +208,6 @@ static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
                                                  const MB_MODE_INFO *mbmi) {
   const int mode = mbmi->mode;
 
-#if CONFIG_FLEX_MVRES && ENABLE_FLEX_MV_FOR_NEW_NEAR
-  if (mode == NEAR_NEWMV || mode == NEW_NEARMV || mode == NEAR_NEWMV_OPTFLOW ||
-      mode == NEW_NEARMV_OPTFLOW)
-    return 0;
-#endif
-
   return (mode == NEAR_NEWMV || mode == NEW_NEARMV
 #if CONFIG_OPTFLOW_REFINEMENT
           || mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW
@@ -612,11 +606,7 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
 
 #if CONFIG_FLEX_MVRES
-#if DISABLE_INTERPOLATION_FILTER_FOR_INT_MV == 1
   if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return 0;
-#elif DISABLE_INTERPOLATION_FILTER_FOR_INT_MV == 2
-  if (mbmi->pb_mv_precision != mbmi->max_mv_precision) return 0;
-#endif
 #endif
 
   if (mbmi->skip_mode) return 0;
@@ -690,18 +680,13 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
                    WarpedMotionParams *final_warp_params);
 
 #if CONFIG_FLEX_MVRES
-#if SIGNAL_MOST_PROBABLE_PRECISION
 int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd);
-#endif
 int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
                                          const MACROBLOCKD *xd);
 int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision);
 void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
-
-#if SIGNAL_MOST_PROBABLE_PRECISION
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
-#endif
 
 #if ADAPTIVE_PRECISION_SETS
 void set_default_precision_set(const AV1_COMMON *const cm, MB_MODE_INFO *mbmi,

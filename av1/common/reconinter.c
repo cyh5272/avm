@@ -2813,7 +2813,6 @@ void av1_build_interintra_predictor(const AV1_COMMON *cm, MACROBLOCKD *xd,
 }
 
 #if CONFIG_FLEX_MVRES
-#if SIGNAL_MOST_PROBABLE_PRECISION
 int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
   (void)cm;
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
@@ -2829,7 +2828,6 @@ int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
 
   return (above_mpp_flag + left_mpp_flag);
 }
-#endif
 
 int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
                                          const MACROBLOCKD *xd) {
@@ -2846,7 +2844,7 @@ int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
           : 0;
   assert(above_down >= 0);
   assert(left_down >= 0);
-#if ADAPTIVE_PRECISION_SETS && BLOCK_BASED_PRECISION_ADAPTATION
+#if ADAPTIVE_PRECISION_SETS && MODE_BASED_PRECISION_ADAPTATION
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   int offset = 0;
   if (mbmi->mb_precision_set == 1 || mbmi->mb_precision_set == 3) offset += 2;
@@ -2908,7 +2906,6 @@ MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
 
 #endif
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi,
                                     const BLOCK_SIZE bsize) {
@@ -2932,7 +2929,6 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
   CHECK_FLEX_MV(!mpp_found, "MPP is not found in the preceision set");
 #endif
 }
-#endif
 
 #if ADAPTIVE_PRECISION_SETS
 // If n != 0, returns the floor of log base 2 of n. If n == 0, returns 0.
@@ -2947,59 +2943,10 @@ void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
   (void)cm;
   (void)xd;
   (void)ref_mv_idx;
-#if REF_MV_BASED_PRECISION_SETS
-  int_mv ref_mv[2];
-  const MV_REFERENCE_FRAME ref_frame = av1_ref_frame_type(mbmi->ref_frame);
-  const int is_comp_pred = mbmi->ref_frame[1] > INTRA_FRAME;
-  const PREDICTION_MODE mode = mbmi->mode;
-  ref_mv[0] = xd->ref_mv_stack[ref_frame][ref_mv_idx].this_mv;
-  ref_mv[1] = xd->ref_mv_stack[ref_frame][ref_mv_idx].comp_mv;
-  int current_max = 0;
-  // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-  int class_to_set[11] = { 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2 };
-  if (mode == NEWMV || mode == NEW_NEWMV
-#if CONFIG_OPTFLOW_REFINEMENT
-      || mode == NEW_NEWMV_OPTFLOW
-#endif
-  ) {
-    for (int i = 0; i < is_comp_pred + 1; ++i) {
-      if (abs(ref_mv[i].as_mv.row) > current_max)
-        current_max = abs(ref_mv[i].as_mv.row);
 
-      if (abs(ref_mv[i].as_mv.col) > current_max)
-        current_max = abs(ref_mv[i].as_mv.col);
-    }
-  } else {
-#if CONFIG_JOINT_MVD
-    const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
-    const int i = (mode == JOINT_NEWMV
-#if CONFIG_OPTFLOW_REFINEMENT
-                   || mode == JOINT_NEWMV_OPTFLOW
-#endif
-                   )
-                      ? jmvd_base_ref_list
-                      : (compound_ref1_mode(mode) == NEWMV);
-#else
-    const int i = compound_ref1_mode(mode) == NEWMV;
-#endif
-    if (abs(ref_mv[i].as_mv.row) > current_max)
-      current_max = abs(ref_mv[i].as_mv.row);
-    if (abs(ref_mv[i].as_mv.col) > current_max)
-      current_max = abs(ref_mv[i].as_mv.col);
-  }
-
-  const int mag_int_mv = (current_max >> 3);
-  assert(mag_int_mv >= 0);
-  const int mv_class = (mag_int_mv == 0) ? 0 : av1_log_in_base_2(mag_int_mv);
-  assert(mv_class < 11);
-  // printf("%d %d \n", mag_int_mv, mv_class);
-
-  int set_idx = class_to_set[mv_class];
-#else
   int set_idx = 0;
-#endif
 
-#if BLOCK_BASED_PRECISION_ADAPTATION
+#if MODE_BASED_PRECISION_ADAPTATION
   if (mbmi->mode == NEWMV) set_idx = 1;
 #endif
 

@@ -113,11 +113,7 @@ typedef struct {
    * (number of reference MVs) X
    * (number of reference frames).
    */
-#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
-  int64_t (*modelled_rd)[NUM_MV_PRECISIONS][MAX_REF_MV_SEARCH][REF_FRAMES];
-#else
   int64_t (*modelled_rd)[MAX_REF_MV_SEARCH][REF_FRAMES];
-#endif
 
   /*!
    * Holds an estimated entropy cost for picking the current reference frame.
@@ -135,11 +131,7 @@ typedef struct {
    * modes used to determine compound ref modes. The full structure is:
    * (number of inter modes) X (length of refmv list) X (number of ref frames)
    */
-#if CONFIG_FLEX_MVRES && REFACTOR_MODEL_RD
-  int64_t (*simple_rd)[NUM_MV_PRECISIONS][MAX_REF_MV_SEARCH][REF_FRAMES];
-#else
   int64_t (*simple_rd)[MAX_REF_MV_SEARCH][REF_FRAMES];
-#endif
 
   /*!
    * An integer value 0 or 1 which indicates whether or not to skip the motion
