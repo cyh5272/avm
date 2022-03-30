@@ -376,6 +376,8 @@ specialize qw/aom_highbd_convolve8_vert sse2 avx2/;
 if (aom_config("CONFIG_NEW_DF") eq "yes") {
       add_proto qw/void aom_highbd_lpf_horizontal_generic/, "uint16_t *s, int p, int filt_width, const uint16_t *q_thresh, const uint16_t *side_thresh, int bd";
       add_proto qw/void aom_highbd_lpf_vertical_generic/, "uint16_t *s, int pitch, int filt_width, const uint16_t *q_thresh, const uint16_t *side_thresh, int bd";
+      add_proto qw/void aom_lpf_horizontal_generic/, "uint8_t *s, int p, int filt_width, const uint16_t *q_thresh, const uint16_t *side_thresh";
+      add_proto qw/void aom_lpf_vertical_generic/, "uint8_t *s, int pitch, int filt_width, const uint16_t *q_thresh, const uint16_t *side_thresh";
 } else {
 add_proto qw/void aom_lpf_vertical_14/, "uint8_t *s, int pitch, const uint8_t *blimit, const uint8_t *limit, const uint8_t *thresh";
 specialize qw/aom_lpf_vertical_14 sse2 neon/;

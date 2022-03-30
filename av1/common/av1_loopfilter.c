@@ -973,17 +973,22 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
         params.filter_length = 0;
         tx_size = TX_4X4;
       }
-#if !CONFIG_NEW_DF
+
       const int use_highbitdepth = cm->seq_params.use_highbitdepth;
-#endif
       const aom_bit_depth_t bit_depth = cm->seq_params.bit_depth;
 #if CONFIG_NEW_DF
 
-      if (params.filter_length)
-        aom_highbd_lpf_vertical_generic_c(
-            CONVERT_TO_SHORTPTR(p), dst_stride, params.filter_length,
-            &params.q_threshold, &params.side_threshold, bit_depth);
-
+      if (params.filter_length) {
+        if (use_highbitdepth) {
+          aom_highbd_lpf_vertical_generic_c(
+              CONVERT_TO_SHORTPTR(p), dst_stride, params.filter_length,
+              &params.q_threshold, &params.side_threshold, bit_depth);
+        } else {
+          aom_lpf_vertical_generic_c(p, dst_stride, params.filter_length,
+                                     &params.q_threshold,
+                                     &params.side_threshold);
+        }
+      }
 #else
       switch (params.filter_length) {
         // apply 4-tap filtering
@@ -1072,16 +1077,21 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
         params.filter_length = 0;
         tx_size = TX_4X4;
       }
-#if !CONFIG_NEW_DF
       const int use_highbitdepth = cm->seq_params.use_highbitdepth;
-#endif
       const aom_bit_depth_t bit_depth = cm->seq_params.bit_depth;
 
 #if CONFIG_NEW_DF
-      if (params.filter_length)
-        aom_highbd_lpf_horizontal_generic_c(
-            CONVERT_TO_SHORTPTR(p), dst_stride, params.filter_length,
-            &params.q_threshold, &params.side_threshold, bit_depth);
+      if (params.filter_length) {
+        if (use_highbitdepth) {
+          aom_highbd_lpf_horizontal_generic_c(
+              CONVERT_TO_SHORTPTR(p), dst_stride, params.filter_length,
+              &params.q_threshold, &params.side_threshold, bit_depth);
+        } else {
+          aom_lpf_horizontal_generic_c(p, dst_stride, params.filter_length,
+                                       &params.q_threshold,
+                                       &params.side_threshold);
+        }
+      }
 
 #else
       switch (params.filter_length) {
