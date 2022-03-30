@@ -119,7 +119,6 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   // clang-format on
   WarpedMotionParams tmp_wm_params;
   const double *params_this_motion;
-  int inliers_by_motion[RANSAC_NUM_MOTIONS];
   assert(ref_buf[frame] != NULL);
   TransformationType model;
 
@@ -145,14 +144,13 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       params_by_motion[i].num_inliers = 0;
     }
 
-    aom_compute_global_motion(model, src_buffer, src_width, src_height,
-                              src_stride, src_corners, num_src_corners,
-                              ref_buf[frame], cpi->common.seq_params.bit_depth,
-                              gm_estimation_type, inliers_by_motion,
-                              params_by_motion, RANSAC_NUM_MOTIONS);
+    aom_compute_global_motion(
+        model, src_buffer, src_width, src_height, src_stride, src_corners,
+        num_src_corners, ref_buf[frame], cpi->common.seq_params.bit_depth,
+        gm_estimation_type, params_by_motion, RANSAC_NUM_MOTIONS);
     int64_t ref_frame_error = 0;
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
-      if (inliers_by_motion[i] == 0) continue;
+      if (params_by_motion[i].num_inliers == 0) continue;
 
       params_this_motion = params_by_motion[i].params;
       av1_convert_model_to_params(params_this_motion, &tmp_wm_params);

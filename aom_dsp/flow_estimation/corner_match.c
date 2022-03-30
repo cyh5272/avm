@@ -215,8 +215,8 @@ static void get_inliers_from_indices(MotionModel *params,
 int aom_compute_global_motion_feature_based(
     TransformationType type, unsigned char *src_buffer, int src_width,
     int src_height, int src_stride, int *src_corners, int num_src_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
-    MotionModel *params_by_motion, int num_motions) {
+    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
+    int num_motions) {
   int i;
   int num_ref_corners;
   int num_correspondences;
@@ -241,14 +241,14 @@ int aom_compute_global_motion_feature_based(
       (int *)ref_corners, num_ref_corners, src_width, src_height, src_stride,
       ref->y_stride, correspondences);
 
-  ransac(correspondences, num_correspondences, num_inliers_by_motion,
-         params_by_motion, num_motions);
+  ransac(correspondences, num_correspondences, params_by_motion, num_motions);
 
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
   for (i = 0; i < num_motions; ++i) {
-    if (num_inliers_by_motion[i] < MIN_INLIER_PROB * num_correspondences ||
+    if (params_by_motion[i].num_inliers <
+            MIN_INLIER_PROB * num_correspondences ||
         num_correspondences == 0) {
-      num_inliers_by_motion[i] = 0;
+      params_by_motion[i].num_inliers = 0;
     } else {
       get_inliers_from_indices(&params_by_motion[i], correspondences);
     }
@@ -258,7 +258,7 @@ int aom_compute_global_motion_feature_based(
 
   // Return true if any one of the motions has inliers.
   for (i = 0; i < num_motions; ++i) {
-    if (num_inliers_by_motion[i] > 0) return 1;
+    if (params_by_motion[i].num_inliers > 0) return 1;
   }
   return 0;
 }

@@ -39,14 +39,13 @@ FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
 
 int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
                                 int *frm_corners, int num_frm_corners,
-                                int *num_inliers_by_motion,
                                 MotionModel *params_by_motion, int num_motions);
 
 int aom_compute_global_motion_disflow_based(
     TransformationType type, unsigned char *frm_buffer, int frm_width,
     int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
-    MotionModel *params_by_motion, int num_motions);
+    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
+    int num_motions);
 
 #ifdef __cplusplus
 }

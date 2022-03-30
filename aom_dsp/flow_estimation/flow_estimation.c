@@ -23,19 +23,16 @@ int aom_compute_global_motion(TransformationType type,
                               int num_src_corners, YV12_BUFFER_CONFIG *ref,
                               int bit_depth,
                               GlobalMotionEstimationType gm_estimation_type,
-                              int *num_inliers_by_motion,
                               MotionModel *params_by_motion, int num_motions) {
   switch (gm_estimation_type) {
     case GLOBAL_MOTION_FEATURE_BASED:
       return aom_compute_global_motion_feature_based(
           type, src_buffer, src_width, src_height, src_stride, src_corners,
-          num_src_corners, ref, bit_depth, num_inliers_by_motion,
-          params_by_motion, num_motions);
+          num_src_corners, ref, bit_depth, params_by_motion, num_motions);
     case GLOBAL_MOTION_DISFLOW_BASED:
       return aom_compute_global_motion_disflow_based(
           type, src_buffer, src_width, src_height, src_stride, src_corners,
-          num_src_corners, ref, bit_depth, num_inliers_by_motion,
-          params_by_motion, num_motions);
+          num_src_corners, ref, bit_depth, params_by_motion, num_motions);
     default: assert(0 && "Unknown global motion estimation type");
   }
   return 0;

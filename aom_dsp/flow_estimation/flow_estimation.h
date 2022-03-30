@@ -65,7 +65,6 @@ int aom_compute_global_motion(TransformationType type,
                               int num_src_corners, YV12_BUFFER_CONFIG *ref,
                               int bit_depth,
                               GlobalMotionEstimationType gm_estimation_type,
-                              int *num_inliers_by_motion,
                               MotionModel *params_by_motion, int num_motions);
 
 #ifdef __cplusplus

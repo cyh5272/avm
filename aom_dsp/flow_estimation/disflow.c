@@ -503,7 +503,6 @@ FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
 
 int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
                                 int *frm_corners, int num_frm_corners,
-                                int *num_inliers_by_motion,
                                 MotionModel *params_by_motion,
                                 int num_motions) {
   int num_correspondences;
@@ -515,20 +514,20 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
   num_correspondences = determine_disflow_correspondence(
       frm_corners, num_frm_corners, flow->u, flow->v, flow->width, flow->height,
       flow->stride, correspondences);
-  ransac(correspondences, num_correspondences, num_inliers_by_motion,
-         params_by_motion, num_motions);
+  ransac(correspondences, num_correspondences, params_by_motion, num_motions);
 
   aom_free(correspondences);
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
   for (int i = 0; i < num_motions; ++i) {
-    if (num_inliers_by_motion[i] < MIN_INLIER_PROB * num_correspondences) {
-      num_inliers_by_motion[i] = 0;
+    if (params_by_motion[i].num_inliers <
+        MIN_INLIER_PROB * num_correspondences) {
+      params_by_motion[i].num_inliers = 0;
     }
   }
 
   // Return true if any one of the motions has inliers.
   for (int i = 0; i < num_motions; ++i) {
-    if (num_inliers_by_motion[i] > 0) return 1;
+    if (params_by_motion[i].num_inliers > 0) return 1;
   }
   return 0;
 }
@@ -536,13 +535,12 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
 int aom_compute_global_motion_disflow_based(
     TransformationType type, unsigned char *frm_buffer, int frm_width,
     int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, int *num_inliers_by_motion,
-    MotionModel *params_by_motion, int num_motions) {
+    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
+    int num_motions) {
   FlowField *flow = aom_compute_flow_field(frm_buffer, frm_width, frm_height,
                                            frm_stride, ref, bit_depth);
   int result = aom_fit_model_to_flow_field(
-      flow, type, frm_corners, num_frm_corners, num_inliers_by_motion,
-      params_by_motion, num_motions);
+      flow, type, frm_corners, num_frm_corners, params_by_motion, num_motions);
   aom_free_flow_field(flow);
 
   return result;

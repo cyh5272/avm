@@ -25,10 +25,8 @@ extern "C" {
 #endif
 
 typedef int (*RansacFunc)(int *matched_points, int npoints,
-                          int *num_inliers_by_motion,
                           MotionModel *params_by_motion, int num_motions);
 typedef int (*RansacFuncDouble)(double *matched_points, int npoints,
-                                int *num_inliers_by_motion,
                                 MotionModel *params_by_motion, int num_motions);
 RansacFunc aom_get_ransac_type(TransformationType type);
 RansacFuncDouble aom_get_ransac_double_prec_type(TransformationType type);
