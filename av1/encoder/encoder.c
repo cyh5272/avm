@@ -2644,6 +2644,7 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
     if (cpi->mv_stats.valid) {
       av1_zero(cpi->mv_stats);
     }
+
     // Gather the mv_stats for the next frame
     if (cpi->sf.hl_sf.high_precision_mv_usage == LAST_MV_DATA &&
         av1_frame_allows_smart_mv(cpi)) {

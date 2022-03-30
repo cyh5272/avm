@@ -51,6 +51,11 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
 #if CONFIG_FLEX_MVRES
   mv_cost_params->mv_costs = mv_costs;
   mv_cost_params->pb_mv_precision = pb_mv_precision;
+
+#if CONFIG_ADAPTIVE_MVD
+  mv_cost_params->is_adaptive_mvd = is_adaptive_mvd;
+#endif  // CONFIG_ADAPTIVE_MVD
+
 #else
   mv_cost_params->error_per_bit = mv_costs->errorperbit;
   mv_cost_params->sad_per_bit = mv_costs->sadperbit;
@@ -152,8 +157,13 @@ void av1_make_default_fullpel_ms_params(
   ms_params->fine_search_interval = fine_search_interval;
 
   ms_params->is_intra_mode = 0;
-
+#if CONFIG_FLEX_MVRES && REUSE_PREV_MV == 2
+  ms_params->fast_obmc_search = (pb_mv_precision == mbmi->max_mv_precision)
+                                    ? mv_sf->obmc_full_pixel_search_level
+                                    : 1;
+#else
   ms_params->fast_obmc_search = mv_sf->obmc_full_pixel_search_level;
+#endif
 
   ms_params->mv_limits = x->mv_limits;
   av1_set_mv_search_range(&ms_params->mv_limits, ref_mv
@@ -185,14 +195,24 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                                        const MvSubpelPrecision pb_mv_precision,
 #endif
                                        const int *cost_list) {
-#if !CONFIG_FLEX_MVRES
+
+#if CONFIG_ADAPTIVE_MVD
   const AV1_COMMON *cm = &cpi->common;
+#endif
+
+#if !CONFIG_FLEX_MVRES
   ms_params->allow_hp = cm->features.allow_high_precision_mv;
 #endif
 #if CONFIG_ADAPTIVE_MVD
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  CHECK_FLEX_MV(
+      is_adaptive_mvd && (mbmi->pb_mv_precision != mbmi->max_mv_precision),
+      " pb and max mv precision value should be same");
+#endif
+
 #endif  // CONFIG_ADAPTIVE_MVD
   // High level params
   ms_params->forced_stop = cpi->sf.mv_sf.subpel_force_stop;
@@ -342,11 +362,24 @@ int av1_mv_bit_cost(const MV *mv, const MV *ref_mv, const int *mvjcost,
 #if CONFIG_FLEX_MVRES
 static INLINE int get_mv_cost_with_precision(
     const MV mv, const MV ref_mv, const MvSubpelPrecision pb_mv_precision,
+#if CONFIG_ADAPTIVE_MVD
+    const int is_adaptive_mvd,
+#endif
     const MvCosts *mv_costs, int weight, int round_bits) {
-  const int *mvjcost = mv_costs->nmv_joint_cost;
 
+#if CONFIG_ADAPTIVE_MVD
+  const int *mvjcost = is_adaptive_mvd ? mv_costs->amvd_nmv_joint_cost
+                                       : mv_costs->nmv_joint_cost;
+  const int *const *mvcost =
+      is_adaptive_mvd
+          ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
+          : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#else
+  const int *mvjcost = mv_costs->nmv_joint_cost;
   const int *const *mvcost =
       CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
+
   MV low_prec_ref_mv = ref_mv;
   lower_mv_precision(&low_prec_ref_mv, pb_mv_precision);
   const MV diff = { mv.row - low_prec_ref_mv.row,
@@ -376,9 +409,17 @@ static INLINE int get_intrabc_mv_cost_with_precision(
 // This is NOT used during motion compensation.
 int av1_mv_bit_cost(const MV *mv, const MV *ref_mv,
                     const MvSubpelPrecision pb_mv_precision,
-                    const MvCosts *mv_costs, int weight) {
-  return get_mv_cost_with_precision(*mv, *ref_mv, pb_mv_precision, mv_costs,
-                                    weight, 7);
+                    const MvCosts *mv_costs, int weight
+#if CONFIG_ADAPTIVE_MVD
+                    ,
+                    const int is_adaptive_mvd
+#endif
+) {
+  return get_mv_cost_with_precision(*mv, *ref_mv, pb_mv_precision,
+#if CONFIG_ADAPTIVE_MVD
+                                    is_adaptive_mvd,
+#endif
+                                    mv_costs, weight, 7);
 }
 
 int av1_intrabc_mv_bit_cost(const MV *mv, const MV *ref_mv,
@@ -414,8 +455,11 @@ static INLINE int mv_err_cost(const MV mv,
     case MV_COST_ENTROPY:
 #if CONFIG_FLEX_MVRES
       return get_mv_cost_with_precision(
-          mv, ref_mv, mv_cost_params->pb_mv_precision, mv_costs,
-          mv_costs->errorperbit,
+          mv, ref_mv, mv_cost_params->pb_mv_precision,
+#if CONFIG_ADAPTIVE_MVD
+          mv_cost_params->is_adaptive_mvd,
+#endif
+          mv_costs, mv_costs->errorperbit,
           RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
               PIXEL_TRANSFORM_ERROR_SCALE);
 #else
@@ -2176,7 +2220,12 @@ static int full_pixel_exhaustive(const FULLPEL_MV start_mv,
 // This function is called when we do joint motion search in comp_inter_inter
 // mode, or when searching for one component of an ext-inter compound mode.
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv) {
+                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+                             ,
+                             const int fast_mv_refinement
+#endif
+) {
   static const search_neighbors neighbors[8] = {
     { { -1, 0 }, -1 * SEARCH_GRID_STRIDE_8P + 0 },
     { { 0, -1 }, 0 * SEARCH_GRID_STRIDE_8P - 1 },
@@ -2213,6 +2262,10 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
   best_sad += mvsad_err_cost(*best_mv, mv_cost_params);
 #else
   best_sad += mvsad_err_cost_(best_mv, mv_cost_params);
+#endif
+
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+  if (fast_mv_refinement) return best_sad;
 #endif
 
   do_refine_search_grid[grid_coord] = 1;
@@ -2292,7 +2345,11 @@ int av1_refining_search_8p_c_low_precision(
   };
 
   int grid_center = search_range * search_grid_stride + search_range;
+#if FAST_MV_REFINEMENT
+  const int num_of_search_steps = 1;
+#else
   const int num_of_search_steps = 3;
+#endif
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
   const MV_COST_PARAMS *mv_cost_params = &ms_params->mv_cost_params;
   const FullMvLimits *mv_limits = &ms_params->mv_limits;
@@ -2841,6 +2898,7 @@ static int obmc_refining_search_sad(
 #else
   const FULLPEL_MV neighbors[4] = { { -1, 0 }, { 0, -1 }, { 0, 1 }, { 1, 0 } };
 #endif
+
   const int kSearchRange = 8;
 
   unsigned int best_sad = fn_ptr->osdf(get_buf_from_fullmv(ref_buf, best_mv),
@@ -3992,6 +4050,12 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       ms_params->var_params.subpel_search_type;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  MB_MODE_INFO *const mbmi = xd->mi[0];
+  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
+                " pb mv precision is not same as maximum");
+#endif
+
   // How many steps to take. A round of 0 means fullpel search only, 1 means
   // half-pel, and so on.
   int round = AOMMIN(FULL_PEL - forced_stop, FULL_PEL - !allow_hp);
@@ -4002,7 +4066,11 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   *bestmv = start_mv;
 
+#if CONFIG_FLEX_MVRES
+  if (subpel_search_type != FILTER_UNUSED) {
+#else
   if (subpel_search_type != USE_2_TAPS_ORIG) {
+#endif
     besterr = upsampled_setup_center_error(xd, cm, bestmv, var_params,
                                            mv_cost_params, sse1, distortion);
   } else {
@@ -4070,7 +4138,9 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                                  MV *best_other_mv, uint8_t *second_pred,
                                  InterPredParams *inter_pred_params) {
   const int allow_hp_mvd = 0;
+#if !CONFIG_FLEX_MVRES
   const int allow_hp = ms_params->allow_hp;
+#endif
   const int forced_stop = ms_params->forced_stop;
   // const int iters_per_step = ms_params->iters_per_step;
   const MV_COST_PARAMS *mv_cost_params = &ms_params->mv_cost_params;
@@ -4083,8 +4153,16 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   // perform prediction for second MV
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
 
+#if CONFIG_FLEX_MVRES
+#if DEBUG_FLEX_MV
+  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
+                " pb mv precision is not same as maximum");
+#endif
+  lower_mv_precision(other_mv, mbmi->pb_mv_precision);
+#else
   lower_mv_precision(other_mv, allow_hp,
                      cm->features.cur_frame_force_integer_mv);
+#endif
 
   // How many steps to take. A round of 0 means fullpel search only, 1 means
   // half-pel, and so on.
@@ -4097,7 +4175,11 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   *bestmv = *start_mv;
   *best_other_mv = *other_mv;
 
+#if CONFIG_FLEX_MVRES
+  if (subpel_search_type != FILTER_UNUSED) {
+#else
   if (subpel_search_type != USE_2_TAPS_ORIG) {
+#endif
     besterr = upsampled_setup_center_error(xd, cm, bestmv, var_params,
                                            mv_cost_params, sse1, distortion);
   } else {
@@ -4133,8 +4215,13 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       candidate_mv[0].col = iter_center_mv.col + cur_mvd.col;
 
       get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
+#if CONFIG_FLEX_MVRES
+      lower_mv_precision(&other_mvd, mbmi->pb_mv_precision);
+#else
       lower_mv_precision(&other_mvd, allow_hp_mvd,
                          cm->features.cur_frame_force_integer_mv);
+#endif
+
       candidate_mv[1].row = (int)(other_mv->row + other_mvd.row);
       candidate_mv[1].col = (int)(other_mv->col + other_mvd.col);
       if (av1_is_subpelmv_in_range(mv_limits, candidate_mv[1]) == 0) continue;
