@@ -391,7 +391,7 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
 
 #if CONFIG_BVCOST_UPDATE
 #if CONFIG_FLEX_MVRES
-void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMvCosts *dv_costs);
+void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc);
 #else
 void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMVCosts *dv_costs);
 #endif

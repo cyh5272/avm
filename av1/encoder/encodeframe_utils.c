@@ -1343,22 +1343,29 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
 #endif
 #if CONFIG_FLEX_MVRES
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
   for (int p = 0; p < NUM_MV_PREC_MPP_CONTEXT; ++p) {
     AVG_CDF_STRIDE(ctx_left->pb_mv_mpp_flag_cdf[p],
                    ctx_tr->pb_mv_mpp_flag_cdf[p], 2, CDF_SIZE(2));
   }
+  for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
+#if ADAPTIVE_PRECISION_SETS
+    int mb_precision_set = (p == MV_PRECISION_QTR_PEL);
+    const PRECISION_SET *precision_def =
+        &av1_mv_precision_sets[mb_precision_set];
+    int num_precisions = precision_def->num_precisions;
 #endif
 
-  for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
     for (int j = 0; j < MV_PREC_DOWN_CONTEXTS; ++j) {
       AVG_CDF_STRIDE(
           ctx_left->pb_mv_precision_cdf[j][p - MV_PRECISION_HALF_PEL],
           ctx_tr->pb_mv_precision_cdf[j][p - MV_PRECISION_HALF_PEL],
+#if ADAPTIVE_PRECISION_SETS
+          num_precisions - 1
+#else
+
           p
-#if !SIGNAL_MOST_PROBABLE_PRECISION
-              + 1
 #endif
+
           ,
           CDF_SIZE(FLEX_MV_COSTS_SIZE));
     }
@@ -1532,7 +1539,11 @@ void av1_set_cost_upd_freq(AV1_COMP *cpi, ThreadData *td,
 #endif
 #if CONFIG_BVCOST_UPDATE
       if (cm->features.allow_intrabc) {
+#if CONFIG_FLEX_MVRES
+        fill_dv_costs(&cpi->dv_costs, cm->fc);
+#else
         av1_fill_dv_costs(xd->tile_ctx, &cpi->dv_costs);
+#endif
       }
 #endif  // CONFIG_BVCOST_UPDATE
       break;

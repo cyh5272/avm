@@ -262,10 +262,8 @@ typedef struct frame_contexts {
 #endif
 #if CONFIG_FLEX_MVRES
   aom_cdf_prob sb_mv_precision_cdf[NUM_MV_PRECISIONS - MV_PRECISION_HALF_PEL]
-                                  [CDF_SIZE(FLEX_MV_COSTS_SIZE)];
-#if SIGNAL_MOST_PROBABLE_PRECISION
+                                  [CDF_SIZE(FLEX_MV_COSTS_SB_SIZE)];
   aom_cdf_prob pb_mv_mpp_flag_cdf[NUM_MV_PREC_MPP_CONTEXT][CDF_SIZE(2)];
-#endif
 
   aom_cdf_prob pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
                                   [NUM_PB_FLEX_QUALIFIED_MAX_PREC]

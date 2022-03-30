@@ -242,28 +242,6 @@ static INLINE int is_joint_amvd_coding_mode(PREDICTION_MODE mode) {
       ;
 }
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
-#if CONFIG_FLEX_MVRES && EANBLE_EARLY_TERMINATION
-static INLINE int have_precision_in_inter_mode(PREDICTION_MODE mode) {
-  return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
-#if CONFIG_JOINT_MVD
-          mode == JOINT_NEWMV ||
-#endif  // CONFIG_JOINT_MVD
-#if CONFIG_OPTFLOW_REFINEMENT
-          mode == NEAR_NEWMV_OPTFLOW || mode == NEW_NEARMV_OPTFLOW ||
-          mode == NEW_NEWMV_OPTFLOW ||
-#if CONFIG_JOINT_MVD
-          mode == JOINT_NEWMV_OPTFLOW ||
-#endif  // CONFIG_JOINT_MVD
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-          mode == JOINT_AMVDNEWMV_OPTFLOW ||
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
-#endif  // CONFIG_OPTFLOW_REFINEMENT
-#if IMPROVED_AMVD && CONFIG_JOINT_MVD
-          mode == JOINT_AMVDNEWMV ||
-#endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
-          mode == NEW_NEARMV);
-}
-#endif
 
 static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
   return (mode == NEWMV || mode == NEW_NEWMV || mode == NEAR_NEWMV ||
@@ -405,9 +383,13 @@ typedef struct MB_MODE_INFO {
   MvSubpelPrecision max_mv_precision;
   /*! The mv_precision used by the given partition block. */
   MvSubpelPrecision pb_mv_precision;
-#if SIGNAL_MOST_PROBABLE_PRECISION
   /*! The most probable mv_precision used by the given partition block. */
   MvSubpelPrecision most_probable_pb_mv_precision;
+#if ADAPTIVE_PRECISION_SETS
+  /*!
+   * The precision_set of the current frame.
+   */
+  uint8_t mb_precision_set;
 #endif
 #endif
   /*! \brief The motion mode used by the inter prediction. */

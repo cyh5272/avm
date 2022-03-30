@@ -2824,7 +2824,6 @@ void av1_build_interintra_predictor(const AV1_COMMON *cm, MACROBLOCKD *xd,
 }
 
 #if CONFIG_FLEX_MVRES
-#if SIGNAL_MOST_PROBABLE_PRECISION
 int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
   (void)cm;
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
@@ -2840,7 +2839,6 @@ int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
 
   return (above_mpp_flag + left_mpp_flag);
 }
-#endif
 
 int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
                                          const MACROBLOCKD *xd) {
@@ -2857,7 +2855,14 @@ int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
           : 0;
   assert(above_down >= 0);
   assert(left_down >= 0);
+#if ADAPTIVE_PRECISION_SETS && MODE_BASED_PRECISION_ADAPTATION
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  int offset = 0;
+  if (mbmi->mb_precision_set == 1 || mbmi->mb_precision_set == 3) offset += 2;
+  return offset + (above_down + left_down > 0);
+#else
   return (above_down + left_down > 0);
+#endif
 }
 
 int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision) {
@@ -2868,7 +2873,50 @@ void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision) {
   mbmi->pb_mv_precision = precision;
 }
 
-#if SIGNAL_MOST_PROBABLE_PRECISION
+#if ADAPTIVE_PRECISION_SETS
+int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi) {
+  const PRECISION_SET *precision_def =
+      &av1_mv_precision_sets[mbmi->mb_precision_set];
+  int coded_precision_idx = -1;
+  for (int precision_dx = precision_def->num_precisions - 1; precision_dx >= 0;
+       precision_dx--) {
+    MvSubpelPrecision pb_mv_precision = precision_def->precision[precision_dx];
+    if (pb_mv_precision != mbmi->most_probable_pb_mv_precision) {
+      coded_precision_idx++;
+      if (pb_mv_precision == mbmi->pb_mv_precision) return coded_precision_idx;
+    }
+  }
+  assert(0);
+#if DEBUG_FLEX_MV
+  CHECK_FLEX_MV(1, " Error in precision value");
+#endif
+  return coded_precision_idx;
+}
+
+MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
+                                               int precision_idx_coded_value) {
+  const PRECISION_SET *precision_def =
+      &av1_mv_precision_sets[mbmi->mb_precision_set];
+  int coded_precision_idx = -1;
+  MvSubpelPrecision pb_mv_precision = NUM_MV_PRECISIONS;
+  for (int precision_dx = precision_def->num_precisions - 1; precision_dx >= 0;
+       precision_dx--) {
+    pb_mv_precision = precision_def->precision[precision_dx];
+    if (pb_mv_precision != mbmi->most_probable_pb_mv_precision) {
+      coded_precision_idx++;
+      if (coded_precision_idx == precision_idx_coded_value)
+        return pb_mv_precision;
+    }
+  }
+  assert(0);
+#if DEBUG_FLEX_MV
+  CHECK_FLEX_MV(1, " Error in precision value");
+#endif
+  return pb_mv_precision;
+}
+
+#endif
+
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi,
                                     const BLOCK_SIZE bsize) {
@@ -2876,10 +2924,62 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
   mbmi->most_probable_pb_mv_precision =
       cm->features.most_probable_fr_mv_precision;
   assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
+
+#if ADAPTIVE_PRECISION_SETS && DEBUG_FLEX_MV
+  int mpp_found = 0;
+  const PRECISION_SET *precision_def =
+      &av1_mv_precision_sets[mbmi->mb_precision_set];
+  for (int precision_dx = precision_def->num_precisions - 1; precision_dx >= 0;
+       precision_dx--) {
+    MvSubpelPrecision pb_mv_precision = precision_def->precision[precision_dx];
+    if (pb_mv_precision == mbmi->most_probable_pb_mv_precision) {
+      mpp_found = 1;
+      break;
+    }
+  }
+  CHECK_FLEX_MV(!mpp_found, "MPP is not found in the preceision set");
+#endif
+}
+
+#if ADAPTIVE_PRECISION_SETS
+// If n != 0, returns the floor of log base 2 of n. If n == 0, returns 0.
+static INLINE uint8_t av1_log_in_base_2(unsigned int n) {
+  // get_msb() is only valid when n != 0.
+  return n == 0 ? 0 : get_msb(n);
+}
+void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
+                       MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize,
+                       uint8_t ref_mv_idx) {
+  (void)bsize;
+  (void)cm;
+  (void)xd;
+  (void)ref_mv_idx;
+
+  int set_idx = 0;
+
+#if MODE_BASED_PRECISION_ADAPTATION
+  if (mbmi->mode == NEWMV) set_idx = 1;
+#endif
+
+  int offset_idx = (mbmi->max_mv_precision == MV_PRECISION_QTR_PEL)
+                       ? NUMBER_OF_PRECISION_SETS
+                       : 0;
+  mbmi->mb_precision_set = set_idx + offset_idx;
+}
+void set_default_precision_set(const AV1_COMMON *const cm, MB_MODE_INFO *mbmi,
+                               const BLOCK_SIZE bsize) {
+  (void)bsize;
+  (void)cm;
+  int set_idx = 0;
+  int offset_idx = (mbmi->max_mv_precision == MV_PRECISION_QTR_PEL)
+                       ? NUMBER_OF_PRECISION_SETS
+                       : 0;
+  mbmi->mb_precision_set = set_idx + offset_idx;
 }
 #endif
 
-void set_max_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision) {
+void set_default_max_mv_precision(MB_MODE_INFO *mbmi,
+                                  MvSubpelPrecision precision) {
   mbmi->max_mv_precision = precision;
 }
 MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
@@ -2902,9 +3002,9 @@ int is_pb_mv_precision_active(const AV1_COMMON *const cm,
   // if (bsize < BLOCK_8X8)
   // return 0;
 
-  // if (mbmi->mode == JOINT_NEWMV || mbmi->mode == JOINT_NEWMV_OPTFLOW)
-  // return 0;
-
+#if CONFIG_ADAPTIVE_MVD
+  if (enable_adaptive_mvd_resolution(cm, mbmi)) return 0;
+#endif
   return mbmi->max_mv_precision >= MV_PRECISION_HALF_PEL &&
          cm->features.use_pb_mv_precision &&
          have_newmv_in_inter_mode(mbmi->mode);
