@@ -44,6 +44,11 @@ typedef struct {
   int num_inliers;
 } MotionModel;
 
+typedef struct {
+  double x, y;
+  double rx, ry;
+} Correspondence;
+
 /*
   Computes "num_motions" candidate global motion parameters between two frames.
   The array "params_by_motion" should be length 8 * "num_motions". The ordering

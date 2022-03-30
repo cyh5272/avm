@@ -27,16 +27,12 @@ extern "C" {
 #define MATCH_SZ_BY2 ((MATCH_SZ - 1) / 2)
 #define MATCH_SZ_SQ (MATCH_SZ * MATCH_SZ)
 
-typedef struct {
-  int x, y;
-  int rx, ry;
-} Correspondence;
-
 int aom_determine_correspondence(unsigned char *src, int *src_corners,
                                  int num_src_corners, unsigned char *ref,
                                  int *ref_corners, int num_ref_corners,
                                  int width, int height, int src_stride,
-                                 int ref_stride, int *correspondence_pts);
+                                 int ref_stride,
+                                 Correspondence *correspondences);
 
 int aom_compute_global_motion_feature_based(
     TransformationType type, unsigned char *src_buffer, int src_width,

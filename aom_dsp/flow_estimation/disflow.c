@@ -45,17 +45,17 @@ static int determine_disflow_correspondence(int *frm_corners,
                                             int num_frm_corners, double *flow_u,
                                             double *flow_v, int width,
                                             int height, int stride,
-                                            double *correspondences) {
+                                            Correspondence *correspondences) {
   int num_correspondences = 0;
   int x, y;
   for (int i = 0; i < num_frm_corners; ++i) {
     x = frm_corners[2 * i];
     y = frm_corners[2 * i + 1];
     if (valid_point(x, y, width, height)) {
-      correspondences[4 * num_correspondences] = x;
-      correspondences[4 * num_correspondences + 1] = y;
-      correspondences[4 * num_correspondences + 2] = x + flow_u[y * stride + x];
-      correspondences[4 * num_correspondences + 3] = y + flow_v[y * stride + x];
+      correspondences[num_correspondences].x = x;
+      correspondences[num_correspondences].y = y;
+      correspondences[num_correspondences].rx = x + flow_u[y * stride + x];
+      correspondences[num_correspondences].ry = y + flow_v[y * stride + x];
       num_correspondences++;
     }
   }
@@ -506,15 +506,15 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
                                 MotionModel *params_by_motion,
                                 int num_motions) {
   int num_correspondences;
-  double *correspondences;
-  RansacFuncDouble ransac = aom_get_ransac_double_prec_type(type);
 
   // find correspondences between the two images using the flow field
-  correspondences = aom_malloc(num_frm_corners * 4 * sizeof(*correspondences));
+  Correspondence *correspondences =
+      aom_malloc(num_frm_corners * sizeof(*correspondences));
   num_correspondences = determine_disflow_correspondence(
       frm_corners, num_frm_corners, flow->u, flow->v, flow->width, flow->height,
       flow->stride, correspondences);
-  ransac(correspondences, num_correspondences, params_by_motion, num_motions);
+  ransac(correspondences, num_correspondences, type, params_by_motion,
+         num_motions);
 
   aom_free(correspondences);
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
