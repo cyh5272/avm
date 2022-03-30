@@ -2181,7 +2181,7 @@ typedef struct {
   int vert_text;
   int diag_text;
 
-#if CONFIG_FLEX_MVRES && SIGNAL_MOST_PROBABLE_PRECISION
+#if CONFIG_FLEX_MVRES
   // precision
   int precision_count[NUM_MV_PRECISIONS];
 #endif

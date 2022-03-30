@@ -64,6 +64,10 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int mi_col = xd->mi_col;
   const MvCosts *mv_costs = &x->mv_costs;
 
+#if CONFIG_FLEX_MVRES && CONFIG_ADAPTIVE_MVD
+  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+#endif
+
   if (scaled_ref_frame) {
     // Swap out the reference frame for a version that's been scaled to
     // match the resolution of the current frame, allowing the existing
@@ -312,7 +316,12 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     const int ref_mv_idx = mbmi->ref_mv_idx;
 #if CONFIG_FLEX_MVRES
     const int this_mv_rate = av1_mv_bit_cost(
-        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT);
+        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+        ,
+        is_adaptive_mvd
+#endif
+    );
 #else
     const int this_mv_rate =
         av1_mv_bit_cost(&this_mv.as_mv, &ref_mv, mv_costs->nmv_joint_cost,
@@ -414,7 +423,12 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
   }
 #if CONFIG_FLEX_MVRES
   *rate_mv = av1_mv_bit_cost(&best_mv->as_mv, &ref_mv, pb_mv_precision,
-                             mv_costs, MV_COST_WEIGHT);
+                             mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                             ,
+                             is_adaptive_mvd
+#endif
+  );
 #else
   *rate_mv = av1_mv_bit_cost(&best_mv->as_mv, &ref_mv, mv_costs->nmv_joint_cost,
                              mv_costs->mv_cost_stack, MV_COST_WEIGHT);
@@ -434,7 +448,9 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
                                              inter_mode_info *mode_info,
                                              const int_mv *start_mv,
                                              int_mv *best_mv) {
+#if !SKIP_REPEATED_FULL_NEW_MV
   (void)mode_info;
+#endif
   MACROBLOCKD *xd = &x->e_mbd;
   const AV1_COMMON *cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
@@ -449,6 +465,11 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
   const int mi_col = xd->mi_col;
   const MvCosts *mv_costs = &x->mv_costs;
   *best_mv = *start_mv;
+
+#if CONFIG_FLEX_MVRES && CONFIG_ADAPTIVE_MVD
+  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+  assert(!is_adaptive_mvd);
+#endif
 
   if (scaled_ref_frame) {
     // Swap out the reference frame for a version that's been scaled to
@@ -472,12 +493,22 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
 
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
                                      pb_mv_precision, NULL, 0);
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+  const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
+#endif
+
   if (pb_mv_precision < MV_PRECISION_ONE_PEL)
     bestsme = av1_refining_search_8p_c_low_precision(
         &full_ms_params, start_fullmv, &curr_best_mv.as_fullmv);
   else
     bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                       &curr_best_mv.as_fullmv);
+                                       &curr_best_mv.as_fullmv
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+                                       ,
+                                       fast_mv_refinement
+#endif
+
+    );
 
   if (scaled_ref_frame) {
     // Swap back the original buffers for subpel motion search.
@@ -493,21 +524,28 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
       " Error in MV precision value after integer search 1");
 #endif
 
-#if 0
+#if SKIP_REPEATED_FULL_NEW_MV
+
   // Terminate search with the current ref_idx if we have already encountered
   // another ref_mv in the drl such that:
   //  1. The other drl has the same fullpel_mv during the SIMPLE_TRANSLATION
   //     search process as the current fullpel_mv.
   //  2. The rate needed to encode the current fullpel_mv is larger than that
   //     for the other ref_mv.
+#if 1
+  if (mbmi->pb_mv_precision != mbmi->max_mv_precision &&
+      mbmi->motion_mode == SIMPLE_TRANSLATION &&
+      curr_best_mv.as_int != INVALID_MV) {
+#else
   if (cpi->sf.inter_sf.skip_repeated_full_newmv &&
       mbmi->motion_mode == SIMPLE_TRANSLATION &&
       curr_best_mv.as_int != INVALID_MV) {
+#endif
     int_mv this_mv;
     this_mv.as_mv = get_mv_from_fullmv(&curr_best_mv.as_fullmv);
     const int ref_mv_idx = mbmi->ref_mv_idx;
     const int this_mv_rate = av1_mv_bit_cost(
-        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT);
+        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT, 0);
 
     mode_info[ref_mv_idx].full_search_mv.as_int = this_mv.as_int;
     mode_info[ref_mv_idx].full_mv_rate = this_mv_rate;
@@ -565,7 +603,12 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
 
   if (bestsme < INT_MAX) *best_mv = curr_best_mv;
   *rate_mv = av1_mv_bit_cost(&best_mv->as_mv, &ref_mv, pb_mv_precision,
-                             mv_costs, MV_COST_WEIGHT);
+                             mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                             ,
+                             is_adaptive_mvd
+#endif
+  );
 
 #if DEBUG_FLEX_MV
   CHECK_FLEX_MV(
@@ -591,7 +634,10 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_FLEX_MVRES
   const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
 #endif
-
+#if CONFIG_FLEX_MVRES && CONFIG_ADAPTIVE_MVD
+  const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
+  assert(!is_adaptive_mvd);
+#endif
 #if CONFIG_FLEX_MVRES
   // TODO(Mohammed): May not necessary, need to double check
   lower_mv_precision(&cur_mv[0].as_mv, pb_mv_precision);
@@ -698,13 +744,25 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
     // Small-range full-pixel motion search.
 #if CONFIG_FLEX_MVRES
+#if FAST_MV_REFINEMENT > 1
+#if FAST_MV_REFINEMENT > 2
+    const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
+#else
+    const int fast_mv_refinement = 0;
+#endif
+#endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL)
       bestsme = av1_refining_search_8p_c_low_precision(
           &full_ms_params, start_fullmv, &best_mv.as_fullmv);
     else
 #endif
       bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                         &best_mv.as_fullmv);
+                                         &best_mv.as_fullmv
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+                                         ,
+                                         fast_mv_refinement
+#endif
+      );
 
     // Restore the pointer to the first (possibly scaled) prediction buffer.
     if (id) xd->plane[plane].pre[0] = ref_yv12[0];
@@ -759,9 +817,13 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   for (ref = 0; ref < 2; ++ref) {
     const int_mv curr_ref_mv = av1_get_ref_mv(x, ref);
 #if CONFIG_FLEX_MVRES
-    *rate_mv +=
-        av1_mv_bit_cost(&cur_mv[ref].as_mv, &curr_ref_mv.as_mv,
-                        mbmi->pb_mv_precision, mv_costs, MV_COST_WEIGHT);
+    *rate_mv += av1_mv_bit_cost(&cur_mv[ref].as_mv, &curr_ref_mv.as_mv,
+                                mbmi->pb_mv_precision, mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                                ,
+                                is_adaptive_mvd
+#endif
+    );
 #else
     *rate_mv += av1_mv_bit_cost(&cur_mv[ref].as_mv, &curr_ref_mv.as_mv,
                                 mv_costs->nmv_joint_cost,
@@ -782,6 +844,13 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   const int_mv ref_mv = av1_get_ref_mv(x, ref_idx);
   struct macroblockd_plane *const pd = &xd->plane[0];
   const MvCosts *mv_costs = &x->mv_costs;
+
+#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
+  CHECK_FLEX_MV(is_pb_mv_precision_active(cm, mbmi, bsize),
+                " AMVD and AMVR can not be enabled for same block");
+  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
+                " pb mv precision should be same as mv precision");
+#endif
 
   const YV12_BUFFER_CONFIG *const scaled_ref_frame =
       av1_get_scaled_ref_frame(cpi, ref);
@@ -811,6 +880,9 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   unsigned int sse;
   SUBPEL_MOTION_SEARCH_PARAMS ms_params;
   av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                    mbmi->pb_mv_precision,
+#endif
                                     NULL);
   ms_params.forced_stop = EIGHTH_PEL;
   bestsme = adaptive_mvd_search(cm, xd, &ms_params, ref_mv.as_mv,
@@ -831,8 +903,18 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
   *rate_mv = 0;
   *rate_mv +=
+#if CONFIG_FLEX_MVRES
+      av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mbmi->pb_mv_precision, mv_costs,
+                      MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                      ,
+                      ms_params.mv_cost_params.is_adaptive_mvd
+#endif
+      );
+#else
       av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->amvd_nmv_joint_cost,
                       mv_costs->amvd_mv_cost_stack, MV_COST_WEIGHT);
+#endif
 }
 #endif  // IMPROVED_AMVD
 
@@ -1015,6 +1097,13 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
     // Small-range full-pixel motion search.
 #if CONFIG_FLEX_MVRES
+#if FAST_MV_REFINEMENT > 1
+#if FAST_MV_REFINEMENT > 2
+    const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
+#else
+    const int fast_mv_refinement = 0;
+#endif
+#endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL) {
       bestsme = av1_refining_search_8p_c_low_precision(
           &full_ms_params, start_fullmv, &best_mv.as_fullmv);
@@ -1022,7 +1111,13 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif
       // Small-range full-pixel motion search.
       bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                         &best_mv.as_fullmv);
+                                         &best_mv.as_fullmv
+#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
+                                         ,
+                                         fast_mv_refinement
+#endif
+
+      );
 #if CONFIG_FLEX_MVRES
     }
 #endif
@@ -1076,13 +1171,28 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_ADAPTIVE_MVD
   if (is_adaptive_mvd) {
     *rate_mv +=
+#if CONFIG_FLEX_MVRES
+        av1_mv_bit_cost(this_mv, &ref_mv.as_mv, pb_mv_precision, mv_costs,
+                        MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                        ,
+                        is_adaptive_mvd
+#endif
+        );
+#else
         av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->amvd_nmv_joint_cost,
                         mv_costs->amvd_mv_cost_stack, MV_COST_WEIGHT);
+#endif
   } else {
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
     *rate_mv += av1_mv_bit_cost(this_mv, &ref_mv.as_mv, pb_mv_precision,
-                                mv_costs, MV_COST_WEIGHT);
+                                mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                                ,
+                                is_adaptive_mvd
+#endif
+    );
 #else
   *rate_mv += av1_mv_bit_cost(this_mv, &ref_mv.as_mv, mv_costs->nmv_joint_cost,
                               mv_costs->mv_cost_stack, MV_COST_WEIGHT);
@@ -1259,12 +1369,12 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
 #endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_FLEX_MVRES
-  set_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+  set_default_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
   set_mv_precision(mbmi, mbmi->max_mv_precision);
-#if SIGNAL_MOST_PROBABLE_PRECISION
-  set_most_probable_mv_precision(cm, mbmi, bsize);
+#if ADAPTIVE_PRECISION_SETS
+  set_default_precision_set(cm, mbmi, bsize);
 #endif
-
+  set_most_probable_mv_precision(cm, mbmi, bsize);
 #endif
   const YV12_BUFFER_CONFIG *yv12 = get_ref_frame_yv12_buf(cm, ref);
   const YV12_BUFFER_CONFIG *scaled_ref_frame =

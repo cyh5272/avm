@@ -25,6 +25,10 @@ typedef struct {
   int64_t rd;
   int drl_cost;
 
+#if CONFIG_FLEX_MVRES && SKIP_NEW_MV_ET
+  int flex_mv_cost;
+#endif
+
   int rate_mv;
   int_mv mv;
 

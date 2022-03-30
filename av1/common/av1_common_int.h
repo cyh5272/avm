@@ -522,12 +522,10 @@ typedef struct {
    * The maximum allowable mv precision of the current frame.
    */
   MvSubpelPrecision fr_mv_precision;
-#if SIGNAL_MOST_PROBABLE_PRECISION
   /*!
    * The most probable mv precision of the current frame.
    */
   MvSubpelPrecision most_probable_fr_mv_precision;
-#endif
 #else
   /*!
    * If true, motion vectors are specified to eighth pel precision; and

@@ -31,22 +31,40 @@ extern "C" {
 
 #if CONFIG_FLEX_MVRES
 #define DEBUG_FLEX_MV 0
-#define SIGNAL_MOST_PROBABLE_PRECISION 1
-#define FAST_ALGORITHMS 1
+#define ADAPTIVE_PRECISION_SETS \
+  0                             // Enable adaptive precision sets for each block
+#define FAST_FLEX_MV_ENCODER 1  // Enable fast encoder searching algorithms
 
-#if FAST_ALGORITHMS
-#define REUSE_PREV_MV 1
-#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 1
-#define EANBLE_EARLY_TERMINATION 0
-#define ET_TEST_NUMBER 4
-#define DISABLE_MOTION_MODE_LOW_PRECISION 1
+#if FAST_FLEX_MV_ENCODER
+#define REUSE_PREV_MV 2  // 1 for partial MV reuse, 2 for full MV reuse
+#define SKIP_NEW_MV_ET \
+  0  // Terminate early if similar MV was not better in earlier
+#define SKIP_REPEATED_FULL_NEW_MV \
+  0  // Skip repeated newMV of previous ref_mv_idx during motion search for
+     // higher precisions
+#define ENABLE_SKIP_NEW_MV_FOR_HIGH_PRECISIONS \
+  0  // Skip RDO of the repeated newMV for higher precisions.
+#define MODEL_RDO_BASED_SEARCH 0  // Use model based RD for precision search
+
+#if REUSE_PREV_MV == 2
+#define FAST_MV_REFINEMENT \
+  0  // Fast refinement of MV for low precision. 1 means only less than int pel;
+     // 2 means 1 + all precisions in the single ref mode; 3 means 1 + 2 + all
+#endif  // REUSE_PREV_MV
+#endif  // FAST_ALGORITHMS
+
+#if ADAPTIVE_PRECISION_SETS
+#define MODE_BASED_PRECISION_ADAPTATION \
+  0  // 4 precisions for all modes except NEWMV. NEWMV mode allows all
+     // precisions
+#if MODE_BASED_PRECISION_ADAPTATION
+#define MAX_NUM_OF_SUPPORTED_PRECISIONS 7
+#define NUMBER_OF_PRECISION_SETS 2  // Number of precision sets used
 #else
-#define REUSE_PREV_MV 0
-#define DISABLE_INTERPOLATION_FILTER_FOR_INT_MV 0
-#define EANBLE_EARLY_TERMINATION 0
-#define ET_TEST_NUMBER 0
-#define DISABLE_MOTION_MODE_LOW_PRECISION 0
+#define MAX_NUM_OF_SUPPORTED_PRECISIONS 4  // All blocks allow 4 precisions
+#define NUMBER_OF_PRECISION_SETS 1         // Number of precision sets used
 #endif
+#endif  // ADAPTIVE_PRECISION_SETS
 
 #if DEBUG_FLEX_MV
 #define CHECK_FLEX_MV(c, err)                                            \
@@ -54,10 +72,8 @@ extern "C" {
     printf("The assertion failed on line %d, in file %s %s\n", __LINE__, \
            __FILE__, err);                                               \
   }
-#endif
-#else
-#define JOINT_MODE_BUG_FIX 0
-#define REUSE_PREV_MV 0
+#endif  // DEBUG_FLEX_MV
+
 #endif  // CONFIG_FLEX_MVRES
 
 // Cross-Component Sample Offset (CCSO)
