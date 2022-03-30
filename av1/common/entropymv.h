@@ -79,6 +79,9 @@ enum {
 typedef struct {
 #if CONFIG_FLEX_MVRES
   aom_cdf_prob classes_cdf[NUM_MV_PRECISIONS][CDF_SIZE(MV_CLASSES)];
+#if CONFIG_ADAPTIVE_MVD
+  aom_cdf_prob amvd_classes_cdf[CDF_SIZE(MV_CLASSES)];
+#endif  // CONFIG_ADAPTIVE_MVD
   aom_cdf_prob class0_fp_cdf[CLASS0_SIZE][3][CDF_SIZE(2)];
   aom_cdf_prob fp_cdf[3][CDF_SIZE(2)];
 #else

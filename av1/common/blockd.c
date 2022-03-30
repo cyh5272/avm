@@ -164,7 +164,7 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
     if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
   }
 
-#if CONFIG_FLEX_MVRES && DISABLE_MOTION_MODE_LOW_PRECISION
+#if CONFIG_FLEX_MVRES
   if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return SIMPLE_TRANSLATION;
 #endif
 
