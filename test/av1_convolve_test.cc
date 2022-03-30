@@ -897,4 +897,123 @@ INSTANTIATE_TEST_SUITE_P(
     BuildHighbdLumaParams(av1_highbd_dist_wtd_convolve_2d_avx2));
 #endif
 
+//////////////////////////////////////////////////////////
+// Nonseparable convolve-2d functions (high bit-depth)
+//////////////////////////////////////////////////////////
+
+typedef void (*highbd_convolve_nonsep_2d_func)(
+    const uint16_t *src, int src_stride,
+    const NonsepFilterConfig *filter_config, const int16_t *filter,
+    uint16_t *dst, int dst_stride, int bit_depth, int block_row_begin,
+    int block_row_end, int block_col_begin, int block_col_end);
+
+class AV1ConvolveNonSep2DHighbdTest
+    : public AV1ConvolveTest<highbd_convolve_nonsep_2d_func> {
+ public:
+  void RunTest() {
+    SetFilterTaps();
+
+    // CONFIG_WIENER_NONSEP use case.
+    TestConvolve(&UnitSumFilterConfig_, FilterTaps_);
+
+    // CONFIG_PC_WIENER use case.
+    TestConvolve(&UnconstrainedSumFilterConfig_, FilterTaps_);
+  }
+
+ private:
+  void TestConvolve(const NonsepFilterConfig *filter_config,
+                    const int16_t *filter) {
+    const int width = GetParam().Block().Width();
+    const int height = GetParam().Block().Height();
+    const int bit_depth = GetParam().BitDepth();
+
+    const uint16_t *input = FirstRandomInput16(GetParam());
+    DECLARE_ALIGNED(32, uint16_t, reference[MAX_SB_SQUARE]);
+
+    ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
+        << "Not enough padding for 7x7 filters";
+    const uint16_t *centered_input =
+        input + kMaxTapOffset * width + kMaxTapOffset;
+    av1_convolve_symmetric_highbd(centered_input, width, filter_config, filter,
+                                  reference, kOutputStride, bit_depth, 0,
+                                  height, 0, width);
+    DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
+    GetParam().TestFunction()(centered_input, width, filter_config, filter,
+                              test, kOutputStride, bit_depth, 0, height, 0,
+                              width);
+    AssertOutputBufferEq(reference, test, width, height);
+  }
+
+  // Generates NonsepFilterConfig compliant origin symmetric filter tap values.
+  // The first (2 * kNumSymmetricTaps) are for the CONFIG_WIENER_NONSEP use case
+  // where the center tap is constrained so that filter sums to one. The last
+  // added tap at (2 * kNumSymmetricTaps) is unconstrained and intended for
+  // CONFIG_PC_WIENER use case.
+  void SetFilterTaps() {
+    Randomize(UniqueTaps_, kNumSymmetricTaps + 1, kMaxPrecisionBeforeOverflow);
+
+    // Add origin-symmetric taps for CONFIG_WIENER_NONSEP and CONFIG_PC_WIENER.
+    for (int i = 0; i < kNumSymmetricTaps; ++i) {
+      FilterTaps_[2 * i] = UniqueTaps_[i];
+      FilterTaps_[2 * i + 1] = UniqueTaps_[i];
+    }
+
+    // Add unconstrained center tap as used by CONFIG_PC_WIENER.
+    FilterTaps_[2 * kNumSymmetricTaps] = UniqueTaps_[kNumSymmetricTaps];
+  }
+
+  // Fills the array p with signed integers.
+  void Randomize(int16_t *p, int size, int max_bit_range) {
+    ASSERT_TRUE(max_bit_range < 16) << "max_bit_range has to be less than 16";
+    for (int i = 0; i < size; ++i) {
+      p[i] = rnd_.Rand15Signed() & ((1 << max_bit_range) - 1);
+    }
+  }
+
+  libaom_test::ACMRandom rnd_;
+  static constexpr int kMaxPrecisionBeforeOverflow = 14;
+  static constexpr int kNumSymmetricTaps = 16;
+  static constexpr int kMaxTapOffset = 3;  // Filters are 7x7.
+
+  // Configuration for nonseparable 7x7 filters. Format is offset (i) row and
+  // (ii) column from center pixel and the (iii) filter-tap index that
+  // multiplies the pixel at the respective offset.
+  const int NonsepConfig_[33][3] = {
+    { -3, -3, 0 }, { 3, 3, 0 },   { -3, 0, 1 },  { 3, 0, 1 },   { -3, 3, 2 },
+    { 3, -3, 2 },  { -2, -2, 3 }, { 2, 2, 3 },   { -2, -1, 4 }, { 2, 1, 4 },
+    { -2, 0, 5 },  { 2, 0, 5 },   { -2, 1, 6 },  { 2, -1, 6 },  { -2, 2, 7 },
+    { 2, -2, 7 },  { -1, -2, 8 }, { 1, 2, 8 },   { -1, -1, 9 }, { 1, 1, 9 },
+    { -1, 0, 10 }, { 1, 0, 10 },  { -1, 1, 11 }, { 1, -1, 11 }, { -1, 2, 12 },
+    { 1, -2, 12 }, { 0, -3, 13 }, { 0, 3, 13 },  { 0, -2, 14 }, { 0, 2, 14 },
+    { 0, -1, 15 }, { 0, 1, 15 },  { 0, 0, 16 },
+  };
+
+  // Filters use only the first (2 * kNumSymmetricTaps) taps. Center tap is
+  // constrained.
+  const NonsepFilterConfig UnitSumFilterConfig_ = { kMaxPrecisionBeforeOverflow,
+                                                    2 * kNumSymmetricTaps,
+                                                    0,
+                                                    NonsepConfig_,
+                                                    NULL,
+                                                    0 };
+
+  // Filters use all unique taps.
+  const NonsepFilterConfig UnconstrainedSumFilterConfig_ = {
+    kMaxPrecisionBeforeOverflow,
+    2 * kNumSymmetricTaps + 1,
+    0,
+    NonsepConfig_,
+    NULL,
+    0
+  };
+  int16_t UniqueTaps_[kNumSymmetricTaps + 1];
+  int16_t FilterTaps_[2 * kNumSymmetricTaps + 1];
+};
+
+TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
+
+// TODO(rachelbarker@): Test with appropriate fast routine.
+INSTANTIATE_TEST_SUITE_P(C, AV1ConvolveNonSep2DHighbdTest,
+                         BuildHighbdParams(av1_convolve_symmetric_highbd));
+
 }  // namespace
