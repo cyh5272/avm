@@ -2827,7 +2827,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
   }
 
-  assert(best_rd != INT64_MAX);
+  // assert(best_rd != INT64_MAX);
 
   best_rd_stats->skip_txfm = best_eob == 0;
   if (plane == 0) update_txk_array(xd, blk_row, blk_col, tx_size, best_tx_type);
