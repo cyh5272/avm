@@ -24,8 +24,11 @@
 #include "av1/encoder/ethread.h"
 #include "av1/encoder/rdopt.h"
 
-// Highest motion model to search.
-#define GLOBAL_TRANS_TYPES_ENC 3
+// Motion models to search
+#define NUM_MODELS_TO_SEARCH 1
+static const TransformationType models_to_search[NUM_MODELS_TO_SEARCH] = {
+  ROTZOOM
+};
 
 // Computes the cost for the warp parameters.
 static int gm_get_params_cost(const WarpedMotionParams *gm,
@@ -120,7 +123,6 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   WarpedMotionParams tmp_wm_params;
   const double *params_this_motion;
   assert(ref_buf[frame] != NULL);
-  TransformationType model;
 
   aom_clear_system_state();
 
@@ -135,7 +137,9 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
               abs(ref_frame_dist) <= 2 && do_adaptive_gm_estimation
           ? GLOBAL_MOTION_DISFLOW_BASED
           : GLOBAL_MOTION_FEATURE_BASED;
-  for (model = ROTZOOM; model < GLOBAL_TRANS_TYPES_ENC; ++model) {
+  for (int model_type_index = 0; model_type_index < NUM_MODELS_TO_SEARCH;
+       model_type_index++) {
+    TransformationType model_type = models_to_search[model_type_index];
     int64_t best_warp_error = INT64_MAX;
     // Initially set all params to identity.
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
@@ -145,7 +149,7 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
     }
 
     aom_compute_global_motion(
-        model, src_buffer, src_width, src_height, src_stride, src_corners,
+        model_type, src_buffer, src_width, src_height, src_stride, src_corners,
         num_src_corners, ref_buf[frame], cpi->common.seq_params.bit_depth,
         gm_estimation_type, params_by_motion, RANSAC_NUM_MOTIONS);
     int64_t ref_frame_error = 0;
