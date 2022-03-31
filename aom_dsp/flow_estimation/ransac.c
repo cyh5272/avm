@@ -579,3 +579,15 @@ int ransac(Correspondence *matched_points, int npoints, TransformationType type,
                          num_desired_motions, minpts, is_degenerate[type],
                          find_transform[type], project_points[type]);
 }
+
+// Fit a specified type of motion model to a set of correspondences.
+// The input consists of `np` points, where pts1 stores the source position
+// and pts2 stores the destination position for each correspondence.
+// The resulting model is stored in `mat`
+//
+// Note: The input points lists may be modified during processing
+int aom_fit_motion_model(TransformationType type, int np, double *pts1,
+                         double *pts2, double *mat) {
+  assert(type > IDENTITY && type < TRANS_TYPES);
+  return find_transform[type](np, pts1, pts2, mat);
+}
