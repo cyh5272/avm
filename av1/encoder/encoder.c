@@ -2239,22 +2239,36 @@ static void pick_and_apply_loop_restoration(AV1_COMP *cpi, AV1_COMMON *cm) {
 
 #if CONFIG_SAVE_CNN_RESTORATION_DATA
 #define IS_SAVED_BUFFER_SIZE 500
+
+/*!\brief Structure containing info for CNN restoration dataset.
+ */
 typedef struct {
-  // Filename for saving the data.
+  /*!
+   * Filename for saving the data.
+   */
   char filename[80];
-  // is_saved[i] is true if frame #i has already been saved.
+  /*!
+   * `is_saved[i]` is true if frame `i` has already been saved.
+   */
   bool is_saved[IS_SAVED_BUFFER_SIZE];
-  // Only save a frame if absolute_poc % every_nth == 0.
+  /*!
+   * Only save a frame if absolute_poc % every_nth == 0.
+   */
   int every_nth;
-  // True if this struct instance has been initialized.
+  /*!
+   * True if this struct instance has been initialized.
+   */
   bool is_initialized;
 } CnnDatasetInfo;
 
+/*!\brief Instance of CnnDatasetInfo.
+ */
 static CnnDatasetInfo cnn_dataset_info = {
   "cnn_data.bin", { false }, 4, false
 };
 
-// Initialize the dataset for saving, and save frame width and height.
+/*!\brief Initialize the dataset for saving, and save frame width and height.
+ */
 static bool cnn_dataset_init(int width, int height) {
   assert(!cnn_dataset_info.is_initialized);
   FILE *out = fopen(cnn_dataset_info.filename, "wb");
@@ -2273,7 +2287,8 @@ static bool cnn_dataset_init(int width, int height) {
   return true;
 }
 
-// Save frame pixels as floats normalized in [0, 1] range.
+/*!\brief Save frame pixels as floats normalized in [0, 1] range.
+ */
 static bool cnn_dataset_save_frame(const uint8_t *frame, int width, int height,
                                    int stride, bool use_highbd, int bitdepth) {
   assert(cnn_dataset_info.is_initialized);
@@ -2297,9 +2312,10 @@ static bool cnn_dataset_save_frame(const uint8_t *frame, int width, int height,
   return true;
 }
 
-// Save frame's qindex.
-// Note: This is repeatedly written to create a fake image.
-// This makes it straightforward to read all frame data using tf.io.decode_raw.
+/*!\brief Save frame's qindex.
+ * Note: This is repeatedly written to create a fake image.
+ * This makes it straightforward to read all frame data using tf.io.decode_raw.
+ */
 static bool cnn_dataset_save_qindex(int qindex, int width, int height) {
   assert(cnn_dataset_info.is_initialized);
   FILE *out = fopen(cnn_dataset_info.filename, "ab");
