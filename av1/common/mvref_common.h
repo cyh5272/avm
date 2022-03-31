@@ -364,12 +364,8 @@ static INLINE int av1_is_dv_in_local_range_64x64(const MV dv,
     const int LT_mi_row_offset = (src_top_y >> MI_SIZE_LOG2) & (sb_mi_size - 1);
     const int LT_pos =
         LT_mi_row_offset * xd->is_mi_coded_stride + LT_mi_col_offset;
-#if CONFIG_SDP
     const int is_chroma_tree = xd->tree_type == CHROMA_PART;
     const unsigned char *is_mi_coded_map = xd->is_mi_coded[is_chroma_tree];
-#else   // CONFIG_SDP
-    const unsigned char *is_mi_coded_map = xd->is_mi_coded;
-#endif  // CONFIG_SDP
     if (is_mi_coded_map[LT_pos] == 0) return 0;
 
     const int BR_mi_col_offset =
@@ -423,12 +419,8 @@ static INLINE int av1_is_dv_in_local_range(const MV dv, const MACROBLOCKD *xd,
   int BR_same_sb = 0;
   const int sb_size = 1 << sb_size_log2;
   const int sb_mi_size = sb_size >> MI_SIZE_LOG2;
-#if CONFIG_SDP
   const int is_chroma_tree = xd->tree_type == CHROMA_PART;
   const unsigned char *is_mi_coded_map = xd->is_mi_coded[is_chroma_tree];
-#else   // CONFIG_SDP
-  const unsigned char *is_mi_coded_map = xd->is_mi_coded;
-#endif  // CONFIG_SDP
   if ((sb_size_log2 == 7)) {
     if ((src_left_x >> sb_size_log2) == ((active_left_x >> sb_size_log2) - 1)) {
       const int src_colo_left_x = src_left_x + sb_size;
