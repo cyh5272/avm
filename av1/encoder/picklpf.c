@@ -463,8 +463,12 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
     lf->filter_level_u = lf->filter_level_v = 0;
   } else if (method >= LPF_PICK_FROM_Q) {
     // TODO(chengchen): retrain the model for Y, U, V filter levels
-    lf->filter_level[0] = lf->filter_level[1] = lf->filter_level_u =
-        lf->filter_level_v = 1;
+    lf->filter_level[0] = lf->filter_level[1] = 1;
+    if (num_planes > 1) {
+      lf->filter_level_u = lf->filter_level_v = 1;
+    } else {
+      lf->filter_level_u = lf->filter_level_v = 0;
+    }
 #if DF_DUAL
     lf->delta_q_luma[0] = lf->delta_q_luma[1] = lf->delta_q_u = lf->delta_q_v =
         0;
@@ -478,7 +482,11 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
     // To make sure the df filters are run
     lf->filter_level[0] = 1;
     lf->filter_level[1] = 1;
-    lf->filter_level_u = lf->filter_level_v = 1;
+    if (num_planes > 1) {
+      lf->filter_level_u = lf->filter_level_v = 1;
+    } else {
+      lf->filter_level_u = lf->filter_level_v = 0;
+    }
     // TODO(anyone): What are good initial levels for keyframes?
 #if DF_DUAL
     lf->delta_q_luma[0] = lf->delta_q_luma[1] = lf->delta_q_u = lf->delta_q_v =
