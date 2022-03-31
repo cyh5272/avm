@@ -194,6 +194,11 @@ set_aom_config_var(CONFIG_FLEX_MVRES 0
                    "AV2 flexible mv precision experiment flag")
 set_aom_config_var(CONFIG_DERIVED_MV 0 NUMBER
                    "AV2 derived motion vector experiment flag")
+set_aom_config_var(
+  CONFIG_GM_USE_DISFLOW
+  0
+  "Encoder only: Use disflow method for flow estimation, rather than corner matching"
+)
 
 #
 # Variables in this section control optional features of the build system.

@@ -126,17 +126,16 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
 
   aom_clear_system_state();
 
-  // TODO(sarahparker, debargha): Explore do_adaptive_gm_estimation = 1
-  const int do_adaptive_gm_estimation = 0;
-
-  const int ref_frame_dist = get_relative_dist(
-      &cm->seq_params.order_hint_info, cm->current_frame.order_hint,
-      cm->cur_frame->ref_order_hints[frame - LAST_FRAME]);
+#if CONFIG_GM_USE_DISFLOW
+  // TODO(rachelbarker): Test a hybrid method, where we use disflow for
+  // refs with order hint distance <= 2, and corner matching for the rest
   const GlobalMotionEstimationType gm_estimation_type =
-      cm->seq_params.order_hint_info.enable_order_hint &&
-              abs(ref_frame_dist) <= 2 && do_adaptive_gm_estimation
-          ? GLOBAL_MOTION_DISFLOW_BASED
-          : GLOBAL_MOTION_FEATURE_BASED;
+      GLOBAL_MOTION_DISFLOW_BASED;
+#else
+  const GlobalMotionEstimationType gm_estimation_type =
+      GLOBAL_MOTION_FEATURE_BASED;
+#endif  // CONFIG_GM_USE_DISFLOW
+
   for (int model_type_index = 0; model_type_index < NUM_MODELS_TO_SEARCH;
        model_type_index++) {
     TransformationType model_type = models_to_search[model_type_index];
