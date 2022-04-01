@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 #include "config/av1_rtcd.h"
 
@@ -778,6 +779,7 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
   }
 }
 
+#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 #define SUBTRACT_CENTER 1
 
 // Convolves a block of pixels with origin-symmetric, non-separable filters.
@@ -812,12 +814,12 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 // SUBTRACT_CENTER = 1.
 // - Current NonsepFilterConfig supports arbitrary filters and hence the loop
 // over every other tap, e.g., filter_config->config[2 * k].
-void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
-                                   const NonsepFilterConfig *filter_config,
-                                   const int16_t *filter, uint16_t *dst,
-                                   int dst_stride, int bit_depth,
-                                   int block_row_begin, int block_row_end,
-                                   int block_col_begin, int block_col_end) {
+void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
+                                     const NonsepFilterConfig *filter_config,
+                                     const int16_t *filter, uint16_t *dst,
+                                     int dst_stride, int bit_depth,
+                                     int block_row_begin, int block_row_end,
+                                     int block_col_begin, int block_col_end) {
   const int num_sym_taps = filter_config->num_pixels / 2;
   int32_t singleton_tap = 1 << filter_config->prec_bits;
   if (filter_config->num_pixels % 2) {
@@ -880,6 +882,7 @@ void av1_convolve_symmetric_highbd(const uint16_t *dgd, int stride,
     }
   }
 }
+#endif  // CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *nsfilter,
