@@ -96,6 +96,7 @@ static const int mode_lf_lut[] = {
 };
 #endif  // CONFIG_NEW_INTER_MODES
 
+#if CONFIG_NEW_DF
 // Function obtains q_threshold from the quantization index.
 int df_quant_from_qindex(int q_index, int bit_depth) {
   int qstep = ROUND_POWER_OF_TWO(av1_ac_quant_QTX(q_index, 0, bit_depth),
@@ -117,6 +118,7 @@ int df_side_from_qindex(int q_index, int bit_depth) {
 
   return side_threshold;
 }
+#endif  // CONFIG_NEW_DF
 
 #if !CONFIG_NEW_DF
 static void update_sharpness(loop_filter_info_n *lfi, int sharpness_lvl) {

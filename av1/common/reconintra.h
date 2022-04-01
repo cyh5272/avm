@@ -26,6 +26,8 @@ extern "C" {
 #if CONFIG_NEW_DF
 #define DF_RESTRICT_ORIP 1
 #define ORIP_BLOCK_SIZE 32
+#else
+#define DF_RESTRICT_ORIP 0
 #endif
 
 #if CONFIG_AIMC
