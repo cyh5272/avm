@@ -2052,7 +2052,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   const int num_planes = av1_num_planes(cm);
   struct loopfilter *lf = &cm->lf;
 
-  if (cm->features.allow_intrabc || cm->features.coded_lossless) {
+  if (is_global_intrabc_allowed(cm) || cm->features.coded_lossless) {
     // write default deltas to frame buffer
     av1_set_default_ref_deltas(cm->cur_frame->ref_deltas);
     av1_set_default_mode_deltas(cm->cur_frame->mode_deltas);

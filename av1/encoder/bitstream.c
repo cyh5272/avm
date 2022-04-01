@@ -2659,7 +2659,7 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
                                          struct aom_write_bit_buffer *wb) {
   assert(!cm->features.coded_lossless);
-  if (cm->features.allow_intrabc) return;
+  if (is_global_intrabc_allowed(cm)) return;
   const int num_planes = av1_num_planes(cm);
   struct loopfilter *lf = &cm->lf;
 
