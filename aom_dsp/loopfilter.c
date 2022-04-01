@@ -92,6 +92,12 @@ int side_first[DBL_REG_DECIS_LEN] = { 7, 7, 6, 5, 4, 4, 4, 4, 4 };
 #define DF_Q_THRESH_SHIFT 4
 int q_first[DBL_REG_DECIS_LEN] = { 45, 43, 40, 35, 32, 32, 32, 32, 32 };
 
+#if DF_FILT26
+#define SEC_DERIV_ARRAY_LEN (MAX_DBL_FLT_LEN + 1) * 2
+#else
+#define SEC_DERIV_ARRAY_LEN 14
+#endif  // DF_FILT26
+
 // Determining number of samples to be modified for the current row/column
 static INLINE int filt_choice_highbd(uint16_t *s, int pitch, int max_filt,
                                      uint16_t q_thresh, uint16_t side_thresh) {
@@ -99,11 +105,7 @@ static INLINE int filt_choice_highbd(uint16_t *s, int pitch, int max_filt,
 
   int max_samples = max_filt / 2 - 1;
 
-#if DF_FILT26
-#define SEC_DERIV_ARRAY_LEN (MAX_DBL_FLT_LEN + 1) * 2
-#else
-#define SEC_DERIV_ARRAY_LEN 14
-#endif  // DF_FILT26
+  if (max_samples < 1) return 0;
 
   int16_t second_derivs_buf[SEC_DERIV_ARRAY_LEN];
   int16_t *second_deriv = &second_derivs_buf[(SEC_DERIV_ARRAY_LEN >> 1)];
@@ -154,9 +156,6 @@ static INLINE int filt_choice_highbd(uint16_t *s, int pitch, int max_filt,
 #endif  //! DF_SHORT_DEC
 
   mask |= ((second_deriv[-1] + second_deriv[0]) > q_thresh * DF_8_THRESH) * -1;
-
-  //    mask |= ( abs( s[-4*pitch] - s[-1*pitch] - s[0] + s[3*pitch]) >
-  //    (side_thresh>>1) ) * -1;
 
   int end_dir_thresh = (side_thresh * 3) >> 4;
   mask |= (abs((s[-1 * pitch] - s[(-3 - 1) * pitch]) -
@@ -254,12 +253,6 @@ static INLINE int filt_choice(uint8_t *s, int pitch, int max_filt,
 
   int max_samples = max_filt / 2 - 1;
 
-#if DF_FILT26
-#define SEC_DERIV_ARRAY_LEN (MAX_DBL_FLT_LEN + 1) * 2
-#else
-#define SEC_DERIV_ARRAY_LEN 14
-#endif  // DF_FILT26
-
   int16_t second_derivs_buf[SEC_DERIV_ARRAY_LEN];
   int16_t *second_deriv = &second_derivs_buf[(SEC_DERIV_ARRAY_LEN >> 1)];
 
@@ -309,9 +302,6 @@ static INLINE int filt_choice(uint8_t *s, int pitch, int max_filt,
 #endif  //! DF_SHORT_DEC
 
   mask |= ((second_deriv[-1] + second_deriv[0]) > q_thresh * DF_8_THRESH) * -1;
-
-  //    mask |= ( abs( s[-4*pitch] - s[-1*pitch] - s[0] + s[3*pitch]) >
-  //    (side_thresh>>1) ) * -1;
 
   int end_dir_thresh = (side_thresh * 3) >> 4;
   mask |= (abs((s[-1 * pitch] - s[(-3 - 1) * pitch]) -

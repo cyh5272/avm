@@ -108,6 +108,7 @@ int df_quant_from_qindex(int q_index, int bit_depth) {
 
 // Function obtains side_threshold from the quantization index.
 int df_side_from_qindex(int q_index, int bit_depth) {
+  assert(bit_depth <= 12);
   int q_ind = clamp(q_index - 24 * (bit_depth - 8), 0, MAX_SIDE_TABLE - 1);
 
   int side_threshold = side_thresholds[q_ind];
@@ -148,96 +149,26 @@ uint16_t av1_get_filter_q(const loop_filter_info_n *lfi_n, const int dir_idx,
                           int plane, const MB_MODE_INFO *mbmi) {
   const int segment_id = mbmi->segment_id;
 
-  /*  // TODO(Andrey): non-CTC condition
-    if (cm->delta_q_info.delta_lf_present_flag) {
-      int8_t delta_lf;
-      if (cm->delta_q_info.delta_lf_multi) {
-        const int delta_lf_idx = delta_lf_id_lut[plane][dir_idx];
-        delta_lf = mbmi->delta_lf[delta_lf_idx];
-      } else {
-        delta_lf = mbmi->delta_lf_from_base;
-      }
-      int base_level;
-      if (plane == 0)
-        base_level = cm->lf.filter_level[dir_idx];
-      else if (plane == 1)
-        base_level = cm->lf.filter_level_u;
-      else
-        base_level = cm->lf.filter_level_v;
-      int lvl_seg = clamp(delta_lf + base_level, 0, MAX_LOOP_FILTER);
-      assert(plane >= 0 && plane <= 2);
-      const int seg_lf_feature_id = seg_lvl_lf_lut[plane][dir_idx];
-      if (segfeature_active(&cm->seg, segment_id, seg_lf_feature_id)) {
-        const int data = get_segdata(&cm->seg, segment_id, seg_lf_feature_id);
-        lvl_seg = clamp(lvl_seg + data, 0, MAX_LOOP_FILTER);
-      }
-
-      if (cm->lf.mode_ref_delta_enabled) {
-        const int scale = 1 << (lvl_seg >> 5);
-        lvl_seg += cm->lf.ref_deltas[mbmi->ref_frame[0]] * scale;
-        if (mbmi->ref_frame[0] > INTRA_FRAME)
-          lvl_seg += cm->lf.mode_deltas[mode_lf_lut[mbmi->mode]] * scale;
-        lvl_seg = clamp(lvl_seg, 0, MAX_LOOP_FILTER);
-      }
-      return lvl_seg;
-    } else
-  */
-  {
+// TODO(Andrey): non-CTC conditions
 #if CONFIG_NEW_REF_SIGNALING
-    return lfi_n->q_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
-        mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
+  return lfi_n->q_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
+      mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
 #else
-    return lfi_n->q_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
-                       [mode_lf_lut[mbmi->mode]];
+  return lfi_n->q_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
+                     [mode_lf_lut[mbmi->mode]];
 #endif
-  }
 }
 uint16_t av1_get_filter_side(const loop_filter_info_n *lfi_n, const int dir_idx,
                              int plane, const MB_MODE_INFO *mbmi) {
   const int segment_id = mbmi->segment_id;
-  /*    // TODO(Andrey): non-CTC condition
-    if (cm->delta_q_info.delta_lf_present_flag) {
-      int8_t delta_lf;
-      if (cm->delta_q_info.delta_lf_multi) {
-        const int delta_lf_idx = delta_lf_id_lut[plane][dir_idx];
-        delta_lf = mbmi->delta_lf[delta_lf_idx];
-      } else {
-        delta_lf = mbmi->delta_lf_from_base;
-      }
-      int base_level;
-      if (plane == 0)
-        base_level = cm->lf.filter_level[dir_idx];
-      else if (plane == 1)
-        base_level = cm->lf.filter_level_u;
-      else
-        base_level = cm->lf.filter_level_v;
-      int lvl_seg = clamp(delta_lf + base_level, 0, MAX_LOOP_FILTER);
-      assert(plane >= 0 && plane <= 2);
-      const int seg_lf_feature_id = seg_lvl_lf_lut[plane][dir_idx];
-      if (segfeature_active(&cm->seg, segment_id, seg_lf_feature_id)) {
-        const int data = get_segdata(&cm->seg, segment_id, seg_lf_feature_id);
-        lvl_seg = clamp(lvl_seg + data, 0, MAX_LOOP_FILTER);
-      }
-
-      if (cm->lf.mode_ref_delta_enabled) {
-        const int scale = 1 << (lvl_seg >> 5);
-        lvl_seg += cm->lf.ref_deltas[mbmi->ref_frame[0]] * scale;
-        if (mbmi->ref_frame[0] > INTRA_FRAME)
-          lvl_seg += cm->lf.mode_deltas[mode_lf_lut[mbmi->mode]] * scale;
-        lvl_seg = clamp(lvl_seg, 0, MAX_LOOP_FILTER);
-      }
-      return lvl_seg;
-    } else
-  */
-  {
+// TODO(Andrey): non-CTC conditions
 #if CONFIG_NEW_REF_SIGNALING
-    return lfi_n->side_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
-        mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
+  return lfi_n->side_thr[plane][segment_id][dir_idx][COMPACT_INDEX0_NRS(
+      mbmi->ref_frame[0])][mode_lf_lut[mbmi->mode]];
 #else
-    return lfi_n->side_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
-                          [mode_lf_lut[mbmi->mode]];
+  return lfi_n->side_thr[plane][segment_id][dir_idx][mbmi->ref_frame[0]]
+                        [mode_lf_lut[mbmi->mode]];
 #endif  // CONFIG_NEW_REF_SIGNALING
-  }
 }
 
 #else
@@ -432,7 +363,6 @@ void av1_loop_filter_frame_init(AV1_COMMON *cm, int plane_start,
         }
 
         if (!lf->mode_ref_delta_enabled) {
-          //          if (1) {
           int q_thr_seg =
               df_quant_from_qindex(q_ind_seg, cm->seq_params.bit_depth);
           int side_thr_seg =

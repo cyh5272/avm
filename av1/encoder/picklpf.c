@@ -557,10 +557,7 @@ void av1_pick_filter_level(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
       lf->delta_side_luma[0] = last_frame_offsets[1] = best_single_offsets[1];
       lf->delta_q_luma[1] = last_frame_offsets[2] = best_single_offsets[2];
       lf->delta_side_luma[1] = last_frame_offsets[3] = best_single_offsets[3];
-      //      best_cost[0] = best_single_cost;
-    }  // else {
-    //      best_cost[0] = best_dual_cost;
-    //    }
+    }
 
     if (num_planes > 1) {
       // Cb
