@@ -901,6 +901,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Nonseparable convolve-2d functions (high bit-depth)
 //////////////////////////////////////////////////////////
 
+#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 typedef void (*highbd_convolve_nonsep_2d_func)(
     const uint16_t *src, int src_stride,
     const NonsepFilterConfig *filter_config, const int16_t *filter,
@@ -934,9 +935,9 @@ class AV1ConvolveNonSep2DHighbdTest
         << "Not enough padding for 7x7 filters";
     const uint16_t *centered_input =
         input + kMaxTapOffset * width + kMaxTapOffset;
-    av1_convolve_symmetric_highbd(centered_input, width, filter_config, filter,
-                                  reference, kOutputStride, bit_depth, 0,
-                                  height, 0, width);
+    av1_convolve_symmetric_highbd_c(centered_input, width, filter_config,
+                                    filter, reference, kOutputStride, bit_depth,
+                                    0, height, 0, width);
     DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
     GetParam().TestFunction()(centered_input, width, filter_config, filter,
                               test, kOutputStride, bit_depth, 0, height, 0,
@@ -1014,6 +1015,7 @@ TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
 
 // TODO(rachelbarker@): Test with appropriate fast routine.
 INSTANTIATE_TEST_SUITE_P(C, AV1ConvolveNonSep2DHighbdTest,
-                         BuildHighbdParams(av1_convolve_symmetric_highbd));
+                         BuildHighbdParams(av1_convolve_symmetric_highbd_c));
+#endif  // CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 
 }  // namespace
