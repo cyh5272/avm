@@ -402,20 +402,18 @@ static INLINE int filt_choice(uint8_t *s, int pitch, int max_filt,
   return MAX_DBL_FLT_LEN;
 }
 
-void aom_highbd_lpf_horizontal_generic_c(uint16_t *s, int p /* pitch */,
-                                         int filt_width,
+void aom_highbd_lpf_horizontal_generic_c(uint16_t *s, int pitch, int filt_width,
                                          const uint16_t *q_thresh,
                                          const uint16_t *side_thresh, int bd) {
   int i;
   int count = 4;
 
 #if EDGE_DECISION
-
   const int filter0 =
-      filt_choice_highbd(s, p, filt_width, *q_thresh, *side_thresh);
+      filt_choice_highbd(s, pitch, filt_width, *q_thresh, *side_thresh);
   s += count - 1;
   const int filter3 =
-      filt_choice_highbd(s, p, filt_width, *q_thresh, *side_thresh);
+      filt_choice_highbd(s, pitch, filt_width, *q_thresh, *side_thresh);
   s -= count - 1;
 
   int filter = AOMMIN(filter0, filter3);
@@ -424,10 +422,11 @@ void aom_highbd_lpf_horizontal_generic_c(uint16_t *s, int p /* pitch */,
   // of 8 bit simd instructions.
   for (i = 0; i < count; ++i) {
 #if !EDGE_DECISION
-    int filter = filt_choice_highbd(s, p, filt_width, *q_thresh, *side_thresh);
+    int filter =
+        filt_choice_highbd(s, pitch, filt_width, *q_thresh, *side_thresh);
 #endif
 
-    filt_generic_highbd(*q_thresh, filter, s, p, bd);
+    filt_generic_highbd(*q_thresh, filter, s, pitch, bd);
 
     ++s;
   }
@@ -460,7 +459,7 @@ void aom_highbd_lpf_vertical_generic_c(uint16_t *s, int pitch, int filt_width,
   }
 }
 
-void aom_lpf_horizontal_generic_c(uint8_t *s, int p /* pitch */, int filt_width,
+void aom_lpf_horizontal_generic_c(uint8_t *s, int pitch, int filt_width,
                                   const uint16_t *q_thresh,
                                   const uint16_t *side_thresh) {
   int i;
@@ -468,9 +467,11 @@ void aom_lpf_horizontal_generic_c(uint8_t *s, int p /* pitch */, int filt_width,
 
 #if EDGE_DECISION
 
-  const int filter0 = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+  const int filter0 =
+      filt_choice(s, pitch, filt_width, *q_thresh, *side_thresh);
   s += count - 1;
-  const int filter3 = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+  const int filter3 =
+      filt_choice(s, pitch, filt_width, *q_thresh, *side_thresh);
   s -= count - 1;
 
   int filter = AOMMIN(filter0, filter3);
@@ -479,10 +480,10 @@ void aom_lpf_horizontal_generic_c(uint8_t *s, int p /* pitch */, int filt_width,
   // of 8 bit simd instructions.
   for (i = 0; i < count; ++i) {
 #if !EDGE_DECISION
-    int filter = filt_choice(s, p, filt_width, *q_thresh, *side_thresh);
+    int filter = filt_choice(s, pitch, filt_width, *q_thresh, *side_thresh);
 #endif
 
-    filt_generic(*q_thresh, filter, s, p);
+    filt_generic(*q_thresh, filter, s, pitch);
 
     ++s;
   }
