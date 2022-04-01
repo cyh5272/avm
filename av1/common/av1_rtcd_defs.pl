@@ -17,6 +17,7 @@ print <<EOF
 #include "aom/aom_integer.h"
 #include "aom_dsp/txfm_common.h"
 #include "av1/common/common.h"
+#include "av1/common/convolve.h"
 #include "av1/common/enums.h"
 #include "av1/common/quant_common.h"
 #include "av1/common/filter.h"
@@ -84,6 +85,11 @@ specialize qw/av1_highbd_convolve_horiz_rs sse4_1/;
 
 add_proto qw/void av1_highbd_wiener_convolve_add_src/, "const uint8_t *src, ptrdiff_t src_stride, uint8_t *dst, ptrdiff_t dst_stride, const int16_t *filter_x, int x_step_q4, const int16_t *filter_y, int y_step_q4, int w, int h, const ConvolveParams *conv_params, int bd";
 specialize qw/av1_highbd_wiener_convolve_add_src ssse3 avx2/;
+
+# Non-separable Wiener filter
+if (aom_config("CONFIG_WIENER_NONSEP") eq "yes" && aom_config("CONFIG_PC_WIENER") eq "yes") {
+  add_proto qw/void av1_convolve_symmetric_highbd/, "const uint16_t *dgd, int stride, const NonsepFilterConfig *filter_config, const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth, int block_row_begin, int block_row_end, int block_col_begin, int block_col_end";
+}
 
 # directional intra predictor functions
 add_proto qw/void av1_dr_prediction_z1/, "uint8_t *dst, ptrdiff_t stride, int bw, int bh, const uint8_t *above, const uint8_t *left, int upsample_above, int dx, int dy, int mrl_index";
