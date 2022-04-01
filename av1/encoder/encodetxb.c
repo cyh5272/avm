@@ -409,8 +409,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
   const CB_COEFF_BUFFER *cb_coef_buff = x->cb_coef_buff;
 #if CONFIG_SDP
   const int txb_offset =
-      x->mbmi_ext_frame->cb_offset[plane > 0 && xd->tree_type == CHROMA_PART] /
-      (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
+      x->mbmi_ext_frame->cb_offset[plane] / (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
 #else
   const int txb_offset =
       x->mbmi_ext_frame->cb_offset / (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
@@ -481,8 +480,7 @@ void av1_write_coeffs_txb_skip(const AV1_COMMON *const cm, MACROBLOCK *const x,
   int8_t signs_buf[TX_PAD_2D];
 #if CONFIG_SDP
   const tran_low_t *tcoeff_txb =
-      cb_coef_buff->tcoeff[plane] +
-      x->mbmi_ext_frame->cb_offset[plane > 0 && xd->tree_type == CHROMA_PART];
+      cb_coef_buff->tcoeff[plane] + x->mbmi_ext_frame->cb_offset[plane];
 #else
   const tran_low_t *tcoeff_txb =
       cb_coef_buff->tcoeff[plane] + x->mbmi_ext_frame->cb_offset;
@@ -2286,9 +2284,7 @@ void av1_update_and_record_txb_skip_context(int plane, int block, int blk_row,
     CB_COEFF_BUFFER *cb_coef_buff = x->cb_coef_buff;
 #if CONFIG_SDP
     const int txb_offset =
-        x->mbmi_ext_frame
-            ->cb_offset[(plane > 0 && xd->tree_type == CHROMA_PART) ? 1 : 0] /
-        (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
+        x->mbmi_ext_frame->cb_offset[plane] / (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
 #else
     const int txb_offset =
         x->mbmi_ext_frame->cb_offset / (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
@@ -2307,8 +2303,7 @@ void av1_update_and_record_txb_skip_context(int plane, int block, int blk_row,
     const int seg_eob = av1_get_tx_eob(&cpi->common.seg, segment_id, tx_size);
 #if CONFIG_SDP
     tran_low_t *tcoeff_txb =
-        cb_coef_buff->tcoeff[plane] +
-        x->mbmi_ext_frame->cb_offset[plane > 0 && xd->tree_type == CHROMA_PART];
+        cb_coef_buff->tcoeff[plane] + x->mbmi_ext_frame->cb_offset[plane];
 #else
     tran_low_t *tcoeff_txb =
         cb_coef_buff->tcoeff[plane] + x->mbmi_ext_frame->cb_offset;
