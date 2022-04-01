@@ -1288,6 +1288,8 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
     }
 
 #if CONFIG_NEW_REF_SIGNALING
+    cm->current_frame.frame_type = frame_params.frame_type;
+    cm->features.error_resilient_mode = frame_params.error_resilient_mode;
     if (cm->seq_params.explicit_ref_frame_map)
       av1_get_ref_frames_enc(cm, cur_frame_disp, ref_frame_map_pairs);
     else
