@@ -4968,7 +4968,7 @@ static INLINE int get_disp_order_hint(AV1_COMMON *const cm) {
   // Here, the actual display_order_hint is recovered.
   int cur_disp_order_hint = current_frame->order_hint;
   while (abs(max_disp_order_hint - cur_disp_order_hint) > 35) {
-    assert(cur_disp_order_hint < max_disp_order_hint);
+    if (cur_disp_order_hint > max_disp_order_hint) return cur_disp_order_hint;
     int display_order_hint_factor =
         1 << (cm->seq_params.order_hint_info.order_hint_bits_minus_1 + 1);
     cur_disp_order_hint += display_order_hint_factor;
