@@ -175,6 +175,11 @@ typedef struct {
   int mi_row;
   int mi_col;
 #endif  // CONFIG_IBC_SR_EXT
+#if CONFIG_BVP_IMPROVEMENT
+  MACROBLOCK *x;
+  int ref_bv_cnt;
+#endif  // CONFIG_BVP_IMPROVEMENT
+
   MSBuffers ms_buffers;
 
   // WARNING: search_method should be regarded as a private variable and should
@@ -433,6 +438,20 @@ static INLINE int av1_is_subpelmv_in_range(const SubpelMvLimits *mv_limits,
   return (mv.col >= mv_limits->col_min) && (mv.col <= mv_limits->col_max) &&
          (mv.row >= mv_limits->row_min) && (mv.row <= mv_limits->row_max);
 }
+
+#if CONFIG_BVP_IMPROVEMENT
+int get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params);
+void init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv);
+int get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
+                             const MACROBLOCK *x);
+int get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx, MACROBLOCK *x,
+                         FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
+                         int ref_bv_cnt);
+int pick_ref_bv(FULLPEL_MV *best_full_mv,
+                const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params);
+int search_ref_bv(const struct AV1_COMP *cpi, const MACROBLOCKD *xd,
+                  const FULLPEL_MOTION_SEARCH_PARAMS *ms_params);
+#endif  // CONFIG_BVP_IMPROVEMENT
 
 #ifdef __cplusplus
 }  // extern "C"
