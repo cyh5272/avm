@@ -196,20 +196,6 @@ int aom_determine_correspondence(unsigned char *src, int *src_corners,
   return num_correspondences;
 }
 
-static void get_inliers_from_indices(MotionModel *params,
-                                     Correspondence *correspondences) {
-  int *inliers_tmp = (int *)aom_malloc(2 * MAX_CORNERS * sizeof(*inliers_tmp));
-  memset(inliers_tmp, 0, 2 * MAX_CORNERS * sizeof(*inliers_tmp));
-
-  for (int i = 0; i < params->num_inliers; i++) {
-    int index = params->inliers[i];
-    inliers_tmp[2 * i] = (int)rint(correspondences[index].x);
-    inliers_tmp[2 * i + 1] = (int)rint(correspondences[index].y);
-  }
-  memcpy(params->inliers, inliers_tmp, sizeof(*inliers_tmp) * 2 * MAX_CORNERS);
-  aom_free(inliers_tmp);
-}
-
 int aom_compute_global_motion_feature_based(
     TransformationType type, unsigned char *src_buffer, int src_width,
     int src_height, int src_stride, int *src_corners, int num_src_corners,
@@ -246,8 +232,6 @@ int aom_compute_global_motion_feature_based(
             MIN_INLIER_PROB * num_correspondences ||
         num_correspondences == 0) {
       params_by_motion[i].num_inliers = 0;
-    } else {
-      get_inliers_from_indices(&params_by_motion[i], correspondences);
     }
   }
 

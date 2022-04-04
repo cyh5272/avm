@@ -1641,15 +1641,22 @@ static int ransac_internal(const Correspondence *matched_points, int npoints,
   // Recompute the motions using only the inliers.
   for (i = 0; i < num_desired_motions; ++i) {
     if (motions[i].num_inliers >= minpts) {
+      int num_inliers = motions[i].num_inliers;
       copy_points_at_indices(points1, corners1, motions[i].inlier_indices,
-                             motions[i].num_inliers);
+                             num_inliers);
       copy_points_at_indices(points2, corners2, motions[i].inlier_indices,
-                             motions[i].num_inliers);
+                             num_inliers);
 
-      find_transformation(motions[i].num_inliers, points1, points2,
+      find_transformation(num_inliers, points1, points2,
                           params_by_motion[i].params);
-      memcpy(params_by_motion[i].inliers, motions[i].inlier_indices,
-             sizeof(*motions[i].inlier_indices) * npoints);
+
+      // Populate inliers array
+      for (int j = 0; j < num_inliers; j++) {
+        int index = motions[i].inlier_indices[j];
+        const Correspondence *corr = &matched_points[index];
+        params_by_motion[i].inliers[2 * j + 0] = (int)rint(corr->x);
+        params_by_motion[i].inliers[2 * j + 1] = (int)rint(corr->y);
+      }
     }
     params_by_motion[i].num_inliers = motions[i].num_inliers;
   }
