@@ -2197,8 +2197,9 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
   // Note:
   // - width, height, frame*_qindex are integers
   // - frame*_src, frame*_dgd are normalized pixels values
+  const YV12_BUFFER_CONFIG *src = cpi->source;
   if (!cnn_dataset_info.is_initialized) {
-    if (!cnn_dataset_init(cm->cur_frame->width, cm->cur_frame->height)) {
+    if (!cnn_dataset_init(src->y_crop_width, src->y_crop_height)) {
       fprintf(stderr, "ERROR in cnn_dataset_init()");
     };
   }
@@ -2206,7 +2207,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
   if (!cnn_dataset_info.is_saved[cm->cur_frame->absolute_poc] &&
       cm->cur_frame->absolute_poc % cnn_dataset_info.every_nth == 0) {
     // Save source frame.
-    const YV12_BUFFER_CONFIG *src = cpi->source;
     cnn_dataset_save_frame(src->buffers[AOM_PLANE_Y], src->y_crop_width,
                            src->y_crop_height, src->y_stride,
                            cm->seq_params.use_highbitdepth,
