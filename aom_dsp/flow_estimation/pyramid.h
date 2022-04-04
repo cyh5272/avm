@@ -30,7 +30,7 @@ extern "C" {
 // Similarly to the border around regular image buffers, this border is filled
 // with copies of the outermost pixels of the frame, to allow for more efficient
 // convolution code
-#define PYRAMID_PADDING 8
+#define PYRAMID_PADDING 16
 
 // Struct for an image pyramid
 typedef struct {

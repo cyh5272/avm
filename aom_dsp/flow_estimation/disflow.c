@@ -59,124 +59,90 @@ static int determine_disflow_correspondence(int *frm_corners,
   return num_correspondences;
 }
 
-static double getCubicValue(double p[4], double x) {
-  return p[1] + 0.5 * x *
-                    (p[2] - p[0] +
-                     x * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] +
-                          x * (3.0 * (p[1] - p[2]) + p[3] - p[0])));
+static void getCubicKernel(double x, double *kernel) {
+  assert(0 <= x && x < 1);
+  double x2 = x * x;
+  double x3 = x2 * x;
+  kernel[0] = -0.5 * x + x2 - 0.5 * x3;
+  kernel[1] = 1.0 - 2.5 * x2 + 1.5 * x3;
+  kernel[2] = 0.5 * x + 2.0 * x2 - 1.5 * x3;
+  kernel[3] = -0.5 * x2 + 0.5 * x3;
 }
 
-static void get_subcolumn(unsigned char *ref, double col[4], int stride, int x,
-                          int y_start) {
-  int i;
-  for (i = 0; i < 4; ++i) {
-    col[i] = ref[(i + y_start) * stride + x];
-  }
-}
-
-static double bicubic(unsigned char *ref, double x, double y, int stride) {
-  double arr[4];
-  int k;
-  int i = (int)x;
-  int j = (int)y;
-  for (k = 0; k < 4; ++k) {
-    double arr_temp[4];
-    get_subcolumn(ref, arr_temp, stride, i + k - 1, j - 1);
-    arr[k] = getCubicValue(arr_temp, y - j);
-  }
-  return getCubicValue(arr, x - i);
-}
-
-// Interpolate a warped block using bicubic interpolation when possible
-static unsigned char interpolate(unsigned char *ref, double x, double y,
-                                 int width, int height, int stride) {
-  if (x < 0 && y < 0)
-    return ref[0];
-  else if (x < 0 && y > height - 1)
-    return ref[(height - 1) * stride];
-  else if (x > width - 1 && y < 0)
-    return ref[width - 1];
-  else if (x > width - 1 && y > height - 1)
-    return ref[(height - 1) * stride + (width - 1)];
-  else if (x < 0) {
-    int v;
-    int i = (int)y;
-    double a = y - i;
-    if (y > 1 && y < height - 2) {
-      double arr[4];
-      get_subcolumn(ref, arr, stride, 0, i - 1);
-      return clamp((int)(getCubicValue(arr, a) + 0.5), 0, 255);
-    }
-    v = (int)(ref[i * stride] * (1 - a) + ref[(i + 1) * stride] * a + 0.5);
-    return clamp(v, 0, 255);
-  } else if (y < 0) {
-    int v;
-    int j = (int)x;
-    double b = x - j;
-    if (x > 1 && x < width - 2) {
-      double arr[4] = { ref[j - 1], ref[j], ref[j + 1], ref[j + 2] };
-      return clamp((int)(getCubicValue(arr, b) + 0.5), 0, 255);
-    }
-    v = (int)(ref[j] * (1 - b) + ref[j + 1] * b + 0.5);
-    return clamp(v, 0, 255);
-  } else if (x > width - 1) {
-    int v;
-    int i = (int)y;
-    double a = y - i;
-    if (y > 1 && y < height - 2) {
-      double arr[4];
-      get_subcolumn(ref, arr, stride, width - 1, i - 1);
-      return clamp((int)(getCubicValue(arr, a) + 0.5), 0, 255);
-    }
-    v = (int)(ref[i * stride + width - 1] * (1 - a) +
-              ref[(i + 1) * stride + width - 1] * a + 0.5);
-    return clamp(v, 0, 255);
-  } else if (y > height - 1) {
-    int v;
-    int j = (int)x;
-    double b = x - j;
-    if (x > 1 && x < width - 2) {
-      int row = (height - 1) * stride;
-      double arr[4] = { ref[row + j - 1], ref[row + j], ref[row + j + 1],
-                        ref[row + j + 2] };
-      return clamp((int)(getCubicValue(arr, b) + 0.5), 0, 255);
-    }
-    v = (int)(ref[(height - 1) * stride + j] * (1 - b) +
-              ref[(height - 1) * stride + j + 1] * b + 0.5);
-    return clamp(v, 0, 255);
-  } else if (x > 1 && y > 1 && x < width - 2 && y < height - 2) {
-    return clamp((int)(bicubic(ref, x, y, stride) + 0.5), 0, 255);
-  } else {
-    int i = (int)y;
-    int j = (int)x;
-    double a = y - i;
-    double b = x - j;
-    int v = (int)(ref[i * stride + j] * (1 - a) * (1 - b) +
-                  ref[i * stride + j + 1] * (1 - a) * b +
-                  ref[(i + 1) * stride + j] * a * (1 - b) +
-                  ref[(i + 1) * stride + j + 1] * a * b);
-    return clamp(v, 0, 255);
-  }
+static double getCubicValue(double *p, double *kernel) {
+  return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
+         kernel[3] * p[3];
 }
 
 // Warps a block using flow vector [u, v] and computes the mse
 static double compute_warp_and_error(unsigned char *ref, unsigned char *frm,
                                      int width, int height, int stride, int x,
                                      int y, double u, double v, int16_t *dt) {
-  int i, j;
   unsigned char warped;
-  double x_w, y_w;
+  int x_w, y_w;
   double mse = 0;
   int16_t err = 0;
-  for (i = y; i < y + PATCH_SIZE; ++i)
-    for (j = x; j < x + PATCH_SIZE; ++j) {
-      x_w = (double)j + u;
-      y_w = (double)i + v;
-      warped = interpolate(ref, x_w, y_w, width, height, stride);
-      err = warped - frm[j + i * stride];
-      mse += err * err;
-      dt[(i - y) * PATCH_SIZE + (j - x)] = err;
+
+  // Split offset into integer and fractional parts, and compute cubic
+  // interpolation kernels
+  int u_int = (int)floor(u);
+  int v_int = (int)floor(v);
+  double u_frac = u - u_int;
+  double v_frac = v - v_int;
+
+  double h_kernel[4];
+  double v_kernel[4];
+  getCubicKernel(u_frac, h_kernel);
+  getCubicKernel(v_frac, v_kernel);
+
+  // Storage for intermediate values between the two convolution directions
+  double tmp_[PATCH_SIZE * (PATCH_SIZE + 3)];
+  double *tmp = tmp_ + PATCH_SIZE;  // Offset by one row
+
+  // Clamp coordinates so that all pixels we fetch will remain within the
+  // allocated border region, but allow them to go far enough out that
+  // the border pixels' values do not change.
+  // Since we are calculating an 8x8 block, the bottom-right pixel
+  // in the block has coordinates (x0 + 7, y0 + 7). Then, the cubic
+  // interpolation has 4 taps, meaning that the output of pixel
+  // (x_w, y_w) depends on the pixels in the range
+  // ([x_w - 1, x_w + 2], [y_w - 1, y_w + 2]).
+  //
+  // Thus the most extreme coordinates which will be fetched are
+  // (x0 - 1, y0 - 1) and (x0 + 9, y0 + 9).
+  int x0 = clamp(x + u_int, -9, width);
+  int y0 = clamp(y + v_int, -9, height);
+
+  // Horizontal convolution
+  for (int i = -1; i < PATCH_SIZE + 2; ++i) {
+    y_w = y0 + i;
+    for (int j = 0; j < PATCH_SIZE; ++j) {
+      x_w = x0 + j;
+      double arr[4];
+
+      arr[0] = (double)ref[y_w * stride + (x_w - 1)];
+      arr[1] = (double)ref[y_w * stride + (x_w + 0)];
+      arr[2] = (double)ref[y_w * stride + (x_w + 1)];
+      arr[3] = (double)ref[y_w * stride + (x_w + 2)];
+
+      tmp[i * PATCH_SIZE + j] = getCubicValue(arr, h_kernel);
     }
+  }
+
+  // Vertical convolution
+  for (int i = 0; i < PATCH_SIZE; ++i) {
+    for (int j = 0; j < PATCH_SIZE; ++j) {
+      double *p = &tmp[i * PATCH_SIZE + j];
+      double arr[4] = { p[-PATCH_SIZE], p[0], p[PATCH_SIZE],
+                        p[2 * PATCH_SIZE] };
+      double result = getCubicValue(arr, v_kernel);
+
+      warped = clamp((int)(result + 0.5), 0, 255);
+      err = warped - frm[(x + j) + (y + i) * stride];
+      mse += err * err;
+      dt[i * PATCH_SIZE + j] = err;
+    }
+  }
 
   mse /= (PATCH_SIZE * PATCH_SIZE);
   return mse;
