@@ -197,16 +197,19 @@ int aom_determine_correspondence(unsigned char *src, int *src_corners,
 }
 
 int aom_compute_global_motion_feature_based(
-    TransformationType type, unsigned char *src_buffer, int src_width,
-    int src_height, int src_stride, int *src_corners, int num_src_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
-    int num_motions) {
+    TransformationType type, YV12_BUFFER_CONFIG *src, int *src_corners,
+    int num_src_corners, YV12_BUFFER_CONFIG *ref, int bit_depth,
+    MotionModel *params_by_motion, int num_motions) {
   int i;
   int num_ref_corners;
   int num_correspondences;
   int ref_corners[2 * MAX_CORNERS];
+  unsigned char *src_buffer = src->y_buffer;
   unsigned char *ref_buffer = ref->y_buffer;
 
+  if (src->flags & YV12_FLAG_HIGHBITDEPTH) {
+    src_buffer = aom_downconvert_frame(src, bit_depth);
+  }
   if (ref->flags & YV12_FLAG_HIGHBITDEPTH) {
     ref_buffer = aom_downconvert_frame(ref, bit_depth);
   }
@@ -220,8 +223,8 @@ int aom_compute_global_motion_feature_based(
       (Correspondence *)malloc(num_src_corners * sizeof(*correspondences));
   num_correspondences = aom_determine_correspondence(
       src_buffer, (int *)src_corners, num_src_corners, ref_buffer,
-      (int *)ref_corners, num_ref_corners, src_width, src_height, src_stride,
-      ref->y_stride, correspondences);
+      (int *)ref_corners, num_ref_corners, src->y_width, src->y_height,
+      src->y_stride, ref->y_stride, correspondences);
 
   ransac(correspondences, num_correspondences, type, params_by_motion,
          num_motions);

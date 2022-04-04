@@ -19,6 +19,9 @@
 extern "C" {
 #endif
 
+// Number of pyramid levels in disflow computation
+#define DISFLOW_PYRAMID_LEVELS 2
+
 typedef struct {
   // x and y directions of flow, per patch
   double *u;
@@ -33,8 +36,7 @@ typedef struct {
 FlowField *aom_alloc_flow_field(int width, int height, int stride);
 void aom_free_flow_field(FlowField *flow);
 
-FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
-                                  int frm_height, int frm_stride,
+FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
                                   YV12_BUFFER_CONFIG *ref, int bit_depth);
 
 int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
@@ -42,10 +44,9 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
                                 MotionModel *params_by_motion, int num_motions);
 
 int aom_compute_global_motion_disflow_based(
-    TransformationType type, unsigned char *frm_buffer, int frm_width,
-    int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
-    int num_motions);
+    TransformationType type, YV12_BUFFER_CONFIG *frm, int *frm_corners,
+    int num_frm_corners, YV12_BUFFER_CONFIG *ref, int bit_depth,
+    MotionModel *params_by_motion, int num_motions);
 
 #ifdef __cplusplus
 }

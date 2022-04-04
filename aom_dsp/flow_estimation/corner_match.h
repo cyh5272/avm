@@ -35,10 +35,9 @@ int aom_determine_correspondence(unsigned char *src, int *src_corners,
                                  Correspondence *correspondences);
 
 int aom_compute_global_motion_feature_based(
-    TransformationType type, unsigned char *src_buffer, int src_width,
-    int src_height, int src_stride, int *src_corners, int num_src_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
-    int num_motions);
+    TransformationType type, YV12_BUFFER_CONFIG *src, int *src_corners,
+    int num_src_corners, YV12_BUFFER_CONFIG *ref, int bit_depth,
+    MotionModel *params_by_motion, int num_motions);
 
 #ifdef __cplusplus
 }

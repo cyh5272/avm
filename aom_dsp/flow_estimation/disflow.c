@@ -10,15 +10,14 @@
  * aomedia.org/license/patent-license/.
  */
 
+#include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/flow_estimation/disflow.h"
 #include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_dsp/flow_estimation/ransac.h"
 #include "aom_dsp/flow_estimation/util.h"
-
 #include "aom_mem/aom_mem.h"
 
-// TODO(rachelbarker): Remove dependence on code in av1/encoder/
-#include "av1/common/resize.h"
+#include <assert.h>
 
 // Size of square patches in the disflow dense grid
 #define PATCH_SIZE 8
@@ -26,8 +25,6 @@
 #define PATCH_CENTER ((PATCH_SIZE + 1) >> 1)
 // Step size between patches, lower value means greater patch overlap
 #define PATCH_STEP 1
-// Minimum size of border padding for disflow
-#define MIN_PAD 7
 // Warp error convergence threshold for disflow
 #define DISFLOW_ERROR_TR 0.01
 // Max number of iterations if warp convergence is not found
@@ -251,100 +248,6 @@ static INLINE void image_difference(const uint8_t *src, int src_stride,
 }
 */
 
-// Compute an image gradient using a sobel filter.
-// If dir == 1, compute the x gradient. If dir == 0, compute y. This function
-// assumes the images have been padded so that they can be processed in units
-// of 8.
-static INLINE void sobel_xy_image_gradient(const uint8_t *src, int src_stride,
-                                           double *dst, int dst_stride,
-                                           int height, int width, int dir) {
-  double norm = 1.0;
-  // TODO(sarahparker) experiment with doing this over larger block sizes
-  const int block_unit = 8;
-  // Filter in 8x8 blocks to eventually make use of optimized convolve function
-  for (int i = 0; i < height; i += block_unit) {
-    for (int j = 0; j < width; j += block_unit) {
-      av1_convolve_2d_sobel_y_c(src + i * src_stride + j, src_stride,
-                                dst + i * dst_stride + j, dst_stride,
-                                block_unit, block_unit, dir, norm);
-    }
-  }
-}
-
-// Compute coarse to fine pyramids for a frame
-static void compute_flow_pyramids(unsigned char *frm, const int frm_width,
-                                  const int frm_height, const int frm_stride,
-                                  int n_levels, int pad_size, int compute_grad,
-                                  ImagePyramid *frm_pyr) {
-  int cur_width, cur_height, cur_stride, cur_loc;
-  assert((frm_width >> n_levels) > 0);
-  assert((frm_height >> n_levels) > 0);
-
-  // Initialize first level
-  frm_pyr->n_levels = n_levels;
-  frm_pyr->pad_size = pad_size;
-  frm_pyr->widths[0] = frm_width;
-  frm_pyr->heights[0] = frm_height;
-  frm_pyr->strides[0] = frm_width + 2 * frm_pyr->pad_size;
-  // Point the beginning of the level buffer to the location inside
-  // the padded border
-  frm_pyr->level_loc[0] =
-      frm_pyr->strides[0] * frm_pyr->pad_size + frm_pyr->pad_size;
-  // This essentially copies the original buffer into the pyramid buffer
-  // without the original padding
-  av1_resize_plane(frm, frm_height, frm_width, frm_stride,
-                   frm_pyr->level_buffer + frm_pyr->level_loc[0],
-                   frm_pyr->heights[0], frm_pyr->widths[0],
-                   frm_pyr->strides[0]);
-
-  if (compute_grad) {
-    cur_width = frm_pyr->widths[0];
-    cur_height = frm_pyr->heights[0];
-    cur_stride = frm_pyr->strides[0];
-    cur_loc = frm_pyr->level_loc[0];
-    assert(frm_pyr->has_gradient && frm_pyr->level_dx_buffer != NULL &&
-           frm_pyr->level_dy_buffer != NULL);
-    // Computation x gradient
-    sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                            frm_pyr->level_dx_buffer + cur_loc, cur_stride,
-                            cur_height, cur_width, 1);
-
-    // Computation y gradient
-    sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                            frm_pyr->level_dy_buffer + cur_loc, cur_stride,
-                            cur_height, cur_width, 0);
-  }
-
-  // Start at the finest level and resize down to the coarsest level
-  for (int level = 1; level < n_levels; ++level) {
-    aom_pyramid_update_level_dims(frm_pyr, level);
-    cur_width = frm_pyr->widths[level];
-    cur_height = frm_pyr->heights[level];
-    cur_stride = frm_pyr->strides[level];
-    cur_loc = frm_pyr->level_loc[level];
-
-    av1_resize_plane(frm_pyr->level_buffer + frm_pyr->level_loc[level - 1],
-                     frm_pyr->heights[level - 1], frm_pyr->widths[level - 1],
-                     frm_pyr->strides[level - 1],
-                     frm_pyr->level_buffer + cur_loc, cur_height, cur_width,
-                     cur_stride);
-
-    if (compute_grad) {
-      assert(frm_pyr->has_gradient && frm_pyr->level_dx_buffer != NULL &&
-             frm_pyr->level_dy_buffer != NULL);
-      // Computation x gradient
-      sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                              frm_pyr->level_dx_buffer + cur_loc, cur_stride,
-                              cur_height, cur_width, 1);
-
-      // Computation y gradient
-      sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                              frm_pyr->level_dy_buffer + cur_loc, cur_stride,
-                              cur_height, cur_width, 0);
-    }
-  }
-}
-
 static INLINE void compute_flow_at_point(unsigned char *frm, unsigned char *ref,
                                          double *dx, double *dy, int x, int y,
                                          int width, int height, int stride,
@@ -453,24 +356,12 @@ void aom_free_flow_field(FlowField *flow) {
   aom_free(flow);
 }
 
-FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
-                                  int frm_height, int frm_stride,
+FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
                                   YV12_BUFFER_CONFIG *ref, int bit_depth) {
-  unsigned char *ref_buffer = ref->y_buffer;
-  const int ref_width = ref->y_width;
-  const int ref_height = ref->y_height;
-  const int pad_size = AOMMAX(PATCH_SIZE, MIN_PAD);
-  assert(frm_width == ref_width);
-  assert(frm_height == ref_height);
-
-  // Ensure the number of pyramid levels will work with the frame resolution
-  const int msb =
-      frm_width < frm_height ? get_msb(frm_width) : get_msb(frm_height);
-  const int n_levels = AOMMIN(msb, N_LEVELS);
-
-  if (ref->flags & YV12_FLAG_HIGHBITDEPTH) {
-    ref_buffer = aom_downconvert_frame(ref, bit_depth);
-  }
+  const int frm_width = frm->y_width;
+  const int frm_height = frm->y_height;
+  assert(frm->y_width == ref->y_width);
+  assert(frm->y_height == ref->y_height);
 
   // TODO(sarahparker) We will want to do the source pyramid computation
   // outside of this function so it doesn't get recomputed for every
@@ -478,18 +369,10 @@ FlowField *aom_compute_flow_field(unsigned char *frm_buffer, int frm_width,
   // reference in advance, since lower levels can be overwritten once their
   // flow field is computed and upscaled. I'll add these optimizations
   // once the full implementation is working.
-  // Allocate frm image pyramids
-  int compute_gradient = 1;
   ImagePyramid *frm_pyr =
-      aom_alloc_pyramid(frm_width, frm_height, pad_size, compute_gradient);
-  compute_flow_pyramids(frm_buffer, frm_width, frm_height, frm_stride, n_levels,
-                        pad_size, compute_gradient, frm_pyr);
-  // Allocate ref image pyramids
-  compute_gradient = 0;
+      aom_compute_pyramid(frm, bit_depth, 1, DISFLOW_PYRAMID_LEVELS);
   ImagePyramid *ref_pyr =
-      aom_alloc_pyramid(ref_width, ref_height, pad_size, compute_gradient);
-  compute_flow_pyramids(ref_buffer, ref_width, ref_height, ref->y_stride,
-                        n_levels, pad_size, compute_gradient, ref_pyr);
+      aom_compute_pyramid(ref, bit_depth, 0, DISFLOW_PYRAMID_LEVELS);
 
   FlowField *flow =
       aom_alloc_flow_field(frm_width, frm_height, frm_pyr->strides[0]);
@@ -533,12 +416,10 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
 }
 
 int aom_compute_global_motion_disflow_based(
-    TransformationType type, unsigned char *frm_buffer, int frm_width,
-    int frm_height, int frm_stride, int *frm_corners, int num_frm_corners,
-    YV12_BUFFER_CONFIG *ref, int bit_depth, MotionModel *params_by_motion,
-    int num_motions) {
-  FlowField *flow = aom_compute_flow_field(frm_buffer, frm_width, frm_height,
-                                           frm_stride, ref, bit_depth);
+    TransformationType type, YV12_BUFFER_CONFIG *frm, int *frm_corners,
+    int num_frm_corners, YV12_BUFFER_CONFIG *ref, int bit_depth,
+    MotionModel *params_by_motion, int num_motions) {
+  FlowField *flow = aom_compute_flow_field(frm, ref, bit_depth);
   int result = aom_fit_model_to_flow_field(
       flow, type, frm_corners, num_frm_corners, params_by_motion, num_motions);
   aom_free_flow_field(flow);
