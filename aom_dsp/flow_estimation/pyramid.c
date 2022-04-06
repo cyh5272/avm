@@ -24,8 +24,7 @@
 // TODO(rachelbarker): Check for allocations returning NULL
 // TODO(rachelbarker): Align the first image pixel of each level to some
 // convenient power of two (eg, to 16 bytes for SIMD)
-static INLINE ImagePyramid *alloc_pyramid(int width, int height,
-                                          int compute_gradient, int n_levels) {
+static INLINE ImagePyramid *alloc_pyramid(int width, int height, int n_levels) {
   assert(n_levels <= MAX_PYRAMID_LEVELS);
 
   // Limit number of levels on small frames
@@ -35,7 +34,6 @@ static INLINE ImagePyramid *alloc_pyramid(int width, int height,
 
   ImagePyramid *pyr = aom_malloc(sizeof(*pyr));
   pyr->n_levels = n_levels;
-  pyr->has_gradient = compute_gradient;
 
   // Compute sizes and offsets for each pyramid level
   size_t buffer_size = 0;
@@ -63,34 +61,7 @@ static INLINE ImagePyramid *alloc_pyramid(int width, int height,
   // TODO(rachelbarker): Do we need to zero this buffer?
   pyr->level_buffer = aom_calloc(buffer_size, sizeof(*pyr->level_buffer));
 
-  if (compute_gradient) {
-    // TODO(rachelbarker): Do we need to zero these?
-    pyr->level_dx_buffer =
-        aom_calloc(buffer_size, sizeof(*pyr->level_dx_buffer));
-    pyr->level_dy_buffer =
-        aom_calloc(buffer_size, sizeof(*pyr->level_dy_buffer));
-  }
   return pyr;
-}
-
-// Compute an image gradient using a sobel filter.
-// If dir == 1, compute the x gradient. If dir == 0, compute y. This function
-// assumes the images have been padded so that they can be processed in units
-// of 8.
-static INLINE void sobel_xy_image_gradient(const uint8_t *src, int src_stride,
-                                           double *dst, int dst_stride,
-                                           int height, int width, int dir) {
-  double norm = 1.0;
-  // TODO(sarahparker) experiment with doing this over larger block sizes
-  const int block_unit = 8;
-  // Filter in 8x8 blocks to eventually make use of optimized convolve function
-  for (int i = 0; i < height; i += block_unit) {
-    for (int j = 0; j < width; j += block_unit) {
-      av1_convolve_2d_sobel_y_c(src + i * src_stride + j, src_stride,
-                                dst + i * dst_stride + j, dst_stride,
-                                block_unit, block_unit, dir, norm);
-    }
-  }
 }
 
 // Fill the border region of a pyramid frame.
@@ -126,7 +97,7 @@ static INLINE void fill_border(unsigned char *img_buf, const int width,
 
 // Compute coarse to fine pyramids for a frame
 static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
-                                int compute_grad, ImagePyramid *frm_pyr) {
+                                ImagePyramid *frm_pyr) {
   int n_levels = frm_pyr->n_levels;
   const int frm_width = frm->y_width;
   const int frm_height = frm->y_height;
@@ -169,20 +140,6 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
   fill_border(frm_pyr->level_buffer + cur_loc, cur_width, cur_height,
               cur_stride);
 
-  if (compute_grad) {
-    assert(frm_pyr->has_gradient && frm_pyr->level_dx_buffer != NULL &&
-           frm_pyr->level_dy_buffer != NULL);
-    // Computation x gradient
-    sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                            frm_pyr->level_dx_buffer + cur_loc, cur_stride,
-                            cur_height, cur_width, 1);
-
-    // Computation y gradient
-    sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                            frm_pyr->level_dy_buffer + cur_loc, cur_stride,
-                            cur_height, cur_width, 0);
-  }
-
   // Start at the finest level and resize down to the coarsest level
   for (int level = 1; level < n_levels; ++level) {
     cur_width = frm_pyr->widths[level];
@@ -199,37 +156,18 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
                      cur_stride);
     fill_border(frm_pyr->level_buffer + cur_loc, cur_width, cur_height,
                 cur_stride);
-
-    if (compute_grad) {
-      assert(frm_pyr->has_gradient && frm_pyr->level_dx_buffer != NULL &&
-             frm_pyr->level_dy_buffer != NULL);
-      // Computation x gradient
-      sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                              frm_pyr->level_dx_buffer + cur_loc, cur_stride,
-                              cur_height, cur_width, 1);
-
-      // Computation y gradient
-      sobel_xy_image_gradient(frm_pyr->level_buffer + cur_loc, cur_stride,
-                              frm_pyr->level_dy_buffer + cur_loc, cur_stride,
-                              cur_height, cur_width, 0);
-    }
   }
 }
 
 // Allocate and fill out a pyramid structure for a given frame
 ImagePyramid *aom_compute_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
-                                  int compute_gradient, int n_levels) {
-  ImagePyramid *frm_pyr =
-      alloc_pyramid(frm->y_width, frm->y_height, compute_gradient, n_levels);
-  fill_pyramid(frm, bit_depth, compute_gradient, frm_pyr);
+                                  int n_levels) {
+  ImagePyramid *frm_pyr = alloc_pyramid(frm->y_width, frm->y_height, n_levels);
+  fill_pyramid(frm, bit_depth, frm_pyr);
   return frm_pyr;
 }
 
 void aom_free_pyramid(ImagePyramid *pyr) {
   aom_free(pyr->level_buffer);
-  if (pyr->has_gradient) {
-    aom_free(pyr->level_dx_buffer);
-    aom_free(pyr->level_dy_buffer);
-  }
   aom_free(pyr);
 }

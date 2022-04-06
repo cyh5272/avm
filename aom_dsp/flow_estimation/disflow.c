@@ -17,6 +17,8 @@
 #include "aom_dsp/flow_estimation/util.h"
 #include "aom_mem/aom_mem.h"
 
+#include "config/av1_rtcd.h"
+
 #include <assert.h>
 
 // Size of square patches in the disflow dense grid
@@ -215,9 +217,8 @@ static INLINE void image_difference(const uint8_t *src, int src_stride,
 */
 
 static INLINE void compute_flow_at_point(unsigned char *frm, unsigned char *ref,
-                                         double *dx, double *dy, int x, int y,
-                                         int width, int height, int stride,
-                                         double *u, double *v) {
+                                         int x, int y, int width, int height,
+                                         int stride, double *u, double *v) {
   double M[4] = { 0 };
   double b[2] = { 0 };
   double tmp_output_vec[2] = { 0 };
@@ -226,11 +227,22 @@ static INLINE void compute_flow_at_point(unsigned char *frm, unsigned char *ref,
   double o_u = *u;
   double o_v = *v;
 
+  double dx_tmp[PATCH_SIZE * PATCH_SIZE];
+  double dy_tmp[PATCH_SIZE * PATCH_SIZE];
+
+  // Compute gradients within this patch
+  unsigned char *frm_patch = &frm[y * stride + x];
+  av1_convolve_2d_sobel_y_c(frm_patch, stride, dx_tmp, PATCH_SIZE, PATCH_SIZE,
+                            PATCH_SIZE, 1, 1.0);
+  av1_convolve_2d_sobel_y_c(frm_patch, stride, dy_tmp, PATCH_SIZE, PATCH_SIZE,
+                            PATCH_SIZE, 0, 1.0);
+
   for (int itr = 0; itr < DISFLOW_MAX_ITR; itr++) {
     error = compute_warp_and_error(ref, frm, width, height, stride, x, y, *u,
                                    *v, dt);
     if (error <= DISFLOW_ERROR_TR) break;
-    compute_flow_system(dx, stride, dy, stride, dt, PATCH_SIZE, M, b);
+    compute_flow_system(dx_tmp, PATCH_SIZE, dy_tmp, PATCH_SIZE, dt, PATCH_SIZE,
+                        M, b);
     solve_2x2_system(M, b, tmp_output_vec);
     *u += tmp_output_vec[0];
     *v += tmp_output_vec[1];
@@ -264,11 +276,9 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
         patch_loc = i * cur_stride + j;
         patch_center = patch_loc + PATCH_CENTER * cur_stride + PATCH_CENTER;
         compute_flow_at_point(frm_pyr->level_buffer + cur_loc,
-                              ref_pyr->level_buffer + cur_loc,
-                              frm_pyr->level_dx_buffer + cur_loc + patch_loc,
-                              frm_pyr->level_dy_buffer + cur_loc + patch_loc, j,
-                              i, cur_width, cur_height, cur_stride,
-                              flow_u + patch_center, flow_v + patch_center);
+                              ref_pyr->level_buffer + cur_loc, j, i, cur_width,
+                              cur_height, cur_stride, flow_u + patch_center,
+                              flow_v + patch_center);
       }
     }
     // TODO(sarahparker) Replace this with upscale function in resize.c
@@ -336,9 +346,9 @@ FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
   // flow field is computed and upscaled. I'll add these optimizations
   // once the full implementation is working.
   ImagePyramid *frm_pyr =
-      aom_compute_pyramid(frm, bit_depth, 1, DISFLOW_PYRAMID_LEVELS);
+      aom_compute_pyramid(frm, bit_depth, DISFLOW_PYRAMID_LEVELS);
   ImagePyramid *ref_pyr =
-      aom_compute_pyramid(ref, bit_depth, 0, DISFLOW_PYRAMID_LEVELS);
+      aom_compute_pyramid(ref, bit_depth, DISFLOW_PYRAMID_LEVELS);
 
   FlowField *flow =
       aom_alloc_flow_field(frm_width, frm_height, frm_pyr->strides[0]);

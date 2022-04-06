@@ -35,14 +35,11 @@ extern "C" {
 // Struct for an image pyramid
 typedef struct {
   int n_levels;
-  int has_gradient;
   int widths[MAX_PYRAMID_LEVELS];
   int heights[MAX_PYRAMID_LEVELS];
   int strides[MAX_PYRAMID_LEVELS];
   int level_loc[MAX_PYRAMID_LEVELS];
   unsigned char *level_buffer;
-  double *level_dx_buffer;
-  double *level_dy_buffer;
 } ImagePyramid;
 
 // Allocate and fill out a downsampling pyramid for a given frame.
@@ -65,7 +62,7 @@ typedef struct {
 // However, if the input frame has a side of length < MIN_PYRAMID_SIZE,
 // we will still construct the top level.
 ImagePyramid *aom_compute_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
-                                  int compute_gradient, int n_levels);
+                                  int n_levels);
 
 void aom_free_pyramid(ImagePyramid *pyr);
 
