@@ -196,6 +196,11 @@ const int16_t
     };
 #endif  // CONFIG_DST_32X32
 
+#if CONFIG_CROSS_CHROMA_TX
+// Haar transform [1, 1; 1, -1] * 1/sqrt(2) * (1<<CCTX_PREC_BITS)
+const int32_t cctx_mtx[4] = { 181, 181, 181, -181 };
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 // av1_sinpi_arr_data[i][j] = (int)round((sqrt(2) * sin(j*Pi/9) * 2 / 3) * (1
 // << (cos_bit_min + i))) modified so that elements j=1,2 sum to element j=4.
 const int32_t av1_sinpi_arr_data[7][5] = {

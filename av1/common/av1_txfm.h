@@ -49,6 +49,12 @@ extern const int16_t dst7_32x32[32][32];
 #define KLT_PREC_BITS 10
 #endif  // CONFIG_DDT_INTER
 
+#if CONFIG_CROSS_CHROMA_TX
+#define CCTX_DC_ONLY 0
+#define CCTX_PREC_BITS 8
+extern const int32_t cctx_mtx[4];
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 #define MAX_TXFM_STAGE_NUM 12
 
 static const int cos_bit_min = 10;

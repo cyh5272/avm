@@ -165,8 +165,24 @@ static AOM_INLINE void inverse_transform_block(DecoderCodingBlock *dcb,
   tran_low_t *const dqcoeff = dcb->dqcoeff_block[plane] + dcb->cb_offset[plane];
 #endif
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
+#if CONFIG_CROSS_CHROMA_TX
+  // TODO(kslu): keep track of transform domain eobs of U and V
+  eob_info *eob_data_u =
+      dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+  eob_info *eob_data_v =
+      dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
+  uint16_t scan_line = (plane == 0) ? eob_data->max_scan_line
+                                    : AOMMIN(av1_get_max_eob(tx_size),
+                                             AOMMAX(eob_data_u->max_scan_line,
+                                                    eob_data_v->max_scan_line));
+  uint16_t eob = (plane == 0)
+                     ? eob_data->eob
+                     : AOMMIN(av1_get_max_eob(tx_size),
+                              AOMMAX(eob_data_u->eob, eob_data_v->eob));
+#else
   uint16_t scan_line = eob_data->max_scan_line;
   uint16_t eob = eob_data->eob;
+#endif  // CONFIG_CROSS_CHROMA_TX
   av1_inverse_transform_block(&dcb->xd, dqcoeff, plane, tx_type, tx_size, dst,
                               stride, eob, reduced_tx_set);
 #if CONFIG_IST
@@ -256,6 +272,24 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
   }
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+static AOM_INLINE void inverse_cross_chroma_transform_block(
+    const AV1_COMMON *const cm, DecoderCodingBlock *dcb, aom_reader *const r,
+    const int plane, const int blk_row, const int blk_col,
+    const TX_SIZE tx_size) {
+  (void)cm;
+  (void)r;
+  (void)plane;
+  (void)blk_row;
+  (void)blk_col;
+  tran_low_t *dqcoeff_u =
+      dcb->dqcoeff_block[AOM_PLANE_U] + dcb->cb_offset[AOM_PLANE_U];
+  tran_low_t *dqcoeff_v =
+      dcb->dqcoeff_block[AOM_PLANE_V] + dcb->cb_offset[AOM_PLANE_V];
+  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size);
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 static AOM_INLINE void inverse_transform_inter_block(
     const AV1_COMMON *const cm, DecoderCodingBlock *dcb, aom_reader *const r,
     const int plane, const int blk_row, const int blk_col,
@@ -336,7 +370,7 @@ static AOM_INLINE void decode_reconstruct_tx(
                                              blk_col, tx_size);
         td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
                                              blk_col, tx_size);
-        // TODO(kslu): apply inv cctx here
+        td->inverse_cctx_block_visit(cm, dcb, r, -1, blk_row, blk_col, tx_size);
         td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
                                          blk_col, tx_size);
         td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
@@ -3083,6 +3117,9 @@ static AOM_INLINE void set_decode_func_pointers(ThreadData *td,
   td->predict_and_recon_intra_block_visit = decode_block_void;
   td->read_coeffs_tx_inter_block_visit = decode_block_void;
   td->inverse_tx_inter_block_visit = decode_block_void;
+#if CONFIG_CROSS_CHROMA_TX
+  td->inverse_cctx_block_visit = decode_block_void;
+#endif  // CONFIG_CROSS_CHROMA_TX
   td->predict_inter_block_visit = predict_inter_block_void;
   td->cfl_store_inter_block_visit = cfl_store_inter_block_void;
 
@@ -3094,6 +3131,9 @@ static AOM_INLINE void set_decode_func_pointers(ThreadData *td,
     td->predict_and_recon_intra_block_visit =
         predict_and_reconstruct_intra_block;
     td->inverse_tx_inter_block_visit = inverse_transform_inter_block;
+#if CONFIG_CROSS_CHROMA_TX
+    td->inverse_cctx_block_visit = inverse_cross_chroma_transform_block;
+#endif  // CONFIG_CROSS_CHROMA_TX
     td->predict_inter_block_visit = predict_inter_block;
     td->cfl_store_inter_block_visit = cfl_store_inter_block;
   }
