@@ -18,19 +18,16 @@
 #include "aom_scale/yv12config.h"
 
 int aom_compute_global_motion(TransformationType type, YV12_BUFFER_CONFIG *src,
-                              int *src_corners, int num_src_corners,
                               YV12_BUFFER_CONFIG *ref, int bit_depth,
                               GlobalMotionEstimationType gm_estimation_type,
                               MotionModel *params_by_motion, int num_motions) {
   switch (gm_estimation_type) {
     case GLOBAL_MOTION_FEATURE_BASED:
       return aom_compute_global_motion_feature_based(
-          type, src, src_corners, num_src_corners, ref, bit_depth,
-          params_by_motion, num_motions);
+          type, src, ref, bit_depth, params_by_motion, num_motions);
     case GLOBAL_MOTION_DISFLOW_BASED:
       return aom_compute_global_motion_disflow_based(
-          type, src, src_corners, num_src_corners, ref, bit_depth,
-          params_by_motion, num_motions);
+          type, src, ref, bit_depth, params_by_motion, num_motions);
     default: assert(0 && "Unknown global motion estimation type");
   }
   return 0;

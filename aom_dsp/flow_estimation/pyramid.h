@@ -13,14 +13,20 @@
 #ifndef AOM_FLOW_ESTIMATION_PYRAMID_H_
 #define AOM_FLOW_ESTIMATION_PYRAMID_H_
 
-#include "aom_scale/yv12config.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "config/aom_config.h"
+
 // Maximum number of pyramid levels
+#if CONFIG_GM_USE_DISFLOW
+// Disflow requires two pyramid levels
 #define MAX_PYRAMID_LEVELS 2
+#else
+// Feature based code only requires one pyramid level
+#define MAX_PYRAMID_LEVELS 1
+#endif  // CONFIG_GM_USE_DISFLOW
 
 // Minimum dimensions of a downsampled image
 #define MIN_PYRAMID_SIZE_LOG2 3
@@ -31,6 +37,10 @@ extern "C" {
 // with copies of the outermost pixels of the frame, to allow for more efficient
 // convolution code
 #define PYRAMID_PADDING 16
+
+// Forward declare this struct rather than including "aom_scale/yv12config.h",
+// so that that file can include this one without causing circular dependencies
+struct yv12_buffer_config;
 
 // Struct for an image pyramid
 typedef struct {
@@ -61,7 +71,7 @@ typedef struct {
 //
 // However, if the input frame has a side of length < MIN_PYRAMID_SIZE,
 // we will still construct the top level.
-ImagePyramid *aom_compute_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
+ImagePyramid *aom_compute_pyramid(struct yv12_buffer_config *frm, int bit_depth,
                                   int n_levels);
 
 void aom_free_pyramid(ImagePyramid *pyr);

@@ -12,6 +12,7 @@
 
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/flow_estimation/disflow.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_dsp/flow_estimation/ransac.h"
 #include "aom_dsp/flow_estimation/util.h"
@@ -339,39 +340,48 @@ FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
   assert(frm->y_width == ref->y_width);
   assert(frm->y_height == ref->y_height);
 
-  // TODO(sarahparker) We will want to do the source pyramid computation
-  // outside of this function so it doesn't get recomputed for every
-  // reference. We also don't need to compute every pyramid level for the
-  // reference in advance, since lower levels can be overwritten once their
-  // flow field is computed and upscaled. I'll add these optimizations
-  // once the full implementation is working.
-  ImagePyramid *frm_pyr =
-      aom_compute_pyramid(frm, bit_depth, DISFLOW_PYRAMID_LEVELS);
-  ImagePyramid *ref_pyr =
-      aom_compute_pyramid(ref, bit_depth, DISFLOW_PYRAMID_LEVELS);
+  // Compute pyramids if necessary.
+  // These are cached alongside the framebuffer to avoid unnecessary
+  // recomputation. When the framebuffer is freed, or reused for a new frame,
+  // these pyramids will be automatically freed.
+  if (!frm->y_pyramid) {
+    frm->y_pyramid =
+        aom_compute_pyramid(frm, bit_depth, DISFLOW_PYRAMID_LEVELS);
+    assert(frm->y_pyramid);
+  }
+  if (!ref->y_pyramid) {
+    ref->y_pyramid =
+        aom_compute_pyramid(ref, bit_depth, DISFLOW_PYRAMID_LEVELS);
+    assert(ref->y_pyramid);
+  }
+
+  ImagePyramid *frm_pyr = frm->y_pyramid;
+  ImagePyramid *ref_pyr = ref->y_pyramid;
 
   FlowField *flow =
       aom_alloc_flow_field(frm_width, frm_height, frm_pyr->strides[0]);
 
   compute_flow_field(frm_pyr, ref_pyr, flow->u, flow->v);
 
-  aom_free_pyramid(frm_pyr);
-  aom_free_pyramid(ref_pyr);
   return flow;
 }
 
 int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
-                                int *frm_corners, int num_frm_corners,
+                                YV12_BUFFER_CONFIG *frm, int bit_depth,
                                 MotionModel *params_by_motion,
                                 int num_motions) {
   int num_correspondences;
 
+  if (!frm->corners) {
+    aom_find_corners_in_frame(frm, bit_depth);
+  }
+
   // find correspondences between the two images using the flow field
   Correspondence *correspondences =
-      aom_malloc(num_frm_corners * sizeof(*correspondences));
+      aom_malloc(frm->num_corners * sizeof(*correspondences));
   num_correspondences = determine_disflow_correspondence(
-      frm_corners, num_frm_corners, flow->u, flow->v, flow->width, flow->height,
-      flow->stride, correspondences);
+      frm->corners, frm->num_corners, flow->u, flow->v, flow->width,
+      flow->height, flow->stride, correspondences);
   ransac(correspondences, num_correspondences, type, params_by_motion,
          num_motions);
 
@@ -392,12 +402,11 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
 }
 
 int aom_compute_global_motion_disflow_based(
-    TransformationType type, YV12_BUFFER_CONFIG *frm, int *frm_corners,
-    int num_frm_corners, YV12_BUFFER_CONFIG *ref, int bit_depth,
-    MotionModel *params_by_motion, int num_motions) {
+    TransformationType type, YV12_BUFFER_CONFIG *frm, YV12_BUFFER_CONFIG *ref,
+    int bit_depth, MotionModel *params_by_motion, int num_motions) {
   FlowField *flow = aom_compute_flow_field(frm, ref, bit_depth);
-  int result = aom_fit_model_to_flow_field(
-      flow, type, frm_corners, num_frm_corners, params_by_motion, num_motions);
+  int result = aom_fit_model_to_flow_field(flow, type, frm, bit_depth,
+                                           params_by_motion, num_motions);
   aom_free_flow_field(flow);
 
   return result;

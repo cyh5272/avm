@@ -2312,7 +2312,7 @@ static int encode_without_recode(AV1_COMP *cpi) {
   int phase_scaler = 0;
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_gm_data(cpi->source);
   av1_setup_frame_size(cpi);
   av1_set_size_dependent_vars(cpi, &q, &bottom_index, &top_index);
 
@@ -2471,7 +2471,7 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
   assert(IMPLIES(oxcf->rc_cfg.min_cr > 0, allow_recode));
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_gm_data(cpi->source);
 
   av1_setup_frame_size(cpi);
 

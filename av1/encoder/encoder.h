@@ -1830,11 +1830,6 @@ typedef struct {
   YV12_BUFFER_CONFIG *ref_buf[REF_FRAMES];
 
   /*!
-   * Pointer to the source frame buffer.
-   */
-  unsigned char *src_buffer;
-
-  /*!
    * Holds the number of valid reference frames in past and future directions
    * w.r.t. the current frame. num_ref_frames[i] stores the total number of
    * valid reference frames in 'i' direction.
@@ -1856,18 +1851,6 @@ typedef struct {
   int segment_map_w; /*!< segment map width */
   int segment_map_h; /*!< segment map height */
   /**@}*/
-
-  /*!
-   * Holds the total number of corner points detected in the source frame.
-   */
-  int num_src_corners;
-
-  /*!
-   * Holds the x and y co-ordinates of the corner points detected in the source
-   * frame. src_corners[i] holds the x co-ordinate and src_corners[i+1] holds
-   * the y co-ordinate of the ith corner point detected.
-   */
-  int src_corners[2 * MAX_CORNERS];
 } GlobalMotionInfo;
 
 /*!

@@ -78,7 +78,6 @@ typedef struct {
   num_inliers entry is 0 should be ignored by the caller.
 */
 int aom_compute_global_motion(TransformationType type, YV12_BUFFER_CONFIG *src,
-                              int *src_corners, int num_src_corners,
                               YV12_BUFFER_CONFIG *ref, int bit_depth,
                               GlobalMotionEstimationType gm_estimation_type,
                               MotionModel *params_by_motion, int num_motions);

@@ -59,7 +59,7 @@ static INLINE ImagePyramid *alloc_pyramid(int width, int height, int n_levels) {
   }
 
   // TODO(rachelbarker): Do we need to zero this buffer?
-  pyr->level_buffer = aom_calloc(buffer_size, sizeof(*pyr->level_buffer));
+  pyr->level_buffer = aom_malloc(buffer_size * sizeof(*pyr->level_buffer));
 
   return pyr;
 }
@@ -168,6 +168,8 @@ ImagePyramid *aom_compute_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
 }
 
 void aom_free_pyramid(ImagePyramid *pyr) {
-  aom_free(pyr->level_buffer);
-  aom_free(pyr);
+  if (pyr) {
+    aom_free(pyr->level_buffer);
+    aom_free(pyr);
+  }
 }

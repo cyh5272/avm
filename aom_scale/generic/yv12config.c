@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include "aom/internal/aom_image_internal.h"
+#include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/mem.h"
 #include "aom_scale/yv12config.h"
@@ -33,6 +34,12 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
       aom_free(ybf->buffer_alloc);
     }
     if (ybf->y_buffer_8bit) aom_free(ybf->y_buffer_8bit);
+    if (ybf->y_pyramid) {
+      aom_free_pyramid(ybf->y_pyramid);
+    }
+    if (ybf->corners) {
+      aom_free(ybf->corners);
+    }
     aom_remove_metadata_from_frame_buffer(ybf);
     /* buffer_alloc isn't accessed by most functions.  Rather y_buffer,
       u_buffer and v_buffer point to buffer_alloc and are used.  Clear out
@@ -42,6 +49,24 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
   }
 
   return AOM_CODEC_MEM_ERROR;
+}
+
+// Discard global motion data
+// This should be called whenever a frame buffer is reused for a new frame,
+// to avoid using stale data
+void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf) {
+  // TODO(rachelbarker): Erase data but keep allocations
+  // This requires appropriate resizing logic
+  if (ybf->y_pyramid) {
+    aom_free_pyramid(ybf->y_pyramid);
+    ybf->y_pyramid = NULL;
+  }
+  if (ybf->corners) {
+    aom_free(ybf->corners);
+    ybf->corners = NULL;
+  }
+  ybf->num_corners = 0;
+  ybf->buf_8bit_valid = 0;
 }
 
 static int realloc_frame_buffer_aligned(
@@ -164,9 +189,10 @@ static int realloc_frame_buffer_aligned(
         ybf->y_buffer_8bit = NULL;
       }
     }
-    // y_buffer_8bit may have been allocated above, but it has not been filled
-    // in yet. So, mark it as invalid.
-    ybf->buf_8bit_valid = 0;
+
+    // Discard global motion data, so that stale data is not used
+    aom_invalidate_gm_data(ybf);
+
     ybf->corrupted = 0; /* assume not corrupted by errors */
     return 0;
   }

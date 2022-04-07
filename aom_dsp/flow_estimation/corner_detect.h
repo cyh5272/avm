@@ -13,6 +13,8 @@
 #ifndef AOM_FLOW_ESTIMATION_CORNER_DETECT_H_
 #define AOM_FLOW_ESTIMATION_CORNER_DETECT_H_
 
+#include "aom_scale/yv12config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -23,6 +25,8 @@ extern "C" {
 
 int aom_fast_corner_detect(unsigned char *buf, int width, int height,
                            int stride, int *points, int max_points);
+
+void aom_find_corners_in_frame(YV12_BUFFER_CONFIG *frm, int bit_depth);
 
 #ifdef __cplusplus
 }
