@@ -474,8 +474,8 @@ void av1_setup_frame_size(AV1_COMP *cpi) {
     cm->superres_scale_numerator =
         superres_scales[cm->superres_scale_index].scale_num;
   } else {
-    assert(rsz->superres_denom == SCALE_NUMERATOR &&
-           rsz->superres_num == SCALE_NUMERATOR &&
+    assert(cm->superres_scale_denominator == SCALE_NUMERATOR &&
+           cm->superres_scale_numerator == SCALE_NUMERATOR &&
            "The encoder-decided superres scale is not supported.");
   }
 #endif  // CONFIG_EXT_SUPERRES
