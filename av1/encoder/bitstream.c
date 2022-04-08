@@ -1864,7 +1864,7 @@ static void write_intrabc_drl_idx(int max_ref_bv_num, FRAME_CONTEXT *ec_ctx,
     aom_write_symbol(w, mbmi->intrabc_drl_idx != idx,
                      ec_ctx->intrabc_drl_idx_cdf[bit_cnt], 2);
     if (mbmi->intrabc_drl_idx == idx) break;
-    bit_cnt++;
+    ++bit_cnt;
   }
 }
 #endif  // CONFIG_BVP_IMPROVEMENT

@@ -954,7 +954,7 @@ static INLINE int assign_dv(AV1_COMMON *cm, MACROBLOCKD *xd, int_mv *mv,
                             BLOCK_SIZE bsize, aom_reader *r) {
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 #if CONFIG_BVP_IMPROVEMENT
-  MB_MODE_INFO *const mbmi = xd->mi[0];
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
   if (mbmi->intrabc_mode == 1) {
     mv->as_int = ref_mv->as_int;
   } else {
@@ -984,11 +984,11 @@ static void read_intrabc_drl_idx(int max_ref_bv_cnt, FRAME_CONTEXT *ec_ctx,
   mbmi->intrabc_drl_idx = 0;
   int bit_cnt = 0;
   for (int idx = 0; idx < max_ref_bv_cnt - 1; ++idx) {
-    int intrabc_drl_idx =
+    const int intrabc_drl_idx =
         aom_read_symbol(r, ec_ctx->intrabc_drl_idx_cdf[bit_cnt], 2, ACCT_STR);
     mbmi->intrabc_drl_idx = idx + intrabc_drl_idx;
     if (!intrabc_drl_idx) break;
-    bit_cnt++;
+    ++bit_cnt;
   }
   assert(mbmi->intrabc_drl_idx < max_ref_bv_cnt);
 }
@@ -1022,7 +1022,7 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     // ref_mvs
     int_mv ref_mvs[INTRA_FRAME + 1][MAX_MV_REF_CANDIDATES];
 #if CONFIG_BVP_IMPROVEMENT
-    for (int i = 0; i < MAX_REF_BV_STACK_SIZE; i++) {
+    for (int i = 0; i < MAX_REF_BV_STACK_SIZE; ++i) {
       xd->ref_mv_stack[INTRA_FRAME][i].this_mv.as_int = 0;
       xd->ref_mv_stack[INTRA_FRAME][i].comp_mv.as_int = 0;
     }
@@ -1035,10 +1035,8 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     int_mv dv_ref = nearestmv.as_int == 0 ? nearmv : nearestmv;
 
 #if CONFIG_BVP_IMPROVEMENT
-    mbmi->intrabc_mode = 0;
     mbmi->intrabc_mode =
         aom_read_symbol(r, ec_ctx->intrabc_mode_cdf, 2, ACCT_STR);
-    mbmi->intrabc_drl_idx = 0;
     read_intrabc_drl_idx(MAX_REF_BV_STACK_SIZE, ec_ctx, mbmi, r);
     dv_ref = xd->ref_mv_stack[INTRA_FRAME][mbmi->intrabc_drl_idx].this_mv;
 #endif  // CONFIG_BVP_IMPROVEMENT

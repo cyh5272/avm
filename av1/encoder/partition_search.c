@@ -876,7 +876,7 @@ static void update_intrabc_drl_idx_stats(int max_ref_bv_num, FRAME_CONTEXT *fc,
     update_cdf(fc->intrabc_drl_idx_cdf[bit_cnt], mbmi->intrabc_drl_idx != idx,
                2);
     if (mbmi->intrabc_drl_idx == idx) break;
-    bit_cnt++;
+    ++bit_cnt;
   }
 }
 #endif  // CONFIG_BVP_IMPROVEMENT
@@ -976,7 +976,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
     if (is_intrabc_block(mbmi, xd->tree_type)) {
       update_cdf(fc->intrabc_mode_cdf, mbmi->intrabc_mode, 2);
 #if CONFIG_ENTROPY_STATS
-      ++td->counts->intrabc_mode_cdf[mbmi->intrabc_mode];
+      ++td->counts->intrabc_mode[mbmi->intrabc_mode];
 #endif  // CONFIG_ENTROPY_STATS
       update_intrabc_drl_idx_stats(MAX_REF_BV_STACK_SIZE, fc, td->counts, mbmi);
     }

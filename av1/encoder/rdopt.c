@@ -3802,6 +3802,7 @@ static int64_t handle_inter_mode(
 }
 
 #if CONFIG_BVP_IMPROVEMENT
+// Check if BV is valid
 static INLINE int is_bv_valid(const FULLPEL_MV *full_mv, const AV1_COMMON *cm,
                               const MACROBLOCKD *xd, int mi_row, int mi_col,
                               BLOCK_SIZE bsize,
@@ -3814,6 +3815,7 @@ static INLINE int is_bv_valid(const FULLPEL_MV *full_mv, const AV1_COMMON *cm,
   return 1;
 }
 
+// Search for the best ref BV
 int rd_pick_ref_bv(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
                    FULLPEL_MOTION_SEARCH_PARAMS fullms_params_init, int_mv *bv,
                    int *cost) {
@@ -3863,7 +3865,7 @@ int rd_pick_ref_bv(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
       mbmi_ext->ref_mv_stack[INTRA_FRAME][0].this_mv = cur_ref_bv;
 
       fullms_params = fullms_params_init;
-      init_ref_mv(&fullms_params.mv_cost_params, &cur_ref_bv.as_mv);
+      av1_init_ref_mv(&fullms_params.mv_cost_params, &cur_ref_bv.as_mv);
       av1_set_mv_search_range(&fullms_params.mv_limits, &cur_ref_bv.as_mv);
       if (fullms_params.mv_limits.col_max < fullms_params.mv_limits.col_min ||
           fullms_params.mv_limits.row_max < fullms_params.mv_limits.row_min) {
@@ -3871,9 +3873,9 @@ int rd_pick_ref_bv(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
       }
 
       cur_ref_bv_cost =
-          get_ref_bv_rate_cost(1, intrabc_drl_idx, x, fullms_params,
-                               mbmi_ext->ref_mv_count[INTRA_FRAME]);
-      cur_cost = search_ref_bv(cpi, xd, &fullms_params);
+          av1_get_ref_bv_rate_cost(1, intrabc_drl_idx, x, fullms_params,
+                                   mbmi_ext->ref_mv_count[INTRA_FRAME]);
+      cur_cost = av1_get_ref_mvpred_var_cost(cpi, xd, &fullms_params);
 
       if (cur_cost != INT_MAX) cur_cost += cur_ref_bv_cost;
       if (cur_cost < best_cost) {
@@ -4127,7 +4129,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
                        &best_ref_bv_cost)) {
       fullms_params = fullms_params_init;
       best_ref_bv = mbmi_ext->ref_mv_stack[INTRA_FRAME][0].this_mv;
-      init_ref_mv(&fullms_params.mv_cost_params, &best_ref_bv.as_mv);
+      av1_init_ref_mv(&fullms_params.mv_cost_params, &best_ref_bv.as_mv);
       av1_set_mv_search_range(&fullms_params.mv_limits, &best_ref_bv.as_mv);
       dv_ref.as_mv = best_ref_bv.as_mv;
     }
@@ -4160,10 +4162,11 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
       cur_ref_bv.as_mv = dv_ref.as_mv;
       int_mv cur_bv;
       cur_bv.as_mv = get_mv_from_fullmv(&best_mv.as_fullmv);
-      int cur_dist = bestsme - get_mv_err_cost(&cur_bv.as_mv,
-                                               &fullms_params.mv_cost_params);
+      int cur_dist =
+          bestsme -
+          av1_get_mv_err_cost(&cur_bv.as_mv, &fullms_params.mv_cost_params);
       assert(cur_dist >= 0);
-      int cur_rate = pick_ref_bv(&best_mv.as_fullmv, &fullms_params);
+      int cur_rate = av1_pick_ref_bv(&best_mv.as_fullmv, &fullms_params);
 
       if (cur_rate != INT_MAX) {
         cur_ref_bv_cost = cur_dist + cur_rate;
@@ -4255,9 +4258,6 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
     mbmi->uv_mode = UV_DC_PRED;
     mbmi->motion_mode = SIMPLE_TRANSLATION;
     mbmi->mv[0].as_mv = dv;
-#if CONFIG_BVP_IMPROVEMENT
-    mbmi->mv[1].as_int = 0;
-#endif  // CONFIG_BVP_IMPROVEMENT
     mbmi->interp_fltr = BILINEAR;
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 0;
     av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
@@ -4274,8 +4274,8 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 
     int rate_mode = x->mode_costs.intrabc_cost[1];
     rate_mode += x->mode_costs.intrabc_mode_cost[mbmi->intrabc_mode];
-    rate_mode += get_intrabc_drl_idx_cost(MAX_REF_BV_STACK_SIZE,
-                                          mbmi->intrabc_drl_idx, x);
+    rate_mode += av1_get_intrabc_drl_idx_cost(MAX_REF_BV_STACK_SIZE,
+                                              mbmi->intrabc_drl_idx, x);
 #else
     // TODO(aconverse@google.com): The full motion field defining discount
     // in MV_COST_WEIGHT is too large. Explore other values.
@@ -7324,9 +7324,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       mbmi->ref_frame[1] = NONE_FRAME;
       mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
       mbmi->mv[0].as_int = 0;
-#if CONFIG_BVP_IMPROVEMENT
-      mbmi->mv[1].as_int = 0;
-#endif  // CONFIG_BVP_IMPROVEMENT
       mbmi->skip_mode = 0;
       mbmi->mode = 0;
 

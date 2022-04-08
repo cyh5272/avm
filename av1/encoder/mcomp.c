@@ -628,7 +628,8 @@ static INLINE int check_bounds(const FullMvLimits *mv_limits, int row, int col,
 }
 
 #if CONFIG_BVP_IMPROVEMENT
-int get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params) {
+// Returns the cost of using the current mv during the motion search
+int av1_get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params) {
   return mv_err_cost(mv, mv_cost_params->ref_mv, mv_cost_params->mvjcost,
                      mv_cost_params->mvcost, mv_cost_params->error_per_bit,
                      mv_cost_params->mv_cost_type);
@@ -2018,8 +2019,9 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
 }
 
 #if CONFIG_BVP_IMPROVEMENT
-int search_ref_bv(const AV1_COMP *cpi, const MACROBLOCKD *xd,
-                  const FULLPEL_MOTION_SEARCH_PARAMS *ms_params) {
+// Compute the estimated RD cost for the reference BV
+int av1_get_ref_mvpred_var_cost(const AV1_COMP *cpi, const MACROBLOCKD *xd,
+                                const FULLPEL_MOTION_SEARCH_PARAMS *ms_params) {
   const BLOCK_SIZE bsize = ms_params->bsize;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -2038,7 +2040,8 @@ int search_ref_bv(const AV1_COMP *cpi, const MACROBLOCKD *xd,
   return cost;
 }
 
-void init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv) {
+// Set the reference MV for the motion search
+void av1_init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv) {
   mv_cost_params->ref_mv = ref_mv;
   mv_cost_params->full_ref_mv = get_fullmv_from_mv(ref_mv);
 }
@@ -2059,35 +2062,40 @@ void get_default_ref_bv(int_mv *cur_ref_bv,
   assert((cur_ref_bv->as_mv.row & 7) == 0);
 }
 
-int get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
-                             const MACROBLOCK *x) {
+// Compute the cost for signalling the intrabc DRL index
+int av1_get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
+                                 const MACROBLOCK *x) {
   assert(intrabc_drl_idx < max_ref_bv_num);
   int cost = 0;
   int bit_cnt = 0;
   for (int idx = 0; idx < max_ref_bv_num - 1; ++idx) {
     cost += x->mode_costs.intrabc_drl_idx_cost[bit_cnt][intrabc_drl_idx != idx];
     if (intrabc_drl_idx == idx) return cost;
-    bit_cnt++;
+    ++bit_cnt;
   }
   return cost;
 }
 
-int get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx, MACROBLOCK *x,
-                         FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
-                         int ref_bv_cnt) {
+// Compute the cost for signalling the intrabc mode and intrabc DRL index. This
+// is only used during the motion search
+int av1_get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx,
+                             MACROBLOCK *x,
+                             FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
+                             int ref_bv_cnt) {
   (void)ref_bv_cnt;
   int ref_bv_cost = 0;
   ref_bv_cost += x->mode_costs.intrabc_mode_cost[intrabc_mode];
   ref_bv_cost +=
-      get_intrabc_drl_idx_cost(MAX_REF_BV_STACK_SIZE, intrabc_drl_idx, x);
+      av1_get_intrabc_drl_idx_cost(MAX_REF_BV_STACK_SIZE, intrabc_drl_idx, x);
   ref_bv_cost = (int)ROUND_POWER_OF_TWO_64(
       (int64_t)ref_bv_cost * fullms_params.mv_cost_params.error_per_bit,
       RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT + 4);
   return ref_bv_cost;
 }
 
-int pick_ref_bv(FULLPEL_MV *best_full_mv,
-                const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params) {
+// Pick the best reference BV for the current BV
+int av1_pick_ref_bv(FULLPEL_MV *best_full_mv,
+                    const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params) {
   MACROBLOCK *x = fullms_params->x;
   const MACROBLOCKD *const xd = fullms_params->xd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -2106,11 +2114,11 @@ int pick_ref_bv(FULLPEL_MV *best_full_mv,
     cur_ref_bv = xd->ref_mv_stack[INTRA_FRAME][cur_intrabc_drl_idx].this_mv;
     get_default_ref_bv(&cur_ref_bv, fullms_params);
 
-    init_ref_mv(&ref_bv_ms_params.mv_cost_params, &cur_ref_bv.as_mv);
+    av1_init_ref_mv(&ref_bv_ms_params.mv_cost_params, &cur_ref_bv.as_mv);
     cur_ref_bv_cost =
-        get_ref_bv_rate_cost(0, cur_intrabc_drl_idx, x, ref_bv_ms_params,
-                             ref_bv_cnt) +
-        get_mv_err_cost(&best_mv, &ref_bv_ms_params.mv_cost_params);
+        av1_get_ref_bv_rate_cost(0, cur_intrabc_drl_idx, x, ref_bv_ms_params,
+                                 ref_bv_cnt) +
+        av1_get_mv_err_cost(&best_mv, &ref_bv_ms_params.mv_cost_params);
 
     if (cur_ref_bv_cost < best_ref_bv_cost) {
       best_ref_bv_cost = cur_ref_bv_cost;
@@ -2196,9 +2204,9 @@ int av1_intrabc_hash_search(const AV1_COMP *cpi, const MACROBLOCKD *xd,
       int_mv cur_bv;
       cur_bv.as_mv = get_mv_from_fullmv(&hash_mv);
 
-      int cur_dist =
-          refCost - get_mv_err_cost(&cur_bv.as_mv, &ms_params->mv_cost_params);
-      int cur_rate = pick_ref_bv(&hash_mv, ms_params);
+      int cur_dist = refCost - av1_get_mv_err_cost(&cur_bv.as_mv,
+                                                   &ms_params->mv_cost_params);
+      int cur_rate = av1_pick_ref_bv(&hash_mv, ms_params);
       if (cur_rate != INT_MAX) {
         cur_ref_bv.as_mv = mbmi->ref_bv.as_mv;
         cur_intrabc_drl_idx = mbmi->intrabc_drl_idx;

@@ -440,17 +440,19 @@ static INLINE int av1_is_subpelmv_in_range(const SubpelMvLimits *mv_limits,
 }
 
 #if CONFIG_BVP_IMPROVEMENT
-int get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params);
-void init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv);
-int get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
-                             const MACROBLOCK *x);
-int get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx, MACROBLOCK *x,
-                         FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
-                         int ref_bv_cnt);
-int pick_ref_bv(FULLPEL_MV *best_full_mv,
-                const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params);
-int search_ref_bv(const struct AV1_COMP *cpi, const MACROBLOCKD *xd,
-                  const FULLPEL_MOTION_SEARCH_PARAMS *ms_params);
+int av1_get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params);
+void av1_init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv);
+int av1_get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
+                                 const MACROBLOCK *x);
+int av1_get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx,
+                             MACROBLOCK *x,
+                             FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
+                             int ref_bv_cnt);
+int av1_pick_ref_bv(FULLPEL_MV *best_full_mv,
+                    const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params);
+int av1_get_ref_mvpred_var_cost(const struct AV1_COMP *cpi,
+                                const MACROBLOCKD *xd,
+                                const FULLPEL_MOTION_SEARCH_PARAMS *ms_params);
 #endif  // CONFIG_BVP_IMPROVEMENT
 
 #ifdef __cplusplus
