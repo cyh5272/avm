@@ -628,7 +628,6 @@ static INLINE int check_bounds(const FullMvLimits *mv_limits, int row, int col,
 }
 
 #if CONFIG_BVP_IMPROVEMENT
-// Returns the cost of using the current mv during the motion search
 int av1_get_mv_err_cost(const MV *mv, const MV_COST_PARAMS *mv_cost_params) {
   return mv_err_cost(mv, mv_cost_params->ref_mv, mv_cost_params->mvjcost,
                      mv_cost_params->mvcost, mv_cost_params->error_per_bit,
@@ -2019,7 +2018,6 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
 }
 
 #if CONFIG_BVP_IMPROVEMENT
-// Compute the estimated RD cost for the reference BV
 int av1_get_ref_mvpred_var_cost(const AV1_COMP *cpi, const MACROBLOCKD *xd,
                                 const FULLPEL_MOTION_SEARCH_PARAMS *ms_params) {
   const BLOCK_SIZE bsize = ms_params->bsize;
@@ -2040,7 +2038,6 @@ int av1_get_ref_mvpred_var_cost(const AV1_COMP *cpi, const MACROBLOCKD *xd,
   return cost;
 }
 
-// Set the reference MV for the motion search
 void av1_init_ref_mv(MV_COST_PARAMS *mv_cost_params, const MV *ref_mv) {
   mv_cost_params->ref_mv = ref_mv;
   mv_cost_params->full_ref_mv = get_fullmv_from_mv(ref_mv);
@@ -2062,7 +2059,6 @@ void get_default_ref_bv(int_mv *cur_ref_bv,
   assert((cur_ref_bv->as_mv.row & 7) == 0);
 }
 
-// Compute the cost for signalling the intrabc DRL index
 int av1_get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
                                  const MACROBLOCK *x) {
   assert(intrabc_drl_idx < max_ref_bv_num);
@@ -2076,8 +2072,6 @@ int av1_get_intrabc_drl_idx_cost(int max_ref_bv_num, int intrabc_drl_idx,
   return cost;
 }
 
-// Compute the cost for signalling the intrabc mode and intrabc DRL index. This
-// is only used during the motion search
 int av1_get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx,
                              MACROBLOCK *x,
                              FULLPEL_MOTION_SEARCH_PARAMS fullms_params,
@@ -2093,7 +2087,6 @@ int av1_get_ref_bv_rate_cost(int intrabc_mode, int intrabc_drl_idx,
   return ref_bv_cost;
 }
 
-// Pick the best reference BV for the current BV
 int av1_pick_ref_bv(FULLPEL_MV *best_full_mv,
                     const FULLPEL_MOTION_SEARCH_PARAMS *fullms_params) {
   MACROBLOCK *x = fullms_params->x;
