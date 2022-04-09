@@ -87,6 +87,13 @@ aom_image_t *aom_img_alloc_with_cb(aom_image_t *img, aom_img_fmt_t fmt,
                                    aom_alloc_img_data_cb_fn_t alloc_cb,
                                    void *cb_priv);
 
+void aom_img_upshift(aom_image_t *dst, const aom_image_t *src, int input_shift);
+void aom_img_downshift(aom_image_t *dst, const aom_image_t *src,
+                       int down_shift);
+void aom_shift_img(unsigned int output_bit_depth, aom_image_t **img_ptr,
+                   aom_image_t **img_shifted_ptr);
+void aom_img_truncate_16_to_8(aom_image_t *dst, const aom_image_t *src);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

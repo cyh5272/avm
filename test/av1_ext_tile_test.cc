@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <string>
 #include <vector>
+#include "common/tools_common.h"
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 #include "test/codec_factory.h"
 #include "test/encode_test_driver.h"
@@ -44,7 +45,6 @@ class AV1ExtTileTest
     aom_codec_dec_cfg_t cfg = aom_codec_dec_cfg_t();
     cfg.w = kImgWidth;
     cfg.h = kImgHeight;
-    cfg.allow_lowbitdepth = 1;
 
     decoder_ = codec_->CreateDecoder(cfg, 0);
     decoder_->Control(AV1_SET_TILE_MODE, 1);
@@ -112,7 +112,15 @@ class AV1ExtTileTest
 
     // Calculate MD5 as the reference.
     ::libaom_test::MD5 md5_res;
-    md5_res.Add(&img);
+    const aom_img_fmt_t shifted_fmt =
+        (aom_img_fmt)(img.fmt & ~AOM_IMG_FMT_HIGHBITDEPTH);
+    aom_image_t *img_shifted =
+        aom_img_alloc(NULL, shifted_fmt, img.d_w, img.d_h, 32);
+    img_shifted->bit_depth = img.bit_depth;
+    img_shifted->monochrome = img.monochrome;
+    aom_img_downshift(img_shifted, &img, 0);
+    md5_res.Add(img_shifted);
+    aom_img_free(img_shifted);
     md5_.push_back(md5_res.Get());
   }
 
@@ -121,6 +129,7 @@ class AV1ExtTileTest
     if (pkt->data.frame.pts == (aom_codec_pts_t)kSkip) return;
 
     bool IsLastFrame = (pkt->data.frame.pts == (aom_codec_pts_t)(kLimit - 1));
+    aom_image_t *img_shifted = NULL;
 
     // Decode the first (kLimit - 1) frames as whole frame, and decode the last
     // frame in single tiles.
@@ -143,10 +152,21 @@ class AV1ExtTileTest
         }
         const aom_image_t *img = decoder_->GetDxData().Next();
 
+        if (img) {
+          const aom_img_fmt_t shifted_fmt =
+              (aom_img_fmt)(img->fmt & ~AOM_IMG_FMT_HIGHBITDEPTH);
+          img_shifted =
+              aom_img_alloc(NULL, shifted_fmt, img->d_w, img->d_h, 32);
+          img_shifted->bit_depth = img->bit_depth;
+          img_shifted->monochrome = img->monochrome;
+          aom_img_downshift(img_shifted, img, 0);
+        }
+
         if (!IsLastFrame) {
           if (img) {
             ::libaom_test::MD5 md5_res;
-            md5_res.Add(img);
+            md5_res.Add(img_shifted);
+            aom_img_free(img_shifted);
             tile_md5_.push_back(md5_res.Get());
           }
           break;
@@ -162,9 +182,11 @@ class AV1ExtTileTest
             memcpy(tile_img_.planes[plane] +
                        tile_img_.stride[plane] * (r * tile_height + tr) +
                        c * tile_width,
-                   img->planes[plane] + img->stride[plane] * tr, tile_width);
+                   img_shifted->planes[plane] + img_shifted->stride[plane] * tr,
+                   tile_width);
           }
         }
+        aom_img_free(img_shifted);
       }
 
       if (!IsLastFrame) break;
