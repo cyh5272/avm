@@ -19,6 +19,9 @@
 
 #include "config/av1_rtcd.h"
 
+// TODO(rachelbarker): Move needed code from av1/ to aom_dsp/
+#include "av1/common/resize.h"
+
 #include <assert.h>
 
 // Size of square patches in the disflow dense grid
@@ -30,6 +33,8 @@
 // Warp error convergence threshold for disflow
 #define DISFLOW_ERROR_TR 0.01
 // Max number of iterations if warp convergence is not found
+// TODO(rachelbarker): Experiment with different numbers of pyramid levels
+// and numbers of refinement steps per level
 #define DISFLOW_MAX_ITR 10
 
 // Don't use points around the frame border since they are less reliable
@@ -253,6 +258,49 @@ static INLINE void compute_flow_at_point(unsigned char *frm, unsigned char *ref,
   }
 }
 
+static void fill_flow_field_borders(double *flow, int width, int height,
+                                    int stride) {
+  // Calculate the bounds of the rectangle which was filled in by
+  // compute_flow_field() before calling this function.
+  // These indices are inclusive on both ends.
+  const int left_index = PATCH_CENTER;
+  const int right_index = (width - PATCH_SIZE - 1) + PATCH_CENTER;
+  const int top_index = PATCH_CENTER;
+  const int bottom_index = (height - PATCH_SIZE - 1) + PATCH_CENTER;
+
+  // Left area
+  for (int i = top_index; i <= bottom_index; i += PATCH_STEP) {
+    double *row = flow + i * stride;
+    double left = row[left_index];
+    for (int j = 0; j < left_index; j++) {
+      row[j] = left;
+    }
+  }
+
+  // Right area
+  for (int i = top_index; i <= bottom_index; i += PATCH_STEP) {
+    double *row = flow + i * stride;
+    double right = row[right_index];
+    for (int j = right_index + 1; j < width; j++) {
+      row[j] = right;
+    }
+  }
+
+  // Top area
+  double *top_row = flow + top_index * stride;
+  for (int i = 0; i < top_index; i++) {
+    double *row = flow + i * stride;
+    memcpy(row, top_row, width * sizeof(double));
+  }
+
+  // Bottom area
+  double *bottom_row = flow + bottom_index * stride;
+  for (int i = bottom_index + 1; i < height; i++) {
+    double *row = flow + i * stride;
+    memcpy(row, bottom_row, width * sizeof(double));
+  }
+}
+
 // make sure flow_u and flow_v start at 0
 static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
                                double *flow_u, double *flow_v) {
@@ -265,14 +313,22 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
   assert(frm_pyr->n_levels == ref_pyr->n_levels);
 
   // Compute flow field from coarsest to finest level of the pyramid
+#if PATCH_STEP != 1
+  // TODO(rachelbarker): This function, as written, only works if PATCH_STEP
+  // == 1. For any other value, the border filling and interpolation code will
+  // need to be reworked to handle the fact that there will be rows and columns
+  // with no flow data
+#error "compute_flow_field() needs updating for PATCH_STEP != 1"
+#endif
+
   for (int level = frm_pyr->n_levels - 1; level >= 0; --level) {
     cur_width = frm_pyr->widths[level];
     cur_height = frm_pyr->heights[level];
     cur_stride = frm_pyr->strides[level];
     cur_loc = frm_pyr->level_loc[level];
 
-    for (int i = PATCH_SIZE; i < cur_height - PATCH_SIZE; i += PATCH_STEP) {
-      for (int j = PATCH_SIZE; j < cur_width - PATCH_SIZE; j += PATCH_STEP) {
+    for (int i = 0; i < cur_height - PATCH_SIZE; i += PATCH_STEP) {
+      for (int j = 0; j < cur_width - PATCH_SIZE; j += PATCH_STEP) {
         patch_loc = i * cur_stride + j;
         patch_center = patch_loc + PATCH_CENTER * cur_stride + PATCH_CENTER;
         compute_flow_at_point(frm_pyr->level_buffer + cur_loc,
@@ -281,23 +337,32 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
                               flow_v + patch_center);
       }
     }
-    // TODO(sarahparker) Replace this with upscale function in resize.c
+
+    // Fill in the areas which we haven't explicitly computed, with copies
+    // of the outermost values which we did compute
+    fill_flow_field_borders(flow_u, cur_width, cur_height, cur_stride);
+    fill_flow_field_borders(flow_v, cur_width, cur_height, cur_stride);
+
     if (level > 0) {
       int h_upscale = frm_pyr->heights[level - 1];
       int w_upscale = frm_pyr->widths[level - 1];
       int s_upscale = frm_pyr->strides[level - 1];
-      for (int i = 0; i < h_upscale; ++i) {
-        for (int j = 0; j < w_upscale; ++j) {
-          u_upscale[j + i * s_upscale] =
-              flow_u[(int)(j >> 1) + (int)(i >> 1) * cur_stride];
-          v_upscale[j + i * s_upscale] =
-              flow_v[(int)(j >> 1) + (int)(i >> 1) * cur_stride];
+      av1_upscale_plane_double_prec(flow_u, cur_height, cur_width, cur_stride,
+                                    u_upscale, h_upscale, w_upscale, s_upscale);
+      av1_upscale_plane_double_prec(flow_v, cur_height, cur_width, cur_stride,
+                                    v_upscale, h_upscale, w_upscale, s_upscale);
+
+      // Multiply all flow vectors by 2.
+      // When we move down a pyramid level, the image resolution doubles.
+      // Thus we need to double all vectors in order for them to represent
+      // the same translation at the next level down
+      for (int i = 0; i < h_upscale; i++) {
+        for (int j = 0; j < w_upscale; j++) {
+          int index = i * s_upscale + j;
+          flow_u[index] = u_upscale[index] * 2.0;
+          flow_v[index] = v_upscale[index] * 2.0;
         }
       }
-      memcpy(flow_u, u_upscale,
-             frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_u));
-      memcpy(flow_v, v_upscale,
-             frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_v));
     }
   }
   aom_free(u_upscale);

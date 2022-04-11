@@ -14,7 +14,7 @@
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/bitops.h"
 
-// TODO(rachelbarker): Remove dependence on code in av1/encoder/
+// TODO(rachelbarker): Move needed code from av1/ to aom_dsp/
 #include "av1/common/resize.h"
 
 #include <assert.h>
