@@ -199,6 +199,11 @@ set_aom_config_var(
   0
   "Encoder only: Use disflow method for flow estimation, rather than corner matching"
 )
+set_aom_config_var(
+  CONFIG_GM_USE_SRC_FRAMES
+  0
+  "Encoder-only: Compute flow using source frames rather than reconstructed frames"
+)
 
 #
 # Variables in this section control optional features of the build system.
