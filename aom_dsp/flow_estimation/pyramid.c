@@ -11,7 +11,6 @@
  */
 
 #include "aom_dsp/flow_estimation/pyramid.h"
-#include "aom_dsp/flow_estimation/util.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/bitops.h"
 

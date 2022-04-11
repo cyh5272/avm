@@ -33,7 +33,6 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
     if (ybf->buffer_alloc_sz > 0) {
       aom_free(ybf->buffer_alloc);
     }
-    if (ybf->y_buffer_8bit) aom_free(ybf->y_buffer_8bit);
     if (ybf->y_pyramid) {
       aom_free_pyramid(ybf->y_pyramid);
     }
@@ -66,7 +65,6 @@ void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf) {
     ybf->corners = NULL;
   }
   ybf->num_corners = 0;
-  ybf->buf_8bit_valid = 0;
 }
 
 static int realloc_frame_buffer_aligned(
@@ -87,8 +85,7 @@ static int realloc_frame_buffer_aligned(
 #if defined AOM_MAX_ALLOCABLE_MEMORY
     // The size of ybf->buffer_alloc.
     uint64_t alloc_size = frame_size;
-    // The size of ybf->y_buffer_8bit.
-    if (use_highbitdepth) alloc_size += yplane_size;
+    // TODO(rachelbarker): Add pyramid size here
     // The decoder may allocate REF_FRAMES frame buffers in the frame buffer
     // pool. Bound the total amount of allocated memory as if these REF_FRAMES
     // frame buffers were allocated in a single allocation.
@@ -178,17 +175,6 @@ static int realloc_frame_buffer_aligned(
                                   aom_byte_align);
 
     ybf->use_external_reference_buffers = 0;
-
-    if (use_highbitdepth) {
-      if (ybf->y_buffer_8bit) aom_free(ybf->y_buffer_8bit);
-      ybf->y_buffer_8bit = (uint8_t *)aom_memalign(32, (size_t)yplane_size);
-      if (!ybf->y_buffer_8bit) return AOM_CODEC_MEM_ERROR;
-    } else {
-      if (ybf->y_buffer_8bit) {
-        aom_free(ybf->y_buffer_8bit);
-        ybf->y_buffer_8bit = NULL;
-      }
-    }
 
     // Discard global motion data, so that stale data is not used
     aom_invalidate_gm_data(ybf);

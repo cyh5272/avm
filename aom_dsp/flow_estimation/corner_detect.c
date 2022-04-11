@@ -20,7 +20,7 @@
 
 #include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_dsp/flow_estimation/flow_estimation.h"
-#include "aom_dsp/flow_estimation/util.h"
+#include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_mem/aom_mem.h"
 
 // Fast_9 wrapper
@@ -41,15 +41,18 @@ int aom_fast_corner_detect(unsigned char *buf, int width, int height,
 }
 
 void aom_find_corners_in_frame(YV12_BUFFER_CONFIG *frm, int bit_depth) {
-  unsigned char *src_buffer = frm->y_buffer;
-  if (frm->flags & YV12_FLAG_HIGHBITDEPTH) {
-    // The source buffer is 16-bit, so we need to convert to 8 bits for the
-    // following code. We cache the result until the source frame is released.
-    src_buffer = aom_downconvert_frame(frm, bit_depth);
+  if (!frm->y_pyramid) {
+    frm->y_pyramid = aom_compute_pyramid(frm, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(frm->y_pyramid);
   }
+  ImagePyramid *pyr = frm->y_pyramid;
+
+  unsigned char *buffer = pyr->level_buffer + pyr->level_loc[0];
+  int width = pyr->widths[0];
+  int height = pyr->heights[0];
+  int stride = pyr->strides[0];
 
   frm->corners = aom_malloc(2 * MAX_CORNERS * sizeof(*frm->corners));
-  frm->num_corners =
-      aom_fast_corner_detect(src_buffer, frm->y_width, frm->y_height,
-                             frm->y_stride, frm->corners, MAX_CORNERS);
+  frm->num_corners = aom_fast_corner_detect(buffer, width, height, stride,
+                                            frm->corners, MAX_CORNERS);
 }

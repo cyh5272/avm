@@ -92,11 +92,6 @@ typedef struct yv12_buffer_config {
   // external reference frame is no longer used.
   uint8_t *store_buf_adr[3];
 
-  // If the frame is stored in a 16-bit buffer, this stores an 8-bit version
-  // for use in global motion detection. It is allocated on-demand.
-  uint8_t *y_buffer_8bit;
-  int buf_8bit_valid;
-
   // Data needed for global motion estimation
   ImagePyramid *y_pyramid;
   int *corners;

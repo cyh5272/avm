@@ -20,7 +20,6 @@
 #include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_dsp/flow_estimation/corner_match.h"
 #include "aom_dsp/flow_estimation/ransac.h"
-#include "aom_dsp/flow_estimation/util.h"
 #include "aom_mem/aom_mem.h"
 
 #define SEARCH_SZ 9
@@ -201,15 +200,29 @@ int aom_compute_global_motion_feature_based(
     int bit_depth, MotionModel *params_by_motion, int num_motions) {
   int i;
   int num_correspondences;
-  unsigned char *src_buffer = src->y_buffer;
-  unsigned char *ref_buffer = ref->y_buffer;
 
-  if (src->flags & YV12_FLAG_HIGHBITDEPTH) {
-    src_buffer = aom_downconvert_frame(src, bit_depth);
+  if (!src->y_pyramid) {
+    src->y_pyramid = aom_compute_pyramid(src, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(src->y_pyramid);
   }
-  if (ref->flags & YV12_FLAG_HIGHBITDEPTH) {
-    ref_buffer = aom_downconvert_frame(ref, bit_depth);
+  if (!ref->y_pyramid) {
+    ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(ref->y_pyramid);
   }
+
+  ImagePyramid *src_pyr = src->y_pyramid;
+
+  unsigned char *src_buffer = src_pyr->level_buffer + src_pyr->level_loc[0];
+  int src_width = src_pyr->widths[0];
+  int src_height = src_pyr->heights[0];
+  int src_stride = src_pyr->strides[0];
+
+  ImagePyramid *ref_pyr = ref->y_pyramid;
+
+  unsigned char *ref_buffer = ref_pyr->level_buffer + ref_pyr->level_loc[0];
+  int ref_stride = ref_pyr->strides[0];
+  assert(ref_pyr->widths[0] == src_width);
+  assert(ref_pyr->heights[0] == src_height);
 
   if (!src->corners) {
     aom_find_corners_in_frame(src, bit_depth);
@@ -223,8 +236,8 @@ int aom_compute_global_motion_feature_based(
       (Correspondence *)malloc(src->num_corners * sizeof(*correspondences));
   num_correspondences = aom_determine_correspondence(
       src_buffer, src->corners, src->num_corners, ref_buffer, ref->corners,
-      ref->num_corners, src->y_width, src->y_height, src->y_stride,
-      ref->y_stride, correspondences);
+      ref->num_corners, src_width, src_height, src_stride, ref_stride,
+      correspondences);
 
   ransac(correspondences, num_correspondences, type, params_by_motion,
          num_motions);

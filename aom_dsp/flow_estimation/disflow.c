@@ -15,7 +15,6 @@
 #include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_dsp/flow_estimation/pyramid.h"
 #include "aom_dsp/flow_estimation/ransac.h"
-#include "aom_dsp/flow_estimation/util.h"
 #include "aom_mem/aom_mem.h"
 
 #include "config/av1_rtcd.h"
@@ -345,13 +344,11 @@ FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
   // recomputation. When the framebuffer is freed, or reused for a new frame,
   // these pyramids will be automatically freed.
   if (!frm->y_pyramid) {
-    frm->y_pyramid =
-        aom_compute_pyramid(frm, bit_depth, DISFLOW_PYRAMID_LEVELS);
+    frm->y_pyramid = aom_compute_pyramid(frm, bit_depth, MAX_PYRAMID_LEVELS);
     assert(frm->y_pyramid);
   }
   if (!ref->y_pyramid) {
-    ref->y_pyramid =
-        aom_compute_pyramid(ref, bit_depth, DISFLOW_PYRAMID_LEVELS);
+    ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
     assert(ref->y_pyramid);
   }
 

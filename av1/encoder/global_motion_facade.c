@@ -15,7 +15,6 @@
 
 #include "aom_dsp/flow_estimation/flow_estimation.h"
 #include "aom_dsp/flow_estimation/corner_detect.h"
-#include "aom_dsp/flow_estimation/util.h"
 
 #if CONFIG_FLEX_MVRES
 #include "av1/common/mv.h"
