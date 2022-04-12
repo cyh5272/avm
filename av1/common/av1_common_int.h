@@ -1732,8 +1732,8 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
   }
 
 #if CONFIG_TIP
-  realloc = cm->tip_ref.available_flag == NULL ||
-            cm->tpl_mvs_mem_size < mem_size;
+  realloc =
+      cm->tip_ref.available_flag == NULL || cm->tpl_mvs_mem_size < mem_size;
   if (realloc) {
     aom_free(cm->tip_ref.available_flag);
     CHECK_MEM_ERROR(
@@ -1741,8 +1741,8 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
         (int *)aom_calloc(mem_size, sizeof(*cm->tip_ref.available_flag)));
   }
 
-  realloc = cm->tip_ref.mf_need_clamp == NULL ||
-            cm->tpl_mvs_mem_size < mem_size;
+  realloc =
+      cm->tip_ref.mf_need_clamp == NULL || cm->tpl_mvs_mem_size < mem_size;
   if (realloc) {
     aom_free(cm->tip_ref.mf_need_clamp);
     CHECK_MEM_ERROR(

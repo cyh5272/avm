@@ -907,10 +907,10 @@ static void setup_tip_frame_size(AV1_COMP *cpi) {
   RefCntBuffer *tip_frame = cm->tip_ref.tip_frame;
   // Reset the frame pointers to the current frame size.
   if (aom_realloc_frame_buffer(
-          &tip_frame->buf, cm->width, cm->height,
-          cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
-          cm->seq_params.use_highbitdepth, cpi->oxcf.border_in_pixels,
-          cm->features.byte_alignment, NULL, NULL, NULL)) {
+          &tip_frame->buf, cm->width, cm->height, cm->seq_params.subsampling_x,
+          cm->seq_params.subsampling_y, cm->seq_params.use_highbitdepth,
+          cpi->oxcf.border_in_pixels, cm->features.byte_alignment, NULL, NULL,
+          NULL)) {
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate frame buffer");
   }

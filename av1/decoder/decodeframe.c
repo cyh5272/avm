@@ -2705,10 +2705,10 @@ static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
   const SequenceHeader *const seq_params = &cm->seq_params;
   YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
   if (aom_realloc_frame_buffer(
-          tip_frame_buf, cm->width, cm->height,
-          seq_params->subsampling_x, seq_params->subsampling_y,
-          seq_params->use_highbitdepth, AOM_DEC_BORDER_IN_PIXELS,
-          cm->features.byte_alignment, NULL, NULL, NULL)) {
+          tip_frame_buf, cm->width, cm->height, seq_params->subsampling_x,
+          seq_params->subsampling_y, seq_params->use_highbitdepth,
+          AOM_DEC_BORDER_IN_PIXELS, cm->features.byte_alignment, NULL, NULL,
+          NULL)) {
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate frame buffer");
   }

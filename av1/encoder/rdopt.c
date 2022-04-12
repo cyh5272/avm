@@ -6922,11 +6922,17 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   // Note that the 0-th element will contain a cut-off that is later used
   // to determine if we should skip a compound mode.
 
-  int64_t ref_frame_rd[SINGLE_REF_FRAMES] = { INT64_MAX, INT64_MAX, INT64_MAX,
-                                              INT64_MAX, INT64_MAX, INT64_MAX,
-                                              INT64_MAX, INT64_MAX,
+  int64_t ref_frame_rd[SINGLE_REF_FRAMES] = {
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
+    INT64_MAX,
 #if CONFIG_TIP
-                                              INT64_MAX
+    INT64_MAX
 #endif  // CONFIG_TIP
   };
 

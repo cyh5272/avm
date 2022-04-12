@@ -4974,7 +4974,7 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
 #if CONFIG_TIP
        || (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT)
 #endif  // CONFIG_TIP
-       );
+      );
   struct aom_write_bit_buffer saved_wb = { NULL, 0 };
   size_t length_field = 0;
   if (write_frame_header) {
