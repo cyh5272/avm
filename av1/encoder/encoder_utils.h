@@ -904,10 +904,10 @@ static AOM_INLINE void restore_all_coding_context(AV1_COMP *cpi) {
 #if CONFIG_TIP
 static void setup_tip_frame_size(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
-
+  RefCntBuffer *tip_frame = cm->tip_ref.tip_frame;
   // Reset the frame pointers to the current frame size.
   if (aom_realloc_frame_buffer(
-          &cm->tip_ref.tip_frame->buf, cm->width, cm->height,
+          &tip_frame->buf, cm->width, cm->height,
           cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
           cm->seq_params.use_highbitdepth, cpi->oxcf.border_in_pixels,
           cm->features.byte_alignment, NULL, NULL, NULL)) {
@@ -915,7 +915,7 @@ static void setup_tip_frame_size(AV1_COMP *cpi) {
                        "Failed to allocate frame buffer");
   }
 
-  cm->tip_ref.tip_frame->frame_type = INTER_FRAME;
+  tip_frame->frame_type = INTER_FRAME;
 }
 #endif  // CONFIG_TIP
 

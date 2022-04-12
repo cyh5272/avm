@@ -2719,9 +2719,9 @@ static AOM_INLINE void setup_buffer_pool(AV1_COMMON *cm) {
 #if CONFIG_TIP
 static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
   const SequenceHeader *const seq_params = &cm->seq_params;
-
+  YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
   if (aom_realloc_frame_buffer(
-          &cm->tip_ref.tip_frame->buf, cm->width, cm->height,
+          tip_frame_buf, cm->width, cm->height,
           seq_params->subsampling_x, seq_params->subsampling_y,
           seq_params->use_highbitdepth, AOM_DEC_BORDER_IN_PIXELS,
           cm->features.byte_alignment, NULL, NULL, NULL)) {
@@ -2729,18 +2729,16 @@ static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
                        "Failed to allocate frame buffer");
   }
 
-  cm->tip_ref.tip_frame->buf.bit_depth = (unsigned int)seq_params->bit_depth;
-  cm->tip_ref.tip_frame->buf.color_primaries = seq_params->color_primaries;
-  cm->tip_ref.tip_frame->buf.transfer_characteristics =
+  tip_frame_buf->bit_depth = (unsigned int)seq_params->bit_depth;
+  tip_frame_buf->color_primaries = seq_params->color_primaries;
+  tip_frame_buf->transfer_characteristics =
       seq_params->transfer_characteristics;
-  cm->tip_ref.tip_frame->buf.matrix_coefficients =
-      seq_params->matrix_coefficients;
-  cm->tip_ref.tip_frame->buf.monochrome = seq_params->monochrome;
-  cm->tip_ref.tip_frame->buf.chroma_sample_position =
-      seq_params->chroma_sample_position;
-  cm->tip_ref.tip_frame->buf.color_range = seq_params->color_range;
-  cm->tip_ref.tip_frame->buf.render_width = cm->render_width;
-  cm->tip_ref.tip_frame->buf.render_height = cm->render_height;
+  tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+  tip_frame_buf->monochrome = seq_params->monochrome;
+  tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
+  tip_frame_buf->color_range = seq_params->color_range;
+  tip_frame_buf->render_width = cm->render_width;
+  tip_frame_buf->render_height = cm->render_height;
 }
 #endif  // CONFIG_TIP
 
@@ -6052,18 +6050,17 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   cm->cur_frame->buf.render_height = cm->render_height;
 
 #if CONFIG_TIP
-  cm->tip_ref.tip_frame->buf.bit_depth = seq_params->bit_depth;
-  cm->tip_ref.tip_frame->buf.color_primaries = seq_params->color_primaries;
-  cm->tip_ref.tip_frame->buf.transfer_characteristics =
+  YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
+  tip_frame_buf->bit_depth = seq_params->bit_depth;
+  tip_frame_buf->color_primaries = seq_params->color_primaries;
+  tip_frame_buf->transfer_characteristics =
       seq_params->transfer_characteristics;
-  cm->tip_ref.tip_frame->buf.matrix_coefficients =
-      seq_params->matrix_coefficients;
-  cm->tip_ref.tip_frame->buf.monochrome = seq_params->monochrome;
-  cm->tip_ref.tip_frame->buf.chroma_sample_position =
-      seq_params->chroma_sample_position;
-  cm->tip_ref.tip_frame->buf.color_range = seq_params->color_range;
-  cm->tip_ref.tip_frame->buf.render_width = cm->render_width;
-  cm->tip_ref.tip_frame->buf.render_height = cm->render_height;
+  tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+  tip_frame_buf->monochrome = seq_params->monochrome;
+  tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
+  tip_frame_buf->color_range = seq_params->color_range;
+  tip_frame_buf->render_width = cm->render_width;
+  tip_frame_buf->render_height = cm->render_height;
 #endif  // CONFIG_TIP
 
   if (pbi->need_resync) {
@@ -6072,12 +6069,11 @@ static int read_uncompressed_header(AV1Decoder *pbi,
                        " state");
   }
 
+  if (is_global_intrabc_allowed(cm)
 #if CONFIG_TIP
-  if (is_global_intrabc_allowed(cm) ||
-      features->tip_frame_mode == TIP_FRAME_AS_OUTPUT) {
-#else
-  if (is_global_intrabc_allowed(cm)) {
+      || features->tip_frame_mode == TIP_FRAME_AS_OUTPUT
 #endif  // CONFIG_TIP
+  ) {
     // Set parameters corresponding to no filtering.
     struct loopfilter *lf = &cm->lf;
     lf->filter_level[0] = 0;

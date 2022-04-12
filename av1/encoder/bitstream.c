@@ -4993,14 +4993,12 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
   // write metadata obus before the frame obu that has the show_frame flag set
   if (cm->show_frame) data += av1_write_metadata_array(cpi, data);
 
+  const int write_frame_header =
+      (cpi->num_tg > 1 || encode_show_existing_frame(cm)
 #if CONFIG_TIP
-  const int write_frame_header =
-      (cpi->num_tg > 1 || encode_show_existing_frame(cm) ||
-       (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT));
-#else
-  const int write_frame_header =
-      (cpi->num_tg > 1 || encode_show_existing_frame(cm));
+       || (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT)
 #endif  // CONFIG_TIP
+       );
   struct aom_write_bit_buffer saved_wb = { NULL, 0 };
   size_t length_field = 0;
   if (write_frame_header) {
@@ -5022,12 +5020,11 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
     data += fh_info.total_length;
   }
 
+  if (encode_show_existing_frame(cm)
 #if CONFIG_TIP
-  if (encode_show_existing_frame(cm) ||
-      (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT)) {
-#else
-  if (encode_show_existing_frame(cm)) {
+      || (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT)
 #endif  // CONFIG_TIP
+  ) {
     data_size = 0;
   } else {
     // Since length_field is determined adaptively after frame header

@@ -21,22 +21,30 @@ extern "C" {
 #include "av1/common/mvref_common.h"
 #include "av1/common/reconinter.h"
 
+// Derive temporal motion field from one closest forward and one closet backward
+// reference frames, then fill the hole
 void av1_setup_tip_motion_field(AV1_COMMON *cm, int check_tip_threshold);
 
+// Generate the whole TIP frame with the temporal motion field
 void av1_setup_tip_frame(AV1_COMMON *cm, MACROBLOCKD *xd, uint8_t **mc_buf,
                          CONV_BUF_TYPE *tmp_conv_dst,
                          CalcSubpelParamsFunc calc_subpel_params_func);
 
+// Generate TIP reference block if current block is coded as TIP mode
 void av1_setup_tip_on_the_fly(AV1_COMMON *cm, MACROBLOCKD *xd,
                               int blk_row_start, int blk_col_start,
                               int blk_row_end, int blk_col_end, int mvs_stride,
                               uint8_t **mc_buf, CONV_BUF_TYPE *tmp_conv_dst,
                               CalcSubpelParamsFunc calc_subpel_params_func);
 
+// Derive TMVP from closest forward and closet backward reference frames
 void av1_derive_tip_nearest_ref_frames_motion_projection(AV1_COMMON *cm);
 
+// Save TMVP motion fields for future frame's TMVP if current frame is coded
+// as TIP_FRAME_AS_OUTPUT
 void av1_copy_tip_frame_tmvp_mvs(const AV1_COMMON *const cm);
 
+// Compute scale factor for temporal scaling
 static AOM_INLINE int tip_derive_scale_factor(int num, int den) {
   den = AOMMIN(den, MAX_FRAME_DISTANCE);
   num = num > 0 ? AOMMIN(num, MAX_FRAME_DISTANCE)
@@ -44,6 +52,7 @@ static AOM_INLINE int tip_derive_scale_factor(int num, int den) {
   return num * div_mult[den];
 }
 
+// Temporal scaling the motion vector
 static AOM_INLINE void tip_get_mv_projection(MV *output, MV ref,
                                              int scale_factor) {
   const int mv_row = ROUND_POWER_OF_TWO_SIGNED(ref.row * scale_factor, 14);
@@ -54,6 +63,8 @@ static AOM_INLINE void tip_get_mv_projection(MV *output, MV ref,
   output->col = (int16_t)clamp(mv_col, clamp_min, clamp_max);
 }
 
+// Convert motion vector to fullpel and clamp the fullpel mv if it is outside
+// of frame boundary
 static AOM_INLINE FULLPEL_MV clamp_tip_fullmv(const AV1_COMMON *const cm,
                                               const MV *mv, const int blk_row,
                                               const int blk_col) {
@@ -77,6 +88,7 @@ static AOM_INLINE FULLPEL_MV clamp_tip_fullmv(const AV1_COMMON *const cm,
   return fullmv;
 }
 
+// SMVP candidate which is derived from TIP mode
 static AOM_INLINE void clamp_tip_smvp_refmv(const AV1_COMMON *const cm, MV *mv,
                                             const int blk_row,
                                             const int blk_col) {
@@ -102,6 +114,7 @@ static AOM_INLINE void clamp_tip_smvp_refmv(const AV1_COMMON *const cm, MV *mv,
   *mv = get_mv_from_fullmv(&fullmv);
 }
 
+// Clamp MV to UMV border based on its distance to left/right/top/bottom edge
 static AOM_INLINE MV tip_clamp_mv_to_umv_border_sb(
     InterPredParams *const inter_pred_params, const MV *src_mv, int bw, int bh,
     int ss_x, int ss_y) {
