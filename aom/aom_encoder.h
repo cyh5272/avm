@@ -268,7 +268,7 @@ typedef struct cfg_options {
    */
   unsigned int enable_mrls;
 #if CONFIG_TIP
-  /*!\brief enable temporal interpolated projection
+  /*!\brief enable temporal interpolated prediction
    *
    */
   unsigned int enable_tip;

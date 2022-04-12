@@ -452,16 +452,12 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
   seq->enable_opfl_refine = tool_cfg->enable_opfl_refine;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_TIP
-  if (!seq->use_highbitdepth) {
-    seq->enable_tip = 0;
-  } else {
-    seq->enable_tip = tool_cfg->enable_tip;
-  }
+  seq->enable_tip = seq->use_highbitdepth ? tool_cfg->enable_tip : 0;
 
   if (oxcf->superres_cfg.superres_mode != AOM_SUPERRES_NONE) {
     seq->enable_tip = 0;
   }
-  seq->enable_tip_hole_fill = seq->enable_tip ? 1 : 0;
+  seq->enable_tip_hole_fill = seq->enable_tip;
 #endif  // CONFIG_TIP
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
@@ -957,7 +953,7 @@ static INLINE void init_frame_info(FRAME_INFO *frame_info,
 
 #if CONFIG_TIP
 static INLINE void init_tip_ref_frame(AV1_COMMON *const cm) {
-  cm->tip_ref.tip_frame = aom_calloc(1, sizeof(RefCntBuffer));
+  cm->tip_ref.tip_frame = aom_calloc(1, sizeof(*cm->tip_ref.tip_frame));
 }
 
 static INLINE void free_tip_ref_frame(AV1_COMMON *const cm) {

@@ -115,7 +115,7 @@ struct av1_extracfg {
   int enable_sdp;   // enable semi-decoupled partitioning
   int enable_mrls;  // enable multiple reference line selection
 #if CONFIG_TIP
-  int enable_tip;  // enable temporal interpolated projection
+  int enable_tip;  // enable temporal interpolated prediction
 #endif             // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   int enable_fsc;  // enable forward skip coding
@@ -411,7 +411,7 @@ static struct av1_extracfg default_extra_cfg = {
   1,                            // enable semi-decoupled partitioning
   1,                            // enable multiple reference line selection
 #if CONFIG_TIP
-  1,    // enable temporal interpolated projection (TIP)
+  1,    // enable temporal interpolated prediction (TIP)
 #endif  // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   1,    // enable forward skip coding
@@ -1212,10 +1212,8 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
 #if CONFIG_TIP
   tool_cfg->enable_tip = extra_cfg->enable_tip;
   if (tool_cfg->enable_tip) {
-    if (extra_cfg->subgop_config_str) {
-      if (!strcmp(extra_cfg->subgop_config_str, "ld")) {
-        tool_cfg->enable_tip = false;
-      }
+    if (cfg->g_lag_in_frames == 0) {
+      tool_cfg->enable_tip = false;
     }
 
     if (cfg->kf_max_dist == 0) {

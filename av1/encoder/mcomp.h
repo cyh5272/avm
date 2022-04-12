@@ -440,17 +440,12 @@ static INLINE void av1_set_subpel_mv_search_range(SubpelMvLimits *subpel_limits,
 #if CONFIG_TIP
 static INLINE void av1_set_tip_subpel_mv_search_range(
     SubpelMvLimits *subpel_limits, const FullMvLimits *mv_limits) {
-  const int allow_tmvp_mv =
-      GET_MV_SUBPEL((TIP_MV_SEARCH_RANGE << TMVP_MI_SZ_LOG2));
+  const int tmvp_mv = GET_MV_SUBPEL(TIP_MV_SEARCH_RANGE << TMVP_MI_SZ_LOG2);
 
-  subpel_limits->col_min =
-      AOMMAX(GET_MV_SUBPEL(mv_limits->col_min), -allow_tmvp_mv);
-  subpel_limits->col_max =
-      AOMMIN(GET_MV_SUBPEL(mv_limits->col_max), allow_tmvp_mv);
-  subpel_limits->row_min =
-      AOMMAX(GET_MV_SUBPEL(mv_limits->row_min), -allow_tmvp_mv);
-  subpel_limits->row_max =
-      AOMMIN(GET_MV_SUBPEL(mv_limits->row_max), allow_tmvp_mv);
+  subpel_limits->col_min = AOMMAX(GET_MV_SUBPEL(mv_limits->col_min), -tmvp_mv);
+  subpel_limits->col_max = AOMMIN(GET_MV_SUBPEL(mv_limits->col_max), tmvp_mv);
+  subpel_limits->row_min = AOMMAX(GET_MV_SUBPEL(mv_limits->row_min), -tmvp_mv);
+  subpel_limits->row_max = AOMMIN(GET_MV_SUBPEL(mv_limits->row_max), tmvp_mv);
 }
 #endif  // CONFIG_TIP
 

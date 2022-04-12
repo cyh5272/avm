@@ -1397,7 +1397,8 @@ static AOM_INLINE void store_coding_context(
 
 static AOM_INLINE void setup_buffer_ref_mvs_inter(
     const AV1_COMP *const cpi, MACROBLOCK *x, MV_REFERENCE_FRAME ref_frame,
-    BLOCK_SIZE block_size, struct buf_2d (*yv12_mb)[MAX_MB_PLANE]) {
+    BLOCK_SIZE block_size,
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE]) {
   const AV1_COMMON *cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   const YV12_BUFFER_CONFIG *scaled_ref_frame =
@@ -4473,7 +4474,7 @@ static AOM_INLINE void calc_target_weighted_pred(
  */
 static AOM_INLINE void rd_pick_motion_copy_mode(
     InterModeSearchState *search_state, const AV1_COMP *cpi, MACROBLOCK *x,
-    BLOCK_SIZE bsize, struct buf_2d (*yv12_mb)[MAX_MB_PLANE],
+    BLOCK_SIZE bsize, struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE],
     PICK_MODE_CONTEXT *ctx, RD_STATS *best_rd_cost) {
   const AV1_COMMON *const cm = &cpi->common;
   const SkipModeInfo *const skip_mode_info = &cm->current_frame.skip_mode_info;
@@ -4750,7 +4751,7 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 static AOM_INLINE void rd_pick_skip_mode(
     RD_STATS *rd_cost, InterModeSearchState *search_state,
     const AV1_COMP *const cpi, MACROBLOCK *const x, BLOCK_SIZE bsize,
-    struct buf_2d (*yv12_mb)[MAX_MB_PLANE]) {
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE]) {
   const AV1_COMMON *const cm = &cpi->common;
   const SkipModeInfo *const skip_mode_info = &cm->current_frame.skip_mode_info;
   const int num_planes = av1_num_planes(cm);
@@ -4978,8 +4979,8 @@ static AOM_INLINE MB_MODE_INFO *get_winner_mode_stats(
 static AOM_INLINE void refine_winner_mode_tx(
     const AV1_COMP *cpi, MACROBLOCK *x, RD_STATS *rd_cost, BLOCK_SIZE bsize,
     PICK_MODE_CONTEXT *ctx, MB_MODE_INFO *best_mbmode,
-    struct buf_2d (*yv12_mb)[MAX_MB_PLANE], int best_rate_y, int best_rate_uv,
-    int *best_skip2, int winner_mode_count) {
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE], int best_rate_y,
+    int best_rate_uv, int *best_skip2, int winner_mode_count) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -5458,7 +5459,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
     const AV1_COMP *cpi, MACROBLOCK *x, HandleInterModeArgs *args,
     BLOCK_SIZE bsize, mode_skip_mask_t *mode_skip_mask, int skip_ref_frame_mask,
     unsigned int *ref_costs_single, unsigned int (*ref_costs_comp)[REF_FRAMES],
-    struct buf_2d (*yv12_mb)[MAX_MB_PLANE]) {
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE]) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -5922,7 +5923,7 @@ static AOM_INLINE void collect_single_states(const AV1_COMMON *const cm,
   const int dir = get_dir_rank(cm, mbmi->ref_frame[0], NULL);
 #else
   const int dir = ref_frame <= GOLDEN_FRAME ? 0 : 1;
-#endif  // CONFIG_TIP
+#endif  // CONFIG_NEW_REF_SIGNALING
 #else
   const MV_REFERENCE_FRAME ref_frame = mbmi->ref_frame[0];
   const int dir = ref_frame <= GOLDEN_FRAME ? 0 : 1;
@@ -6372,7 +6373,8 @@ static INLINE bool in_single_ref_cutoff(int64_t *ref_frame_rd,
 static AOM_INLINE void evaluate_motion_mode_for_winner_candidates(
     const AV1_COMP *const cpi, MACROBLOCK *const x, RD_STATS *const rd_cost,
     HandleInterModeArgs *const args, TileDataEnc *const tile_data,
-    PICK_MODE_CONTEXT *const ctx, struct buf_2d (*yv12_mb)[MAX_MB_PLANE],
+    PICK_MODE_CONTEXT *const ctx,
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE],
     const motion_mode_best_st_candidate *const best_motion_mode_cands,
     int do_tx_search, const BLOCK_SIZE bsize, int64_t *const best_est_rd,
     InterModeSearchState *const search_state) {
@@ -6624,8 +6626,8 @@ static void record_best_compound(REFERENCE_MODE reference_mode,
 static void tx_search_best_inter_candidates(
     AV1_COMP *cpi, TileDataEnc *tile_data, MACROBLOCK *x,
     int64_t best_rd_so_far, BLOCK_SIZE bsize,
-    struct buf_2d (*yv12_mb)[MAX_MB_PLANE], int mi_row, int mi_col,
-    InterModeSearchState *search_state, RD_STATS *rd_cost,
+    struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE], int mi_row,
+    int mi_col, InterModeSearchState *search_state, RD_STATS *rd_cost,
     PICK_MODE_CONTEXT *ctx) {
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -7043,7 +7045,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_TIP
     for (MV_REFERENCE_FRAME rf = NONE_FRAME;
          rf < cm->ref_frames_info.num_total_refs + 1; ++rf) {
-      MV_REFERENCE_FRAME ref_frame =
+      const MV_REFERENCE_FRAME ref_frame =
           (rf == NONE_FRAME)
               ? INTRA_FRAME
               : ((rf == cm->ref_frames_info.num_total_refs) ? TIP_FRAME : rf);
@@ -7054,7 +7056,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #else
     for (MV_REFERENCE_FRAME rf = NONE_FRAME;
          rf < cm->ref_frames_info.num_total_refs; ++rf) {
-      MV_REFERENCE_FRAME ref_frame = (rf == NONE_FRAME) ? INTRA_FRAME : rf;
+      const MV_REFERENCE_FRAME ref_frame =
+          (rf == NONE_FRAME) ? INTRA_FRAME : rf;
 #endif  // CONFIG_TIP
       if (this_mode < INTRA_MODE_END && ref_frame != INTRA_FRAME) continue;
       if (this_mode >= INTRA_MODE_END && ref_frame == INTRA_FRAME) continue;
@@ -7166,26 +7169,22 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         av1_init_rd_stats(&rd_stats);
 
 #if CONFIG_NEW_REF_SIGNALING || CONFIG_TIP
-        const int ref_frame_cost =
-            comp_pred ? ref_costs_comp[ref_frame][second_ref_frame]
-                      : ref_costs_single[COMPACT_INDEX0_NRS(ref_frame)];
+        const int ref_frame_index = COMPACT_INDEX0_NRS(ref_frame);
 #else
-    const int ref_frame_cost = comp_pred
-                                   ? ref_costs_comp[ref_frame][second_ref_frame]
-                                   : ref_costs_single[ref_frame];
+    const int ref_frame_index = ref_frame;
 #endif  // CONFIG_NEW_REF_SIGNALING || CONFIG_TIP
 
-#if CONFIG_TIP
+        const int ref_frame_cost =
+            comp_pred ? ref_costs_comp[ref_frame][second_ref_frame]
+                      : ref_costs_single[ref_frame_index];
+
         const int compmode_cost =
-            (is_comp_ref_allowed(mbmi->sb_type[PLANE_TYPE_Y]) &&
-             !is_tip_ref_frame(ref_frame))
+            (is_comp_ref_allowed(mbmi->sb_type[PLANE_TYPE_Y])
+#if CONFIG_TIP
+             && !is_tip_ref_frame(ref_frame))
+#endif  // CONFIG_TIP
                 ? comp_inter_cost[comp_pred]
                 : 0;
-#else
-    const int compmode_cost = is_comp_ref_allowed(mbmi->sb_type[PLANE_TYPE_Y])
-                                  ? comp_inter_cost[comp_pred]
-                                  : 0;
-#endif  // CONFIG_TIP
         const int real_compmode_cost =
             cm->current_frame.reference_mode == REFERENCE_MODE_SELECT
                 ? compmode_cost
@@ -7220,17 +7219,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
           rd_stats_uv.rate = 0;
         }
 
-#if CONFIG_NEW_REF_SIGNALING || CONFIG_TIP
         if (sf->inter_sf.prune_compound_using_single_ref && is_single_pred &&
-            this_rd < ref_frame_rd[COMPACT_INDEX0_NRS(ref_frame)]) {
-          ref_frame_rd[COMPACT_INDEX0_NRS(ref_frame)] = this_rd;
+            this_rd < ref_frame_rd[ref_frame_index]) {
+          ref_frame_rd[ref_frame_index] = this_rd;
         }
-#else
-    if (sf->inter_sf.prune_compound_using_single_ref && is_single_pred &&
-        this_rd < ref_frame_rd[ref_frame]) {
-      ref_frame_rd[ref_frame] = this_rd;
-    }
-#endif  // CONFIG_NEW_REF_SIGNALING || CONFIG_TIP
 
         // Did this mode help, i.e., is it the new best mode
         if (this_rd < search_state.best_rd) {

@@ -401,7 +401,7 @@ typedef struct SequenceHeader {
   uint8_t enable_sdp;   // enables/disables semi-decoupled partitioning
   uint8_t enable_mrls;  // enables/disables multiple reference line selection
 #if CONFIG_TIP
-  uint8_t enable_tip;  // enables/disables temporal interpolated projection
+  uint8_t enable_tip;  // enables/disables temporal interpolated prediction
   uint8_t enable_tip_hole_fill;  // enables/disables hole fill for TIP
 #endif                           // CONFIG_TIP
 #if CONFIG_FORWARDSKIP

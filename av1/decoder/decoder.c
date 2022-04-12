@@ -118,7 +118,7 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
 #if CONFIG_TIP
 static INLINE void dec_init_tip_ref_frame(AV1_COMMON *const cm) {
   TIP *tip_ref = &cm->tip_ref;
-  tip_ref->tip_frame = aom_calloc(1, sizeof(RefCntBuffer));
+  tip_ref->tip_frame = aom_calloc(1, sizeof(*tip_ref->tip_frame));
 }
 
 static INLINE void dec_free_tip_ref_frame(AV1_COMMON *const cm) {

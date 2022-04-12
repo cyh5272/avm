@@ -97,14 +97,13 @@ void av1_make_default_fullpel_ms_params(
     int fine_search_interval) {
   const MV_SPEED_FEATURES *mv_sf = &cpi->sf.mv_sf;
 
-#if CONFIG_ADAPTIVE_MVD
+#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP
   const AV1_COMMON *cm = &cpi->common;
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
+#endif  // CONFIG_ADAPTIVE_MVD || CONFIG_TIP
+#if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
-#elif CONFIG_TIP
-  const AV1_COMMON *cm = &cpi->common;
-  MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
 #endif  // CONFIG_ADAPTIVE_MVD
 
   // High level params
@@ -168,12 +167,12 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                                        const MACROBLOCK *x, BLOCK_SIZE bsize,
                                        const MV *ref_mv, const int *cost_list) {
   const AV1_COMMON *cm = &cpi->common;
-#if CONFIG_ADAPTIVE_MVD
+#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
+#endif  // CONFIG_ADAPTIVE_MVD  || CONFIG_TIP
+#if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
-#elif CONFIG_TIP
-  MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
 #endif  // CONFIG_ADAPTIVE_MVD
   // High level params
   ms_params->allow_hp = cm->features.allow_high_precision_mv;
@@ -242,11 +241,11 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv) {
 
 #if CONFIG_TIP
 void av1_set_tip_mv_search_range(FullMvLimits *mv_limits) {
-  const int allow_tmvp_mv = (TIP_MV_SEARCH_RANGE << TMVP_MI_SZ_LOG2);
-  const int col_min = -allow_tmvp_mv;
-  const int row_min = -allow_tmvp_mv;
-  const int col_max = allow_tmvp_mv;
-  const int row_max = allow_tmvp_mv;
+  const int tmvp_mv = (TIP_MV_SEARCH_RANGE << TMVP_MI_SZ_LOG2);
+  const int col_min = -tmvp_mv;
+  const int row_min = -tmvp_mv;
+  const int col_max = tmvp_mv;
+  const int row_max = tmvp_mv;
 
   // Get intersection of UMV window and valid MV window to reduce # of checks
   // in diamond search.

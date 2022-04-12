@@ -1034,12 +1034,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 #endif  // CONFIG_TIP
 
+      if (current_frame->reference_mode == REFERENCE_MODE_SELECT
 #if CONFIG_TIP
-      if (current_frame->reference_mode == REFERENCE_MODE_SELECT &&
-          !is_tip_ref_frame(ref0)) {
-#else
-      if (current_frame->reference_mode == REFERENCE_MODE_SELECT) {
+          && !is_tip_ref_frame(ref0)
 #endif  // CONFIG_TIP
+      ) {
         if (is_comp_ref_allowed(bsize)) {
 #if CONFIG_ENTROPY_STATS
           counts->comp_inter[av1_get_reference_mode_context(cm, xd)]
