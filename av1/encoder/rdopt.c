@@ -3127,7 +3127,7 @@ static AOM_INLINE int prune_modes_based_on_tpl_stats(
   if ((prune_mode_level < 3) && have_newmv) return 0;
 
 #if CONFIG_TIP
-  if (is_tip_ref_frame(refs[0])) return 0;
+  if (refs[0] == TIP_FRAME_INDEX) return 0;
 #endif  // CONFIG_TIP
 
   static const int prune_level_idx[3] = { 0, 1, 1 };
