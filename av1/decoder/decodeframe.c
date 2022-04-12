@@ -5094,7 +5094,7 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 #endif
   seq_params->enable_mrls = aom_rb_read_bit(rb);
 #if CONFIG_TIP
-  seq_params->enable_tip = aom_rb_read_bit(rb);
+  seq_params->enable_tip = aom_rb_read_literal(rb, 2);
   if (seq_params->enable_tip) {
     seq_params->enable_tip_hole_fill = aom_rb_read_bit(rb);
   } else {

@@ -2810,9 +2810,9 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
 }
 
 #if CONFIG_TIP
-static INLINE bool allow_tip_mode(AV1_COMMON *const cm) {
+static INLINE bool allow_tip_direct_output(AV1_COMMON *const cm) {
   if (!frame_is_intra_only(cm) && !encode_show_existing_frame(cm) &&
-      cm->features.tip_frame_mode) {
+      cm->seq_params.enable_tip == 1 && cm->features.tip_frame_mode) {
     return true;
   }
 
@@ -2824,8 +2824,7 @@ static INLINE int compute_tip_direct_output_mode_RD(AV1_COMP *cpi,
                                                     int64_t *sse, int64_t *rate,
                                                     int *largest_tile_id) {
   AV1_COMMON *const cm = &cpi->common;
-
-  if (allow_tip_mode(cm)) {
+  if (allow_tip_direct_output(cm)) {
     cm->features.tip_frame_mode = TIP_FRAME_AS_OUTPUT;
     av1_finalize_encoded_frame(cpi);
     if (av1_pack_bitstream(cpi, dest, size, largest_tile_id) != AOM_CODEC_OK)
@@ -3046,7 +3045,7 @@ static int encode_with_recode_loop_and_filter(AV1_COMP *cpi, size_t *size,
   }
 
 #if CONFIG_TIP
-  if (allow_tip_mode(cm)) {
+  if (allow_tip_direct_output(cm)) {
     finalize_tip_mode(cpi, dest, size, sse, rate, tip_as_output_sse,
                       tip_as_output_rate, largest_tile_id);
   }

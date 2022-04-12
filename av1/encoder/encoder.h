@@ -827,7 +827,7 @@ typedef struct {
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_TIP
   // enable temporal interpolated prediction
-  bool enable_tip;
+  int enable_tip;
 #endif  // CONFIG_TIP
   // When enabled, video mode should be used even for single frame input.
   bool force_video_mode;

@@ -3610,7 +3610,7 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif
   aom_wb_write_bit(wb, seq_params->enable_mrls);
 #if CONFIG_TIP
-  aom_wb_write_bit(wb, seq_params->enable_tip);
+  aom_wb_write_literal(wb, seq_params->enable_tip, 2);
   if (seq_params->enable_tip) {
     aom_wb_write_bit(wb, seq_params->enable_tip_hole_fill);
   }
