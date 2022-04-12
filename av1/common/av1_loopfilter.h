@@ -133,11 +133,7 @@ struct loopfilter {
 #else
   // 0 = Intra, Last, Last2+Last3, GF, BRF, ARF2, ARF
 #endif  // CONFIG_NEW_REF_SIGNALING
-#if CONFIG_TIP
-  int8_t ref_deltas[EXTREF_FRAMES];
-#else
-  int8_t ref_deltas[REF_FRAMES];
-#endif  // CONFIG_TIP
+  int8_t ref_deltas[SINGLE_REF_FRAMES];
 
   // 0 = ZERO_MV, MV
   int8_t mode_deltas[MAX_MODE_LF_DELTAS];
@@ -160,26 +156,16 @@ typedef struct {
 } loop_filter_thresh;
 
 typedef struct {
-#if CONFIG_TIP
 #if CONFIG_NEW_DF
-  uint16_t q_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][EXTREF_FRAMES]
+  uint16_t q_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][SINGLE_REF_FRAMES]
                 [MAX_MODE_LF_DELTAS];
-  uint16_t side_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][EXTREF_FRAMES]
+  uint16_t side_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][SINGLE_REF_FRAMES]
                    [MAX_MODE_LF_DELTAS];
 #else
   loop_filter_thresh lfthr[MAX_LOOP_FILTER + 1];
-  uint8_t lvl[MAX_MB_PLANE][MAX_SEGMENTS][2][EXTREF_FRAMES][MAX_MODE_LF_DELTAS];
+  uint8_t lvl[MAX_MB_PLANE][MAX_SEGMENTS][2][SINGLE_REF_FRAMES]
+             [MAX_MODE_LF_DELTAS];
 #endif
-#else
-#if CONFIG_NEW_DF
-  uint16_t q_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][REF_FRAMES][MAX_MODE_LF_DELTAS];
-  uint16_t side_thr[MAX_MB_PLANE][MAX_SEGMENTS][2][REF_FRAMES]
-                   [MAX_MODE_LF_DELTAS];
-#else
-  loop_filter_thresh lfthr[MAX_LOOP_FILTER + 1];
-  uint8_t lvl[MAX_MB_PLANE][MAX_SEGMENTS][2][REF_FRAMES][MAX_MODE_LF_DELTAS];
-#endif
-#endif  // CONFIG_TIP
 } loop_filter_info_n;
 
 typedef struct LoopFilterWorkerData {

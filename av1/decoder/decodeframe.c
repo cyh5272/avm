@@ -2250,11 +2250,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
 
   if (cm->prev_frame) {
     // write deltas to frame buffer
-#if CONFIG_TIP
-    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, EXTREF_FRAMES);
-#else
-    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, REF_FRAMES);
-#endif  // CONFIG_TIP
+    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, SINGLE_REF_FRAMES);
     memcpy(lf->mode_deltas, cm->prev_frame->mode_deltas, MAX_MODE_LF_DELTAS);
   } else {
     av1_set_default_ref_deltas(lf->ref_deltas);
@@ -2409,11 +2405,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   assert(!cm->features.coded_lossless);
   if (cm->prev_frame) {
     // write deltas to frame buffer
-#if CONFIG_TIP
-    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, EXTREF_FRAMES);
-#else
-    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, REF_FRAMES);
-#endif  // CONFIG_TIP
+    memcpy(lf->ref_deltas, cm->prev_frame->ref_deltas, SINGLE_REF_FRAMES);
     memcpy(lf->mode_deltas, cm->prev_frame->mode_deltas, MAX_MODE_LF_DELTAS);
   } else {
     av1_set_default_ref_deltas(lf->ref_deltas);
@@ -2437,11 +2429,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   if (lf->mode_ref_delta_enabled) {
     lf->mode_ref_delta_update = aom_rb_read_bit(rb);
     if (lf->mode_ref_delta_update) {
-#if CONFIG_TIP
-      for (int i = 0; i < EXTREF_FRAMES; i++)
-#else
-      for (int i = 0; i < REF_FRAMES; i++)
-#endif  // CONFIG_TIP
+      for (int i = 0; i < SINGLE_REF_FRAMES; i++)
         if (aom_rb_read_bit(rb))
           lf->ref_deltas[i] = aom_rb_read_inv_signed_literal(rb, 6);
 
@@ -2452,11 +2440,7 @@ static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
   }
 
   // write deltas to frame buffer
-#if CONFIG_TIP
-  memcpy(cm->cur_frame->ref_deltas, lf->ref_deltas, EXTREF_FRAMES);
-#else
-  memcpy(cm->cur_frame->ref_deltas, lf->ref_deltas, REF_FRAMES);
-#endif  // CONFIG_TIP
+  memcpy(cm->cur_frame->ref_deltas, lf->ref_deltas, SINGLE_REF_FRAMES);
   memcpy(cm->cur_frame->mode_deltas, lf->mode_deltas, MAX_MODE_LF_DELTAS);
 }
 #endif  // CONFIG_NEW_DF

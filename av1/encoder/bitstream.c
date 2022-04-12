@@ -2685,28 +2685,16 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
     return 0;
   }
   const RefCntBuffer *buf = get_primary_ref_frame_buf(cm);
-#if CONFIG_TIP
-  int8_t last_ref_deltas[EXTREF_FRAMES];
-#else
-  int8_t last_ref_deltas[REF_FRAMES];
-#endif  // CONFIG_TIP
+  int8_t last_ref_deltas[SINGLE_REF_FRAMES];
   int8_t last_mode_deltas[MAX_MODE_LF_DELTAS];
   if (buf == NULL) {
     av1_set_default_ref_deltas(last_ref_deltas);
     av1_set_default_mode_deltas(last_mode_deltas);
   } else {
-#if CONFIG_TIP
-    memcpy(last_ref_deltas, buf->ref_deltas, EXTREF_FRAMES);
-#else
-    memcpy(last_ref_deltas, buf->ref_deltas, REF_FRAMES);
-#endif  // CONFIG_TIP
+    memcpy(last_ref_deltas, buf->ref_deltas, SINGLE_REF_FRAMES);
     memcpy(last_mode_deltas, buf->mode_deltas, MAX_MODE_LF_DELTAS);
   }
-#if CONFIG_TIP
-  for (int i = 0; i < EXTREF_FRAMES; i++) {
-#else
-  for (int i = 0; i < REF_FRAMES; i++) {
-#endif  // CONFIG_TIP
+  for (int i = 0; i < SINGLE_REF_FRAMES; i++) {
     if (lf->ref_deltas[i] != last_ref_deltas[i]) {
       return true;
     }
@@ -2864,29 +2852,17 @@ static AOM_INLINE void encode_loopfilter(AV1_COMMON *cm,
   }
 
   const RefCntBuffer *buf = get_primary_ref_frame_buf(cm);
-#if CONFIG_TIP
-  int8_t last_ref_deltas[EXTREF_FRAMES];
-#else
-  int8_t last_ref_deltas[REF_FRAMES];
-#endif  // CONFIG_TIP
+  int8_t last_ref_deltas[SINGLE_REF_FRAMES];
   int8_t last_mode_deltas[MAX_MODE_LF_DELTAS];
   if (buf == NULL) {
     av1_set_default_ref_deltas(last_ref_deltas);
     av1_set_default_mode_deltas(last_mode_deltas);
   } else {
-#if CONFIG_TIP
-    memcpy(last_ref_deltas, buf->ref_deltas, EXTREF_FRAMES);
-#else
-    memcpy(last_ref_deltas, buf->ref_deltas, REF_FRAMES);
-#endif  // CONFIG_TIP
+    memcpy(last_ref_deltas, buf->ref_deltas, SINGLE_REF_FRAMES);
     memcpy(last_mode_deltas, buf->mode_deltas, MAX_MODE_LF_DELTAS);
   }
 
-#if CONFIG_TIP
-  for (int i = 0; i < EXTREF_FRAMES; i++) {
-#else
-  for (int i = 0; i < REF_FRAMES; i++) {
-#endif  // CONFIG_TIP
+  for (int i = 0; i < SINGLE_REF_FRAMES; i++) {
     const int delta = lf->ref_deltas[i];
     const int changed = delta != last_ref_deltas[i];
     aom_wb_write_bit(wb, changed);

@@ -54,7 +54,6 @@ typedef struct {
    * Stride for the left predictor in OBMC
    */
   int left_pred_stride[MAX_MB_PLANE];
-#if CONFIG_TIP
   /*!
    * Pointer to the first member in a 2D array which holds
    * single reference mode motion vectors to be used as a starting
@@ -64,21 +63,21 @@ typedef struct {
    * where N is the length of the reference mv stack computed for the single
    * reference case for that particular reference frame.
    */
-  int_mv (*single_newmv)[EXTREF_FRAMES];
+  int_mv (*single_newmv)[SINGLE_REF_FRAMES];
   /*!
    * Pointer to the first array of a 2D array with the same setup as
    * single_newmv array above. This is a 2D array to hold the rate
    * corresponding to each of the single reference mode motion vectors
    * held in single_newmv.
    */
-  int (*single_newmv_rate)[EXTREF_FRAMES];
+  int (*single_newmv_rate)[SINGLE_REF_FRAMES];
   /*!
    * Pointer to the first array of a 2D array with the same setup as
    * single_newmv array above. This is a 2D array to hold a 0 or 1
    * validity value corresponding to each of the single reference mode motion
    * vectors held in single_newmv.
    */
-  int (*single_newmv_valid)[EXTREF_FRAMES];
+  int (*single_newmv_valid)[SINGLE_REF_FRAMES];
   /*!
    * Pointer to the first array in a 3D array of predicted rate-distortion.
    * The dimensions of this structure are:
@@ -86,41 +85,7 @@ typedef struct {
    * (number of reference MVs) X
    * (number of reference frames).
    */
-  int64_t (*modelled_rd)[MAX_REF_MV_SEARCH][EXTREF_FRAMES];
-#else
-  /*!
-   * Pointer to the first member in a 2D array which holds
-   * single reference mode motion vectors to be used as a starting
-   * point in the mv search for compound modes. Each array is length REF_FRAMES,
-   * meaning there is a slot for a single reference motion vector for
-   * each possible reference frame. The 2D array consists of N of these arrays,
-   * where N is the length of the reference mv stack computed for the single
-   * reference case for that particular reference frame.
-   */
-  int_mv (*single_newmv)[REF_FRAMES];
-  /*!
-   * Pointer to the first array of a 2D array with the same setup as
-   * single_newmv array above. This is a 2D array to hold the rate
-   * corresponding to each of the single reference mode motion vectors
-   * held in single_newmv.
-   */
-  int (*single_newmv_rate)[REF_FRAMES];
-  /*!
-   * Pointer to the first array of a 2D array with the same setup as
-   * single_newmv array above. This is a 2D array to hold a 0 or 1
-   * validity value corresponding to each of the single reference mode motion
-   * vectors held in single_newmv.
-   */
-  int (*single_newmv_valid)[REF_FRAMES];
-  /*!
-   * Pointer to the first array in a 3D array of predicted rate-distortion.
-   * The dimensions of this structure are:
-   * (number of possible inter modes) X
-   * (number of reference MVs) X
-   * (number of reference frames).
-   */
-  int64_t (*modelled_rd)[MAX_REF_MV_SEARCH][REF_FRAMES];
-#endif  // CONFIG_TIP
+  int64_t (*modelled_rd)[MAX_REF_MV_SEARCH][SINGLE_REF_FRAMES];
   /*!
    * Holds an estimated entropy cost for picking the current reference frame.
    * This is used to compute an rd estimate.
@@ -137,11 +102,7 @@ typedef struct {
    * modes used to determine compound ref modes. The full structure is:
    * (number of inter modes) X (length of refmv list) X (number of ref frames)
    */
-#if CONFIG_TIP
-  int64_t (*simple_rd)[MAX_REF_MV_SEARCH][EXTREF_FRAMES];
-#else
-  int64_t (*simple_rd)[MAX_REF_MV_SEARCH][REF_FRAMES];
-#endif  // CONFIG_TIP
+  int64_t (*simple_rd)[MAX_REF_MV_SEARCH][SINGLE_REF_FRAMES];
   /*!
    * An integer value 0 or 1 which indicates whether or not to skip the motion
    * mode search and default to SIMPLE_TRANSLATION as a speed feature.

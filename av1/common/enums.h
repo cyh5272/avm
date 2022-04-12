@@ -888,6 +888,12 @@ enum {
 #define EXTREF_FRAMES (REF_FRAMES + 1)
 #endif  // CONFIG_TIP
 
+#if CONFIG_TIP
+#define SINGLE_REF_FRAMES EXTREF_FRAMES
+#else
+#define SINGLE_REF_FRAMES REF_FRAMES
+#endif  // CONFIG_TIP
+
 // Note: It includes single and compound references. So, it can take values from
 // NONE_FRAME to (MODE_CTX_REF_FRAMES - 1). Hence, it is not defined as an enum.
 typedef int8_t MV_REFERENCE_FRAME;
