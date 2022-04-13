@@ -60,6 +60,7 @@
 #endif
 
 #include "aom/internal/aom_codec_internal.h"
+#include "aom_dsp/flow_estimation/flow_estimation.h"
 #include "aom_util/aom_thread.h"
 
 #ifdef __cplusplus
@@ -1843,6 +1844,13 @@ typedef struct {
    * direction 'i' and its temporal distance from the source frame .
    */
   FrameDistPair reference_frames[MAX_DIRECTIONS][REF_FRAMES - 1];
+
+  /*!
+   * Array of structures which hold flow information per ref frame
+   * Exactly what information is stored depends on the motion estimation
+   * method - see aom_dsp/flow_estimation/flow_estimation.h for details
+   */
+  FlowData *flow_data[REF_FRAMES];
 
   /**
    * \name Dimensions for which segment map is allocated.

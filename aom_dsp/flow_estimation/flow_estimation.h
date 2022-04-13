@@ -62,6 +62,38 @@ typedef struct {
   double rx, ry;
 } Correspondence;
 
+typedef struct {
+  int num_correspondences;
+  Correspondence *correspondences;
+} CorrespondenceList;
+
+typedef struct {
+  // x and y directions of flow, per patch
+  double *u;
+  double *v;
+
+  // Sizes of the above arrays
+  size_t width;
+  size_t height;
+  size_t stride;
+} FlowField;
+
+// We want to present external code with a generic type, which holds whatever
+// data is needed for the desired motion estimation method.
+// As different methods use different data, we store this in a tagged union,
+// with the selected motion estimation type as the tag.
+typedef struct {
+  GlobalMotionEstimationType method;
+  union {
+    CorrespondenceList *corrs;
+    FlowField *flow;
+  };
+} FlowData;
+
+FlowData *aom_compute_flow_data(YV12_BUFFER_CONFIG *src,
+                                YV12_BUFFER_CONFIG *ref, int bit_depth,
+                                GlobalMotionEstimationType gm_estimation_type);
+
 /*
   Computes "num_motions" candidate global motion parameters between two frames.
   The array "params_by_motion" should be length 8 * "num_motions". The ordering
@@ -77,10 +109,16 @@ typedef struct {
   number of inlier feature points for each motion. Params for which the
   num_inliers entry is 0 should be ignored by the caller.
 */
-int aom_compute_global_motion(TransformationType type, YV12_BUFFER_CONFIG *src,
-                              YV12_BUFFER_CONFIG *ref, int bit_depth,
-                              GlobalMotionEstimationType gm_estimation_type,
-                              MotionModel *params_by_motion, int num_motions);
+// Fit one or several models of a given type to the specified flow data.
+// This function fits models to the entire frame, using the RANSAC method
+// to fit models in a noise-resilient way, and returns the list of inliers
+// for each model found
+// TODO: Cleanup this comment
+int aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
+                                YV12_BUFFER_CONFIG *src, int bit_depth,
+                                MotionModel *params_by_motion, int num_motions);
+
+void aom_free_flow_data(FlowData *flow_data);
 
 #ifdef __cplusplus
 }

@@ -24,6 +24,11 @@ void av1_compute_gm_for_valid_ref_frames(
     MotionModel *params_by_motion, uint8_t *segment_map, int segment_map_w,
     int segment_map_h);
 void av1_compute_global_motion_facade(struct AV1_COMP *cpi);
+
+// After encoding each frame, this function should be called to free any
+// flow fields which were allocated
+void av1_free_flow_fields(AV1_COMP *cpi);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

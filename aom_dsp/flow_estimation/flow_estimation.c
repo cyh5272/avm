@@ -16,19 +16,58 @@
 #include "aom_dsp/flow_estimation/flow_estimation.h"
 #include "aom_dsp/flow_estimation/disflow.h"
 #include "aom_scale/yv12config.h"
+#include "aom_mem/aom_mem.h"
 
-int aom_compute_global_motion(TransformationType type, YV12_BUFFER_CONFIG *src,
-                              YV12_BUFFER_CONFIG *ref, int bit_depth,
-                              GlobalMotionEstimationType gm_estimation_type,
-                              MotionModel *params_by_motion, int num_motions) {
-  switch (gm_estimation_type) {
-    case GLOBAL_MOTION_FEATURE_BASED:
-      return aom_compute_global_motion_feature_based(
-          type, src, ref, bit_depth, params_by_motion, num_motions);
-    case GLOBAL_MOTION_DISFLOW_BASED:
-      return aom_compute_global_motion_disflow_based(
-          type, src, ref, bit_depth, params_by_motion, num_motions);
-    default: assert(0 && "Unknown global motion estimation type");
+FlowData *aom_compute_flow_data(YV12_BUFFER_CONFIG *src,
+                                YV12_BUFFER_CONFIG *ref, int bit_depth,
+                                GlobalMotionEstimationType gm_estimation_type) {
+  FlowData *flow_data = aom_malloc(sizeof(*flow_data));
+  if (!flow_data) {
+    return NULL;
   }
-  return 0;
+
+  flow_data->method = gm_estimation_type;
+
+  if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
+    flow_data->corrs = aom_compute_corner_match(src, ref, bit_depth);
+  } else if (flow_data->method == GLOBAL_MOTION_DISFLOW_BASED) {
+    flow_data->flow = aom_compute_flow_field(src, ref, bit_depth);
+  } else {
+    assert(0 && "Unknown global motion estimation type");
+    aom_free(flow_data);
+    return NULL;
+  }
+
+  return flow_data;
+}
+
+// Fit one or several models of a given type to the specified flow data.
+// This function fits models to the entire frame, using the RANSAC method
+// to fit models in a noise-resilient way, and returns the list of inliers
+// for each model found
+int aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
+                                YV12_BUFFER_CONFIG *src, int bit_depth,
+                                MotionModel *params_by_motion,
+                                int num_motions) {
+  if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
+    return aom_fit_model_to_correspondences(flow_data->corrs, type,
+                                            params_by_motion, num_motions);
+  } else if (flow_data->method == GLOBAL_MOTION_DISFLOW_BASED) {
+    return aom_fit_model_to_flow_field(flow_data->flow, type, src, bit_depth,
+                                       params_by_motion, num_motions);
+  } else {
+    assert(0 && "Unknown global motion estimation type");
+    return 0;
+  }
+}
+
+void aom_free_flow_data(FlowData *flow_data) {
+  if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
+    aom_free_correspondence_list(flow_data->corrs);
+  } else if (flow_data->method == GLOBAL_MOTION_DISFLOW_BASED) {
+    aom_free_flow_field(flow_data->flow);
+  } else {
+    assert(0 && "Unknown global motion estimation type");
+  }
+  aom_free(flow_data);
 }

@@ -27,11 +27,6 @@ extern "C" {
 #define MATCH_SZ_BY2 ((MATCH_SZ - 1) / 2)
 #define MATCH_SZ_SQ (MATCH_SZ * MATCH_SZ)
 
-typedef struct {
-  int num_correspondences;
-  Correspondence *correspondences;
-} CorrespondenceList;
-
 CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
                                              YV12_BUFFER_CONFIG *ref,
                                              int bit_depth);
@@ -42,10 +37,6 @@ int aom_fit_model_to_correspondences(CorrespondenceList *corrs,
                                      int num_motions);
 
 void aom_free_correspondence_list(CorrespondenceList *list);
-
-int aom_compute_global_motion_feature_based(
-    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *params_by_motion, int num_motions);
 
 #ifdef __cplusplus
 }

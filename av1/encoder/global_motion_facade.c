@@ -109,10 +109,12 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   MACROBLOCK *const x = &td->mb;
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
+  GlobalMotionInfo *const gm_info = &cpi->gm_info;
   int i;
   int src_width = cpi->source->y_width;
   int src_height = cpi->source->y_height;
   int src_stride = cpi->source->y_stride;
+  int bit_depth = cm->seq_params.bit_depth;
   // clang-format off
   static const double kIdentityParams[MAX_PARAMDIM - 1] = {
      0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0
@@ -134,6 +136,10 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       GLOBAL_MOTION_FEATURE_BASED;
 #endif  // CONFIG_GM_USE_DISFLOW
 
+  gm_info->flow_data[frame] = aom_compute_flow_data(
+      cpi->source, ref_buf[frame], bit_depth, gm_estimation_type);
+  FlowData *flow_data = gm_info->flow_data[frame];
+
   for (int model_type_index = 0; model_type_index < NUM_MODELS_TO_SEARCH;
        model_type_index++) {
     TransformationType model_type = models_to_search[model_type_index];
@@ -145,10 +151,9 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       params_by_motion[i].num_inliers = 0;
     }
 
-    aom_compute_global_motion(model_type, cpi->source, ref_buf[frame],
-                              cpi->common.seq_params.bit_depth,
-                              gm_estimation_type, params_by_motion,
-                              RANSAC_NUM_MOTIONS);
+    aom_fit_global_motion_model(flow_data, model_type, cpi->source, bit_depth,
+                                params_by_motion, RANSAC_NUM_MOTIONS);
+
     int64_t ref_frame_error = 0;
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
       if (params_by_motion[i].num_inliers == 0) continue;
@@ -483,4 +488,16 @@ void av1_compute_global_motion_facade(AV1_COMP *cpi) {
   }
   memcpy(cm->cur_frame->global_motion, cm->global_motion,
          sizeof(cm->cur_frame->global_motion));
+}
+
+// After encoding each frame, this function should be called to free any
+// flow fields which were allocated
+void av1_free_flow_fields(AV1_COMP *cpi) {
+  GlobalMotionInfo *const gm_info = &cpi->gm_info;
+  for (int ref = 0; ref < REF_FRAMES; ref++) {
+    if (gm_info->flow_data[ref] != NULL) {
+      aom_free_flow_data(gm_info->flow_data[ref]);
+      gm_info->flow_data[ref] = NULL;
+    }
+  }
 }

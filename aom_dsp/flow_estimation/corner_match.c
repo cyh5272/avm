@@ -271,14 +271,3 @@ void aom_free_correspondence_list(CorrespondenceList *list) {
     aom_free(list);
   }
 }
-
-int aom_compute_global_motion_feature_based(
-    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *params_by_motion, int num_motions) {
-  CorrespondenceList *corrs = aom_compute_corner_match(src, ref, bit_depth);
-  int result = aom_fit_model_to_correspondences(corrs, type, params_by_motion,
-                                                num_motions);
-  aom_free_correspondence_list(corrs);
-
-  return result;
-}

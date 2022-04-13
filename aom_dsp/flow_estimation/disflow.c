@@ -462,14 +462,3 @@ int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
   }
   return 0;
 }
-
-int aom_compute_global_motion_disflow_based(
-    TransformationType type, YV12_BUFFER_CONFIG *frm, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *params_by_motion, int num_motions) {
-  FlowField *flow = aom_compute_flow_field(frm, ref, bit_depth);
-  int result = aom_fit_model_to_flow_field(flow, type, frm, bit_depth,
-                                           params_by_motion, num_motions);
-  aom_free_flow_field(flow);
-
-  return result;
-}

@@ -58,6 +58,7 @@
 #include "av1/encoder/encodetxb.h"
 #include "av1/encoder/ethread.h"
 #include "av1/encoder/firstpass.h"
+#include "av1/encoder/global_motion_facade.h"
 #include "av1/encoder/hash_motion.h"
 #include "av1/encoder/intra_mode_search.h"
 #include "av1/encoder/mv_prec.h"
@@ -3281,6 +3282,8 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
   // NOTE: Save the new show frame buffer index for --test-code=warn, i.e.,
   //       for the purpose to verify no mismatch between encoder and decoder.
   if (cm->show_frame) cpi->last_show_frame_buf = cm->cur_frame;
+
+  av1_free_flow_fields(cpi);
 
   refresh_reference_frames(cpi);
 
