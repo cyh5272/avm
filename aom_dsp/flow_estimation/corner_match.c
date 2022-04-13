@@ -143,12 +143,13 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
   }
 }
 
-int aom_determine_correspondence(unsigned char *src, int *src_corners,
-                                 int num_src_corners, unsigned char *ref,
-                                 int *ref_corners, int num_ref_corners,
-                                 int width, int height, int src_stride,
-                                 int ref_stride,
-                                 Correspondence *correspondences) {
+static INLINE int determine_correspondence(unsigned char *src, int *src_corners,
+                                           int num_src_corners,
+                                           unsigned char *ref, int *ref_corners,
+                                           int num_ref_corners, int width,
+                                           int height, int src_stride,
+                                           int ref_stride,
+                                           Correspondence *correspondences) {
   // TODO(sarahparker) Improve this to include 2-way match
   int i, j;
   int num_correspondences = 0;
@@ -195,12 +196,10 @@ int aom_determine_correspondence(unsigned char *src, int *src_corners,
   return num_correspondences;
 }
 
-int aom_compute_global_motion_feature_based(
-    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *params_by_motion, int num_motions) {
-  int i;
-  int num_correspondences;
-
+CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
+                                             YV12_BUFFER_CONFIG *ref,
+                                             int bit_depth) {
+  // Ensure that all relevant per-frame data is available
   if (!src->y_pyramid) {
     src->y_pyramid = aom_compute_pyramid(src, bit_depth, MAX_PYRAMID_LEVELS);
     assert(src->y_pyramid);
@@ -208,6 +207,12 @@ int aom_compute_global_motion_feature_based(
   if (!ref->y_pyramid) {
     ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
     assert(ref->y_pyramid);
+  }
+  if (!src->corners) {
+    aom_find_corners_in_frame(src, bit_depth);
+  }
+  if (!ref->corners) {
+    aom_find_corners_in_frame(ref, bit_depth);
   }
 
   ImagePyramid *src_pyr = src->y_pyramid;
@@ -224,26 +229,28 @@ int aom_compute_global_motion_feature_based(
   assert(ref_pyr->widths[0] == src_width);
   assert(ref_pyr->heights[0] == src_height);
 
-  if (!src->corners) {
-    aom_find_corners_in_frame(src, bit_depth);
-  }
-  if (!ref->corners) {
-    aom_find_corners_in_frame(ref, bit_depth);
-  }
-
-  // find correspondences between the two images
-  Correspondence *correspondences =
-      (Correspondence *)malloc(src->num_corners * sizeof(*correspondences));
-  num_correspondences = aom_determine_correspondence(
+  // Compute correspondences
+  CorrespondenceList *list = aom_malloc(sizeof(CorrespondenceList));
+  list->correspondences = (Correspondence *)aom_malloc(
+      src->num_corners * sizeof(*list->correspondences));
+  list->num_correspondences = determine_correspondence(
       src_buffer, src->corners, src->num_corners, ref_buffer, ref->corners,
       ref->num_corners, src_width, src_height, src_stride, ref_stride,
-      correspondences);
+      list->correspondences);
+  return list;
+}
 
-  ransac(correspondences, num_correspondences, type, params_by_motion,
+int aom_fit_model_to_correspondences(CorrespondenceList *corrs,
+                                     TransformationType type,
+                                     MotionModel *params_by_motion,
+                                     int num_motions) {
+  int num_correspondences = corrs->num_correspondences;
+
+  ransac(corrs->correspondences, num_correspondences, type, params_by_motion,
          num_motions);
 
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
-  for (i = 0; i < num_motions; ++i) {
+  for (int i = 0; i < num_motions; ++i) {
     if (params_by_motion[i].num_inliers <
             MIN_INLIER_PROB * num_correspondences ||
         num_correspondences == 0) {
@@ -251,11 +258,27 @@ int aom_compute_global_motion_feature_based(
     }
   }
 
-  free(correspondences);
-
   // Return true if any one of the motions has inliers.
-  for (i = 0; i < num_motions; ++i) {
+  for (int i = 0; i < num_motions; ++i) {
     if (params_by_motion[i].num_inliers > 0) return 1;
   }
   return 0;
+}
+
+void aom_free_correspondence_list(CorrespondenceList *list) {
+  if (list) {
+    aom_free(list->correspondences);
+    aom_free(list);
+  }
+}
+
+int aom_compute_global_motion_feature_based(
+    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
+    int bit_depth, MotionModel *params_by_motion, int num_motions) {
+  CorrespondenceList *corrs = aom_compute_corner_match(src, ref, bit_depth);
+  int result = aom_fit_model_to_correspondences(corrs, type, params_by_motion,
+                                                num_motions);
+  aom_free_correspondence_list(corrs);
+
+  return result;
 }
