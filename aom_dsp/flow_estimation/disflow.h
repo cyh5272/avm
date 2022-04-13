@@ -13,6 +13,7 @@
 #define AOM_FLOW_ESTIMATION_DISFLOW_BASED_H_
 
 #include "aom_dsp/flow_estimation/flow_estimation.h"
+#include "aom_dsp/rect.h"
 #include "aom_scale/yv12config.h"
 
 #ifdef __cplusplus
@@ -28,9 +29,14 @@ void aom_free_flow_field(FlowField *flow);
 FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
                                   YV12_BUFFER_CONFIG *ref, int bit_depth);
 
-int aom_fit_model_to_flow_field(FlowField *flow, TransformationType type,
-                                YV12_BUFFER_CONFIG *frm, int bit_depth,
-                                MotionModel *params_by_motion, int num_motions);
+int aom_fit_global_model_to_flow_field(FlowField *flow, TransformationType type,
+                                       YV12_BUFFER_CONFIG *frm, int bit_depth,
+                                       MotionModel *params_by_motion,
+                                       int num_motions);
+
+int aom_fit_local_model_to_flow_field(const FlowField *flow,
+                                      const PixelRect *rect,
+                                      TransformationType type, double *mat);
 
 #ifdef __cplusplus
 }

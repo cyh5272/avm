@@ -240,10 +240,10 @@ CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
   return list;
 }
 
-int aom_fit_model_to_correspondences(CorrespondenceList *corrs,
-                                     TransformationType type,
-                                     MotionModel *params_by_motion,
-                                     int num_motions) {
+int aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                            TransformationType type,
+                                            MotionModel *params_by_motion,
+                                            int num_motions) {
   int num_correspondences = corrs->num_correspondences;
 
   ransac(corrs->correspondences, num_correspondences, type, params_by_motion,
@@ -263,6 +263,48 @@ int aom_fit_model_to_correspondences(CorrespondenceList *corrs,
     if (params_by_motion[i].num_inliers > 0) return 1;
   }
   return 0;
+}
+
+int aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                           PixelRect *rect,
+                                           TransformationType type,
+                                           double *mat) {
+  int width = rect_height(rect);
+  int height = rect_width(rect);
+  int num_points = width * height;
+
+  // TODO(rachelbarker): Downsample if num_points is > some threshold?
+  double *pts1 = aom_malloc(num_points * 2 * sizeof(double));
+  double *pts2 = aom_malloc(num_points * 2 * sizeof(double));
+  int point_index = 0;
+
+  for (int i = 0; i < corrs->num_correspondences; i++) {
+    Correspondence *corr = &corrs->correspondences[i];
+    int x = (int)corr->x;
+    int y = (int)corr->y;
+    if (is_inside_rect(x, y, rect)) {
+      pts1[2 * point_index + 0] = corr->x;
+      pts1[2 * point_index + 1] = corr->y;
+      pts2[2 * point_index + 0] = corr->rx;
+      pts2[2 * point_index + 1] = corr->ry;
+      point_index++;
+    }
+  }
+  assert(point_index <= num_points);
+
+  num_points = point_index;
+
+  int result;
+  if (num_points < 4) {
+    // Too few points to fit a model
+    result = 1;
+  } else {
+    result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
+  }
+
+  aom_free(pts1);
+  aom_free(pts2);
+  return result;
 }
 
 void aom_free_correspondence_list(CorrespondenceList *list) {

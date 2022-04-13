@@ -50,11 +50,28 @@ int aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
                                 MotionModel *params_by_motion,
                                 int num_motions) {
   if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
-    return aom_fit_model_to_correspondences(flow_data->corrs, type,
-                                            params_by_motion, num_motions);
+    return aom_fit_global_model_to_correspondences(
+        flow_data->corrs, type, params_by_motion, num_motions);
   } else if (flow_data->method == GLOBAL_MOTION_DISFLOW_BASED) {
-    return aom_fit_model_to_flow_field(flow_data->flow, type, src, bit_depth,
-                                       params_by_motion, num_motions);
+    return aom_fit_global_model_to_flow_field(
+        flow_data->flow, type, src, bit_depth, params_by_motion, num_motions);
+  } else {
+    assert(0 && "Unknown global motion estimation type");
+    return 0;
+  }
+}
+
+// Fit a model of a given type to a subset of the specified flow data.
+// This does not used the RANSAC method, so is more noise-sensitive than
+// aom_fit_global_motion_model(), but in the context of fitting models
+// to single blocks this is not an issue.
+int aom_fit_local_motion_model(FlowData *flow_data, PixelRect *rect,
+                               TransformationType type, double *mat) {
+  if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
+    return aom_fit_local_model_to_correspondences(flow_data->corrs, rect, type,
+                                                  mat);
+  } else if (flow_data->method == GLOBAL_MOTION_DISFLOW_BASED) {
+    return aom_fit_local_model_to_flow_field(flow_data->flow, rect, type, mat);
   } else {
     assert(0 && "Unknown global motion estimation type");
     return 0;
