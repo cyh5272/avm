@@ -33,12 +33,14 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
     if (ybf->buffer_alloc_sz > 0) {
       aom_free(ybf->buffer_alloc);
     }
+#if CONFIG_AV1_ENCODER
     if (ybf->y_pyramid) {
       aom_free_pyramid(ybf->y_pyramid);
     }
     if (ybf->corners) {
       aom_free(ybf->corners);
     }
+#endif  // CONFIG_AV1_ENCODER
     aom_remove_metadata_from_frame_buffer(ybf);
     /* buffer_alloc isn't accessed by most functions.  Rather y_buffer,
       u_buffer and v_buffer point to buffer_alloc and are used.  Clear out
@@ -50,6 +52,7 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
   return AOM_CODEC_MEM_ERROR;
 }
 
+#if CONFIG_AV1_ENCODER
 // Discard global motion data
 // This should be called whenever a frame buffer is reused for a new frame,
 // to avoid using stale data
@@ -66,6 +69,7 @@ void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf) {
   }
   ybf->num_corners = 0;
 }
+#endif  // CONFIG_AV1_ENCODER
 
 static int realloc_frame_buffer_aligned(
     YV12_BUFFER_CONFIG *ybf, int width, int height, int ss_x, int ss_y,
@@ -176,8 +180,10 @@ static int realloc_frame_buffer_aligned(
 
     ybf->use_external_reference_buffers = 0;
 
+#if CONFIG_AV1_ENCODER
     // Discard global motion data, so that stale data is not used
     aom_invalidate_gm_data(ybf);
+#endif  // CONFIG_AV1_ENCODER
 
     ybf->corrupted = 0; /* assume not corrupted by errors */
     return 0;
