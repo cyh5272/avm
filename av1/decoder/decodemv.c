@@ -963,9 +963,6 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     mbmi->motion_mode = SIMPLE_TRANSLATION;
 
     int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
-#if !CONFIG_BVP_IMPROVEMENT
-    int_mv nearestmv, nearmv;
-#endif
 
     // TODO(kslu): Rework av1_find_mv_refs to avoid having this big array
     // ref_mvs
@@ -987,6 +984,7 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     int_mv dv_ref =
         xd->ref_mv_stack[INTRA_FRAME][mbmi->intrabc_drl_idx].this_mv;
 #else
+    int_mv nearestmv, nearmv;
     av1_find_best_ref_mvs(0, ref_mvs[INTRA_FRAME], &nearestmv, &nearmv, 0);
     int_mv dv_ref = nearestmv.as_int == 0 ? nearmv : nearestmv;
 #endif  // CONFIG_BVP_IMPROVEMENT
