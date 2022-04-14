@@ -3571,8 +3571,9 @@ static AOM_INLINE void block_rd_txfm(int plane, int block, int blk_row,
     args->incomplete_exit = 1;
     return;
   }
-#endif  // CONFIG_FORWARDSKIP
+#else
   assert(this_rd_stats.dist != INT64_MAX);
+#endif  // CONFIG_FORWARDSKIP
 
   if (plane == AOM_PLANE_Y && xd->cfl.store_y && xd->tree_type == SHARED_PART) {
     assert(!is_inter || plane_bsize < BLOCK_8X8);
