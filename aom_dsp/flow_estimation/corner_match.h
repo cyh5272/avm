@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <memory.h>
 
 #include "aom_dsp/flow_estimation/flow_estimation.h"
@@ -31,15 +32,15 @@ CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
                                              YV12_BUFFER_CONFIG *ref,
                                              int bit_depth);
 
-int aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
-                                            TransformationType type,
-                                            MotionModel *params_by_motion,
-                                            int num_motions);
+bool aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                             TransformationType type,
+                                             MotionModel *params_by_motion,
+                                             int num_motions);
 
-int aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
-                                           PixelRect *rect,
-                                           TransformationType type,
-                                           double *mat);
+bool aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                            PixelRect *rect,
+                                            TransformationType type,
+                                            double *mat);
 
 void aom_free_correspondence_list(CorrespondenceList *list);
 

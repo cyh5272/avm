@@ -18,6 +18,7 @@
 // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=msvc-170
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <stdbool.h>
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
@@ -279,10 +280,11 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
       // Copy point arrays, as they will be modified by the fitting code
       memcpy(src_points2, src_points, npoints * 2 * sizeof(*src_points));
       memcpy(dst_points2, dst_points, npoints * 2 * sizeof(*dst_points));
-      int result = aom_fit_motion_model(type, npoints, src_points2, dst_points2,
-                                        fitted_model);
-      ASSERT_EQ(result, 0) << "Model fitting failed for type = "
-                           << model_type_names[type] << ", iter = " << iter;
+      bool result = aom_fit_motion_model(type, npoints, src_points2,
+                                         dst_points2, fitted_model);
+      ASSERT_EQ(result, true)
+          << "Model fitting failed for type = " << model_type_names[type]
+          << ", iter = " << iter;
 
       // Calculate projection errors
       double ground_truth_rms =

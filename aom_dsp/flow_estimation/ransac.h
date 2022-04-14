@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
+#include <stdbool.h>
 
 #include "aom_dsp/flow_estimation/flow_estimation.h"
 
@@ -24,17 +25,19 @@
 extern "C" {
 #endif
 
-int ransac(Correspondence *matched_points, int npoints, TransformationType type,
-           MotionModel *params_by_motion, int num_desired_motions);
+bool ransac(Correspondence *matched_points, int npoints,
+            TransformationType type, MotionModel *params_by_motion,
+            int num_desired_motions);
 
 // Fit a specified type of motion model to a set of correspondences.
 // The input consists of `np` points, where pts1 stores the source position
 // and pts2 stores the destination position for each correspondence.
 // The resulting model is stored in `mat`
+// Returns true on success, false on error
 //
 // Note: The input points lists are modified during processing
-int aom_fit_motion_model(TransformationType type, int np, double *pts1,
-                         double *pts2, double *mat);
+bool aom_fit_motion_model(TransformationType type, int np, double *pts1,
+                          double *pts2, double *mat);
 
 #ifdef __cplusplus
 }

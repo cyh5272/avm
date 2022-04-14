@@ -240,10 +240,10 @@ CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
   return list;
 }
 
-int aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
-                                            TransformationType type,
-                                            MotionModel *params_by_motion,
-                                            int num_motions) {
+bool aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                             TransformationType type,
+                                             MotionModel *params_by_motion,
+                                             int num_motions) {
   int num_correspondences = corrs->num_correspondences;
 
   ransac(corrs->correspondences, num_correspondences, type, params_by_motion,
@@ -260,15 +260,15 @@ int aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
 
   // Return true if any one of the motions has inliers.
   for (int i = 0; i < num_motions; ++i) {
-    if (params_by_motion[i].num_inliers > 0) return 1;
+    if (params_by_motion[i].num_inliers > 0) return true;
   }
-  return 0;
+  return false;
 }
 
-int aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
-                                           PixelRect *rect,
-                                           TransformationType type,
-                                           double *mat) {
+bool aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                            PixelRect *rect,
+                                            TransformationType type,
+                                            double *mat) {
   int width = rect_height(rect);
   int height = rect_width(rect);
   int num_points = width * height;
@@ -294,10 +294,10 @@ int aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
 
   num_points = point_index;
 
-  int result;
+  bool result;
   if (num_points < 4) {
     // Too few points to fit a model
-    result = 1;
+    result = false;
   } else {
     result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
   }

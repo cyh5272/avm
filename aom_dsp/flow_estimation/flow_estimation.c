@@ -45,10 +45,10 @@ FlowData *aom_compute_flow_data(YV12_BUFFER_CONFIG *src,
 // This function fits models to the entire frame, using the RANSAC method
 // to fit models in a noise-resilient way, and returns the list of inliers
 // for each model found
-int aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
-                                YV12_BUFFER_CONFIG *src, int bit_depth,
-                                MotionModel *params_by_motion,
-                                int num_motions) {
+bool aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
+                                 YV12_BUFFER_CONFIG *src, int bit_depth,
+                                 MotionModel *params_by_motion,
+                                 int num_motions) {
   if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
     return aom_fit_global_model_to_correspondences(
         flow_data->corrs, type, params_by_motion, num_motions);
@@ -65,8 +65,8 @@ int aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
 // This does not used the RANSAC method, so is more noise-sensitive than
 // aom_fit_global_motion_model(), but in the context of fitting models
 // to single blocks this is not an issue.
-int aom_fit_local_motion_model(FlowData *flow_data, PixelRect *rect,
-                               TransformationType type, double *mat) {
+bool aom_fit_local_motion_model(FlowData *flow_data, PixelRect *rect,
+                                TransformationType type, double *mat) {
   if (flow_data->method == GLOBAL_MOTION_FEATURE_BASED) {
     return aom_fit_local_model_to_correspondences(flow_data->corrs, rect, type,
                                                   mat);

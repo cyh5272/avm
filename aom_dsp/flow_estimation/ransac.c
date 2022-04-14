@@ -13,7 +13,7 @@
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <assert.h>
 
 #include "aom_dsp/linalg.h"
@@ -41,9 +41,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // ransac
-typedef int (*IsDegenerateFunc)(double *p);
-typedef int (*FindTransformationFunc)(int points, double *points1,
-                                      double *points2, double *params);
+typedef bool (*IsDegenerateFunc)(double *p);
+typedef bool (*FindTransformationFunc)(int points, double *points1,
+                                       double *points2, double *params);
 typedef void (*ProjectPointsFunc)(double *mat, double *points, double *proj,
                                   int n, int stride_points, int stride_proj);
 
@@ -255,11 +255,11 @@ static double norm(double *x, int len) {
 }
 
 #if VERTTRAP_ALGORITHM == 0
-static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Implemented from Peter Kovesi's normalized implementation
   const int nvar = 7;
   const int np3 = np * 3;
-  double *a = (double *)malloc(sizeof(*a) * np3 * nvar * 2);
+  double *a = (double *)aom_malloc(sizeof(*a) * np3 * nvar * 2);
   double *U = a + np3 * nvar;
   double S[7], V[7 * 7];
   int i, mini;
@@ -301,8 +301,8 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np3, nvar)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -324,9 +324,9 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   H[7] = 0;
   H[8] = V[6 * nvar + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -340,14 +340,14 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif VERTTRAP_ALGORITHM == 1
-static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Implemented from Peter Kovesi's normalized implementation
   const int nvar = 7;
   const int np2 = np * 2;
-  double *a = (double *)malloc(sizeof(*a) * np2 * nvar * 2);
+  double *a = (double *)aom_malloc(sizeof(*a) * np2 * nvar * 2);
   double *U = a + np2 * nvar;
   double S[7], V[7 * 7];
   int i, mini;
@@ -381,8 +381,8 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np2, nvar)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -404,9 +404,9 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   H[7] = 0;
   H[8] = V[6 * nvar + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -420,16 +420,16 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif VERTTRAP_ALGORITHM == 2
-static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Based on straight Least-squares
   const int np2 = np * 2;
   const int nvar = 6;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
   int i;
@@ -460,8 +460,8 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[8];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   mat[0] = sol[1];
   mat[1] = sol[4];
@@ -471,19 +471,19 @@ static int find_vertrapezoid(int np, double *pts1, double *pts2, double *mat) {
   mat[5] = sol[3];
   mat[6] = sol[5];
   mat[7] = 0;
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 #else
 #error "Invalid value of VERTTRAP_ALGORITHM"
 #endif
 
 #if HORZTRAP_ALGORITHM == 0
-static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Implemented from Peter Kovesi's normalized implementation
   const int nvar = 7;
   const int np3 = np * 3;
-  double *a = (double *)malloc(sizeof(*a) * np3 * nvar * 2);
+  double *a = (double *)aom_malloc(sizeof(*a) * np3 * nvar * 2);
   double *U = a + np3 * nvar;
   double S[7], V[7 * 7];
   int i, mini;
@@ -525,8 +525,8 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np3, nvar)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -548,9 +548,9 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   H[7] = V[5 * nvar + mini];
   H[8] = V[6 * nvar + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -564,15 +564,15 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif HORZTRAP_ALGORITHM == 1
-static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Based on SVD decomposition of homogeneous equation and using the right
   // unitary vector corresponding to the smallest singular value
   const int nvar = 7;
   const int np2 = np * 2;
-  double *a = (double *)malloc(sizeof(*a) * np2 * nvar * 2);
+  double *a = (double *)aom_malloc(sizeof(*a) * np2 * nvar * 2);
   double *U = a + np2 * nvar;
   double S[7], V[7 * 7];
   int i, mini;
@@ -606,8 +606,8 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np2, nvar)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -630,9 +630,9 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   H[7] = V[5 * nvar + mini];
   H[8] = V[6 * nvar + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -646,16 +646,16 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif HORZTRAP_ALGORITHM == 2
-static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
+static bool find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   // Based on straight Least-squares
   const int np2 = np * 2;
   const int nvar = 8;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
   int i;
@@ -686,8 +686,8 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[8];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   mat[0] = sol[2];
   mat[1] = sol[4];
@@ -697,18 +697,18 @@ static int find_hortrapezoid(int np, double *pts1, double *pts2, double *mat) {
   mat[5] = sol[3];
   mat[6] = 0.0;
   mat[7] = sol[5];
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 #else
 #error "Invalid value of HORZTRAP_ALGORITHM"
 #endif
 
 #if HOMOGRAPHY_ALGORITHM == 0
-static int find_homography(int np, double *pts1, double *pts2, double *mat) {
+static bool find_homography(int np, double *pts1, double *pts2, double *mat) {
   // Implemented from Peter Kovesi's normalized implementation
   const int np3 = np * 3;
-  double *a = (double *)malloc(sizeof(*a) * np3 * 18);
+  double *a = (double *)aom_malloc(sizeof(*a) * np3 * 18);
   double *U = a + np3 * 9;
   double S[9], V[9 * 9], H[9];
   int i, mini;
@@ -752,8 +752,8 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np3, 9)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -767,9 +767,9 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
 
   for (i = 0; i < 9; i++) H[i] = V[i * 9 + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -783,14 +783,14 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif HOMOGRAPHY_ALGORITHM == 1
-static int find_homography(int np, double *pts1, double *pts2, double *mat) {
+static bool find_homography(int np, double *pts1, double *pts2, double *mat) {
   // Based on SVD decomposition of homogeneous equation and using the right
   // unitary vector corresponding to the smallest singular value
   const int np2 = np * 2;
-  double *a = (double *)malloc(sizeof(*a) * np2 * 18);
+  double *a = (double *)aom_malloc(sizeof(*a) * np2 * 18);
   double *U = a + np2 * 9;
   double S[9], V[9 * 9], H[9];
   int i, mini;
@@ -825,8 +825,8 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
   }
 
   if (SVD(U, S, V, a, np2, 9)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   } else {
     double minS = 1e12;
     mini = -1;
@@ -840,9 +840,9 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
 
   for (i = 0; i < 9; i++) H[i] = V[i * 9 + mini];
   // denormalize_homography_reorder(H, T1, T2);
-  free(a);
+  aom_free(a);
   if (H[8] == 0.0) {
-    return 1;
+    return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
@@ -856,16 +856,16 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return 0;
+  return true;
 }
 #elif HOMOGRAPHY_ALGORITHM == 2
-static int find_homography(int np, double *pts1, double *pts2, double *mat) {
+static bool find_homography(int np, double *pts1, double *pts2, double *mat) {
   // Based on straight Least-squares
   const int np2 = np * 2;
   const int nvar = 8;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
   int i;
@@ -900,8 +900,8 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[8];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   mat[0] = sol[2];
   mat[1] = sol[5];
@@ -911,14 +911,14 @@ static int find_homography(int np, double *pts1, double *pts2, double *mat) {
   mat[5] = sol[4];
   mat[6] = sol[6];
   mat[7] = sol[7];
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 #else
 #error "Invalid value of HOMOGRAPHY_ALGORITHM"
 #endif  // HOMOGRAPHY_ALGORITHM
 
-static int find_translation(int np, double *pts1, double *pts2, double *mat) {
+static bool find_translation(int np, double *pts1, double *pts2, double *mat) {
   int i;
   double sx, sy, dx, dy;
   double sumx, sumy;
@@ -941,10 +941,10 @@ static int find_translation(int np, double *pts1, double *pts2, double *mat) {
   mat[0] = sumx / np;
   mat[1] = sumy / np;
   denormalize_translation_reorder(mat, T1, T2);
-  return 0;
+  return true;
 }
 
-static int find_rotzoom(int np, double *pts1, double *pts2, double *mat) {
+static bool find_rotzoom(int np, double *pts1, double *pts2, double *mat) {
   const int np2 = np * 2;
   double *a = (double *)aom_malloc(sizeof(*a) * (np2 * 5 + 20));
   double *b = a + np2 * 4;
@@ -976,18 +976,18 @@ static int find_rotzoom(int np, double *pts1, double *pts2, double *mat) {
   }
   if (!least_squares(4, a, np2, 4, b, temp, mat)) {
     aom_free(a);
-    return 1;
+    return false;
   }
   denormalize_rotzoom_reorder(mat, T1, T2);
   aom_free(a);
-  return 0;
+  return true;
 }
 
-static int find_affine(int np, double *pts1, double *pts2, double *mat) {
+static bool find_affine(int np, double *pts1, double *pts2, double *mat) {
   assert(np > 0);
   const int np2 = np * 2;
   double *a = (double *)aom_malloc(sizeof(*a) * (np2 * 7 + 42));
-  if (a == NULL) return 1;
+  if (a == NULL) return false;
   double *b = a + np2 * 6;
   double *temp = b + np2;
   int i;
@@ -1021,14 +1021,14 @@ static int find_affine(int np, double *pts1, double *pts2, double *mat) {
   }
   if (!least_squares(6, a, np2, 6, b, temp, mat)) {
     aom_free(a);
-    return 1;
+    return false;
   }
   denormalize_affine_reorder(mat, T1, T2);
   aom_free(a);
-  return 0;
+  return true;
 }
 
-static int find_rotation(int np, double *pts1, double *pts2, double *mat) {
+static bool find_rotation(int np, double *pts1, double *pts2, double *mat) {
   // Note(rachelbarker):
   // Unlike the other model types, a rotational model has a nonlinear
   // constraint: The output model must satisfy
@@ -1067,7 +1067,7 @@ static int find_rotation(int np, double *pts1, double *pts2, double *mat) {
     A[3] += (p[1] - mean1[1]) * (q[1] - mean2[1]);
   }
   double V[4], S[2], W[4];
-  if (SVD(V, S, W, A, 2, 2)) return 1;
+  if (SVD(V, S, W, A, 2, 2)) return false;
   // printf("V: %f %f %f %f\n", V[0], V[1], V[2], V[3]);
   // printf("S: %f %f\n", S[0], S[1]);
   // printf("W: %f %f %f %f\n", W[0], W[1], W[2], W[3]);
@@ -1084,12 +1084,12 @@ static int find_rotation(int np, double *pts1, double *pts2, double *mat) {
   mat[0] = mean2[0] - mean1[0] * mat[2] - mean1[1] * mat[3];
   mat[1] = mean2[1] - mean1[0] * mat[4] - mean1[1] * mat[5];
   // denormalize_homography_general_reorder(mat, T1, T2);
-  return 0;
+  return true;
 }
 
-static int find_zoom(int np, double *pts1, double *pts2, double *mat) {
+static bool find_zoom(int np, double *pts1, double *pts2, double *mat) {
   const int np2 = np * 2;
-  double *a = (double *)malloc(sizeof(*a) * (np2 * 4 + 12));
+  double *a = (double *)aom_malloc(sizeof(*a) * (np2 * 4 + 12));
   double *b = a + np2 * 3;
   double *temp = b + np2;
   int i;
@@ -1117,8 +1117,8 @@ static int find_zoom(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[3];
   if (!least_squares(3, a, np2, 3, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   // denormalize_zoom_reorder(mat, T1, T2);
   mat[0] = sol[1];
@@ -1126,16 +1126,16 @@ static int find_zoom(int np, double *pts1, double *pts2, double *mat) {
   mat[2] = mat[5] = sol[0];
   mat[3] = mat[4] = mat[6] = mat[7] = 0.0;
 
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 
-static int find_uzoom(int np, double *pts1, double *pts2, double *mat) {
+static bool find_uzoom(int np, double *pts1, double *pts2, double *mat) {
   const int np2 = np * 2;
   const int nvar = 4;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
   int i;
@@ -1165,8 +1165,8 @@ static int find_uzoom(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[4];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   // denormalize_rotzoom_reorder(mat, T1, T2);
   mat[0] = sol[2];
@@ -1175,11 +1175,11 @@ static int find_uzoom(int np, double *pts1, double *pts2, double *mat) {
   mat[3] = mat[4] = 0;
   mat[5] = sol[1];
   mat[6] = mat[7] = 0.0;
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 
-static int find_rotuzoom(int np, double *pts1, double *pts2, double *mat) {
+static bool find_rotuzoom(int np, double *pts1, double *pts2, double *mat) {
   // The affine matrix is assumed to be the product of a rotation matrix by
   // theta, and a zoom matrix of the form: ( zx  0
   //                                          0 zy )
@@ -1281,7 +1281,7 @@ static int find_rotuzoom(int np, double *pts1, double *pts2, double *mat) {
     double dz_norm = norm(dz, 3);
     if (iters >= iters_thresh) {
       // Could not find a good enough model
-      return 1;
+      return false;
     } else if (dz_norm < termination_threshold) {
       // At a local minimum or saddle point
       break;
@@ -1333,15 +1333,15 @@ static int find_rotuzoom(int np, double *pts1, double *pts2, double *mat) {
   mat[4] = -z[0] * z[2];
   mat[5] = z[1];
   mat[6] = mat[7] = 0.0;
-  return 0;
+  return true;
 }
 
-static int find_vertshear(int np, double *pts1, double *pts2, double *mat) {
+static bool find_vertshear(int np, double *pts1, double *pts2, double *mat) {
   const int nvar = 3;
   const int np2 = np * 2;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
 
@@ -1367,8 +1367,8 @@ static int find_vertshear(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[3];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   // denormalize_zoom_reorder(mat, T1, T2);
   mat[0] = sol[1];
@@ -1378,16 +1378,16 @@ static int find_vertshear(int np, double *pts1, double *pts2, double *mat) {
   mat[4] = sol[0];
   mat[5] = 1.0;
   mat[6] = mat[7] = 0.0;
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 
-static int find_horzshear(int np, double *pts1, double *pts2, double *mat) {
+static bool find_horzshear(int np, double *pts1, double *pts2, double *mat) {
   const int nvar = 3;
   const int np2 = np * 2;
   double *a =
-      (double *)malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return 1;
+      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
+  if (a == NULL) return false;
   double *b = a + np2 * nvar;
   double *temp = b + np2;
 
@@ -1413,8 +1413,8 @@ static int find_horzshear(int np, double *pts1, double *pts2, double *mat) {
   }
   double sol[3];
   if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    free(a);
-    return 1;
+    aom_free(a);
+    return false;
   }
   // denormalize_zoom_reorder(mat, T1, T2);
   mat[0] = sol[1];
@@ -1424,15 +1424,16 @@ static int find_horzshear(int np, double *pts1, double *pts2, double *mat) {
   mat[4] = 0.0;
   mat[5] = 1.0;
   mat[6] = mat[7] = 0.0;
-  free(a);
-  return 0;
+  aom_free(a);
+  return true;
 }
 
-static int get_rand_indices(int npoints, int minpts, int *indices,
-                            unsigned int *seed) {
+// Returns true on success, false if not enough points provided
+static bool get_rand_indices(int npoints, int minpts, int *indices,
+                             unsigned int *seed) {
   int i, j;
   int ptr = lcg_rand16(seed) % npoints;
-  if (minpts > npoints) return 0;
+  if (minpts > npoints) return false;
   indices[0] = ptr;
   ptr = (ptr == npoints - 1 ? 0 : ptr + 1);
   i = 1;
@@ -1447,7 +1448,7 @@ static int get_rand_indices(int npoints, int minpts, int *indices,
     }
     indices[i++] = ptr;
   }
-  return 1;
+  return true;
 }
 
 typedef struct {
@@ -1468,8 +1469,8 @@ static int compare_motions(const void *arg_a, const void *arg_b) {
   return 0;
 }
 
-static int is_better_motion(const RANSAC_MOTION *motion_a,
-                            const RANSAC_MOTION *motion_b) {
+static bool is_better_motion(const RANSAC_MOTION *motion_a,
+                             const RANSAC_MOTION *motion_b) {
   return compare_motions(motion_a, motion_b) < 0;
 }
 
@@ -1491,15 +1492,16 @@ static void clear_motion(RANSAC_MOTION *motion, int num_points) {
          sizeof(*motion->inlier_indices) * num_points);
 }
 
-static int ransac_internal(const Correspondence *matched_points, int npoints,
-                           MotionModel *params_by_motion,
-                           int num_desired_motions, int minpts,
-                           IsDegenerateFunc is_degenerate,
-                           FindTransformationFunc find_transformation,
-                           ProjectPointsFunc projectpoints) {
+// Returns true on success, false on error
+static bool ransac_internal(const Correspondence *matched_points, int npoints,
+                            MotionModel *params_by_motion,
+                            int num_desired_motions, int minpts,
+                            IsDegenerateFunc is_degenerate,
+                            FindTransformationFunc find_transformation,
+                            ProjectPointsFunc projectpoints) {
   int trial_count = 0;
   int i = 0;
-  int ret_val = 0;
+  bool ret_val = true;
 
   unsigned int seed = (unsigned int)npoints;
 
@@ -1549,7 +1551,7 @@ static int ransac_internal(const Correspondence *matched_points, int npoints,
 
   if (!(points1 && points2 && corners1 && corners2 && image1_coord && motions &&
         current_motion.inlier_indices)) {
-    ret_val = 1;
+    ret_val = false;
     goto finish_ransac;
   }
 
@@ -1574,7 +1576,7 @@ static int ransac_internal(const Correspondence *matched_points, int npoints,
     while (degenerate) {
       num_degenerate_iter++;
       if (!get_rand_indices(npoints, minpts, indices, &seed)) {
-        ret_val = 1;
+        ret_val = false;
         goto finish_ransac;
       }
 
@@ -1583,12 +1585,12 @@ static int ransac_internal(const Correspondence *matched_points, int npoints,
 
       degenerate = is_degenerate(points1);
       if (num_degenerate_iter > MAX_DEGENERATE_ITER) {
-        ret_val = 1;
+        ret_val = false;
         goto finish_ransac;
       }
     }
 
-    if (find_transformation(minpts, points1, points2, params_this_motion)) {
+    if (!find_transformation(minpts, points1, points2, params_this_motion)) {
       trial_count++;
       continue;
     }
@@ -1676,23 +1678,23 @@ finish_ransac:
   return ret_val;
 }
 
-static int is_collinear3(double *p1, double *p2, double *p3) {
+static bool is_collinear3(double *p1, double *p2, double *p3) {
   static const double collinear_eps = 1e-3;
   const double v =
       (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0]);
   return fabs(v) < collinear_eps;
 }
 
-static int is_degenerate_homography(double *p) {
+static bool is_degenerate_homography(double *p) {
   return is_collinear3(p, p + 2, p + 4) || is_collinear3(p, p + 2, p + 6) ||
          is_collinear3(p, p + 4, p + 6) || is_collinear3(p + 2, p + 4, p + 6);
 }
 
-static int is_degenerate_translation(double *p) {
+static bool is_degenerate_translation(double *p) {
   return (p[0] - p[2]) * (p[0] - p[2]) + (p[1] - p[3]) * (p[1] - p[3]) <= 2;
 }
 
-static int is_degenerate_affine(double *p) {
+static bool is_degenerate_affine(double *p) {
   return is_collinear3(p, p + 2, p + 4);
 }
 
@@ -1744,8 +1746,10 @@ static ProjectPointsFunc project_points[TRANS_TYPES] = {
   project_points_homography    // HOMOGRAPHY
 };
 
-int ransac(Correspondence *matched_points, int npoints, TransformationType type,
-           MotionModel *params_by_motion, int num_desired_motions) {
+// Returns true on success, false on error
+bool ransac(Correspondence *matched_points, int npoints,
+            TransformationType type, MotionModel *params_by_motion,
+            int num_desired_motions) {
   assert(type > IDENTITY && type < TRANS_TYPES);
 
   int minpts = 3;
@@ -1758,11 +1762,12 @@ int ransac(Correspondence *matched_points, int npoints, TransformationType type,
 // Fit a specified type of motion model to a set of correspondences.
 // The input consists of `np` points, where pts1 stores the source position
 // and pts2 stores the destination position for each correspondence.
-// The resulting model is stored in `mat`
+// The resulting model is stored in `mat`.
+// Returns true on success, false on error
 //
 // Note: The input points lists may be modified during processing
-int aom_fit_motion_model(TransformationType type, int np, double *pts1,
-                         double *pts2, double *mat) {
+bool aom_fit_motion_model(TransformationType type, int np, double *pts1,
+                          double *pts2, double *mat) {
   assert(type > IDENTITY && type < TRANS_TYPES);
   return find_transform[type](np, pts1, pts2, mat);
 }
