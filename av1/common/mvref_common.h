@@ -411,7 +411,7 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 // check a list of motion vectors by sad score using a number rows of pixels
 // above and a number cols of pixels in the left to select the one with best
 // score to use as ref motion vector
-void av1_find_best_ref_mvs(int allow_hp, int_mv *mvlist, int_mv *nearest_mv,
+void av1_find_best_ref_mvs(int allow_hp, int_mv *mvlist, /*int_mv *nearest_mv,*/
                            int_mv *near_mv, int is_integer);
 
 uint8_t av1_selectSamples(MV *mv, int *pts, int *pts_inref, int len,
