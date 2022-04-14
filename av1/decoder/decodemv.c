@@ -2042,6 +2042,9 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // IMPROVED_AMVD
     ) {
       ref_mv[0] = xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx].this_mv;
+      if (dcb->ref_mv_count[ref_frame] == 1)
+        lower_mv_precision(&ref_mv[0].as_mv, allow_hp,
+                           features->cur_frame_force_integer_mv);
     }
   }
   if (mbmi->skip_mode) {
