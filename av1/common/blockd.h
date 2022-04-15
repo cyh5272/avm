@@ -2061,6 +2061,7 @@ static INLINE int tx_size_to_depth(TX_SIZE tx_size, BLOCK_SIZE bsize) {
   }
   return depth;
 }
+
 /*
  * If secondary transform is enabled (CONFIG_IST) :
  * Bits 4~5 of tx_type stores secondary tx_type
@@ -2121,11 +2122,11 @@ static INLINE int block_signals_sec_tx_type(const MACROBLOCKD *xd,
 #endif  // CONFIG_IST_FIX_B076
     ist_eob = 0;
   }
-  const int depth = tx_size_to_depth(tx_size, bs);
+  const int is_depth0 = tx_size_is_depth0(tx_size, bs);
   const int code_stx =
       (primary_tx_type == DCT_DCT || primary_tx_type == ADST_ADST) &&
       (intra_dir < PAETH_PRED) &&
-      !(mbmi->filter_intra_mode_info.use_filter_intra) && !(depth) && ist_eob;
+      !(mbmi->filter_intra_mode_info.use_filter_intra) && is_depth0 && ist_eob;
   return code_stx;
 }
 #endif
