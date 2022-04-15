@@ -20,6 +20,7 @@
 #include "av1/common/ccso.h"
 #include "av1/common/reconinter.h"
 
+#if CONFIG_CCSO
 /* Pad the border of a frame */
 void extend_ccso_border(uint16_t *buf, const int d, MACROBLOCKD *xd) {
   int s = xd->plane[0].dst.width + (CCSO_PADDING_SIZE << 1);
@@ -580,3 +581,4 @@ void ccso_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm, MACROBLOCKD *xd,
 #endif
   }
 }
+#endif  // CONFIG_CCSO
