@@ -1495,7 +1495,7 @@ void av1_set_cost_upd_freq(AV1_COMP *cpi, ThreadData *td,
       if (cm->features.allow_intrabc) {
         av1_fill_dv_costs(xd->tile_ctx, &cpi->dv_costs);
       }
-#endif
+#endif  // CONFIG_BVCOST_UPDATE
       break;
     default: assert(0);
   }

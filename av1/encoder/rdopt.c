@@ -3590,7 +3590,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
       (int *)&cpi->dv_costs.mv_component[0][MV_MAX];
   fullms_params.mv_cost_params.mvcost[1] =
       (int *)&cpi->dv_costs.mv_component[1][MV_MAX];
-#endif
+#endif  // CONFIG_BVCOST_UPDATE
 
   fullms_params.is_intra_mode = 1;
 #if CONFIG_IBC_SR_EXT

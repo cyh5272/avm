@@ -819,7 +819,7 @@ void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMVCosts *dv_costs) {
 #endif  // CONFIG_ADAPTIVE_MVD
                            dvcost, &fc->ndvc, MV_SUBPEL_NONE);
 }
-#endif
+#endif  // CONFIG_BVCOST_UPDATE
 
 void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
                        MvCosts *mv_costs) {
@@ -883,8 +883,9 @@ void av1_initialize_rd_consts(AV1_COMP *cpi) {
   if (cm->features.allow_screen_content_tools &&
 #if !CONFIG_BVCOST_UPDATE
       frame_is_intra_only(cm) &&
-#endif
+#endif  // !CONFIG_BVCOST_UPDATE
       !is_stat_generation_stage(cpi)) {
+
     IntraBCMVCosts *const dv_costs = &cpi->dv_costs;
     int *dvcost[2] = { &dv_costs->mv_component[0][MV_MAX],
                        &dv_costs->mv_component[1][MV_MAX] };
