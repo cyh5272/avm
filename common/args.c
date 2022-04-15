@@ -91,6 +91,9 @@ int parse_cfg(const char *file, cfg_options_t *config) {
 #if CONFIG_ORIP
     GET_PARAMS(enable_orip);
 #endif
+#if CONFIG_NEW_TX_PARTITION
+    GET_PARAMS(enable_new_tx_partition_4way);
+#endif
 #if CONFIG_IST
     GET_PARAMS(enable_ist);
 #endif
