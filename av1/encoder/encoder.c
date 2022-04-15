@@ -474,6 +474,14 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #if CONFIG_JOINT_MVD
   seq->enable_joint_mvd = tool_cfg->enable_joint_mvd;
 #endif  // CONFIG_JOINT_MVD
+#if CONFIG_NEW_TX_PARTITION
+#if CONFIG_EXT_RECUR_PARTITIONS
+  seq->enable_new_tx_partition_4way = 0;
+#else
+  seq->enable_new_tx_partition_4way =
+      oxcf->txfm_cfg.enable_new_tx_partition_4way;
+#endif
+#endif
   set_bitstream_level_tier(seq, cm, frm_dim_cfg->width, frm_dim_cfg->height,
                            oxcf->input_cfg.init_framerate);
 

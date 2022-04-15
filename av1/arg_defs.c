@@ -388,6 +388,13 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
                               "Enable joint MVD coding"
                               "(0: false, 1: true (default))"),
 #endif  // CONFIG_JOINT_MVD
+#if CONFIG_NEW_TX_PARTITION
+  .enable_new_tx_partition_4way =
+      ARG_DEF(NULL, "enable-new-tx-partition-4way", 1,
+              "Enable 4-way split in the new transform partition"
+              "tool"
+              "(0: false, 1:true (default))"),
+#endif
   .min_partition_size =
       ARG_DEF(NULL, "min-partition-size", 1,
               "Set min partition size "

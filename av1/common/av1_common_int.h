@@ -380,6 +380,10 @@ typedef struct SequenceHeader {
 #if CONFIG_REF_MV_BANK
   uint8_t enable_refmvbank;  // To turn on/off Ref MV Bank
 #endif                       // CONFIG_REF_MV_BANK
+#if CONFIG_NEW_TX_PARTITION
+  uint8_t enable_new_tx_partition_4way;  // To turn on/off VERT4 and HORZ4 mode
+                                         // in the NEW_TX_PARTITION tool
+#endif
   BITSTREAM_PROFILE profile;
 
   // Color config.
