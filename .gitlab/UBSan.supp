@@ -23,3 +23,11 @@ alignment:highbd_blend_a64_d16_mask_w4_sse4_1
 
 # aom_dsp/x86/blend_a64_mask_avx2.c
 alignment:highbd_blend_a64_d16_mask_w4_avx2
+
+# av1/common/reconintra.c
+implicit-signed-integer-truncation:get_y_intra_mode_set
+implicit-signed-integer-truncation:get_uv_intra_mode_set
+
+# Lots of warnings throughout codebase
+implicit-integer-sign-change:*/avm/*
+shift-base:*/avm/*
