@@ -37,6 +37,15 @@ implicit-signed-integer-truncation:av1_collect_neighbors_ref_counts
 # av1/encoder/x86/av1_fwd_txfm_sse2.c
 implicit-signed-integer-truncation:av1_fdct8x64_new_sse2
 
+# nullptr-with-offset warnings.
+pointer-overflow:file_read
+pointer-overflow:av1_pack_bitstream
+pointer-overflow:vfilter8
+pointer-overflow:highbd_vfilter8
+
+# nullptr-with-nonzero-offset warning.
+pointer-overflow:av1_set_mv_search_method
+
 # Files with 'invalid-shift-base' warnings.
 shift-base:aom_dsp/simd/*_intrinsics_c.h
 shift-base:aom_dsp/x86/txfm_common_avx2.h
