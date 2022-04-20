@@ -194,6 +194,7 @@ Test Data Check:
           - no-examples
           - debug
   script:
+    - export PATH="/usr/lib/llvm-12/bin:${PATH}"
     - |
       case $AOM_BUILD_CONFIG in
         internal-stats)
