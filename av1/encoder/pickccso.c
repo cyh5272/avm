@@ -24,6 +24,8 @@
 #include "av1/encoder/encoder.h"
 #include "av1/encoder/pickccso.h"
 
+#if CONFIG_CCSO
+
 #if CONFIG_CCSO_EXT
 uint8_t final_band_log2;
 #endif
@@ -912,3 +914,4 @@ void ccso_search(AV1_COMMON *cm, MACROBLOCKD *xd, int rdmult,
                        rec_uv[AOM_PLANE_V], rdmult);
   }
 }
+#endif  // CONFIG_CCSO
