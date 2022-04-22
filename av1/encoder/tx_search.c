@@ -1170,6 +1170,7 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       }
     }
 
+    // TODO(kslu) apply inv cctx for u plane once it is needed for intra
     inverse_transform_block_facade(x, plane, block, blk_row, blk_col,
                                    x->plane[plane].eobs[block],
                                    cm->features.reduced_tx_set_used);
@@ -1249,7 +1250,7 @@ static INLINE int64_t dist_block_px_domain(const AV1_COMP *cpi, MACROBLOCK *x,
   const int dst_idx = (blk_row * dst_stride + blk_col) << MI_SIZE_LOG2;
   const uint8_t *src = &x->plane[plane].src.buf[src_idx];
   const uint8_t *dst = &xd->plane[plane].dst.buf[dst_idx];
-#if CONFIG_IST
+#if CONFIG_IST || CONFIG_CROSS_CHROMA_TX
   tran_low_t *dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
 #else
   const tran_low_t *dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
@@ -1273,6 +1274,12 @@ static INLINE int64_t dist_block_px_domain(const AV1_COMP *cpi, MACROBLOCK *x,
   const PLANE_TYPE plane_type = get_plane_type(plane);
   TX_TYPE tx_type = av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
                                     cpi->common.features.reduced_tx_set_used);
+#if CONFIG_CROSS_CHROMA_TX
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_U) {
+    tran_low_t *dqcoeff_v = x->plane[AOM_PLANE_V].dqcoeff + BLOCK_OFFSET(block);
+    av1_inv_cross_chroma_tx_block(dqcoeff, dqcoeff_v, tx_size);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
   av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, recon,
                               MAX_TX_SIZE, eob,
                               cpi->common.features.reduced_tx_set_used);
@@ -2645,15 +2652,60 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       RD_STATS this_rd_stats;
       av1_invalid_rd_stats(&this_rd_stats);
 
-      if (!dc_only_blk)
+#if CONFIG_CROSS_CHROMA_TX
+      if (is_inter_block(mbmi, xd->tree_type)) {
+        switch (plane) {
+          case AOM_PLANE_Y:
+            if (!dc_only_blk) {
 #if CONFIG_IST
-        av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
-                  1);
+              av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param, 1);
+#else
+              av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param);
+#endif
+            } else {
+              av1_xform_dc_only(x, AOM_PLANE_Y, block, &txfm_param,
+                                per_px_mean);
+            }
+            break;
+          case AOM_PLANE_U:
+            if (!dc_only_blk) {
+#if CONFIG_IST
+              av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param, 1);
+              av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param, 1);
+#else
+              av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param);
+              av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                        &txfm_param);
+#endif
+            } else {
+              av1_xform_dc_only(x, AOM_PLANE_U, block, &txfm_param,
+                                per_px_mean);
+              av1_xform_dc_only(x, AOM_PLANE_V, block, &txfm_param,
+                                per_px_mean);
+            }
+            forward_cross_chroma_transform(x, block, txfm_param.tx_size);
+            break;
+          case AOM_PLANE_V: break;
+        }
+      } else {
+#endif
+        if (!dc_only_blk)
+#if CONFIG_IST
+          av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
+                    1);
 #else
       av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param);
 #endif
-      else
-        av1_xform_dc_only(x, plane, block, &txfm_param, per_px_mean);
+        else
+          av1_xform_dc_only(x, plane, block, &txfm_param, per_px_mean);
+#if CONFIG_CROSS_CHROMA_TX
+      }
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_IST
       skip_trellis_based_on_satd[txfm_param.tx_type] =

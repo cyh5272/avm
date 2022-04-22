@@ -499,6 +499,27 @@ void av1_highbd_fwd_txfm(const int16_t *src_diff, tran_low_t *coeff,
   }
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+void av1_fwd_cross_chroma_tx_block(tran_low_t *coeff_u, tran_low_t *coeff_v,
+                                   TX_SIZE tx_size) {
+#if CCTX_DC_ONLY
+  const int ncoeffs = 1;
+#else
+  const int ncoeffs = av1_get_max_eob(tx_size);
+#endif
+  int32_t *src_u = (int32_t *)coeff_u;
+  int32_t *src_v = (int32_t *)coeff_v;
+  int32_t tmp[2] = { 0, 0 };
+
+  for (int i = 0; i < ncoeffs; i++) {
+    tmp[0] = cctx_mtx[0] * src_u[i] + cctx_mtx[1] * src_v[i];
+    tmp[1] = cctx_mtx[2] * src_u[i] + cctx_mtx[3] * src_v[i];
+    src_u[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[0], CCTX_PREC_BITS);
+    src_v[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[1], CCTX_PREC_BITS);
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 #if CONFIG_IST
 void av1_fwd_stxfm(tran_low_t *coeff, TxfmParam *txfm_param) {
   const TX_TYPE stx_type = txfm_param->sec_tx_type;
