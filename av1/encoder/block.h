@@ -857,6 +857,10 @@ typedef struct {
   int intra_tx_type_costs[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
                          [TX_TYPES];
 #endif  // CONFIG_DDT_INTER
+#if CONFIG_CROSS_CHROMA_TX
+  //! cctx_type_cost
+  int cctx_type_cost[EXT_TX_SIZES][CCTX_TYPES];
+#endif  // CONFIG_CROSS_CHROMA_TX
   /**@}*/
 
   /*****************************************************************************

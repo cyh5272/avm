@@ -448,10 +448,35 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #else
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
 #endif  // CONFIG_CONTEXT_DERIVATION
-  if (eob == 0) return 0;
+
+  if (eob == 0) {
+#if CONFIG_CROSS_CHROMA_TX
+    // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
+    // plane if either of eob_u and eob_v is > 0.
+    if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+      const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
+      const uint16_t eob_u = eob_txb_u[block];
+      if (eob_u > 0) {
+        const CctxType cctx_type = av1_get_cctx_type(
+            xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+        av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+      }
+    }
+#endif  // CONFIG_CROSS_CHROMA_TX
+    return 0;
+  }
+
   if (plane == 0) {  // Only y plane's tx_type is transmitted
     av1_write_tx_type(cm, xd, tx_type, tx_size, w);
   }
+#if CONFIG_CROSS_CHROMA_TX
+  // CCTX type is transmitted with V plane
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+    const CctxType cctx_type = av1_get_cctx_type(
+        xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
   return 1;
 }
 
@@ -575,6 +600,13 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   if (plane == 0) {
     av1_write_tx_type(cm, xd, tx_type, tx_size, w);
   }
+#if CONFIG_CROSS_CHROMA_TX
+  // CCTX type is transmitted with V plane
+  const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col, tx_size);
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
 
 #if DEBUG_EXTQUANT
@@ -2071,6 +2103,27 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
 #if !CONFIG_ENTROPY_STATS
   (void)counts;
 #endif  // !CONFIG_ENTROPY_STATS
+
+#if CONFIG_CROSS_CHROMA_TX
+  // TODO(kslu): figure out these conditions
+  if (plane == AOM_PLANE_V && is_inter &&
+      get_ext_tx_types(tx_size, is_inter, reduced_tx_set_used) > 1 &&
+      cm->quant_params.base_qindex > 0 &&
+      !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
+      !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
+    const int eset = get_ext_tx_set(tx_size, is_inter, reduced_tx_set_used);
+    if (eset > 0) {
+      const CctxType cctx_type =
+          av1_get_cctx_type(xd, blk_row, blk_col, tx_size, reduced_tx_set_used);
+      if (allow_update_cdf)
+        update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
+                   CCTX_TYPES);
+#if CONFIG_ENTROPY_STATS
+      ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
+#endif  // CONFIG_ENTROPY_STATS
+    }
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   // Only y plane's tx_type is updated
   if (plane > 0) return;
