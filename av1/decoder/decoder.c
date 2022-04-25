@@ -113,6 +113,10 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
   mi_params->mi_alloc_size = 0;
   aom_free(mi_params->tx_type_map);
   mi_params->tx_type_map = NULL;
+#if CONFIG_CROSS_CHROMA_TX
+  aom_free(mi_params->cctx_type_map);
+  mi_params->cctx_type_map = NULL;
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 #if CONFIG_TIP

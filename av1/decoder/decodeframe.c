@@ -1800,6 +1800,10 @@ static AOM_INLINE void set_offsets_for_pred_and_recon(AV1Decoder *const pbi,
   xd->mi = mi_params->mi_grid_base + offset;
   xd->tx_type_map =
       &mi_params->tx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map =
+      &mi_params->cctx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 
   set_plane_n4(xd, bw, bh, num_planes);
