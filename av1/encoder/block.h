@@ -277,6 +277,10 @@ typedef struct {
   uint8_t blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   //! Map showing the txfm types for each blcok.
   TX_TYPE tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#if CONFIG_CROSS_CHROMA_TX
+  //! Map showing the cctx types for each block.
+  TX_TYPE cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#endif  // CONFIG_CROSS_CHROMA_TX
   //! Rd_stats for the whole partition block.
   RD_STATS rd_stats;
   //! Hash value of the current record.
@@ -309,6 +313,10 @@ typedef struct {
   uint16_t eob;
   //! Transform type used on the current block.
   TX_TYPE tx_type;
+#if CONFIG_CROSS_CHROMA_TX
+  //! CCTX type used on the current block.
+  CctxType cctx_type;
+#endif  // CONFIG_CROSS_CHROMA_TX
   //! Unknown usage
   uint16_t entropy_context;
   //! Context used to code the coefficients.
@@ -549,6 +557,10 @@ typedef struct {
    * primary tx_type
    */
   TX_TYPE tx_type_map_[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#if CONFIG_CROSS_CHROMA_TX
+  //! \brief CCTX types inside the partition block.
+  CctxType cctx_type_map_[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   /** \name Txfm hash records
    * Hash records of the transform search results based on the residue. There
