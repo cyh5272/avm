@@ -779,7 +779,7 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
   }
 }
 
-#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 #define SUBTRACT_CENTER 1
 
 // Convolves a block of pixels with origin-symmetric, non-separable filters.
@@ -882,7 +882,7 @@ void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
     }
   }
 }
-#endif  // CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *nsfilter,
