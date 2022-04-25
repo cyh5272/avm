@@ -13,6 +13,7 @@
 #include <climits>
 #include <vector>
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
+#include "common/tools_common.h"
 #include "test/codec_factory.h"
 #include "test/encode_test_driver.h"
 #include "test/i420_video_source.h"
@@ -38,12 +39,21 @@ class MonochromeTest
                                      aom_codec_pts_t pts) {
     (void)pts;
 
+    const aom_img_fmt_t shifted_fmt =
+        (aom_img_fmt)(img.fmt & ~AOM_IMG_FMT_HIGHBITDEPTH);
+    aom_image_t *img_shifted =
+        aom_img_alloc(NULL, shifted_fmt, img.d_w, img.d_h, 32);
+    img_shifted->bit_depth = img.bit_depth;
+    img_shifted->monochrome = img.monochrome;
+    aom_img_downshift(img_shifted, &img, 0);
+
     // Get value of top-left corner pixel of U plane
-    int chroma_value = img.planes[AOM_PLANE_U][0];
+    int chroma_value = img_shifted->planes[AOM_PLANE_U][0];
 
     bool is_chroma_constant =
-        ComparePlaneToValue(img, AOM_PLANE_U, chroma_value) &&
-        ComparePlaneToValue(img, AOM_PLANE_V, chroma_value);
+        ComparePlaneToValue(img_shifted, AOM_PLANE_U, chroma_value) &&
+        ComparePlaneToValue(img_shifted, AOM_PLANE_V, chroma_value);
+    aom_img_free(img_shifted);
 
     // Chroma planes should be constant
     EXPECT_TRUE(is_chroma_constant);
@@ -56,12 +66,12 @@ class MonochromeTest
 
   // Returns true if all pixels on the plane are equal to value, and returns
   // false otherwise.
-  bool ComparePlaneToValue(const aom_image_t &img, const int plane,
+  bool ComparePlaneToValue(const aom_image_t *img, const int plane,
                            const int value) {
-    const int w = aom_img_plane_width(&img, plane);
-    const int h = aom_img_plane_height(&img, plane);
-    const uint8_t *const buf = img.planes[plane];
-    const int stride = img.stride[plane];
+    const int w = aom_img_plane_width(img, plane);
+    const int h = aom_img_plane_height(img, plane);
+    const uint8_t *const buf = img->planes[plane];
+    const int stride = img->stride[plane];
 
     for (int r = 0; r < h; ++r) {
       for (int c = 0; c < w; ++c) {

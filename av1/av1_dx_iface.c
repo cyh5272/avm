@@ -93,8 +93,6 @@ static aom_codec_err_t decoder_init(aom_codec_ctx_t *ctx) {
     ctx->priv->init_flags = ctx->init_flags;
     priv->flushed = 0;
 
-    // TODO(tdaede): this should not be exposed to the API
-    priv->cfg.allow_lowbitdepth = 0;
     if (ctx->config.dec) {
       priv->cfg = *ctx->config.dec;
       ctx->config.dec = &priv->cfg;
@@ -470,7 +468,6 @@ static aom_codec_err_t init_decoder(aom_codec_alg_priv_t *ctx) {
   }
   frame_worker_data->frame_context_ready = 0;
   frame_worker_data->received_frame = 0;
-  frame_worker_data->pbi->allow_lowbitdepth = ctx->cfg.allow_lowbitdepth;
 
   // If decoding in serial mode, FrameWorker thread could create tile worker
   // thread or loopfilter thread.
@@ -825,13 +822,11 @@ static aom_image_t *decoder_get_frame(aom_codec_alg_priv_t *ctx,
           const int tile_col = AOMMIN(pbi->dec_tile_col, tiles->cols - 1);
           const int mi_col = tile_col * tile_width;
           const int ssx = ctx->img.x_chroma_shift;
-          const int is_hbd = (ctx->img.fmt & AOM_IMG_FMT_HIGHBITDEPTH) ? 1 : 0;
           int plane;
-          ctx->img.planes[0] += mi_col * MI_SIZE * (1 + is_hbd);
+          ctx->img.planes[0] += mi_col * MI_SIZE * 2;
           if (num_planes > 1) {
             for (plane = 1; plane < MAX_MB_PLANE; ++plane) {
-              ctx->img.planes[plane] +=
-                  mi_col * (MI_SIZE >> ssx) * (1 + is_hbd);
+              ctx->img.planes[plane] += mi_col * (MI_SIZE >> ssx) * 2;
             }
           }
           ctx->img.d_w =
@@ -1357,8 +1352,7 @@ static aom_codec_err_t ctrl_get_bit_depth(aom_codec_alg_priv_t *ctx,
   return AOM_CODEC_INVALID_PARAM;
 }
 
-static aom_img_fmt_t get_img_format(int subsampling_x, int subsampling_y,
-                                    int use_highbitdepth) {
+static aom_img_fmt_t get_img_format(int subsampling_x, int subsampling_y) {
   aom_img_fmt_t fmt = 0;
 
   if (subsampling_x == 0 && subsampling_y == 0)
@@ -1368,7 +1362,7 @@ static aom_img_fmt_t get_img_format(int subsampling_x, int subsampling_y,
   else if (subsampling_x == 1 && subsampling_y == 1)
     fmt = AOM_IMG_FMT_I420;
 
-  if (use_highbitdepth) fmt |= AOM_IMG_FMT_HIGHBITDEPTH;
+  fmt |= AOM_IMG_FMT_HIGHBITDEPTH;
   return fmt;
 }
 
@@ -1384,8 +1378,7 @@ static aom_codec_err_t ctrl_get_img_format(aom_codec_alg_priv_t *ctx,
       const AV1_COMMON *const cm = &frame_worker_data->pbi->common;
 
       *img_fmt = get_img_format(cm->seq_params.subsampling_x,
-                                cm->seq_params.subsampling_y,
-                                cm->seq_params.use_highbitdepth);
+                                cm->seq_params.subsampling_y);
       return AOM_CODEC_OK;
     } else {
       return AOM_CODEC_ERROR;

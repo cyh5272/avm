@@ -22,6 +22,7 @@
 
 #include "aom/aom_encoder.h"
 #include "aom/internal/aom_codec_internal.h"
+#include "aom/internal/aom_image_internal.h"
 
 #include "av1/av1_iface_common.h"
 #include "av1/encoder/bitstream.h"
@@ -2533,8 +2534,6 @@ static aom_codec_err_t encoder_init(aom_codec_ctx_t *ctx) {
           lap_lag_in_frames = LAP_LAG_IN_FRAMES;
         }
       }
-      priv->oxcf.use_highbitdepth =
-          (ctx->init_flags & AOM_CODEC_USE_HIGHBITDEPTH) ? 1 : 0;
 
       res = create_stats_buffer(&priv->frame_stats_buffer,
                                 &priv->stats_buf_context, *num_lap_buffers);
@@ -2796,14 +2795,30 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
           timebase_units_to_ticks(timestamp_ratio, ptsvol + duration);
 
       YV12_BUFFER_CONFIG sd;
-      res = image2yuvconfig(img, &sd);
+      aom_image_t *hbd_img = NULL;
+      // May need to allocate larger buffer to use hbd internal.
+      if (!(img->fmt & AOM_IMG_FMT_HIGHBITDEPTH)) {
+        hbd_img = aom_img_alloc(NULL, img->fmt | AOM_IMG_FMT_HIGHBITDEPTH,
+                                img->w, img->h, 32);
+        aom_img_upshift(hbd_img, img, 0);
+        // Copy some properties aom_img_upshift() ignores
+        hbd_img->cp = img->cp;
+        hbd_img->tc = img->tc;
+        hbd_img->mc = img->mc;
+        hbd_img->monochrome = img->monochrome;
+        hbd_img->csp = img->csp;
+        hbd_img->range = img->range;
+        res = image2yuvconfig(hbd_img, &sd);
+        sd.metadata = img->metadata;
+      } else {
+        res = image2yuvconfig(img, &sd);
+      }
       // When generating a monochrome stream, make |sd| a monochrome image.
       if (ctx->cfg.monochrome) {
         sd.u_buffer = sd.v_buffer = NULL;
         sd.uv_stride = 0;
         sd.monochrome = 1;
       }
-      int use_highbitdepth = (sd.flags & YV12_FLAG_HIGHBITDEPTH) != 0;
       int subsampling_x = sd.subsampling_x;
       int subsampling_y = sd.subsampling_y;
 
@@ -2813,7 +2828,7 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
 
         cpi->lookahead = av1_lookahead_init(
             cpi->oxcf.frm_dim_cfg.width, cpi->oxcf.frm_dim_cfg.height,
-            subsampling_x, subsampling_y, use_highbitdepth, lag_in_frames,
+            subsampling_x, subsampling_y, lag_in_frames,
             cpi->oxcf.border_in_pixels, cpi->common.features.byte_alignment,
             ctx->num_lap_buffers);
       }
@@ -2821,12 +2836,10 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
         aom_internal_error(&cpi->common.error, AOM_CODEC_MEM_ERROR,
                            "Failed to allocate lag buffers");
 
-      av1_check_initial_width(cpi, use_highbitdepth, subsampling_x,
-                              subsampling_y);
+      av1_check_initial_width(cpi, subsampling_x, subsampling_y);
       if (cpi_lap != NULL) {
         cpi_lap->lookahead = cpi->lookahead;
-        av1_check_initial_width(cpi_lap, use_highbitdepth, subsampling_x,
-                                subsampling_y);
+        av1_check_initial_width(cpi_lap, subsampling_x, subsampling_y);
       }
 
       // Store the original flags in to the frame buffer. Will extract the
@@ -2835,6 +2848,7 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
                                 src_time_stamp, src_end_time_stamp)) {
         res = update_error_state(ctx, &cpi->common.error);
       }
+      aom_img_free(hbd_img);
       ctx->next_frame_flags = 0;
     }
 
@@ -4024,11 +4038,10 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 aom_codec_iface_t aom_codec_av1_cx_algo = {
   "AOMedia Project AV1 Encoder" VERSION_STRING,
   AOM_CODEC_INTERNAL_ABI_VERSION,
-  AOM_CODEC_CAP_HIGHBITDEPTH | AOM_CODEC_CAP_ENCODER |
-      AOM_CODEC_CAP_PSNR,  // aom_codec_caps_t
-  encoder_init,            // aom_codec_init_fn_t
-  encoder_destroy,         // aom_codec_destroy_fn_t
-  encoder_ctrl_maps,       // aom_codec_ctrl_fn_map_t
+  AOM_CODEC_CAP_ENCODER | AOM_CODEC_CAP_PSNR,  // aom_codec_caps_t
+  encoder_init,                                // aom_codec_init_fn_t
+  encoder_destroy,                             // aom_codec_destroy_fn_t
+  encoder_ctrl_maps,                           // aom_codec_ctrl_fn_map_t
   {
       // NOLINT
       NULL,  // aom_codec_peek_si_fn_t
