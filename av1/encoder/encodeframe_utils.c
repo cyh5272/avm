@@ -1353,6 +1353,10 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVG_CDF_STRIDE(ctx_left->stx_cdf, ctx_tr->stx_cdf, STX_TYPES,
                  CDF_SIZE(STX_TYPES));
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  AVG_CDF_STRIDE(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf, CCTX_TYPES,
+                 CDF_SIZE(CCTX_TYPES));
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 // Memset the mbmis at the current superblock to 0
