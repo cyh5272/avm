@@ -13,6 +13,7 @@
 #include <ostream>
 #include <set>
 #include <vector>
+#include "aom_ports/aom_timer.h"
 #include "config/av1_rtcd.h"
 #include "config/aom_dsp_rtcd.h"
 #include "test/acm_random.h"
@@ -1489,7 +1490,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Nonseparable convolve-2d functions (high bit-depth)
 //////////////////////////////////////////////////////////
 
-#if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 typedef void (*highbd_convolve_nonsep_2d_func)(
     const uint16_t *src, int src_stride,
     const NonsepFilterConfig *filter_config, const int16_t *filter,
@@ -1508,6 +1509,9 @@ class AV1ConvolveNonSep2DHighbdTest
     // CONFIG_PC_WIENER use case.
     TestConvolve(&UnconstrainedSumFilterConfig_, FilterTaps_);
   }
+  void RunSpeedTest() {
+    SpeedTestConvolve(&UnconstrainedSumFilterConfig_, FilterTaps_);
+  };
 
  private:
   void TestConvolve(const NonsepFilterConfig *filter_config,
@@ -1531,6 +1535,35 @@ class AV1ConvolveNonSep2DHighbdTest
                               test, kOutputStride, bit_depth, 0, height, 0,
                               width);
     AssertOutputBufferEq(reference, test, width, height);
+  }
+
+  void SpeedTestConvolve(const NonsepFilterConfig *filter_config,
+                         const int16_t *filter) {
+    const int width = GetParam().Block().Width();
+    const int height = GetParam().Block().Height();
+    const int bit_depth = GetParam().BitDepth();
+
+    const uint16_t *input = FirstRandomInput16(GetParam());
+    DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
+
+    ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
+        << "Not enough padding for 7x7 filters";
+    const uint16_t *centered_input =
+        input + kMaxTapOffset * width + kMaxTapOffset;
+
+    aom_usec_timer timer;
+    aom_usec_timer_start(&timer);
+    for (int i = 0; i < kSpeedIterations; ++i) {
+      GetParam().TestFunction()(centered_input, width, filter_config, filter,
+                                test, kOutputStride, bit_depth, 0, height, 0,
+                                width);
+    }
+    aom_usec_timer_mark(&timer);
+
+    auto elapsed_time = aom_usec_timer_elapsed(&timer);
+    printf("\tconvolve symmetric: %2d bit,  %3dx%-3d: %10.5f ns per-pixel.\n",
+           bit_depth, width, height,
+           1000.0 * elapsed_time / (kSpeedIterations * width * height));
   }
 
   // Generates NonsepFilterConfig compliant origin symmetric filter tap values.
@@ -1563,6 +1596,7 @@ class AV1ConvolveNonSep2DHighbdTest
   static constexpr int kMaxPrecisionBeforeOverflow = 14;
   static constexpr int kNumSymmetricTaps = 16;
   static constexpr int kMaxTapOffset = 3;  // Filters are 7x7.
+  static constexpr int kSpeedIterations = 10000;
 
   // Configuration for nonseparable 7x7 filters. Format is offset (i) row and
   // (ii) column from center pixel and the (iii) filter-tap index that
@@ -1601,9 +1635,11 @@ class AV1ConvolveNonSep2DHighbdTest
 
 TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
 
+TEST_P(AV1ConvolveNonSep2DHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+
 // TODO(rachelbarker@): Test with appropriate fast routine.
 INSTANTIATE_TEST_SUITE_P(C, AV1ConvolveNonSep2DHighbdTest,
                          BuildHighbdParams(av1_convolve_symmetric_highbd_c));
-#endif  // CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
 }  // namespace
