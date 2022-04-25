@@ -70,12 +70,6 @@ void av1_convolve_nonsep_mask_highbd(const uint8_t *dgd, int width, int height,
                                      const int16_t *filter, uint8_t *dst,
                                      int dst_stride, int bit_depth,
                                      const uint8_t *skip_mask, int mask_stride);
-void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
-                                     const NonsepFilterConfig *filter_config,
-                                     const int16_t *filter, uint16_t *dst,
-                                     int dst_stride, int bit_depth,
-                                     int block_row_begin, int block_row_end,
-                                     int block_col_begin, int block_col_end);
 
 // Nonseparable convolution with dual input planes - used for cross component
 // filtering
