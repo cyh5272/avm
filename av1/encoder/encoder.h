@@ -60,6 +60,7 @@
 #endif
 
 #include "aom/internal/aom_codec_internal.h"
+#include "aom_dsp/flow_estimation/flow_estimation.h"
 #include "aom_util/aom_thread.h"
 
 #ifdef __cplusplus
@@ -1811,12 +1812,6 @@ static INLINE char const *get_component_name(int index) {
  */
 typedef struct {
   /*!
-   * Array to store the cost for signalling each global motion model.
-   * gmtype_cost[i] stores the cost of signalling the ith Global Motion model.
-   */
-  int type_cost[TRANS_TYPES];
-
-  /*!
    * Array to store the cost for signalling a particular global motion model for
    * each reference frame. gmparams_cost[i] stores the cost of signalling global
    * motion for the ith reference frame.
@@ -1836,11 +1831,6 @@ typedef struct {
   YV12_BUFFER_CONFIG *ref_buf[REF_FRAMES];
 
   /*!
-   * Pointer to the source frame buffer.
-   */
-  unsigned char *src_buffer;
-
-  /*!
    * Holds the number of valid reference frames in past and future directions
    * w.r.t. the current frame. num_ref_frames[i] stores the total number of
    * valid reference frames in 'i' direction.
@@ -1855,6 +1845,13 @@ typedef struct {
    */
   FrameDistPair reference_frames[MAX_DIRECTIONS][REF_FRAMES - 1];
 
+  /*!
+   * Array of structures which hold flow information per ref frame
+   * Exactly what information is stored depends on the motion estimation
+   * method - see aom_dsp/flow_estimation/flow_estimation.h for details
+   */
+  FlowData *flow_data[REF_FRAMES];
+
   /**
    * \name Dimensions for which segment map is allocated.
    */
@@ -1862,18 +1859,6 @@ typedef struct {
   int segment_map_w; /*!< segment map width */
   int segment_map_h; /*!< segment map height */
   /**@}*/
-
-  /*!
-   * Holds the total number of corner points detected in the source frame.
-   */
-  int num_src_corners;
-
-  /*!
-   * Holds the x and y co-ordinates of the corner points detected in the source
-   * frame. src_corners[i] holds the x co-ordinate and src_corners[i+1] holds
-   * the y co-ordinate of the ith corner point detected.
-   */
-  int src_corners[2 * MAX_CORNERS];
 } GlobalMotionInfo;
 
 /*!

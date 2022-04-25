@@ -185,6 +185,7 @@ if(CONFIG_AV1_ENCODER)
     "${AOM_ROOT}/aom_dsp/fwd_txfm.c"
     "${AOM_ROOT}/aom_dsp/grain_table.c"
     "${AOM_ROOT}/aom_dsp/grain_table.h"
+    "${AOM_ROOT}/aom_dsp/linalg.c"
     "${AOM_ROOT}/aom_dsp/noise_model.c"
     "${AOM_ROOT}/aom_dsp/noise_model.h"
     "${AOM_ROOT}/aom_dsp/noise_util.c"
@@ -298,6 +299,23 @@ if(CONFIG_AV1_ENCODER)
     "${AOM_ROOT}/aom_dsp/mips/subtract_msa.c"
     "${AOM_ROOT}/aom_dsp/mips/variance_msa.c"
     "${AOM_ROOT}/aom_dsp/mips/sub_pixel_variance_msa.c")
+
+  # Flow estimation library
+  list(
+    APPEND
+    AOM_DSP_ENCODER_SOURCES
+    "${AOM_ROOT}/aom_dsp/flow_estimation/corner_detect.c"
+    "${AOM_ROOT}/aom_dsp/flow_estimation/corner_match.c"
+    "${AOM_ROOT}/aom_dsp/flow_estimation/disflow.c"
+    "${AOM_ROOT}/aom_dsp/flow_estimation/flow_estimation.c"
+    "${AOM_ROOT}/aom_dsp/flow_estimation/pyramid.c"
+    "${AOM_ROOT}/aom_dsp/flow_estimation/ransac.c")
+
+  list(APPEND AOM_DSP_ENCODER_INTRIN_SSE4_1
+       "${AOM_ROOT}/aom_dsp/flow_estimation/x86/corner_match_sse4.c")
+
+  list(APPEND AOM_DSP_ENCODER_INTRIN_AVX2
+       "${AOM_ROOT}/aom_dsp/flow_estimation/x86/corner_match_avx2.c")
 
   if(CONFIG_INTERNAL_STATS)
     list(APPEND AOM_DSP_ENCODER_SOURCES "${AOM_ROOT}/aom_dsp/fastssim.c"
