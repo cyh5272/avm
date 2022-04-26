@@ -501,7 +501,8 @@ void av1_highbd_fwd_txfm(const int16_t *src_diff, tran_low_t *coeff,
 
 #if CONFIG_CROSS_CHROMA_TX
 void av1_fwd_cross_chroma_tx_block(tran_low_t *coeff_u, tran_low_t *coeff_v,
-                                   TX_SIZE tx_size) {
+                                   TX_SIZE tx_size, CctxType cctx_type) {
+  if (cctx_type == CCTX_NONE) return;
 #if CCTX_DC_ONLY
   const int ncoeffs = 1;
 #else

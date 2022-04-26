@@ -1121,7 +1121,11 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_IST
                       plane,
 #endif
-                      tx_size, best_tx_type, &txfm_param_intra);
+                      tx_size, best_tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                      CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                      &txfm_param_intra);
       av1_setup_quant(tx_size, !skip_trellis,
                       skip_trellis
                           ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
@@ -1402,7 +1406,11 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_IST
                   plane,
 #endif
-                  tx_size, DCT_DCT, &txfm_param);
+                  tx_size, DCT_DCT,
+#if CONFIG_CROSS_CHROMA_TX
+                  CCTX_NONE,  // TODO(kslu): check
+#endif                        // CONFIG_CROSS_CHROMA_TX
+                  &txfm_param);
   av1_setup_quant(tx_size, 1, AV1_XFORM_QUANT_B, cpi->oxcf.q_cfg.quant_b_adapt,
                   &quant_param);
   int tx_type;
@@ -1552,7 +1560,11 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_IST
                   plane,
 #endif
-                  tx_size, DCT_DCT, &txfm_param);
+                  tx_size, DCT_DCT,
+#if CONFIG_CROSS_CHROMA_TX
+                  CCTX_NONE,  // TODO(kslu): check
+#endif                        // CONFIG_CROSS_CHROMA_TX
+                  &txfm_param);
   av1_setup_quant(tx_size, 1, AV1_XFORM_QUANT_B, cpi->oxcf.q_cfg.quant_b_adapt,
                   &quant_param);
 
@@ -2508,7 +2520,11 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_IST
                   plane,
 #endif
-                  tx_size, DCT_DCT, &txfm_param);
+                  tx_size, DCT_DCT,
+#if CONFIG_CROSS_CHROMA_TX
+                  CCTX_NONE,  // TODO(kslu): check
+#endif                        // CONFIG_CROSS_CHROMA_TX
+                  &txfm_param);
 
 #if CONFIG_FORWARDSKIP
   const int xform_quant_b =
