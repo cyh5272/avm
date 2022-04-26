@@ -18,11 +18,14 @@
 
 #include "third_party/fastfeat/fast.h"
 
-#include "av1/encoder/corner_detect.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
+#include "aom_dsp/flow_estimation/flow_estimation.h"
+#include "aom_dsp/flow_estimation/pyramid.h"
+#include "aom_mem/aom_mem.h"
 
 // Fast_9 wrapper
 #define FAST_BARRIER 18
-int av1_fast_corner_detect(unsigned char *buf, int width, int height,
+int aom_fast_corner_detect(unsigned char *buf, int width, int height,
                            int stride, int *points, int max_points) {
   int num_points;
   xy *const frm_corners_xy = aom_fast9_detect_nonmax(buf, width, height, stride,
@@ -35,4 +38,21 @@ int av1_fast_corner_detect(unsigned char *buf, int width, int height,
   }
   free(frm_corners_xy);
   return 0;
+}
+
+void aom_find_corners_in_frame(YV12_BUFFER_CONFIG *frm, int bit_depth) {
+  if (!frm->y_pyramid) {
+    frm->y_pyramid = aom_compute_pyramid(frm, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(frm->y_pyramid);
+  }
+  ImagePyramid *pyr = frm->y_pyramid;
+
+  unsigned char *buffer = pyr->level_buffer + pyr->level_loc[0];
+  int width = pyr->widths[0];
+  int height = pyr->heights[0];
+  int stride = pyr->strides[0];
+
+  frm->corners = aom_malloc(2 * MAX_CORNERS * sizeof(*frm->corners));
+  frm->num_corners = aom_fast_corner_detect(buffer, width, height, stride,
+                                            frm->corners, MAX_CORNERS);
 }

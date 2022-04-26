@@ -1851,4 +1851,10 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_highbd_comp_mask_pred sse2 avx2/;
 }  # CONFIG_AV1_ENCODER
 
+# Flow estimation library
+if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
+  add_proto qw/double aom_compute_cross_correlation/, "unsigned char *im1, int stride1, int x1, int y1, unsigned char *im2, int stride2, int x2, int y2";
+  specialize qw/aom_compute_cross_correlation sse4_1 avx2/;
+}
+
 1;

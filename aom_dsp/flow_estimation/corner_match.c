@@ -14,10 +14,13 @@
 #include <memory.h>
 #include <math.h>
 
-#include "config/av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "aom_ports/system_state.h"
-#include "av1/encoder/corner_match.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
+#include "aom_dsp/flow_estimation/corner_match.h"
+#include "aom_dsp/flow_estimation/ransac.h"
+#include "aom_mem/aom_mem.h"
 
 #define SEARCH_SZ 9
 #define SEARCH_SZ_BY2 ((SEARCH_SZ - 1) / 2)
@@ -46,7 +49,7 @@ static double compute_variance(unsigned char *im, int stride, int x, int y) {
    correlation/standard deviation are taken over MATCH_SZ by MATCH_SZ windows
    of each image, centered at (x1, y1) and (x2, y2) respectively.
 */
-double av1_compute_cross_correlation_c(unsigned char *im1, int stride1, int x1,
+double aom_compute_cross_correlation_c(unsigned char *im1, int stride1, int x1,
                                        int y1, unsigned char *im2, int stride2,
                                        int x2, int y2) {
   int v1, v2;
@@ -92,19 +95,18 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
   for (i = 0; i < num_correspondences; ++i) {
     int x, y, best_x = 0, best_y = 0;
     double best_match_ncc = 0.0;
+    int x0 = (int)correspondences[i].x;
+    int y0 = (int)correspondences[i].y;
+    int rx0 = (int)correspondences[i].rx;
+    int ry0 = (int)correspondences[i].ry;
     for (y = -SEARCH_SZ_BY2; y <= SEARCH_SZ_BY2; ++y) {
       for (x = -SEARCH_SZ_BY2; x <= SEARCH_SZ_BY2; ++x) {
         double match_ncc;
-        if (!is_eligible_point(correspondences[i].rx + x,
-                               correspondences[i].ry + y, width, height))
+        if (!is_eligible_point(rx0 + x, ry0 + y, width, height)) continue;
+        if (!is_eligible_distance(x0, y0, rx0 + x, ry0 + y, width, height))
           continue;
-        if (!is_eligible_distance(correspondences[i].x, correspondences[i].y,
-                                  correspondences[i].rx + x,
-                                  correspondences[i].ry + y, width, height))
-          continue;
-        match_ncc = av1_compute_cross_correlation(
-            frm, frm_stride, correspondences[i].x, correspondences[i].y, ref,
-            ref_stride, correspondences[i].rx + x, correspondences[i].ry + y);
+        match_ncc = aom_compute_cross_correlation(frm, frm_stride, x0, y0, ref,
+                                                  ref_stride, rx0 + x, ry0 + y);
         if (match_ncc > best_match_ncc) {
           best_match_ncc = match_ncc;
           best_y = y;
@@ -118,19 +120,18 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
   for (i = 0; i < num_correspondences; ++i) {
     int x, y, best_x = 0, best_y = 0;
     double best_match_ncc = 0.0;
+    int x0 = (int)correspondences[i].x;
+    int y0 = (int)correspondences[i].y;
+    int rx0 = (int)correspondences[i].rx;
+    int ry0 = (int)correspondences[i].ry;
     for (y = -SEARCH_SZ_BY2; y <= SEARCH_SZ_BY2; ++y)
       for (x = -SEARCH_SZ_BY2; x <= SEARCH_SZ_BY2; ++x) {
         double match_ncc;
-        if (!is_eligible_point(correspondences[i].x + x,
-                               correspondences[i].y + y, width, height))
+        if (!is_eligible_point(x0 + x, y0 + y, width, height)) continue;
+        if (!is_eligible_distance(x0 + x, y0 + y, rx0, ry0, width, height))
           continue;
-        if (!is_eligible_distance(
-                correspondences[i].x + x, correspondences[i].y + y,
-                correspondences[i].rx, correspondences[i].ry, width, height))
-          continue;
-        match_ncc = av1_compute_cross_correlation(
-            ref, ref_stride, correspondences[i].rx, correspondences[i].ry, frm,
-            frm_stride, correspondences[i].x + x, correspondences[i].y + y);
+        match_ncc = aom_compute_cross_correlation(
+            ref, ref_stride, rx0, ry0, frm, frm_stride, x0 + x, y0 + y);
         if (match_ncc > best_match_ncc) {
           best_match_ncc = match_ncc;
           best_y = y;
@@ -142,14 +143,15 @@ static void improve_correspondence(unsigned char *frm, unsigned char *ref,
   }
 }
 
-int av1_determine_correspondence(unsigned char *src, int *src_corners,
-                                 int num_src_corners, unsigned char *ref,
-                                 int *ref_corners, int num_ref_corners,
-                                 int width, int height, int src_stride,
-                                 int ref_stride, int *correspondence_pts) {
+static INLINE int determine_correspondence(unsigned char *src, int *src_corners,
+                                           int num_src_corners,
+                                           unsigned char *ref, int *ref_corners,
+                                           int num_ref_corners, int width,
+                                           int height, int src_stride,
+                                           int ref_stride,
+                                           Correspondence *correspondences) {
   // TODO(sarahparker) Improve this to include 2-way match
   int i, j;
-  Correspondence *correspondences = (Correspondence *)correspondence_pts;
   int num_correspondences = 0;
   for (i = 0; i < num_src_corners; ++i) {
     double best_match_ncc = 0.0;
@@ -167,7 +169,7 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
                                 ref_corners[2 * j], ref_corners[2 * j + 1],
                                 width, height))
         continue;
-      match_ncc = av1_compute_cross_correlation(
+      match_ncc = aom_compute_cross_correlation(
           src, src_stride, src_corners[2 * i], src_corners[2 * i + 1], ref,
           ref_stride, ref_corners[2 * j], ref_corners[2 * j + 1]);
       if (match_ncc > best_match_ncc) {
@@ -177,7 +179,7 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
     }
     // Note: We want to test if the best correlation is >= THRESHOLD_NCC,
     // but need to account for the normalization in
-    // av1_compute_cross_correlation.
+    // aom_compute_cross_correlation.
     template_norm = compute_variance(src, src_stride, src_corners[2 * i],
                                      src_corners[2 * i + 1]);
     if (best_match_ncc > THRESHOLD_NCC * sqrt(template_norm)) {
@@ -192,4 +194,122 @@ int av1_determine_correspondence(unsigned char *src, int *src_corners,
   improve_correspondence(src, ref, width, height, src_stride, ref_stride,
                          correspondences, num_correspondences);
   return num_correspondences;
+}
+
+CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
+                                             YV12_BUFFER_CONFIG *ref,
+                                             int bit_depth) {
+  // Ensure that all relevant per-frame data is available
+  if (!src->y_pyramid) {
+    src->y_pyramid = aom_compute_pyramid(src, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(src->y_pyramid);
+  }
+  if (!ref->y_pyramid) {
+    ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
+    assert(ref->y_pyramid);
+  }
+  if (!src->corners) {
+    aom_find_corners_in_frame(src, bit_depth);
+  }
+  if (!ref->corners) {
+    aom_find_corners_in_frame(ref, bit_depth);
+  }
+
+  ImagePyramid *src_pyr = src->y_pyramid;
+
+  unsigned char *src_buffer = src_pyr->level_buffer + src_pyr->level_loc[0];
+  int src_width = src_pyr->widths[0];
+  int src_height = src_pyr->heights[0];
+  int src_stride = src_pyr->strides[0];
+
+  ImagePyramid *ref_pyr = ref->y_pyramid;
+
+  unsigned char *ref_buffer = ref_pyr->level_buffer + ref_pyr->level_loc[0];
+  int ref_stride = ref_pyr->strides[0];
+  assert(ref_pyr->widths[0] == src_width);
+  assert(ref_pyr->heights[0] == src_height);
+
+  // Compute correspondences
+  CorrespondenceList *list = aom_malloc(sizeof(CorrespondenceList));
+  list->correspondences = (Correspondence *)aom_malloc(
+      src->num_corners * sizeof(*list->correspondences));
+  list->num_correspondences = determine_correspondence(
+      src_buffer, src->corners, src->num_corners, ref_buffer, ref->corners,
+      ref->num_corners, src_width, src_height, src_stride, ref_stride,
+      list->correspondences);
+  return list;
+}
+
+bool aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                             TransformationType type,
+                                             MotionModel *params_by_motion,
+                                             int num_motions) {
+  int num_correspondences = corrs->num_correspondences;
+
+  ransac(corrs->correspondences, num_correspondences, type, params_by_motion,
+         num_motions);
+
+  // Set num_inliers = 0 for motions with too few inliers so they are ignored.
+  for (int i = 0; i < num_motions; ++i) {
+    if (params_by_motion[i].num_inliers <
+            MIN_INLIER_PROB * num_correspondences ||
+        num_correspondences == 0) {
+      params_by_motion[i].num_inliers = 0;
+    }
+  }
+
+  // Return true if any one of the motions has inliers.
+  for (int i = 0; i < num_motions; ++i) {
+    if (params_by_motion[i].num_inliers > 0) return true;
+  }
+  return false;
+}
+
+bool aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                            PixelRect *rect,
+                                            TransformationType type,
+                                            double *mat) {
+  int width = rect_height(rect);
+  int height = rect_width(rect);
+  int num_points = width * height;
+
+  // TODO(rachelbarker): Downsample if num_points is > some threshold?
+  double *pts1 = aom_malloc(num_points * 2 * sizeof(double));
+  double *pts2 = aom_malloc(num_points * 2 * sizeof(double));
+  int point_index = 0;
+
+  for (int i = 0; i < corrs->num_correspondences; i++) {
+    Correspondence *corr = &corrs->correspondences[i];
+    int x = (int)corr->x;
+    int y = (int)corr->y;
+    if (is_inside_rect(x, y, rect)) {
+      pts1[2 * point_index + 0] = corr->x;
+      pts1[2 * point_index + 1] = corr->y;
+      pts2[2 * point_index + 0] = corr->rx;
+      pts2[2 * point_index + 1] = corr->ry;
+      point_index++;
+    }
+  }
+  assert(point_index <= num_points);
+
+  num_points = point_index;
+
+  bool result;
+  if (num_points < 4) {
+    // Too few points to fit a model
+    result = false;
+  } else {
+    result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
+  }
+
+  aom_free(pts1);
+  aom_free(pts2);
+  return result;
+}
+
+void aom_free_correspondence_list(CorrespondenceList *list) {
+  if (list) {
+    aom_free(list->correspondences);
+    aom_free(list);
+  }
 }
