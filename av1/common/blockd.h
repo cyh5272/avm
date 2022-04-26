@@ -1851,6 +1851,9 @@ static INLINE int is_interintra_allowed_ref(const MV_REFERENCE_FRAME rf[2]) {
 }
 
 static INLINE int is_interintra_allowed(const MB_MODE_INFO *mbmi) {
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION
+  if (mbmi->pb_mv_precision <= MV_PRECISION_FOUR_PEL) return 0;
+#endif
   return is_interintra_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
          is_interintra_allowed_mode(mbmi->mode) &&
          is_interintra_allowed_ref(mbmi->ref_frame);

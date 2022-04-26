@@ -169,8 +169,9 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
     if (is_global_mv_block(mbmi, gm_type)) return SIMPLE_TRANSLATION;
   }
 
-#if CONFIG_FLEX_MVRES
-  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return SIMPLE_TRANSLATION;
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION
+  if (mbmi->pb_mv_precision <= mbmi->max_mv_precision)
+    return SIMPLE_TRANSLATION;
 #endif
   if (is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
       is_inter_mode(mbmi->mode) && mbmi->ref_frame[1] != INTRA_FRAME &&
