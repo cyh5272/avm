@@ -7653,6 +7653,9 @@ static INLINE int is_tip_mode(THR_MODES mode) {
     unsigned int ref_costs_comp[REF_FRAMES][REF_FRAMES];
 #if CONFIG_FLEX_MVRES
     set_default_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+#if ADAPTIVE_PRECISION_SETS
+    set_default_precision_set(cm, mbmi, bsize);
+#endif
     set_mv_precision(mbmi, mbmi->max_mv_precision);
     set_most_probable_mv_precision(cm, mbmi, bsize);
 #endif

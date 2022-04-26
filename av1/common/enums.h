@@ -32,7 +32,7 @@ extern "C" {
 #if CONFIG_FLEX_MVRES
 #define DEBUG_FLEX_MV 0
 #define ADAPTIVE_PRECISION_SETS \
-  0                             // Enable adaptive precision sets for each block
+  1                             // Enable adaptive precision sets for each block
 #define FAST_FLEX_MV_ENCODER 1  // Enable fast encoder searching algorithms
 
 #if FAST_FLEX_MV_ENCODER
