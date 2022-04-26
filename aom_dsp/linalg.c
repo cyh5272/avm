@@ -10,19 +10,20 @@
  * aomedia.org/license/patent-license/.
  */
 
-#ifndef AOM_AV1_ENCODER_MATHUTILS_H_
-#define AOM_AV1_ENCODER_MATHUTILS_H_
-
 #include <memory.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_dsp/linalg.h"
+#include "aom_mem/aom_mem.h"
+
 static const double TINY_NEAR_ZERO = 1.0E-16;
 
 // Solves Ax = b, where x and b are column vectors of size nx1 and A is nxn
-static INLINE int linsolve(int n, double *A, int stride, double *b, double *x) {
+int linsolve(int n, double *A, int stride, double *b, double *x) {
   int i, j, k;
   double c;
   // Forward elimination
@@ -63,8 +64,8 @@ static INLINE int linsolve(int n, double *A, int stride, double *b, double *x) {
 // Solves for n-dim x in a least squares sense to minimize |Ax - b|^2
 // The solution is simply x = (A'A)^-1 A'b or simply the solution for
 // the system: A'A x = A'b
-static INLINE int least_squares(int n, double *A, int rows, int stride,
-                                double *b, double *scratch, double *x) {
+int least_squares(int n, double *A, int rows, int stride, double *b,
+                  double *scratch, double *x) {
   int i, j, k;
   double *scratch_ = NULL;
   double *AtA, *Atb;
@@ -90,49 +91,9 @@ static INLINE int least_squares(int n, double *A, int rows, int stride,
   return ret;
 }
 
-// Matrix multiply
-static INLINE void multiply_mat(const double *m1, const double *m2, double *res,
-                                const int m1_rows, const int inner_dim,
-                                const int m2_cols) {
-  double sum;
-
-  int row, col, inner;
-  for (row = 0; row < m1_rows; ++row) {
-    for (col = 0; col < m2_cols; ++col) {
-      sum = 0;
-      for (inner = 0; inner < inner_dim; ++inner)
-        sum += m1[row * inner_dim + inner] * m2[inner * m2_cols + col];
-      *(res++) = sum;
-    }
-  }
-}
-
-//
-// The functions below are needed only for homography computation
-// Remove if the homography models are not used.
-//
 ///////////////////////////////////////////////////////////////////////////////
 // svdcmp
 // Adopted from Numerical Recipes in C
-
-static INLINE double sign(double a, double b) {
-  return ((b) >= 0 ? fabs(a) : -fabs(a));
-}
-
-static INLINE double pythag(double a, double b) {
-  double ct;
-  const double absa = fabs(a);
-  const double absb = fabs(b);
-
-  if (absa > absb) {
-    ct = absb / absa;
-    return absa * sqrt(1.0 + ct * ct);
-  } else {
-    ct = absa / absb;
-    return (absb == 0) ? 0 : absb * sqrt(1.0 + ct * ct);
-  }
-}
-
 static INLINE int svdcmp(double **u, int m, int n, double w[], double **v) {
   const int max_its = 30;
   int flag, i, its, j, jj, k, l, nm;
@@ -317,8 +278,7 @@ static INLINE int svdcmp(double **u, int m, int n, double w[], double **v) {
   return 0;
 }
 
-static INLINE int SVD(double *U, double *W, double *V, double *matx, int M,
-                      int N) {
+int SVD(double *U, double *W, double *V, double *matx, int M, int N) {
   // Assumes allocation for U is MxN
   double **nrU = (double **)aom_malloc((M) * sizeof(*nrU));
   double **nrV = (double **)aom_malloc((N) * sizeof(*nrV));
@@ -356,5 +316,3 @@ static INLINE int SVD(double *U, double *W, double *V, double *matx, int M,
 
   return 0;
 }
-
-#endif  // AOM_AV1_ENCODER_MATHUTILS_H_
