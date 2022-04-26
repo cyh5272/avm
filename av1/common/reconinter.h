@@ -646,7 +646,7 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
   if (mbmi->mode >= NEAR_NEARMV_OPTFLOW || use_opfl_refine_all(cm, mbmi))
     return 0;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-  if (mbmi->motion_mode == WARPED_CAUSAL) return 0;
+  if (is_warp_mode(mbmi->motion_mode)) return 0;
   if (is_nontrans_global_motion(xd, xd->mi[0])) return 0;
   return 1;
 }

@@ -509,6 +509,18 @@ int main(int argc, const char **argv) {
   optimize_cdf_table(&fc.warped_causal[0][0], probsfile, 2, cts_each_dim,
                      "static const aom_cdf_prob "
                      "default_warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+#if CONFIG_WARP_DELTA
+  cts_each_dim[0] = BLOCK_SIZES_ALL;
+  cts_each_dim[1] = 2;
+  optimize_cdf_table(&fc.warp_delta[0][0], probsfile, 2, cts_each_dim,
+                     "static const aom_cdf_prob "
+                     "default_warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
+  cts_each_dim[0] = 2;
+  cts_each_dim[1] = WARP_DELTA_NUM_SYMBOLS;
+  optimize_cdf_table(&fc.warp_delta_param[0][0], probsfile, 2, cts_each_dim,
+                     "static const aom_cdf_prob default_warp_delta_param_cdf"
+                     "[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)]");
+#endif  // CONFIG_WARP_DELTA
 #else
   cts_each_dim[0] = BLOCK_SIZES_ALL;
   cts_each_dim[1] = MOTION_MODES;

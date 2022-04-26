@@ -248,6 +248,9 @@ const map_entry motion_mode_map[] = { ENUM(SIMPLE_TRANSLATION),
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
                                       ENUM(OBMC_CAUSAL),    // 2-sided OBMC
                                       ENUM(WARPED_CAUSAL),  // 2-sided WARPED
+#if CONFIG_WARP_DELTA
+                                      ENUM(WARP_DELTA),
+#endif  // CONFIG_WARP_DELTA
                                       LAST_ENUM };
 
 const map_entry compound_type_map[] = { ENUM(COMPOUND_AVERAGE),

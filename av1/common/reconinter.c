@@ -627,7 +627,7 @@ void av1_opfl_build_inter_predictor(
 
   const WarpedMotionParams *const wm = &xd->global_motion[mi->ref_frame[ref]];
   const WarpTypesAllowed warp_types = { is_global_mv_block(mi, wm->wmtype),
-                                        mi->motion_mode == WARPED_CAUSAL };
+                                        is_warp_mode(mi->motion_mode) };
 #if CONFIG_OPTFLOW_ON_TIP
   const struct scale_factors *const sf =
       is_tip
@@ -1656,7 +1656,7 @@ static void build_inter_predictors_8x8_and_bigger(
     struct buf_2d *const pre_buf = is_intrabc ? dst_buf : &pd->pre[ref];
     const MV mv = mi->mv[ref].as_mv;
     const WarpTypesAllowed warp_types = { is_global[ref],
-                                          mi->motion_mode == WARPED_CAUSAL };
+                                          is_warp_mode(mi->motion_mode) };
 
     InterPredParams inter_pred_params;
     av1_init_inter_params(&inter_pred_params, bw, bh, pre_y, pre_x,

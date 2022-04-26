@@ -346,6 +346,36 @@ static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
 }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_WARP_DELTA
+static void write_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
+                                   aom_writer *w) {
+  assert(2 <= index && index <= 5);
+  int index_type = (index == 2 || index == 5) ? 0 : 1;
+  int coded_value = (value / WARP_DELTA_STEP) + WARP_DELTA_CODED_MAX;
+  assert(0 <= coded_value && coded_value < WARP_DELTA_NUM_SYMBOLS);
+
+  aom_write_symbol(w, coded_value,
+                   xd->tile_ctx->warp_delta_param_cdf[index_type],
+                   WARP_DELTA_NUM_SYMBOLS);
+}
+
+static void write_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
+                             aom_writer *w) {
+  const WarpedMotionParams *global_params =
+      &xd->global_motion[mbmi->ref_frame[0]];
+  const WarpedMotionParams *params = &mbmi->wm_params[0];
+
+  // The RDO stage should not give us a model which is not warpable.
+  // Such models can still be signalled, but are effectively useless
+  // as we'll just fall back to translational motion
+  assert(!params->invalid);
+
+  // TODO(rachelbarker): Allow signaling warp type?
+  write_warp_delta_param(xd, 2, params->wmmat[2] - global_params->wmmat[2], w);
+  write_warp_delta_param(xd, 3, params->wmmat[3] - global_params->wmmat[3], w);
+}
+#endif  // CONFIG_WARP_DELTA
+
 static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                          const MB_MODE_INFO *mbmi,
                                          aom_writer *w) {
@@ -397,6 +427,18 @@ static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
       return;
     }
   }
+
+#if CONFIG_WARP_DELTA
+  if (allowed_motion_modes & (1 << WARP_DELTA)) {
+    aom_write_symbol(w, motion_mode == WARP_DELTA,
+                     xd->tile_ctx->warp_delta_cdf[bsize], 2);
+
+    if (motion_mode == WARP_DELTA) {
+      write_warp_delta(xd, mbmi, w);
+      return;
+    }
+  }
+#endif  // CONFIG_WARP_DELTA
 }
 #else
 static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,

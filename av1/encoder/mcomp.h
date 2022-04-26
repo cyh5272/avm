@@ -493,6 +493,14 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                   BLOCK_SIZE bsize, const int *pts0,
                                   const int *pts_inref0, int total_samples);
 
+#if CONFIG_WARP_DELTA
+// Returns 1 if able to select a good model, 0 if not
+int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
+                        MB_MODE_INFO *mbmi,
+                        const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
+                        const ModeCosts *mode_costs);
+#endif  // CONFIG_WARP_DELTA
+
 static INLINE void av1_set_fractional_mv(int_mv *fractional_best_mv) {
   for (int z = 0; z < 3; z++) {
     fractional_best_mv[z].as_int = INVALID_MV;

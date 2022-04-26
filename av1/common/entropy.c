@@ -153,6 +153,10 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
   RESET_CDF_COUNTER(fc->obmc_cdf, 2);
   RESET_CDF_COUNTER(fc->warped_causal_cdf, 2);
+#if CONFIG_WARP_DELTA
+  RESET_CDF_COUNTER(fc->warp_delta_cdf, 2);
+  RESET_CDF_COUNTER(fc->warp_delta_param_cdf, WARP_DELTA_NUM_SYMBOLS);
+#endif  // CONFIG_WARP_DELTA
 #else
   RESET_CDF_COUNTER(fc->motion_mode_cdf, MOTION_MODES);
   RESET_CDF_COUNTER(fc->obmc_cdf, 2);

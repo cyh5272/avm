@@ -83,6 +83,27 @@ extern "C" {
 #define MAX_REFS_ARF 4
 #endif  // CONFIG_NEW_REF_SIGNALING
 
+#if CONFIG_WARP_DELTA
+// Parameters which determine the warp delta coding
+// The raw values which can be signaled are
+//   {-WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX}
+// inclusive.
+//
+// This raw value is then scaled by WARP_DELTA_STEP (on a scale where
+// (1 << WARPEDMODEL_PREC_BITS) == (1 << 16) represents the value 1.0).
+// Hence:
+//  WARP_DELTA_STEP = (1 << 10) => Each step represents 1/64
+//  WARP_DELTA_STEP = (1 << 11) => Each step represents 1/32
+//
+// Note that each coefficient must be < 1/4 (and one must be < 1/7),
+// so `WARP_DELTA_MAX` here should work out to something < (1 << 14)
+#define WARP_DELTA_STEP_BITS 10
+#define WARP_DELTA_STEP (1 << WARP_DELTA_STEP_BITS)
+#define WARP_DELTA_CODED_MAX 7
+#define WARP_DELTA_NUM_SYMBOLS (2 * WARP_DELTA_CODED_MAX + 1)
+#define WARP_DELTA_MAX (WARP_DELTA_STEP * WARP_DELTA_CODED_MAX)
+#endif  // CONFIG_WARP_DELTA
+
 struct AV1Common;
 
 typedef struct {
@@ -144,6 +165,10 @@ typedef struct frame_contexts {
 #if CONFIG_EXTENDED_WARP_PREDICTION
   aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
+#if CONFIG_WARP_DELTA
+  aom_cdf_prob warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
+  aom_cdf_prob warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)];
+#endif  // CONFIG_WARP_DELTA
 #else
   aom_cdf_prob motion_mode_cdf[BLOCK_SIZES_ALL][CDF_SIZE(MOTION_MODES)];
   aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];

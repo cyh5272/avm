@@ -292,6 +292,50 @@ static void read_drl_idx(int max_drl_bits, const int16_t mode_ctx,
   assert(mbmi->ref_mv_idx < max_drl_bits + 1);
 }
 
+#if CONFIG_WARP_DELTA
+// Read the delta for a single warp parameter
+// Each delta is coded as a symbol in the range
+// -WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX
+static int read_warp_delta_param(const MACROBLOCKD *xd, int index,
+                                 aom_reader *r) {
+  assert(2 <= index && index <= 5);
+  int index_type = (index == 2 || index == 5) ? 0 : 1;
+
+  int coded_value =
+      aom_read_symbol(r, xd->tile_ctx->warp_delta_param_cdf[index_type],
+                      WARP_DELTA_NUM_SYMBOLS, ACCT_STR);
+
+  return (coded_value - WARP_DELTA_CODED_MAX) * WARP_DELTA_STEP;
+}
+
+static void read_warp_delta(const MACROBLOCKD *xd, MB_MODE_INFO *mbmi,
+                            aom_reader *r) {
+  const WarpedMotionParams *global_params =
+      &xd->global_motion[mbmi->ref_frame[0]];
+  WarpedMotionParams *params = &mbmi->wm_params[0];
+  int mi_row = xd->mi_row;
+  int mi_col = xd->mi_col;
+  const MV mv = mbmi->mv[0].as_mv;
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+
+  // TODO(rachelbarker): Allow signaling warp type?
+  params->wmtype = ROTZOOM;
+  params->wmmat[2] = global_params->wmmat[2] + read_warp_delta_param(xd, 2, r);
+  params->wmmat[3] = global_params->wmmat[3] + read_warp_delta_param(xd, 3, r);
+  params->wmmat[4] = -params->wmmat[3];
+  params->wmmat[5] = params->wmmat[2];
+  av1_set_warp_translation(mi_row, mi_col, bsize, mv, params);
+
+  int valid = av1_get_shear_params(params);
+  params->invalid = !valid;
+  if (!valid) {
+#if WARPED_MOTION_DEBUG
+    printf("Warning: unexpected WARP_DELTA model from aomenc\n");
+#endif
+  }
+}
+#endif  // CONFIG_WARP_DELTA
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
 static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
                                     MB_MODE_INFO *mbmi, aom_reader *r) {
@@ -339,6 +383,17 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
       return WARPED_CAUSAL;
     }
   }
+
+#if CONFIG_WARP_DELTA
+  if (allowed_motion_modes & (1 << WARP_DELTA)) {
+    int use_warp_delta =
+        aom_read_symbol(r, xd->tile_ctx->warp_delta_cdf[bsize], 2, ACCT_STR);
+    if (use_warp_delta) {
+      read_warp_delta(xd, mbmi, r);
+      return WARP_DELTA;
+    }
+  }
+#endif  // CONFIG_WARP_DELTA
 
   return SIMPLE_TRANSLATION;
 }

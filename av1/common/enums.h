@@ -620,6 +620,9 @@ enum {
 #endif            // CONFIG_EXTENDED_WARP_PREDICTION
   OBMC_CAUSAL,    // 2-sided OBMC
   WARPED_CAUSAL,  // 2-sided WARPED
+#if CONFIG_WARP_DELTA
+  WARP_DELTA,  // Directly-signaled warp model
+#endif         // CONFIG_WARP_DELTA
   MOTION_MODES
 } UENUM1BYTE(MOTION_MODE);
 

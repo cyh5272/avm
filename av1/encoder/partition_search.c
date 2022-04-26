@@ -856,6 +856,53 @@ static void update_intrabc_drl_idx_stats(int max_ref_bv_num, FRAME_CONTEXT *fc,
 }
 #endif  // CONFIG_BVP_IMPROVEMENT
 
+#if CONFIG_WARP_DELTA
+static void update_warp_delta_param_stats(int index, int value,
+#if CONFIG_ENTROPY_STATS
+                                          FRAME_COUNTS *counts,
+#endif  // CONFIG_ENTROPY_STATS
+                                          FRAME_CONTEXT *fc) {
+  assert(2 <= index && index <= 5);
+  int index_type = (index == 2 || index == 5) ? 0 : 1;
+  int coded_value = (value / WARP_DELTA_STEP) + WARP_DELTA_CODED_MAX;
+  assert(0 <= coded_value && coded_value < WARP_DELTA_NUM_SYMBOLS);
+
+  update_cdf(fc->warp_delta_param_cdf[index_type], coded_value,
+             WARP_DELTA_NUM_SYMBOLS);
+#if CONFIG_ENTROPY_STATS
+  counts->warp_delta_param[index_type][coded_value]++;
+#endif  // CONFIG_ENTROPY_STATS
+}
+
+static void update_warp_delta_stats(const MACROBLOCKD *xd,
+                                    const MB_MODE_INFO *mbmi,
+#if CONFIG_ENTROPY_STATS
+                                    FRAME_COUNTS *counts,
+#endif  // CONFIG_ENTROPY_STATS
+                                    FRAME_CONTEXT *fc) {
+  const WarpedMotionParams *global_params =
+      &xd->global_motion[mbmi->ref_frame[0]];
+  const WarpedMotionParams *params = &mbmi->wm_params[0];
+
+  // The RDO stage should not give us a model which is not warpable.
+  // Such models can still be signalled, but are effectively useless
+  // as we'll just fall back to translational motion
+  assert(!params->invalid);
+
+  // TODO(rachelbarker): Allow signaling warp type?
+  update_warp_delta_param_stats(2, params->wmmat[2] - global_params->wmmat[2],
+#if CONFIG_ENTROPY_STATS
+                                counts,
+#endif  // CONFIG_ENTROPY_STATS
+                                fc);
+  update_warp_delta_param_stats(3, params->wmmat[3] - global_params->wmmat[3],
+#if CONFIG_ENTROPY_STATS
+                                counts,
+#endif  // CONFIG_ENTROPY_STATS
+                                fc);
+}
+#endif  // CONFIG_WARP_DELTA
+
 static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   MACROBLOCK *x = &td->mb;
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -1273,6 +1320,24 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           continue_motion_mode_signaling = false;
         }
       }
+
+#if CONFIG_WARP_DELTA
+      if (continue_motion_mode_signaling &&
+          allowed_motion_modes & (1 << WARP_DELTA)) {
+#if CONFIG_ENTROPY_STATS
+        counts->warp_delta[bsize][motion_mode == WARP_DELTA]++;
+#endif
+        update_cdf(fc->warp_delta_cdf[bsize], motion_mode == WARP_DELTA, 2);
+        if (motion_mode == WARP_DELTA) {
+          update_warp_delta_stats(xd, mbmi,
+#if CONFIG_ENTROPY_STATS
+                                  counts,
+#endif  // CONFIG_ENTROPY_STATS
+                                  fc);
+          continue_motion_mode_signaling = false;
+        }
+      }
+#endif  // CONFIG_WARP_DELTA
 #else
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
@@ -1375,7 +1440,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   }
 
   if (inter_block && cm->features.interp_filter == SWITCHABLE &&
-      mbmi->motion_mode != WARPED_CAUSAL &&
+      !is_warp_mode(mbmi->motion_mode) &&
       !is_nontrans_global_motion(xd, mbmi)) {
     update_filter_type_cdf(xd, mbmi);
   }
@@ -1667,6 +1732,9 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
           if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
             td->rd_counts.warped_used[mbmi->motion_mode == WARPED_CAUSAL]++;
           }
+#if CONFIG_WARP_DELTA
+          // TODO(rachelbarker): Add counts and pruning for WARP_DELTA
+#endif  // CONFIG_WARP_DELTA
         }
 #else
         const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);

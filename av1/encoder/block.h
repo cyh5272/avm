@@ -815,6 +815,12 @@ typedef struct {
   int obmc_cost[BLOCK_SIZES_ALL][2];
   //! warped_causal_cost
   int warped_causal_cost[BLOCK_SIZES_ALL][2];
+#if CONFIG_WARP_DELTA
+  //! warp_delta_cost
+  int warp_delta_cost[BLOCK_SIZES_ALL][2];
+  //! warp_delta_param_cost
+  int warp_delta_param_cost[2][WARP_DELTA_NUM_SYMBOLS];
+#endif  // CONFIG_WARP_DELTA
 #else
   //! motion_mode_cost
   int motion_mode_cost[BLOCK_SIZES_ALL][MOTION_MODES];

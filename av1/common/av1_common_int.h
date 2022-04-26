@@ -139,6 +139,10 @@ extern "C" {
 #define TIP_MV_SEARCH_RANGE 4
 #endif  // CONFIG_TIP
 
+#if CONFIG_WARP_DELTA
+#define MIN_BSIZE_WARP_DELTA 16
+#endif  // CONFIG_WARP_DELTA
+
 /*!\cond */
 
 enum {
@@ -2934,6 +2938,14 @@ static inline int is_this_mv_precision_compliant(
 }
 #endif  // CONFIG_FLEX_MVRES
 
+static INLINE bool is_warp_mode(MOTION_MODE motion_mode) {
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  return (motion_mode >= WARPED_CAUSAL);
+#else
+  return (motion_mode == WARPED_CAUSAL);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+}
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
 /* Evaluate which motion modes are allowed for the current block
  * Returns a bit field, where motion mode `i` is allowed if and only if
@@ -2948,6 +2960,7 @@ static inline int is_this_mv_precision_compliant(
 static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd,
                                       const MB_MODE_INFO *mbmi) {
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int allowed_motion_modes = (1 << SIMPLE_TRANSLATION);
 
   if (mbmi->skip_mode) {
@@ -2986,9 +2999,9 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     }
   }
 
-  bool motion_variation_allowed =
-      is_motion_variation_allowed_bsize(mbmi->sb_type[PLANE_TYPE_Y]) &&
-      is_inter_mode(mbmi->mode) && is_motion_variation_allowed_compound(mbmi);
+  bool motion_variation_allowed = is_motion_variation_allowed_bsize(bsize) &&
+                                  is_inter_mode(mbmi->mode) &&
+                                  is_motion_variation_allowed_compound(mbmi);
 
   bool obmc_allowed =
       motion_variation_allowed && check_num_overlappable_neighbors(mbmi);
@@ -2997,13 +3010,26 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     allowed_motion_modes |= (1 << OBMC_CAUSAL);
   }
 
-  const int allow_warped_motion = cm->features.allow_warped_motion;
-
-  if (obmc_allowed && mbmi->num_proj_ref >= 1 && allow_warped_motion &&
+  // From here on, all modes are warped, so have some common criteria:
+  const int allow_warped_motion =
+      motion_variation_allowed && cm->features.allow_warped_motion &&
       !av1_is_scaled(xd->block_ref_scale_factors[0]) &&
-      !xd->cur_frame_force_integer_mv) {
+      !xd->cur_frame_force_integer_mv;
+
+  if (obmc_allowed && allow_warped_motion && mbmi->num_proj_ref >= 1) {
     allowed_motion_modes |= (1 << WARPED_CAUSAL);
   }
+
+#if CONFIG_WARP_DELTA
+  bool warp_delta_allowed =
+      allow_warped_motion &&
+      AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >=
+          MIN_BSIZE_WARP_DELTA;
+
+  if (warp_delta_allowed) {
+    allowed_motion_modes |= (1 << WARP_DELTA);
+  }
+#endif  // CONFIG_WARP_DELTA
 
   return allowed_motion_modes;
 }

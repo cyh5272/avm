@@ -58,4 +58,11 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_TIP AND CONFIG_OPTFLOW_ON_TIP)
     change_config_and_warn(CONFIG_OPTFLOW_ON_TIP 0 !CONFIG_TIP)
   endif()
+
+  # CONFIG_WARP_DELTA requires CONFIG_EXTENDED_WARP_PREDICTION.If
+  # CONFIG_EXTENDED_WARP_PREDICTION is off, we also turn off CONFIG_WARP_DELTA.
+  if (NOT CONFIG_EXTENDED_WARP_PREDICTION AND CONFIG_WARP_DELTA)
+    change_config_and_warn(CONFIG_WARP_DELTA 0 !CONFIG_EXTENDED_WARP_PREDICTION)
+  endif()
+
 endmacro()
