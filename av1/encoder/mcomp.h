@@ -348,7 +348,12 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
 #if CONFIG_FLEX_MVRES
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv);
+    FULLPEL_MV *best_mv
+#if FAST_FLEX_MV_ENCODER
+    ,
+    int fast_mv_refinement
+#endif
+);
 #endif
 
 int av1_full_pixel_search(const FULLPEL_MV start_mv,

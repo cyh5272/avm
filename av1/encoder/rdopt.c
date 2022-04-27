@@ -1810,13 +1810,12 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
     const int ref_idx = 0;
     int_mv best_mv;
 #if CONFIG_FLEX_MVRES && REUSE_PREV_MV
-    int valid_mv0_found = 0;
     int valid_precision_mv0 = NUM_MV_PRECISIONS;
-    int do_refine_ms = (pb_mv_precision != mbmi->max_mv_precision) &&
+    int do_refine_ms = (cpi->sf.flexmv_sf.fast_motion_search_low_precision &&
+                        pb_mv_precision < mbmi->max_mv_precision) &&
                        is_pb_mv_precision_active(&cpi->common, mbmi, bsize);
     if (do_refine_ms) {
-      // for (int prev_mv_precision = mbmi->max_mv_precision; prev_mv_precision
-      // > pb_mv_precision; prev_mv_precision--) {
+      int valid_mv0_found = 0;
 #if REUSE_PREV_MV == 2
       for (int prev_mv_precision = pb_mv_precision;
            prev_mv_precision <= mbmi->max_mv_precision; prev_mv_precision++) {
@@ -1830,6 +1829,7 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
           break;
         }
       }
+
       do_refine_ms &= valid_mv0_found;
     }
 
@@ -2818,6 +2818,52 @@ static INLINE void mask_set_bit(int *mask, int index) { *mask |= (1 << index); }
 static INLINE bool mask_check_bit(int mask, int index) {
   return (mask >> index) & 0x1;
 }
+
+#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+static int skip_similar_ref_mv(AV1_COMP *const cpi, MACROBLOCK *x,
+                               BLOCK_SIZE bsize) {
+  AV1_COMMON *const cm = &cpi->common;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const MB_MODE_INFO_EXT *mbmi_ext = x->mbmi_ext;
+
+  if (is_pb_mv_precision_active(cm, mbmi, bsize) &&
+      (mbmi->pb_mv_precision < mbmi->max_mv_precision) &&
+      mbmi->ref_mv_idx > 0) {
+    const int is_comp_pred = has_second_ref(mbmi);
+    const uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
+    int_mv this_refmv[2];
+    for (int i = 0; i < is_comp_pred + 1; ++i) {
+      this_refmv[i] =
+          (i == 0)
+              ? mbmi_ext->ref_mv_stack[ref_frame_type][mbmi->ref_mv_idx].this_mv
+              : mbmi_ext->ref_mv_stack[ref_frame_type][mbmi->ref_mv_idx]
+                    .comp_mv;
+      lower_mv_precision(&this_refmv[i].as_mv, mbmi->pb_mv_precision);
+    }
+
+    for (int prev_ref_mv_idx = 0; prev_ref_mv_idx < mbmi->ref_mv_idx;
+         prev_ref_mv_idx++) {
+      int_mv prev_refmv[2];
+      for (int i = 0; i < is_comp_pred + 1; ++i) {
+        prev_refmv[i] =
+            (i == 0) ? mbmi_ext->ref_mv_stack[ref_frame_type][prev_ref_mv_idx]
+                           .this_mv
+                     : mbmi_ext->ref_mv_stack[ref_frame_type][prev_ref_mv_idx]
+                           .comp_mv;
+        lower_mv_precision(&prev_refmv[i].as_mv, mbmi->pb_mv_precision);
+      }
+      int prev_refmv_same_as_curr_ref_mv =
+          (this_refmv[0].as_int == prev_refmv[0].as_int);
+      if (is_comp_pred)
+        prev_refmv_same_as_curr_ref_mv &=
+            (this_refmv[1].as_int == prev_refmv[1].as_int);
+      if (prev_refmv_same_as_curr_ref_mv) return 1;
+    }
+  }
+  return 0;
+}
+#endif
 
 // Before performing the full MV search in handle_inter_mode, do a simple
 // translation search and see if we can eliminate any motion vectors.
@@ -4057,7 +4103,10 @@ static int64_t handle_inter_mode(
         get_drl_cost(cm->features.max_drl_bits, mbmi, mbmi_ext, x);
 
 #if CONFIG_FLEX_MVRES && !MODEL_RDO_BASED_SEARCH
-
+#if FAST_FLEX_MV_ENCODER
+    MvSubpelPrecision best_precision_so_far = mbmi->max_mv_precision;
+    int64_t best_precision_rd_so_far = INT64_MAX;
+#endif
 #if ADAPTIVE_PRECISION_SETS
     set_precision_set(cm, xd, mbmi, bsize, ref_mv_idx);
     const PRECISION_SET *precision_def =
@@ -4079,6 +4128,23 @@ static int64_t handle_inter_mode(
         continue;
       }
 
+#if FAST_FLEX_MV_ENCODER
+      if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
+        if (cpi->sf.flexmv_sf.terminate_early_4_pel_precision &&
+            pb_mv_precision < MV_PRECISION_FOUR_PEL &&
+            best_precision_so_far >= MV_PRECISION_QTR_PEL)
+          continue;
+        if (mbmi->ref_mv_idx) {
+          if (cpi->sf.flexmv_sf.do_not_search_8_pel_precision &&
+              mbmi->pb_mv_precision == MV_PRECISION_8_PEL)
+            continue;
+
+          if (cpi->sf.flexmv_sf.do_not_search_4_pel_precision &&
+              mbmi->pb_mv_precision == MV_PRECISION_FOUR_PEL)
+            continue;
+        }
+      }
+#endif
 #endif
 #endif
 
@@ -4149,6 +4215,13 @@ static int64_t handle_inter_mode(
       continue;
     }
 
+#if FAST_FLEX_MV_ENCODER
+    if (cpi->sf.flexmv_sf.skip_similar_ref_mv &&
+        skip_similar_ref_mv(cpi, x, bsize)) {
+      continue;
+    }
+#endif
+
 #endif
 
     // The above call to build_cur_mv does not handle NEWMV modes. Build
@@ -4175,7 +4248,8 @@ static int64_t handle_inter_mode(
 #if SKIP_NEW_MV_ET
 #if ENABLE_SKIP_NEW_MV_FOR_HIGH_PRECISIONS
       int skip_new_mv = cpi->sf.inter_sf.skip_repeated_newmv ||
-                        (mbmi->pb_mv_precision != mbmi->max_mv_precision);
+                        (mbmi->pb_mv_precision != mbmi->max_mv_precision &&
+                         cpi->sf.flexmv_sf.skip_repeated_newmv_low_prec);
       if (skip_new_mv &&
 #else
       if (cpi->sf.inter_sf.skip_repeated_newmv &&
@@ -4190,7 +4264,8 @@ static int64_t handle_inter_mode(
 
 #if ENABLE_SKIP_NEW_MV_FOR_HIGH_PRECISIONS
       int skip_new_mv = cpi->sf.inter_sf.skip_repeated_newmv ||
-                        (mbmi->pb_mv_precision != mbmi->max_mv_precision);
+                        (mbmi->pb_mv_precision != mbmi->max_mv_precision &&
+                         cpi->sf.flexmv_sf.skip_repeated_newmv_low_prec);
       if (skip_new_mv &&
 #else
       if (cpi->sf.inter_sf.skip_repeated_newmv &&
@@ -4467,6 +4542,13 @@ static int64_t handle_inter_mode(
         if (ret_val != INT64_MAX) {
           int64_t tmp_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
 #if CONFIG_FLEX_MVRES
+#if FAST_FLEX_MV_ENCODER
+          if (is_pb_mv_precision_active(cm, mbmi, bsize) &&
+              tmp_rd < best_precision_rd_so_far) {
+            best_precision_so_far = mbmi->pb_mv_precision;
+            best_precision_rd_so_far = tmp_rd;
+          }
+#endif
           if (tmp_rd < mode_info[mbmi->pb_mv_precision][ref_mv_idx].rd) {
             // Only update mode_info if the new result is actually better.
             mode_info[mbmi->pb_mv_precision][ref_mv_idx].mv.as_int =

@@ -160,9 +160,10 @@ void av1_make_default_fullpel_ms_params(
 
   ms_params->is_intra_mode = 0;
 #if CONFIG_FLEX_MVRES && REUSE_PREV_MV == 2
-  ms_params->fast_obmc_search = (pb_mv_precision == mbmi->max_mv_precision)
-                                    ? mv_sf->obmc_full_pixel_search_level
-                                    : 1;
+  ms_params->fast_obmc_search =
+      (pb_mv_precision == mbmi->max_mv_precision)
+          ? mv_sf->obmc_full_pixel_search_level
+          : cpi->sf.flexmv_sf.low_prec_obmc_full_pixel_search_level;
 #else
   ms_params->fast_obmc_search = mv_sf->obmc_full_pixel_search_level;
 #endif
@@ -2377,7 +2378,12 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
 // compound mode.
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv) {
+    FULLPEL_MV *best_mv
+#if FAST_FLEX_MV_ENCODER
+    ,
+    int fast_mv_refinement
+#endif
+) {
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
   const int search_range =
       1 << (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
@@ -2399,7 +2405,7 @@ int av1_refining_search_8p_c_low_precision(
 
   int grid_center = search_range * search_grid_stride + search_range;
 #if FAST_MV_REFINEMENT
-  const int num_of_search_steps = 1;
+  const int num_of_search_steps = fast_mv_refinement ? 1 : 3;
 #else
   const int num_of_search_steps = 3;
 #endif

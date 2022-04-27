@@ -499,7 +499,12 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
 
   if (pb_mv_precision < MV_PRECISION_ONE_PEL)
     bestsme = av1_refining_search_8p_c_low_precision(
-        &full_ms_params, start_fullmv, &curr_best_mv.as_fullmv);
+        &full_ms_params, start_fullmv, &curr_best_mv.as_fullmv
+#if FAST_FLEX_MV_ENCODER
+        ,
+        cpi->sf.flexmv_sf.fast_mv_refinement
+#endif
+    );
   else
     bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
                                        &curr_best_mv.as_fullmv
@@ -532,15 +537,10 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
   //     search process as the current fullpel_mv.
   //  2. The rate needed to encode the current fullpel_mv is larger than that
   //     for the other ref_mv.
-#if 1
-  if (mbmi->pb_mv_precision != mbmi->max_mv_precision &&
+  if (cpi->sf.flexmv_sf.skip_repeated_newmv_low_prec &&
+      mbmi->pb_mv_precision != mbmi->max_mv_precision &&
       mbmi->motion_mode == SIMPLE_TRANSLATION &&
       curr_best_mv.as_int != INVALID_MV) {
-#else
-  if (cpi->sf.inter_sf.skip_repeated_full_newmv &&
-      mbmi->motion_mode == SIMPLE_TRANSLATION &&
-      curr_best_mv.as_int != INVALID_MV) {
-#endif
     int_mv this_mv;
     this_mv.as_mv = get_mv_from_fullmv(&curr_best_mv.as_fullmv);
     const int ref_mv_idx = mbmi->ref_mv_idx;
@@ -753,7 +753,11 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL)
       bestsme = av1_refining_search_8p_c_low_precision(
-          &full_ms_params, start_fullmv, &best_mv.as_fullmv);
+          &full_ms_params, start_fullmv, &best_mv.as_fullmv,
+#if FAST_FLEX_MV_ENCODER
+          cpi->sf.flexmv_sf.fast_mv_refinement
+#endif
+      );
     else
 #endif
       bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
@@ -1106,7 +1110,11 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL) {
       bestsme = av1_refining_search_8p_c_low_precision(
-          &full_ms_params, start_fullmv, &best_mv.as_fullmv);
+          &full_ms_params, start_fullmv, &best_mv.as_fullmv,
+#if FAST_FLEX_MV_ENCODER
+          cpi->sf.flexmv_sf.fast_mv_refinement
+#endif
+      );
     } else {
 #endif
       // Small-range full-pixel motion search.
