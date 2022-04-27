@@ -1409,7 +1409,7 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 }
 
 #if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
-#define SUBTRACT_CENTER 1
+#define SUBTRACT_CENTER 0
 
 // Convolves a block of pixels with origin-symmetric, non-separable filters.
 // This routine is intended as a starting point for SIMD and other acceleration
