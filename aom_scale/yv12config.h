@@ -24,6 +24,8 @@ extern "C" {
 #include "aom/aom_integer.h"
 #include "aom/internal/aom_image_internal.h"
 
+#include "aom_dsp/flow_estimation/pyramid.h"
+
 /*!\cond */
 
 #define AOMINNERBORDERINPIXELS 160
@@ -90,10 +92,12 @@ typedef struct yv12_buffer_config {
   // external reference frame is no longer used.
   uint8_t *store_buf_adr[3];
 
-  // If the frame is stored in a 16-bit buffer, this stores an 8-bit version
-  // for use in global motion detection. It is allocated on-demand.
-  uint8_t *y_buffer_8bit;
-  int buf_8bit_valid;
+#if CONFIG_AV1_ENCODER
+  // Data needed for global motion estimation
+  ImagePyramid *y_pyramid;
+  int *corners;
+  int num_corners;
+#endif  // CONFIG_AV1_ENCODER
 
   uint8_t *buffer_alloc;
   size_t buffer_alloc_sz;
@@ -124,6 +128,13 @@ typedef struct yv12_buffer_config {
 int aom_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf, int width, int height,
                            int ss_x, int ss_y, int use_highbitdepth, int border,
                            int byte_alignment);
+
+#if CONFIG_AV1_ENCODER
+// Discard global motion data
+// This should be called whenever a frame buffer is reused for a new frame,
+// to avoid using stale data
+void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf);
+#endif  // CONFIG_AV1_ENCODER
 
 // Updates the yv12 buffer config with the frame buffer. |byte_alignment| must
 // be a power of 2, from 32 to 1024. 0 sets legacy alignment. If cb is not

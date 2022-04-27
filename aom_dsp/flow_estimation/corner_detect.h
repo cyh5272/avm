@@ -10,14 +10,26 @@
  * aomedia.org/license/patent-license/.
  */
 
-#ifndef AOM_AV1_ENCODER_CORNER_DETECT_H_
-#define AOM_AV1_ENCODER_CORNER_DETECT_H_
+#ifndef AOM_FLOW_ESTIMATION_CORNER_DETECT_H_
+#define AOM_FLOW_ESTIMATION_CORNER_DETECT_H_
+
+#include "aom_scale/yv12config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
 
-int av1_fast_corner_detect(unsigned char *buf, int width, int height,
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int aom_fast_corner_detect(unsigned char *buf, int width, int height,
                            int stride, int *points, int max_points);
 
-#endif  // AOM_AV1_ENCODER_CORNER_DETECT_H_
+void aom_find_corners_in_frame(YV12_BUFFER_CONFIG *frm, int bit_depth);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // AOM_FLOW_ESTIMATION_CORNER_DETECT_H_
