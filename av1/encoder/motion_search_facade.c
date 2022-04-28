@@ -441,16 +441,13 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
 #endif
 }
 
-#if CONFIG_FLEX_MVRES && REUSE_PREV_MV
+#if CONFIG_FLEX_MVRES
 void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
                                              MACROBLOCK *x, BLOCK_SIZE bsize,
                                              int ref_idx, int *rate_mv,
                                              inter_mode_info *mode_info,
                                              const int_mv *start_mv,
                                              int_mv *best_mv) {
-#if !SKIP_REPEATED_FULL_NEW_MV
-  (void)mode_info;
-#endif
   MACROBLOCKD *xd = &x->e_mbd;
   const AV1_COMMON *cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
@@ -493,27 +490,14 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
 
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
                                      pb_mv_precision, NULL, 0);
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-  const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
-#endif
 
   if (pb_mv_precision < MV_PRECISION_ONE_PEL)
     bestsme = av1_refining_search_8p_c_low_precision(
-        &full_ms_params, start_fullmv, &curr_best_mv.as_fullmv
-#if FAST_FLEX_MV_ENCODER
-        ,
-        cpi->sf.flexmv_sf.fast_mv_refinement
-#endif
-    );
+        &full_ms_params, start_fullmv, &curr_best_mv.as_fullmv,
+        cpi->sf.flexmv_sf.fast_mv_refinement);
   else
     bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                       &curr_best_mv.as_fullmv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                                       ,
-                                       fast_mv_refinement
-#endif
-
-    );
+                                       &curr_best_mv.as_fullmv);
 
   if (scaled_ref_frame) {
     // Swap back the original buffers for subpel motion search.
@@ -528,8 +512,6 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
           get_mv_from_fullmv(&curr_best_mv.as_fullmv), mbmi->pb_mv_precision),
       " Error in MV precision value after integer search 1");
 #endif
-
-#if SKIP_REPEATED_FULL_NEW_MV
 
   // Terminate search with the current ref_idx if we have already encountered
   // another ref_mv in the drl such that:
@@ -571,7 +553,6 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
       }
     }
   }
-#endif
 
 #if DEBUG_FLEX_MV
   CHECK_FLEX_MV(
@@ -744,29 +725,14 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
     // Small-range full-pixel motion search.
 #if CONFIG_FLEX_MVRES
-#if FAST_MV_REFINEMENT > 1
-#if FAST_MV_REFINEMENT > 2
-    const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
-#else
-    const int fast_mv_refinement = 0;
-#endif
-#endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL)
       bestsme = av1_refining_search_8p_c_low_precision(
           &full_ms_params, start_fullmv, &best_mv.as_fullmv,
-#if FAST_FLEX_MV_ENCODER
-          cpi->sf.flexmv_sf.fast_mv_refinement
-#endif
-      );
+          cpi->sf.flexmv_sf.fast_mv_refinement);
     else
 #endif
       bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                         &best_mv.as_fullmv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                                         ,
-                                         fast_mv_refinement
-#endif
-      );
+                                         &best_mv.as_fullmv);
 
     // Restore the pointer to the first (possibly scaled) prediction buffer.
     if (id) xd->plane[plane].pre[0] = ref_yv12[0];
@@ -1101,31 +1067,15 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
     // Small-range full-pixel motion search.
 #if CONFIG_FLEX_MVRES
-#if FAST_MV_REFINEMENT > 1
-#if FAST_MV_REFINEMENT > 2
-    const int fast_mv_refinement = (pb_mv_precision != mbmi->max_mv_precision);
-#else
-    const int fast_mv_refinement = 0;
-#endif
-#endif
     if (pb_mv_precision < MV_PRECISION_ONE_PEL) {
       bestsme = av1_refining_search_8p_c_low_precision(
           &full_ms_params, start_fullmv, &best_mv.as_fullmv,
-#if FAST_FLEX_MV_ENCODER
-          cpi->sf.flexmv_sf.fast_mv_refinement
-#endif
-      );
+          cpi->sf.flexmv_sf.fast_mv_refinement);
     } else {
 #endif
       // Small-range full-pixel motion search.
       bestsme = av1_refining_search_8p_c(&full_ms_params, start_fullmv,
-                                         &best_mv.as_fullmv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                                         ,
-                                         fast_mv_refinement
-#endif
-
-      );
+                                         &best_mv.as_fullmv);
 #if CONFIG_FLEX_MVRES
     }
 #endif

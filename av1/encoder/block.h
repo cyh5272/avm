@@ -96,24 +96,6 @@ typedef struct {
   int refs[2];
 } WinnerModeStats;
 
-#if CONFIG_FLEX_MVRES && MODEL_RDO_BASED_SEARCH
-typedef struct {
-  //! The best mbmi mode.
-  MB_MODE_INFO best_mbmi;
-  //! The best model rd for this precision.
-  int64_t model_rd;
-  //! The best mode index of this precision.
-  int rate_mv;
-  //! The skip his precision for full RDO or not
-  uint8_t skip_this_precision;
-
-  //! The best mv value
-  int_mv cur_mv[2];
-  //! The return value of motion search
-  int64_t newmv_ret_val;
-} PrecisionStats;
-#endif
-
 /*! \brief Each source plane of the current macroblock
  *
  * This struct also stores the txfm buffers and quantizer settings.

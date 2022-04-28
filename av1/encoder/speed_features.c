@@ -743,7 +743,7 @@ static AOM_INLINE void init_mv_sf(MV_SPEED_FEATURES *mv_sf) {
   mv_sf->use_downsampled_sad = 0;
 }
 
-#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+#if CONFIG_FLEX_MVRES
 static AOM_INLINE void init_flexmv_sf(
     FLEXMV_PRECISION_SPEED_FEATURES *flexmv_sf) {
   flexmv_sf->do_not_search_4_pel_precision = 0;
@@ -971,7 +971,7 @@ void av1_set_speed_features_framesize_independent(AV1_COMP *cpi, int speed) {
   init_winner_mode_sf(&sf->winner_mode_sf);
   init_lpf_sf(&sf->lpf_sf);
 
-#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+#if CONFIG_FLEX_MVRES
   init_flexmv_sf(&sf->flexmv_sf);
 #endif
 

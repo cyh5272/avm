@@ -933,7 +933,7 @@ typedef struct LOOP_FILTER_SPEED_FEATURES {
   int disable_lr_filter;
 } LOOP_FILTER_SPEED_FEATURES;
 
-#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+#if CONFIG_FLEX_MVRES
 typedef struct FLEXMV_PRECISION_SPEED_FEATURES {
   // Do not search 8-pel precision
   int do_not_search_8_pel_precision;
@@ -950,10 +950,10 @@ typedef struct FLEXMV_PRECISION_SPEED_FEATURES {
   // fast_obmc_search for low precisions
   int skip_similar_ref_mv;
 
-  // Skip repeated new MV
+  // Skip RDO of the repeated newMV for lower precisions.
   int skip_repeated_newmv_low_prec;
 
-  // fast mv refinement
+  // Fast refinement of MV for low precision. 1 means fast refinement is enabled
   int fast_mv_refinement;
 
   // fast motion search
@@ -1026,7 +1026,7 @@ typedef struct SPEED_FEATURES {
    * In-loop filter speed features:
    */
   LOOP_FILTER_SPEED_FEATURES lpf_sf;
-#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+#if CONFIG_FLEX_MVRES
   /*!
    * flexible MV precisions speed features:
    */

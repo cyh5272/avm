@@ -339,21 +339,11 @@ unsigned int av1_int_pro_motion_estimation(const struct AV1_COMP *cpi,
                                            const MV *ref_mv);
 
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                             ,
-                             const int fast_mv_refinement
-#endif
-);
+                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv);
 #if CONFIG_FLEX_MVRES
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv
-#if FAST_FLEX_MV_ENCODER
-    ,
-    int fast_mv_refinement
-#endif
-);
+    FULLPEL_MV *best_mv, int fast_mv_refinement);
 #endif
 
 int av1_full_pixel_search(const FULLPEL_MV start_mv,
