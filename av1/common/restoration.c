@@ -1491,9 +1491,9 @@ static int get_qstep(int base_qindex, int bit_depth, int *shift) {
 #define MAX_FEATURE_LENGTH PC_WIENER_FEATURE_LENGTH_LUMA
 #define NUM_FEATURE_LINE_BUFFERS (NUM_PC_WIENER_FEATURES * MAX_FEATURE_LENGTH)
 static int buffer_width = 0;
-static int *feature_line_buffers[NUM_FEATURE_LINE_BUFFERS] = { 0 };
+static int16_t *feature_line_buffers[NUM_FEATURE_LINE_BUFFERS] = { 0 };
 static int *feature_sum_buffers[NUM_PC_WIENER_FEATURES] = { 0 };
-static int *tskip_sum_buffer = 0;
+static int16_t *tskip_sum_buffer = 0;
 
 static int directional_feature_accumulator[NUM_PC_WIENER_FEATURES] = { 0 };
 static int tskip_feature_accumulator = 0;
@@ -1504,7 +1504,7 @@ static void rotate_feature_line_buffers(int feature_len) {
   assert(feature_len <= MAX_FEATURE_LENGTH);
   for (int feature = 0; feature < NUM_PC_WIENER_FEATURES; ++feature) {
     const int row_begin = feature * feature_len;
-    int *buffer_0 = feature_line_buffers[row_begin];
+    int16_t *buffer_0 = feature_line_buffers[row_begin];
     for (int row = row_begin; row < row_begin + feature_len - 1; ++row) {
       feature_line_buffers[row] = feature_line_buffers[row + 1];
     }
@@ -1532,109 +1532,60 @@ static void fill_directional_feature_buffers_highbd(int row, int buffer_row,
   const int buffer_row_2 = buffer_row_1 + feature_length;
   const int buffer_row_3 = buffer_row_2 + feature_length;
 
-  int f0 = 0, f1 = 0, f2 = 0, f3 = 0;
   int buffer_col = 0;
   // TODO(oguleryuz): Reduce buffer sizes for downsampling.
-  const int offset = row % PC_WIENER_DIR_DOWNSAMPLE;
-  for (int col = col_begin; col < col_end; ++col) {
-    if ((buffer_col + offset) % PC_WIENER_DIR_DOWNSAMPLE == 0 ||
-        buffer_col == col_begin) {
-      int dgd_id = row * dgd_stride + col;
-
-      // D V A
-      // H O H
-      // A V D
-      const int base_value = 2 * dgd[dgd_id];  // O.
-      const int horizontal_diff =
-          dgd[dgd_id + 1] + dgd[dgd_id - 1] - base_value;                  // H.
-      int vertical_diff = dgd[dgd_id - dgd_stride] - base_value;           // V.
-      int anti_diagonal_diff = dgd[dgd_id + 1 - dgd_stride] - base_value;  // A.
-      int diagonal_diff = dgd[dgd_id - 1 - dgd_stride] - base_value;       // D.
-
-      vertical_diff += dgd[dgd_id + dgd_stride];
-      anti_diagonal_diff += dgd[dgd_id - 1 + dgd_stride];
-      diagonal_diff += dgd[dgd_id + 1 + dgd_stride];
-
-      f0 = abs(horizontal_diff);
-      f1 = abs(vertical_diff);
-      f2 = abs(anti_diagonal_diff);
-      f3 = abs(diagonal_diff);
-    }
-
-    feature_sum_buffers[0][buffer_col] +=
-        f0 - feature_line_buffers[buffer_row_0][buffer_col];
-    feature_sum_buffers[1][buffer_col] +=
-        f1 - feature_line_buffers[buffer_row_1][buffer_col];
-    feature_sum_buffers[2][buffer_col] +=
-        f2 - feature_line_buffers[buffer_row_2][buffer_col];
-    feature_sum_buffers[3][buffer_col] +=
-        f3 - feature_line_buffers[buffer_row_3][buffer_col];
-
-    feature_line_buffers[buffer_row_0][buffer_col] = f0;
-    feature_line_buffers[buffer_row_1][buffer_col] = f1;
-    feature_line_buffers[buffer_row_2][buffer_col] = f2;
-    feature_line_buffers[buffer_row_3][buffer_col] = f3;
-
-    ++buffer_col;
+#pragma GCC ivdep
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
+    feature_sum_buffers[0][buffer_col] -=
+        feature_line_buffers[buffer_row_0][buffer_col];
+    feature_sum_buffers[1][buffer_col] -=
+        feature_line_buffers[buffer_row_1][buffer_col];
+    feature_sum_buffers[2][buffer_col] -=
+        feature_line_buffers[buffer_row_2][buffer_col];
+    feature_sum_buffers[3][buffer_col] -=
+        feature_line_buffers[buffer_row_3][buffer_col];
   }
-}
 
-static void fill_directional_feature_buffers(int row, int buffer_row,
-                                             const uint8_t *dgd, int dgd_stride,
-                                             int width, int feature_length,
-                                             bool use_strict_bounds) {
-  assert(use_strict_bounds == false);
-  const int col_begin = -feature_length / 2;
-  const int col_end = width + feature_length / 2;
+  buffer_col = 0;
+#pragma GCC ivdep
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
+    const int dgd_id = row * dgd_stride + col;
+    const int prev_row = dgd_id - dgd_stride;
+    const int next_row = dgd_id + dgd_stride;
 
-  const int buffer_row_0 = buffer_row;
-  const int buffer_row_1 = buffer_row_0 + feature_length;
-  const int buffer_row_2 = buffer_row_1 + feature_length;
-  const int buffer_row_3 = buffer_row_2 + feature_length;
+    // D V A
+    // H O H
+    // A V D
+    const int16_t base_value = 2 * dgd[dgd_id];  // O.
+    const int16_t horizontal_diff =
+        dgd[dgd_id + 1] + dgd[dgd_id - 1] - base_value;           // H.
+    int16_t vertical_diff = dgd[prev_row] - base_value;           // V.
+    int16_t anti_diagonal_diff = dgd[prev_row + 1] - base_value;  // A.
+    int16_t diagonal_diff = dgd[prev_row - 1] - base_value;       // D.
 
-  int f0 = 0, f1 = 0, f2 = 0, f3 = 0;
-  int buffer_col = 0;
-  const int offset = row % PC_WIENER_DIR_DOWNSAMPLE;
-  for (int col = col_begin; col < col_end; ++col) {
-    if ((buffer_col + offset) % PC_WIENER_DIR_DOWNSAMPLE == 0 ||
-        buffer_col == col_begin) {
-      int dgd_id = row * dgd_stride + col;
+    vertical_diff += dgd[next_row];
+    anti_diagonal_diff += dgd[next_row - 1];
+    diagonal_diff += dgd[next_row + 1];
 
-      // D V A
-      // H O H
-      // A V D
-      const int base_value = 2 * dgd[dgd_id];  // O.
-      const int horizontal_diff =
-          dgd[dgd_id + 1] + dgd[dgd_id - 1] - base_value;                  // H.
-      int vertical_diff = dgd[dgd_id - dgd_stride] - base_value;           // V.
-      int anti_diagonal_diff = dgd[dgd_id + 1 - dgd_stride] - base_value;  // A.
-      int diagonal_diff = dgd[dgd_id - 1 - dgd_stride] - base_value;       // D.
+    feature_line_buffers[buffer_row_0][buffer_col] =
+        abs(horizontal_diff);                                             // fo
+    feature_line_buffers[buffer_row_1][buffer_col] = abs(vertical_diff);  // f1
+    feature_line_buffers[buffer_row_2][buffer_col] =
+        abs(anti_diagonal_diff);                                          // f2
+    feature_line_buffers[buffer_row_3][buffer_col] = abs(diagonal_diff);  // f3
+  }
 
-      vertical_diff += dgd[dgd_id + dgd_stride];
-      anti_diagonal_diff += dgd[dgd_id - 1 + dgd_stride];
-      diagonal_diff += dgd[dgd_id + 1 + dgd_stride];
-
-      f0 = abs(horizontal_diff);
-      f1 = abs(vertical_diff);
-      f2 = abs(anti_diagonal_diff);
-      f3 = abs(diagonal_diff);
-    }
-
+  buffer_col = 0;
+#pragma GCC ivdep
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
     feature_sum_buffers[0][buffer_col] +=
-        f0 - feature_line_buffers[buffer_row_0][buffer_col];
+        feature_line_buffers[buffer_row_0][buffer_col];
     feature_sum_buffers[1][buffer_col] +=
-        f1 - feature_line_buffers[buffer_row_1][buffer_col];
+        feature_line_buffers[buffer_row_1][buffer_col];
     feature_sum_buffers[2][buffer_col] +=
-        f2 - feature_line_buffers[buffer_row_2][buffer_col];
+        feature_line_buffers[buffer_row_2][buffer_col];
     feature_sum_buffers[3][buffer_col] +=
-        f3 - feature_line_buffers[buffer_row_3][buffer_col];
-
-    feature_line_buffers[buffer_row_0][buffer_col] = f0;
-    feature_line_buffers[buffer_row_1][buffer_col] = f1;
-    feature_line_buffers[buffer_row_2][buffer_col] = f2;
-    feature_line_buffers[buffer_row_3][buffer_col] = f3;
-
-    ++buffer_col;
+        feature_line_buffers[buffer_row_3][buffer_col];
   }
 }
 
@@ -1642,8 +1593,8 @@ static void allocate_pcwiener_line_buffers(int procunit_width) {
   buffer_width = procunit_width + MAX_FEATURE_LENGTH - 1;
   for (int j = 0; j < NUM_FEATURE_LINE_BUFFERS; ++j) {
     // This should be done only once.
-    feature_line_buffers[j] =
-        (int *)(aom_malloc(buffer_width * sizeof(*feature_line_buffers[j])));
+    feature_line_buffers[j] = (int16_t *)(aom_malloc(
+        buffer_width * sizeof(*feature_line_buffers[j])));
   }
   for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
     // This should be done only once.
@@ -1651,7 +1602,7 @@ static void allocate_pcwiener_line_buffers(int procunit_width) {
         (int *)(aom_malloc(buffer_width * sizeof(*feature_sum_buffers[j])));
   }
   tskip_sum_buffer =
-      (int *)(aom_malloc(buffer_width * sizeof(*tskip_sum_buffer)));
+      (int16_t *)(aom_malloc(buffer_width * sizeof(*tskip_sum_buffer)));
 }
 
 static void free_pcwiener_line_buffers() {
@@ -1700,7 +1651,18 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
     tskip_sum_buffer[buffer_col] += tskip[left_tskip_id];
     ++buffer_col;
   }
-  for (int col = 0; col < width; ++col) {
+  int tskip_id_base = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
+#pragma GCC ivdep
+  for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
+    const uint8_t tskip_val = tskip[tskip_id_base + col];
+
+    for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
+      tskip_sum_buffer[buffer_col] += tskip_val;
+      ++buffer_col;
+    }
+  }
+
+  for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width; ++col) {
     int tskip_id =
         (clamped_row >> MI_SIZE_LOG2) * tskip_stride + (col >> MI_SIZE_LOG2);
     tskip_sum_buffer[buffer_col] += tskip[tskip_id];
@@ -1724,7 +1686,18 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
       tskip_sum_buffer[buffer_col] -= tskip[left_tskip_id];
       ++buffer_col;
     }
-    for (int col = 0; col < width; ++col) {
+    tskip_id_base = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
+#pragma GCC ivdep
+    for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
+      const uint8_t tskip_val = tskip[tskip_id_base + col];
+
+      for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
+        tskip_sum_buffer[buffer_col] -= tskip_val;
+        ++buffer_col;
+      }
+    }
+    for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width;
+         ++col) {
       int tskip_id =
           (subtract_row >> MI_SIZE_LOG2) * tskip_stride + (col >> MI_SIZE_LOG2);
       tskip_sum_buffer[buffer_col] -= tskip[tskip_id];
@@ -1741,25 +1714,35 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
 
 static void fill_directional_feature_accumulators(int col, int col_offset,
                                                   int feature_length) {
-  int cl = col + col_offset - feature_length + feature_length / 2;
-  if (cl >= 0) {
-    for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
-      directional_feature_accumulator[k] -= feature_sum_buffers[k][cl];
+  const int col_base = col + col_offset + feature_length / 2;
+  const int cl = col_base - feature_length;
+  // Lose the if check.
+  if (cl < 0) {
+    const int cr = col_base;
+    for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
+      directional_feature_accumulator[k] += feature_sum_buffers[k][cr];
     }
+    return;
   }
-  cl = col + col_offset + feature_length / 2;
-  for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
-    directional_feature_accumulator[k] += feature_sum_buffers[k][cl];
+  const int cr = col_base;
+  for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
+    directional_feature_accumulator[k] +=
+        feature_sum_buffers[k][cr] - feature_sum_buffers[k][cl];
   }
 }
 
 static void fill_tskip_feature_accumulator(int col, int col_offset,
                                            int tskip_length) {
-  int cl = col + col_offset - tskip_length + tskip_length / 2;
-  if (cl >= 0) tskip_feature_accumulator -= tskip_sum_buffer[cl];
-
-  cl = col + col_offset + tskip_length / 2;
-  tskip_feature_accumulator += tskip_sum_buffer[cl];
+  const int col_base = col + col_offset + tskip_length / 2;
+  const int cl = col_base - tskip_length;
+  // Lose the if check.
+  if (cl < 0) {
+    const int cr = col_base;
+    tskip_feature_accumulator += tskip_sum_buffer[cr];
+    return;
+  }
+  const int cr = col_base;
+  tskip_feature_accumulator += tskip_sum_buffer[cr] - tskip_sum_buffer[cl];
 }
 
 // Initializes the accumulators.
@@ -1874,10 +1857,12 @@ static int get_pcwiener_index(int bit_depth, int32_t *multiplier) {
   const int tskip_index = NUM_PC_WIENER_FEATURES;
   const int tskip = feature_vector[tskip_index];
   assert(tskip < 256);
+  for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i)
+    assert(feature_vector[i] >= 0);
 
   for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i) {
     int32_t qval = ROUND_POWER_OF_TWO_SIGNED(
-        abs(feature_vector[i]) + qval_given_tskip_lut[tskip][i],
+        feature_vector[i] + qval_given_tskip_lut[tskip][i],
         PC_WIENER_PREC_FEATURE);
 
     // qval range is [0, 1] -> [0, 255]
@@ -1966,6 +1951,11 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
     pixel_offset_diffs[k] = diff;
     filter_pos[k] = filter_config->config[2 * k][NONSEP_BUF_POS];
   }
+  int16_t max_pixel_value = 255;
+  switch (bit_depth) {
+    case 10: max_pixel_value = 1023; break;
+    case 12: max_pixel_value = 4095; break;
+  }
 
   assert(filter_config->strict_bounds == false);
   const bool dir_strict = filter_config->strict_bounds;
@@ -1999,10 +1989,14 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
         i % PC_WIENER_BLOCK_SIZE != PC_WIENER_BLOCK_ROW_OFFSET;
 #endif  // PC_WIENER_BLOCK_SIZE > 1
     // Initialize accumulators on the leftmost portion of the line.
-    initialize_feature_accumulators(feature_length, tskip_length);
+    if (!skip_row_compute) {
+      initialize_feature_accumulators(feature_length, tskip_length);
+    }
     for (int j = 0; j < width; ++j) {
-      update_accumulators(j, feature_length, feature_half_length, tskip_length,
-                          tskip_half_length);
+      if (!skip_row_compute) {
+        update_accumulators(j, feature_length, feature_half_length,
+                            tskip_length, tskip_half_length);
+      }
 
 #if PC_WIENER_BLOCK_SIZE > 1
       if (skip_row_compute ||
@@ -2012,8 +2006,10 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 
       int32_t multiplier = 0;
       const int filter_index = get_pcwiener_index(bit_depth, &multiplier);
-      const int32_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
+      const int16_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
                                     : pcwiener_filters_luma[filter_index];
+      const int16_t singleton_tap =
+          filter[singleton_tap_index] + (1 << filter_config->prec_bits);
 #if CONFIG_COMBINE_PC_NS_WIENER
       if (nsfilter != NULL) {
         add_filters(nsfilter_config, &pcfilter_config, nsfilter, filter,
@@ -2031,15 +2027,22 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
       const int block_col_begin = j - PC_WIENER_BLOCK_COL_OFFSET;
       int block_col_end = AOMMIN(block_col_begin + PC_WIENER_BLOCK_SIZE, width);
       if (j + PC_WIENER_BLOCK_SIZE >= width) block_col_end = width;
+#else
+      const int block_row_begin = i;
+      const int block_row_end = i + 1;
+      const int block_col_begin = j;
+      const int block_col_end = j + 1;
+#endif  // PC_WIENER_BLOCK_SIZE > 1
 
+#if USE_CONVOLVE_SYM
+      // Have to set #define SUBTRACT_CENTER 0 in convolve.c with current
+      // filter parametrization.
+      av1_convolve_symmetric_highbd_c(
+          dgd, stride, filter_config, filter, dst, dst_stride, bit_depth,
+          block_row_begin, block_row_end, block_col_begin, block_col_end);
+#else
       for (int r = block_row_begin; r < block_row_end; ++r) {
         for (int c = block_col_begin; c < block_col_end; ++c) {
-#else
-      const int r = i;
-      const int c = j;
-      {
-        {
-#endif  // PC_WIENER_BLOCK_SIZE > 1
           int dgd_id = r * stride + c;
 
           // Two loops for a potential data cache miss.
@@ -2055,7 +2058,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
           }
 
           // Handle singleton tap.
-          int32_t tmp = filter[singleton_tap_index] * dgd[dgd_id];
+          int32_t tmp = singleton_tap * dgd[dgd_id];
           for (int k = 0; k < num_sym_taps; ++k) {
             const int pos = filter_pos[k];
             tmp += filter[pos] * compute_buffer[k];
@@ -2069,12 +2072,14 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
             tmp -= correction_factor * dgd[dgd_id];
             tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
           }
-          tmp += (int32_t)dgd[dgd_id];
 
           int dst_id = r * dst_stride + c;
-          dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
+          dst[dst_id] = (tmp > max_pixel_value) ? max_pixel_value
+                        : (tmp < 0) ? 0
+                                    : tmp;
         }
       }
+#endif  // USE_CONVOLVE_SYM
     }
 
     rotate_feature_line_buffers(feature_length);
@@ -2091,18 +2096,26 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
   (void)bit_depth;
   assert(rui->tskip);
   bool is_uv = (rui->plane != AOM_PLANE_Y);
+  static int prev_qindex = -1;
+  static int prev_bit_depth = -1;
 
-  fill_qval_given_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
+  if (rui->base_qindex + rui->qindex_offset != prev_qindex ||
+      bit_depth != prev_bit_depth) {
+    fill_qval_given_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
+    prev_qindex = rui->base_qindex + rui->qindex_offset;
+    prev_bit_depth = bit_depth;
+  }
+
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
 
-    apply_pc_wiener_highbd(
-        src + j, w, stripe_height, src_stride, dst + j, dst_stride,
-        rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+    apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
+                           dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
+                           rui->tskip_stride,
 #if CONFIG_COMBINE_PC_NS_WIENER
-        NULL,
+                           NULL,
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-        is_uv, bit_depth);
+                           is_uv, bit_depth);
   }
 }
 #endif  // CONFIG_PC_WIENER
