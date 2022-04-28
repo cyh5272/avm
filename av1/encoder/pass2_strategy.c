@@ -45,6 +45,8 @@
 #define DEFAULT_KF_BOOST 2300
 #define DEFAULT_GF_BOOST 2000
 #define GROUP_ADAPTIVE_MAXQ 1
+#define GF_BOOST_SCALE 50
+
 static void init_gf_stats(GF_GROUP_STATS *gf_stats);
 
 // Calculate an active area of the image that discounts formatting
@@ -671,8 +673,8 @@ int av1_calc_arf_boost(const TWO_PASS *twopass, const RATE_CONTROL *rc,
     }
   }
 
-  if (arf_boost < ((b_frames + f_frames) * 50))
-    arf_boost = ((b_frames + f_frames) * 50);
+  if (arf_boost < ((b_frames + f_frames) * GF_BOOST_SCALE))
+    arf_boost = ((b_frames + f_frames) * GF_BOOST_SCALE);
 
   return arf_boost;
 }
@@ -1800,22 +1802,40 @@ static void define_gf_group(AV1_COMP *cpi, FIRSTPASS_STATS *this_frame,
                                    : AOMMAX(0, rc->frames_to_key - i + 1);
 
     // Calculate the boost for alt ref.
-    rc->gfu_boost = av1_calc_arf_boost(
-        twopass, rc, frame_info, alt_offset, forward_frames, (i - 1),
-        cpi->lap_enabled ? &rc->num_stats_used_for_gfu_boost : NULL,
-        cpi->lap_enabled ? &rc->num_stats_required_for_gfu_boost : NULL);
+    if (cpi->oxcf.rc_cfg.mode == AOM_Q &&
+        cpi->oxcf.q_cfg.use_fixed_qp_offsets) {
+      const int b_frames = i - 1;
+      const int f_frames = forward_frames;
+      rc->gfu_boost =
+          AOMMIN(MAX_GF_BOOST, (b_frames + f_frames) * GF_BOOST_SCALE);
+    } else {
+      rc->gfu_boost = AOMMIN(
+          MAX_GF_BOOST,
+          av1_calc_arf_boost(
+              twopass, rc, frame_info, alt_offset, forward_frames, (i - 1),
+              cpi->lap_enabled ? &rc->num_stats_used_for_gfu_boost : NULL,
+              cpi->lap_enabled ? &rc->num_stats_required_for_gfu_boost : NULL));
+    }
   } else {
     reset_fpf_position(twopass, start_pos);
     gf_group->max_layer_depth_allowed = 0;
     set_baseline_gf_interval(cpi, (i - 1), active_max_gf_interval, use_alt_ref,
                              frame_params->frame_type);
 
-    rc->gfu_boost = AOMMIN(
-        MAX_GF_BOOST,
-        av1_calc_arf_boost(
-            twopass, rc, frame_info, alt_offset, (i - 1), 0,
-            cpi->lap_enabled ? &rc->num_stats_used_for_gfu_boost : NULL,
-            cpi->lap_enabled ? &rc->num_stats_required_for_gfu_boost : NULL));
+    if (cpi->oxcf.rc_cfg.mode == AOM_Q &&
+        cpi->oxcf.q_cfg.use_fixed_qp_offsets) {
+      const int b_frames = 0;
+      const int f_frames = i - 1;
+      rc->gfu_boost =
+          AOMMIN(MAX_GF_BOOST, (b_frames + f_frames) * GF_BOOST_SCALE);
+    } else {
+      rc->gfu_boost = AOMMIN(
+          MAX_GF_BOOST,
+          av1_calc_arf_boost(
+              twopass, rc, frame_info, alt_offset, (i - 1), 0,
+              cpi->lap_enabled ? &rc->num_stats_used_for_gfu_boost : NULL,
+              cpi->lap_enabled ? &rc->num_stats_required_for_gfu_boost : NULL));
+    }
   }
 
   // rc->gf_intervals assumes the usage of alt_ref, therefore adding one overlay
@@ -2277,8 +2297,8 @@ static int64_t get_kf_group_bits(AV1_COMP *cpi, double kf_group_err,
           cpi->oxcf.rc_cfg.vbr_corpus_complexity_lap / 10.0;
       /* Get the average corpus complexity of the frame */
       vbr_corpus_complexity_lap = vbr_corpus_complexity_lap * num_mbs;
-      kf_group_bits = (int64_t)(kf_group_bits * (kf_group_avg_error /
-                                                 vbr_corpus_complexity_lap));
+      kf_group_bits = (int64_t)(
+          kf_group_bits * (kf_group_avg_error / vbr_corpus_complexity_lap));
     }
   } else {
     kf_group_bits = (int64_t)(twopass->bits_left *
