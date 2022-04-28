@@ -140,6 +140,8 @@ set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
 set_aom_config_var(CONFIG_SDP 0 NUMBER "AV2 Semi-Decoupled Partitioning.")
 set_aom_config_var(CONFIG_EXTQUANT 1
                    "AV2 extended quantization experiment flag")
+set_aom_config_var(ZERO_DC_DELTAQ_OFS 1
+                   "AV2 set zero dc_deltaq offset")
 
 #
 # Variables in this section control optional features of the build system.
