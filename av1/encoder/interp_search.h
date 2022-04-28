@@ -170,6 +170,12 @@ int64_t av1_interpolation_filter_search(
     int64_t *const rd, int *const switchable_rate, int *skip_build_pred,
     HandleInterModeArgs *args, int64_t ref_best_rd);
 
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+int skip_interpolation_filter_search_precision(const AV1_COMMON *const cm,
+                                               const MB_MODE_INFO *mbmi,
+                                               BLOCK_SIZE bsize);
+#endif
+
 /*!\endcond */
 #ifdef __cplusplus
 }  // extern "C"

@@ -35,7 +35,8 @@ extern "C" {
   1                             // Enable adaptive precision sets for each block
 #define FAST_FLEX_MV_ENCODER 1  // Enable fast encoder searching algorithms
 #define DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION \
-  1  // 0 means do not disable, 1 means normatively disable
+  2  // 0 means do not disable, 1 means normatively disable, 2 means encoder
+     // does not search
 
 #if FAST_FLEX_MV_ENCODER
 #define REUSE_PREV_MV 2  // 1 for partial MV reuse, 2 for full MV reuse

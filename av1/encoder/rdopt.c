@@ -1948,6 +1948,20 @@ static INLINE void update_mode_start_end_index(const AV1_COMP *const cpi,
   }
 }
 
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+static INLINE int skip_search_inter_intra(const AV1_COMMON *const cm,
+                                          const MB_MODE_INFO *mbmi,
+                                          BLOCK_SIZE bsize) {
+  return (is_pb_mv_precision_active(cm, mbmi, bsize) &&
+          (mbmi->pb_mv_precision <= MV_PRECISION_FOUR_PEL));
+}
+static INLINE int skip_search_non_transalation_motion_mode(
+    const AV1_COMMON *const cm, const MB_MODE_INFO *mbmi, BLOCK_SIZE bsize) {
+  return (is_pb_mv_precision_active(cm, mbmi, bsize) &&
+          (mbmi->pb_mv_precision < mbmi->max_mv_precision));
+}
+#endif
+
 /*!\brief AV1 motion mode search
  *
  * \ingroup inter_mode_search
@@ -2103,6 +2117,17 @@ static int64_t motion_mode_rd(
       mbmi->motion_mode = (MOTION_MODE)mode_index;
       assert(mbmi->ref_frame[1] != INTRA_FRAME);
     }
+
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+    // skip searching inter-intra for low precisions
+    if (is_interintra_mode && skip_search_inter_intra(cm, mbmi, bsize))
+      continue;
+
+    // skip searching non-transalation motion for low precisions
+    if (!is_interintra_mode && (mbmi->motion_mode != SIMPLE_TRANSLATION) &&
+        skip_search_non_transalation_motion_mode(cm, mbmi, bsize))
+      continue;
+#endif
 
     // Do not search OBMC if the probability of selecting it is below a
     // predetermined threshold for this update_type and block size.
@@ -3549,7 +3574,12 @@ static int process_compound_inter_mode(
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
   // Find matching interp filter or set to default interp filter
-  const int need_search = av1_is_interp_needed(cm, xd);
+  const int need_search =
+      av1_is_interp_needed(cm, xd)
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+      && !skip_interpolation_filter_search_precision(cm, mbmi, bsize)
+#endif
+      ;
   const InterpFilter assign_filter = cm->features.interp_filter;
   int is_luma_interp_done = 0;
   av1_find_interp_filter_match(mbmi, cpi, assign_filter, need_search,
@@ -8685,7 +8715,11 @@ static INLINE int is_tip_mode(THR_MODES mode) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                                interp_filter);
 
-    if (interp_filter != SWITCHABLE) {
+    if (interp_filter != SWITCHABLE
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+        || skip_interpolation_filter_search_precision(cm, mbmi, bsize)
+#endif
+    ) {
       best_filter = interp_filter;
     } else {
       best_filter = EIGHTTAP_REGULAR;
