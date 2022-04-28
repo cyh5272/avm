@@ -13,10 +13,9 @@
 #define AV1_COMMON_PC_WIENER_FILTERS_H_
 
 #define NUM_PC_WIENER_FILTERS 256
-#define PC_WIENER_BLOCK_SIZE 1
+#define PC_WIENER_BLOCK_SIZE 3
 #define PC_WIENER_BLOCK_ROW_OFFSET 1
 #define PC_WIENER_BLOCK_COL_OFFSET 1
-#define PC_WIENER_DIR_DOWNSAMPLE 1
 #define PC_WIENER_FEATURE_LENGTH_LUMA 5  // Lengths are odd numbers.
 #define PC_WIENER_FEATURE_LENGTH_CHROMA 3
 #define PC_WIENER_TSKIP_LENGTH_LUMA 5
@@ -30,6 +29,7 @@
 #define PC_WIENER_PREC_FEATURE 14
 #define PC_WIENER_MULT_ROOM 6
 #define PC_WIENER_LUT_SIZE 4096
+#define USE_CONVOLVE_SYM 0
 
 // Should be positive numbers.
 const int32_t feature_normalizers_luma[NUM_PC_WIENER_FEATURES] = { 13, 5384,
@@ -65,7 +65,7 @@ const int pcwiener_tap_config_chroma[2 * NUM_PC_WIENER_TAPS_CHROMA - 1][3] = {
   { 0, 1, 7 },   { 0, 0, 8 },
 };
 
-const int32_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LUMA] = {
+const int16_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LUMA] = {
   //    0 ----------------------------------------------------------------------
   { 23, 47, -7, -112, 3, -213, 40, 6, -27, 276, 425, -220, 60, 32, -181, 431,
     -1167 },
@@ -822,7 +822,7 @@ const int32_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LU
     -119, -1594 }
 };
 
-const int32_t pcwiener_filters_chroma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_CHROMA] = {
+const int16_t pcwiener_filters_chroma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_CHROMA] = {
   //    0 ----------------------------------------------------------------------
   { -140, -30, 46, 497, 274, -261, -6, 188, -1137 },
   //    1 ----------------------------------------------------------------------
