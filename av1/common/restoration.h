@@ -32,7 +32,7 @@ extern "C" {
 /*!\cond */
 
 #if CONFIG_PC_WIENER
-#define PC_WIENER_PROCESS_CHROMA 1
+#define PC_WIENER_PROCESS_CHROMA 0
 #endif  // CONFIG_PC_WIENER
 
 // Border for Loop restoration buffer
