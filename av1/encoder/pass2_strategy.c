@@ -2748,10 +2748,11 @@ static void process_first_pass_stats(AV1_COMP *cpi,
     subtract_stats(twopass->stats_buf_ctx->total_left_stats, this_frame);
 
   // Set the frame content type flag.
-  if (this_frame->intra_skip_pct >= FC_ANIMATION_THRESH)
-    twopass->fr_content_type = FC_GRAPHICS_ANIMATION;
-  else
-    twopass->fr_content_type = FC_NORMAL;
+  twopass->fr_content_type = FC_GRAPHICS_ANIMATION;
+
+  if (!(cpi->oxcf.rc_cfg.mode == AOM_Q && cpi->oxcf.q_cfg.use_fixed_qp_offsets))
+    if (this_frame->intra_skip_pct < FC_ANIMATION_THRESH)
+      twopass->fr_content_type = FC_NORMAL;
 }
 
 static void setup_target_rate(AV1_COMP *cpi) {
