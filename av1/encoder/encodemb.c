@@ -82,6 +82,9 @@ void av1_subtract_plane(MACROBLOCK *x, BLOCK_SIZE plane_bsize, int plane) {
 
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                   CctxType cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
                    const TXB_CTX *const txb_ctx, int *rate_cost) {
   MACROBLOCKD *const xd = &x->e_mbd;
   struct macroblock_plane *const p = &x->plane[plane];
@@ -99,8 +102,11 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     return eob;
   }
 
-  return av1_optimize_txb_new(cpi, x, plane, block, tx_size, tx_type, txb_ctx,
-                              rate_cost, cpi->oxcf.algo_cfg.sharpness);
+  return av1_optimize_txb_new(cpi, x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                              cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                              txb_ctx, rate_cost, cpi->oxcf.algo_cfg.sharpness);
 }
 
 // Hyper-parameters for dropout optimization, based on following logics.
@@ -626,8 +632,11 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
                   mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
       );
-      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, &txb_ctx,
-                     &dummy_rate_cost);
+      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                     cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                     &txb_ctx, &dummy_rate_cost);
     }
     if (!quant_param.use_optimize_b && do_dropout
 #if CONFIG_FORWARDSKIP
@@ -1131,8 +1140,11 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                   mbmi->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
       );
-      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, &txb_ctx,
-                     &dummy_rate_cost);
+      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                     CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                     &txb_ctx, &dummy_rate_cost);
     }
     if (do_dropout
 #if CONFIG_FORWARDSKIP

@@ -1170,8 +1170,11 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
           x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param_intra,
           &quant_param_intra);
       if (quant_param_intra.use_optimize_b) {
-        av1_optimize_b(cpi, x, plane, block, tx_size, best_tx_type, txb_ctx,
-                       rate_cost);
+        av1_optimize_b(cpi, x, plane, block, tx_size, best_tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                       CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                       txb_ctx, rate_cost);
       }
     }
 
@@ -1286,6 +1289,88 @@ static INLINE int64_t dist_block_px_domain(const AV1_COMP *cpi, MACROBLOCK *x,
   return 16 * pixel_dist(cpi, x, plane, src, src_stride, recon, MAX_TX_SIZE,
                          blk_row, blk_col, plane_bsize, tx_bsize);
 }
+
+#if CONFIG_CROSS_CHROMA_TX
+// Evaluate U and V distortion jointly for cross chroma component transform
+// search.
+static INLINE int64_t joint_uv_dist_block_px_domain(
+    const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE plane_bsize, int block,
+    int blk_row, int blk_col, TX_SIZE tx_size) {
+  MACROBLOCKD *const xd = &x->e_mbd;
+  const struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
+  const struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
+  const struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
+  const struct macroblockd_plane *const pd_v = &xd->plane[AOM_PLANE_V];
+  const uint16_t max_uv_eob = AOMMAX(p_u->eobs[block], p_v->eobs[block]);
+  const int eob_max = av1_get_max_eob(tx_size);
+  const BLOCK_SIZE tx_bsize = txsize_to_bsize[tx_size];
+  const int bsw = block_size_wide[tx_bsize];
+  const int bsh = block_size_high[tx_bsize];
+  // Scale the transform block index to pixel unit.
+  const int src_idx_u = (blk_row * p_u->src.stride + blk_col) << MI_SIZE_LOG2;
+  const int src_idx_v = (blk_row * p_v->src.stride + blk_col) << MI_SIZE_LOG2;
+  const int dst_idx_u = (blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2;
+  const int dst_idx_v = (blk_row * pd_v->dst.stride + blk_col) << MI_SIZE_LOG2;
+  const uint8_t *src_u = &p_u->src.buf[src_idx_u];
+  const uint8_t *src_v = &p_v->src.buf[src_idx_v];
+  const uint8_t *dst_u = &pd_u->dst.buf[dst_idx_u];
+  const uint8_t *dst_v = &pd_v->dst.buf[dst_idx_v];
+  // p_u->dqcoeff and p_v->dqcoeff must remain unchanged here because the best
+  // dqcoeff in the CCTX domain may be used in the search later
+  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_u[MAX_SB_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_v[MAX_SB_SQUARE]);
+  memcpy(tmp_dqcoeff_u, p_u->dqcoeff + BLOCK_OFFSET(block),
+         sizeof(tran_low_t) * eob_max);
+  memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
+         sizeof(tran_low_t) * eob_max);
+
+  assert(cpi != NULL);
+  assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
+
+  uint8_t *recon_u, *recon_v;
+  DECLARE_ALIGNED(16, uint16_t, recon16_u[MAX_TX_SQUARE]);
+  DECLARE_ALIGNED(16, uint16_t, recon16_v[MAX_TX_SQUARE]);
+
+  if (is_cur_buf_hbd(xd)) {
+    recon_u = CONVERT_TO_BYTEPTR(recon16_u);
+    recon_v = CONVERT_TO_BYTEPTR(recon16_v);
+    aom_highbd_convolve_copy(CONVERT_TO_SHORTPTR(dst_u), pd_u->dst.stride,
+                             CONVERT_TO_SHORTPTR(recon_u), MAX_TX_SIZE, bsw,
+                             bsh);
+    aom_highbd_convolve_copy(CONVERT_TO_SHORTPTR(dst_v), pd_v->dst.stride,
+                             CONVERT_TO_SHORTPTR(recon_v), MAX_TX_SIZE, bsw,
+                             bsh);
+  } else {
+    recon_u = (uint8_t *)recon16_u;
+    recon_v = (uint8_t *)recon16_v;
+    aom_convolve_copy(dst_u, pd_u->dst.stride, recon_u, MAX_TX_SIZE, bsw, bsh);
+    aom_convolve_copy(dst_v, pd_v->dst.stride, recon_v, MAX_TX_SIZE, bsw, bsh);
+  }
+
+  CctxType cctx_type = av1_get_cctx_type(
+      xd, blk_row, blk_col, tx_size, cpi->common.features.reduced_tx_set_used);
+  TX_TYPE tx_type =
+      av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
+                      cpi->common.features.reduced_tx_set_used);
+  av1_inv_cross_chroma_tx_block(tmp_dqcoeff_u, tmp_dqcoeff_v, tx_size,
+                                cctx_type);
+  // TODO(kslu): handle transform domain eobs in addition to cctx domain eobs
+  av1_inverse_transform_block(xd, tmp_dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
+                              recon_u, MAX_TX_SIZE, max_uv_eob,
+                              cpi->common.features.reduced_tx_set_used);
+  av1_inverse_transform_block(xd, tmp_dqcoeff_v, AOM_PLANE_V, tx_type, tx_size,
+                              recon_v, MAX_TX_SIZE, max_uv_eob,
+                              cpi->common.features.reduced_tx_set_used);
+
+  int64_t dist_u =
+      pixel_dist(cpi, x, AOM_PLANE_U, src_u, p_u->src.stride, recon_u,
+                 MAX_TX_SIZE, blk_row, blk_col, plane_bsize, tx_bsize);
+  int64_t dist_v =
+      pixel_dist(cpi, x, AOM_PLANE_V, src_v, p_v->src.stride, recon_v,
+                 MAX_TX_SIZE, blk_row, blk_col, plane_bsize, tx_bsize);
+  return 16 * (dist_u + dist_v);
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 static uint32_t get_intra_txb_hash(MACROBLOCK *x, int plane, int blk_row,
                                    int blk_col, BLOCK_SIZE plane_bsize,
@@ -1483,7 +1568,11 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_FORWARDSKIP
         cm,
 #endif  // CONFIG_FORWARDSKIP
-        x, plane, block, tx_size, tx_type, txb_ctx, reduced_tx_set_used, 0);
+        x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+        CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+        txb_ctx, reduced_tx_set_used, 0);
 
     rds_h[idx] = RDCOST(x->rdmult, rate_cost, dist);
 
@@ -1520,7 +1609,11 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_FORWARDSKIP
         cm,
 #endif  // CONFIG_FORWARDSKIP
-        x, plane, block, tx_size, tx_type, txb_ctx, reduced_tx_set_used, 0);
+        x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+        CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+        txb_ctx, reduced_tx_set_used, 0);
 
     rds_v[idx] = RDCOST(x->rdmult, rate_cost, dist);
 
@@ -1636,7 +1729,11 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #if CONFIG_FORWARDSKIP
         cm,
 #endif  // CONFIG_FORWARDSKIP
-        x, plane, block, tx_size, tx_type, txb_ctx, reduced_tx_set_used, 0);
+        x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+        CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+        txb_ctx, reduced_tx_set_used, 0);
     // tx domain dist
     dist_block_tx_domain(x, plane, block, tx_size, &dist, &sse);
 
@@ -2253,6 +2350,9 @@ static INLINE int cost_coeffs(
     const AV1_COMMON *cm,
 #endif  // CONFIG_FORWARDSKIP
     MACROBLOCK *x, int plane, int block, TX_SIZE tx_size, const TX_TYPE tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+    const CctxType cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
     const TXB_CTX *const txb_ctx, int reduced_tx_set_used) {
 #if TXCOEFF_COST_TIMER
   struct aom_usec_timer timer;
@@ -2262,7 +2362,11 @@ static INLINE int cost_coeffs(
 #if CONFIG_FORWARDSKIP
       cm,
 #endif  // CONFIG_FORWARDSKIP
-      x, plane, block, tx_size, tx_type, txb_ctx, reduced_tx_set_used);
+      x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+      cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+      txb_ctx, reduced_tx_set_used);
 #if TXCOEFF_COST_TIMER
   AV1_COMMON *tmp_cm = (AV1_COMMON *)&cpi->common;
   aom_usec_timer_mark(&timer);
@@ -2710,15 +2814,21 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
       // Calculate rate cost of quantized coefficients.
       if (quant_param.use_optimize_b) {
-        av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, txb_ctx,
-                       &rate_cost);
+        av1_optimize_b(cpi, x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                       CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                       txb_ctx, &rate_cost);
       } else {
         rate_cost = cost_coeffs(
 #if CONFIG_FORWARDSKIP
             cm,
 #endif  // CONFIG_FORWARDSKIP
-            x, plane, block, tx_size, tx_type, txb_ctx,
-            cm->features.reduced_tx_set_used);
+            x, plane, block, tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+            CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
+            txb_ctx, cm->features.reduced_tx_set_used);
       }
 
       // If rd cost based on coeff rate alone is already more than best_rd,
@@ -2907,6 +3017,204 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
               txb_ctx, skip_trellis, best_tx_type, 0, &rate_cost, best_eob);
   p->dqcoeff = orig_dqcoeff;
 }
+
+#if CONFIG_CROSS_CHROMA_TX
+// Search for the best CCTX type for a given transform block.
+static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
+                             int blk_row, int blk_col, BLOCK_SIZE plane_bsize,
+                             TX_SIZE tx_size, const TXB_CTX *const txb_ctx_uv,
+                             const int skip_trellis, RD_STATS *best_rd_stats) {
+  const AV1_COMMON *cm = &cpi->common;
+  MACROBLOCKD *xd = &x->e_mbd;
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
+  struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
+
+  int64_t best_rd = RDCOST(x->rdmult, best_rd_stats->rate, best_rd_stats->dist);
+  uint16_t best_eob_u = p_u->eobs[block];
+  uint16_t best_eob_v = p_v->eobs[block];
+  CctxType best_cctx_type = CCTX_NONE;
+  TX_TYPE tx_type =
+      av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
+                      cpi->common.features.reduced_tx_set_used);
+
+  int rate_cost[2] = { 0, 0 };
+
+  // The buffer used to swap dqcoeff in macroblockd_plane so we can keep dqcoeff
+  // of the best tx_type
+  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_u[MAX_SB_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_v[MAX_SB_SQUARE]);
+  tran_low_t *orig_dqcoeff_u = p_u->dqcoeff;
+  tran_low_t *orig_dqcoeff_v = p_v->dqcoeff;
+  tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
+  tran_low_t *best_dqcoeff_v = this_dqcoeff_v;
+
+  // TODO(kslu): predict_dc_block feature
+  const uint16_t *eobs_ptr_u = x->plane[AOM_PLANE_U].eobs;
+  const uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
+  uint8_t best_txb_ctx_u = 0;
+  uint8_t best_txb_ctx_v = 0;
+
+  TxfmParam txfm_param;
+  av1_setup_xform(cm, x,
+#if CONFIG_IST
+                  AOM_PLANE_U,
+#endif
+                  tx_size, tx_type, CCTX_NONE, &txfm_param);
+
+  // CCTX is performed in-place, so these buffers are needed to store original
+  // transform coefficients.
+  const int max_eob = av1_get_max_eob(tx_size);
+  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_u[MAX_SB_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_v[MAX_SB_SQUARE]);
+  memcpy(orig_coeff_u, p_u->coeff + BLOCK_OFFSET(block),
+         sizeof(tran_low_t) * max_eob);
+  memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),
+         sizeof(tran_low_t) * max_eob);
+
+  // Iterate through all transform type candidates.
+  for (CctxType cctx_type = CCTX_NONE + 1; cctx_type < CCTX_TYPES;
+       ++cctx_type) {
+    RD_STATS this_rd_stats;
+    av1_invalid_rd_stats(&this_rd_stats);
+
+    update_cctx_array(xd, blk_row, blk_col, tx_size, cctx_type);
+    forward_cross_chroma_transform(x, block, tx_size, cctx_type);
+
+    for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+      QUANT_PARAM quant_param;
+      // TODO(kslu): need to search skip trellis?
+      int xform_quant_idx = skip_trellis
+                                ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
+                                                          : AV1_XFORM_QUANT_FP)
+                                : AV1_XFORM_QUANT_FP;
+      av1_setup_quant(tx_size, !skip_trellis, xform_quant_idx,
+                      cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
+
+      if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
+        av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
+                          &quant_param);
+
+      av1_quant(x, plane, block, &txfm_param, &quant_param);
+
+      // Calculate rate cost of quantized coefficients.
+      if (quant_param.use_optimize_b) {
+        av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, cctx_type,
+                       &txb_ctx_uv[plane - AOM_PLANE_U],
+                       &rate_cost[plane - AOM_PLANE_U]);
+      } else {
+        rate_cost[plane - AOM_PLANE_U] = cost_coeffs(
+#if CONFIG_FORWARDSKIP
+            cm,
+#endif  // CONFIG_FORWARDSKIP
+            x, plane, block, tx_size, tx_type, cctx_type,
+            &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
+      }
+    }
+
+    // If rd cost based on coeff rate alone is already more than best_rd,
+    // terminate early.
+    if (RDCOST(x->rdmult, rate_cost[0] + rate_cost[1], 0) > best_rd) continue;
+
+    // Calculate distortion.
+    // TODO(kslu): adding back the dc_only_block feature
+    if (eobs_ptr_u[block] == 0 && eobs_ptr_v[block] == 0) {
+      // When eob is 0, pixel domain distortion is more efficient and accurate.
+      this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
+    } else {
+      // TODO(kslu): transform domain distortion?
+      int64_t sse_diff = INT64_MAX;
+      // high_energy threshold assumes that every pixel within a txfm block
+      // has a residue energy of at least 25% of the maximum, i.e. 128 *
+      // 128 for 8 bit.
+      const int64_t high_energy_thresh =
+          ((int64_t)128 * 128 * tx_size_2d[tx_size]);
+      const int is_high_energy = best_rd_stats->sse >= 2 * high_energy_thresh;
+      if (tx_size == TX_64X64 || is_high_energy) {
+        int64_t dist_tx_u = 0;
+        int64_t dist_tx_v = 0;
+        int64_t sse_tx_u = 0;
+        int64_t sse_tx_v = 0;
+        // Because 3 out 4 quadrants of transform coefficients are forced to
+        // zero, the inverse transform has a tendency to overflow. sse_diff
+        // is effectively the energy of those 3 quadrants, here we use it
+        // to decide if we should do pixel domain distortion. If the energy
+        // is mostly in first quadrant, then it is unlikely that we have
+        // overflow issue in inverse transform.
+        dist_block_tx_domain(x, AOM_PLANE_U, block, tx_size, &dist_tx_u,
+                             &sse_tx_u);
+        dist_block_tx_domain(x, AOM_PLANE_V, block, tx_size, &dist_tx_v,
+                             &sse_tx_v);
+        this_rd_stats.dist = dist_tx_u + dist_tx_v;
+        this_rd_stats.sse = sse_tx_u + sse_tx_v;
+        sse_diff = best_rd_stats->sse - this_rd_stats.sse;
+      }
+      if (tx_size != TX_64X64 || !is_high_energy ||
+          sse_diff < this_rd_stats.sse) {
+        const int64_t tx_domain_dist = this_rd_stats.dist;
+        this_rd_stats.dist = joint_uv_dist_block_px_domain(
+            cpi, x, plane_bsize, block, blk_row, blk_col, tx_size);
+        // For high energy blocks, occasionally, the pixel domain distortion
+        // can be artificially low due to clamping at reconstruction stage
+        // even when inverse transform output is hugely different from the
+        // actual residue.
+        if (is_high_energy && this_rd_stats.dist < tx_domain_dist)
+          this_rd_stats.dist = tx_domain_dist;
+      } else {
+        assert(sse_diff < INT64_MAX);
+        this_rd_stats.dist += sse_diff;
+      }
+      this_rd_stats.sse = best_rd_stats->sse;
+    }
+
+    this_rd_stats.rate = rate_cost[0] + rate_cost[1];
+
+    const int64_t rd =
+        RDCOST(x->rdmult, this_rd_stats.rate, this_rd_stats.dist);
+
+    if (rd < best_rd) {
+      best_rd = rd;
+      *best_rd_stats = this_rd_stats;
+      best_cctx_type = cctx_type;
+      best_txb_ctx_u = p_u->txb_entropy_ctx[block];
+      best_txb_ctx_v = p_v->txb_entropy_ctx[block];
+      best_eob_u = p_u->eobs[block];
+      best_eob_v = p_v->eobs[block];
+      // Swap dqcoeff buffers
+      tran_low_t *const tmp_dqcoeff_u = best_dqcoeff_u;
+      tran_low_t *const tmp_dqcoeff_v = best_dqcoeff_v;
+      best_dqcoeff_u = p_u->dqcoeff;
+      best_dqcoeff_v = p_v->dqcoeff;
+      p_u->dqcoeff = tmp_dqcoeff_u;
+      p_v->dqcoeff = tmp_dqcoeff_v;
+    }
+
+    // TODO(kslu): can we do it without memcpy?
+    // Recover the original transform coefficients
+    if (cctx_type < CCTX_TYPES - 1) {
+      memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
+             sizeof(tran_low_t) * max_eob);
+      memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
+             sizeof(tran_low_t) * max_eob);
+    }
+  }
+
+  assert(best_rd != INT64_MAX);
+
+  // TODO(kslu): best_rd_stats->skip_txfm = (best_eob_u << 1) + best_eob_v;
+  best_rd_stats->skip_txfm = (best_eob_u == 0 && best_eob_v == 0);
+  update_cctx_array(xd, blk_row, blk_col, tx_size, best_cctx_type);
+  p_u->txb_entropy_ctx[block] = best_txb_ctx_u;
+  p_v->txb_entropy_ctx[block] = best_txb_ctx_v;
+  p_u->eobs[block] = best_eob_u;
+  p_v->eobs[block] = best_eob_v;
+
+  // TODO(kslu) double check the removal of calc_pixel_domain_distortion_final
+
+  p_u->dqcoeff = orig_dqcoeff_u;
+  p_v->dqcoeff = orig_dqcoeff_v;
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 // Pick transform type for a luma transform block of tx_size. Note this function
 // is used only for inter-predicted blocks.
@@ -4028,6 +4336,11 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
 
     args->current_rd += rd;
     av1_merge_rd_stats(&rd_stats_joint_uv, this_rd_stats);
+  }
+
+  if (!rd_stats_uv[0].skip_txfm || !rd_stats_uv[1].skip_txfm) {
+    search_cctx_type(cpi, x, block, blk_row, blk_col, plane_bsize, tx_size,
+                     txb_ctx_uv, args->skip_trellis, &rd_stats_joint_uv);
   }
 
   av1_merge_rd_stats(&args->rd_stats, &rd_stats_joint_uv);
