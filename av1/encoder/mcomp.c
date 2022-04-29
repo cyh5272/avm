@@ -116,7 +116,7 @@ void av1_make_default_fullpel_ms_params(
     int fine_search_interval) {
   const MV_SPEED_FEATURES *mv_sf = &cpi->sf.mv_sf;
 
-#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP
+#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP || CONFIG_FLEX_MVRES
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
 #endif  // CONFIG_ADAPTIVE_MVD || CONFIG_TIP

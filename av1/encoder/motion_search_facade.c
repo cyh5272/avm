@@ -527,7 +527,12 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
     this_mv.as_mv = get_mv_from_fullmv(&curr_best_mv.as_fullmv);
     const int ref_mv_idx = mbmi->ref_mv_idx;
     const int this_mv_rate = av1_mv_bit_cost(
-        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT, 0);
+        &this_mv.as_mv, &ref_mv, pb_mv_precision, mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+        ,
+        0
+#endif
+    );
 
     mode_info[ref_mv_idx].full_search_mv.as_int = this_mv.as_int;
     mode_info[ref_mv_idx].full_mv_rate = this_mv_rate;
