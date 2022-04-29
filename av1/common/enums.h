@@ -30,13 +30,14 @@ extern "C" {
 #undef MAX_SB_SIZE
 
 #if CONFIG_FLEX_MVRES
-#define DEBUG_FLEX_MV 1
+#define DEBUG_FLEX_MV 0
 #define ADAPTIVE_PRECISION_SETS \
   1                             // Enable adaptive precision sets for each block
 #define FAST_FLEX_MV_ENCODER 1  // Enable fast encoder searching algorithms
 #define DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION \
-  2  // 0 means do not disable, 1 means normatively disable, 2 means encoder
+  1  // 0 means do not disable, 1 means normatively disable, 2 means encoder
      // does not search
+#define DISABLE_NEW_NEAR_MODES_FOR_FLEX_MV 0
 
 #if ADAPTIVE_PRECISION_SETS
 #define MODE_BASED_PRECISION_ADAPTATION \

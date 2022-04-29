@@ -3013,6 +3013,16 @@ int is_pb_mv_precision_active(const AV1_COMMON *const cm,
 #if CONFIG_ADAPTIVE_MVD
   if (enable_adaptive_mvd_resolution(cm, mbmi)) return 0;
 #endif
+
+#if DISABLE_NEW_NEAR_MODES_FOR_FLEX_MV
+  if (mbmi->mode == NEW_NEARMV || mbmi->mode == NEAR_NEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+      || mbmi->mode == NEAR_NEWMV_OPTFLOW || mbmi->mode == NEW_NEARMV_OPTFLOW
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+  )
+    return 0;
+#endif
+
   return mbmi->max_mv_precision >= MV_PRECISION_HALF_PEL &&
          cm->features.use_pb_mv_precision &&
          have_newmv_in_inter_mode(mbmi->mode);
