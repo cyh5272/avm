@@ -473,6 +473,10 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
     }
   }
 #if CONFIG_EXTQUANT
+#if ZERO_DC_DELTAQ_OFS
+    seq->base_y_dc_delta_q = 0;
+    seq->base_uv_dc_delta_q = 0;
+#else
   const int is_360p_or_larger =
       AOMMIN(seq->max_frame_width, seq->max_frame_height) >= 360;
   const int is_720p_or_larger =
@@ -487,6 +491,7 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
     seq->base_y_dc_delta_q = -4;
     seq->base_uv_dc_delta_q = -3;
   }
+#endif
 #endif  // CONFIG_EXTQUANT
 }
 
