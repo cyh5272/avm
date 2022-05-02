@@ -3547,9 +3547,11 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                  argv, err_string)) {
     extra_cfg.disable_ml_partition_speed_features =
         arg_parse_int_helper(&arg, err_string);
+#if CONFIG_EXT_RECUR_PARTITIONS
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.erp_pruning_level,
                               argv, err_string)) {
     extra_cfg.erp_pruning_level = arg_parse_int_helper(&arg, err_string);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   } else if (arg_match_helper(
                  &arg,
                  &g_av1_codec_arg_defs.disable_ml_transform_speed_features,
