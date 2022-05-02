@@ -1554,11 +1554,7 @@ static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
 
 // TODO(oguleryuz): This should remain in sync with av1_convert_qindex_to_q.
 static int get_qstep(int base_qindex, int bit_depth, int *shift) {
-#if CONFIG_EXTQUANT
   int base_shift = QUANT_TABLE_BITS;
-#else
-  int base_shift = 0;
-#endif  // CONFIG_EXTQUANT
   switch (bit_depth) {
     case AOM_BITS_8:
       *shift = 2 + base_shift;
