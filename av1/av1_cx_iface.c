@@ -867,10 +867,9 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_ccso = extra_cfg->enable_ccso;
 #endif
   cfg->superblock_size =
-      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64)
-          ? 64
-          : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
-                                                                        : 0;
+      (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_64X64) ? 64
+      : (extra_cfg->superblock_size == AOM_SUPERBLOCK_SIZE_128X128) ? 128
+                                                                    : 0;
   cfg->enable_warped_motion = extra_cfg->enable_warped_motion;
   cfg->enable_diff_wtd_comp = extra_cfg->enable_diff_wtd_comp;
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -1057,9 +1056,9 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth,
     // At higher end of QP the slope of quant step-size grows exponentially,
     // captured by qp_threshold.
 
-    const int max_q = (bit_depth == AOM_BITS_8)
-                          ? MAXQ_8_BITS
-                          : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS : MAXQ;
+    const int max_q = (bit_depth == AOM_BITS_8) ? MAXQ_8_BITS
+                          : (bit_depth == AOM_BITS_10) ? MAXQ_10_BITS
+                                                       : MAXQ;
 
     const int qp_threshold = (max_q * 7) / 10;
     if (qp < qp_threshold) {
