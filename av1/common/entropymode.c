@@ -684,13 +684,13 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 #endif  // CONFIG_DDT_INTER
 
 #if CONFIG_CROSS_CHROMA_TX
-static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
-                                               [CDF_SIZE(CCTX_TYPES)] = {
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-                                               };
+static const aom_cdf_prob
+    default_cctx_type_cdf[EXT_TX_SIZES][CDF_SIZE(CCTX_TYPES)] = {
+      { AOM_CDF4(8192, 16384, 24576) },
+      { AOM_CDF4(8192, 16384, 24576) },
+      { AOM_CDF4(8192, 16384, 24576) },
+      { AOM_CDF4(8192, 16384, 24576) },
+    };
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 static const aom_cdf_prob default_cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)] = {

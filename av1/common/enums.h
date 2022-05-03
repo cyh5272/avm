@@ -407,7 +407,10 @@ enum {
 enum {
   CCTX_NONE,  // No cross chroma transform
   CCTX_45,    // 45 degrees rotation (Haar transform)
+  CCTX_30,    // 30 degrees rotation
+  CCTX_60,    // 60 degrees rotation
   CCTX_TYPES,
+  CCTX_START = CCTX_45,
 } UENUM1BYTE(CctxType);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
