@@ -109,6 +109,10 @@ void av1_xform(MACROBLOCK *x, int plane, int block, int blk_row, int blk_col,
 #endif
 );
 
+#if CONFIG_CROSS_CHROMA_TX
+void forward_cross_chroma_transform(MACROBLOCK *x, int block, TX_SIZE tx_size);
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
                QUANT_PARAM *qparam);
 
