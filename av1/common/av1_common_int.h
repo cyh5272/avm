@@ -143,6 +143,34 @@ extern "C" {
 #define MIN_BSIZE_WARP_DELTA 16
 #endif  // CONFIG_WARP_DELTA
 
+#if CONFIG_WARP_DELTA && CONFIG_WARP_EXTEND
+// When WARP_DELTA and WARP_EXTEND are enabled, we can use a nearby block's
+// warp model as a prediction and then modify it with an explicitly coded delta.
+//
+// If this flag is set to 0, then any spatial reference block (ie, a DRL entry
+// which came from a block in the current frame) can provide a warp model which
+// we can use as a prediction.
+//
+// If this flag is set to 1, then only directly adjacent blocks can be used
+// as references (similar to WARP_EXTEND), meaning that we only need to store
+// one above row and one left column of warp models. This can be enabled if
+// the above behaviour causes concerns for hardware implementations.
+//
+// Interaction with different modes:
+//
+// For GLOBALMV, WARP_DELTA can always be used, and uses the global warp model
+// (if any) as a base. If no global warp model was given, we use a translational
+// model as a base.
+//
+// For NEARMV, WARP_DELTA can only be used if the reference block selected from
+// the DRL can provide a warp model under the logic mentioned above.
+//
+// For NEWMV, WARP_DELTA can always be used. If the reference block can provide
+// a warp model, then this is used as a base; otherwise the global warp model
+// (or a translational model) is used.
+#define WARP_DELTA_REQUIRES_NEIGHBOR 1
+#endif  // CONFIG_WARP_DELTA && CONFIG_WARP_EXTEND
+
 /*!\cond */
 
 enum {
@@ -3058,6 +3086,28 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
       allow_warped_motion &&
       AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >=
           MIN_BSIZE_WARP_DELTA;
+
+#if CONFIG_WARP_EXTEND
+  if (warp_delta_allowed && mode == NEARMV) {
+#if WARP_DELTA_REQUIRES_NEIGHBOR
+    // Only allow WARP_DELTA on a NEARMV block when there is a neighboring
+    // warp block to extend from
+    warp_delta_allowed = warp_extend_allowed;
+#else
+    const CANDIDATE_MV *ref = &ref_mv_stack[mbmi->ref_mv_idx];
+    bool ref_is_spatial = (ref->row_offset != OFFSET_NONSPATIAL) &&
+                          (ref->col_offset != OFFSET_NONSPATIAL);
+    if (ref_is_spatial) {
+      const MB_MODE_INFO *ref_mi =
+          xd->mi[ref->row_offset * xd->mi_stride + ref->col_offset];
+      bool ref_is_warped = is_warp_mode(ref_mi->motion_mode);
+      warp_delta_allowed = ref_is_warped;
+    } else {
+      warp_delta_allowed = false;
+    }
+#endif
+  }
+#endif  // CONFIG_WARP_EXTEND
 
   if (warp_delta_allowed) {
     allowed_motion_modes |= (1 << WARP_DELTA);

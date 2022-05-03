@@ -359,11 +359,19 @@ static void write_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
                    WARP_DELTA_NUM_SYMBOLS);
 }
 
-static void write_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
+static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                             const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                             const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
+#endif  // CONFIG_WARP_EXTEND
                              aom_writer *w) {
-  const WarpedMotionParams *global_params =
-      &xd->global_motion[mbmi->ref_frame[0]];
   const WarpedMotionParams *params = &mbmi->wm_params[0];
+  WarpedMotionParams base_params;
+  av1_get_warp_base_params(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                           mbmi_ext_frame->ref_mv_stack,
+#endif  // CONFIG_WARP_EXTEND
+                           &base_params, NULL);
 
   // The RDO stage should not give us a model which is not warpable.
   // Such models can still be signalled, but are effectively useless
@@ -371,8 +379,8 @@ static void write_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
   assert(!params->invalid);
 
   // TODO(rachelbarker): Allow signaling warp type?
-  write_warp_delta_param(xd, 2, params->wmmat[2] - global_params->wmmat[2], w);
-  write_warp_delta_param(xd, 3, params->wmmat[3] - global_params->wmmat[3], w);
+  write_warp_delta_param(xd, 2, params->wmmat[2] - base_params.wmmat[2], w);
+  write_warp_delta_param(xd, 3, params->wmmat[3] - base_params.wmmat[3], w);
 }
 #endif  // CONFIG_WARP_DELTA
 
@@ -454,7 +462,11 @@ static AOM_INLINE void write_motion_mode(
                      xd->tile_ctx->warp_delta_cdf[bsize], 2);
 
     if (motion_mode == WARP_DELTA) {
-      write_warp_delta(xd, mbmi, w);
+      write_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                       mbmi_ext_frame,
+#endif  // CONFIG_WARP_EXTEND
+                       w);
       return;
     }
   }

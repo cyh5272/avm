@@ -1946,11 +1946,19 @@ static int cost_warp_delta_param(int index, int value,
   return mode_costs->warp_delta_param_cost[index_type][coded_value];
 }
 
-int av1_cost_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
+int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                        const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                        const MB_MODE_INFO_EXT *mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
                         const ModeCosts *mode_costs) {
-  const WarpedMotionParams *global_params =
-      &xd->global_motion[mbmi->ref_frame[0]];
   const WarpedMotionParams *params = &mbmi->wm_params[0];
+  WarpedMotionParams base_params;
+  av1_get_warp_base_params(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                           mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                           &base_params, NULL);
 
   // The RDO stage should not give us a model which is not warpable.
   // Such models can still be signalled, but are effectively useless
@@ -1960,9 +1968,9 @@ int av1_cost_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
   int rate = 0;
 
   // TODO(rachelbarker): Allow signaling warp type?
-  rate += cost_warp_delta_param(2, params->wmmat[2] - global_params->wmmat[2],
+  rate += cost_warp_delta_param(2, params->wmmat[2] - base_params.wmmat[2],
                                 mode_costs);
-  rate += cost_warp_delta_param(3, params->wmmat[3] - global_params->wmmat[3],
+  rate += cost_warp_delta_param(3, params->wmmat[3] - base_params.wmmat[3],
                                 mode_costs);
 
   return rate;
@@ -2340,7 +2348,11 @@ static int64_t motion_mode_rd(
       av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
                                         &ref_mv.as_mv, NULL);
 
-      int valid = av1_pick_warp_delta(cm, xd, mbmi, &ms_params, &x->mode_costs);
+      int valid = av1_pick_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                      mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                                      &ms_params, &x->mode_costs);
       if (!valid) {
         continue;
       }
@@ -2531,7 +2543,11 @@ static int64_t motion_mode_rd(
       rd_stats->rate +=
           mode_costs->warp_delta_cost[bsize][motion_mode == WARP_DELTA];
       if (motion_mode == WARP_DELTA) {
-        rd_stats->rate += av1_cost_warp_delta(xd, mbmi, mode_costs);
+        rd_stats->rate += av1_cost_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                              mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                                              mode_costs);
         continue_motion_mode_signaling = false;
       }
     }

@@ -5289,10 +5289,11 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 // Returns 1 if able to select a good model, 0 if not
 int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                        const MB_MODE_INFO_EXT *mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
                         const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                         const ModeCosts *mode_costs) {
-  const WarpedMotionParams *global_params =
-      &xd->global_motion[mbmi->ref_frame[0]];
   WarpedMotionParams *params = &mbmi->wm_params[0];
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int mi_row = xd->mi_row;
@@ -5305,6 +5306,26 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 #endif  // IMPROVED_AMVD
   bool can_refine_mv = (mbmi->mode == NEWMV);
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
+
+  WarpedMotionParams base_params;
+
+  // Motion vector to use at the center of the block.
+  // This is the MV which should be passed into av1_set_warp_translation()
+  // to determine the translational part of the model, and may differ from
+  // `best_mv`, which is the signaled MV (mbmi->mv[0]) and is passed into
+  // compute_motion_cost() to calculate the motion vector cost.
+  //
+  // For (AMVD)NEWMV, this will be the same as mbmi->mv[0], and will need to
+  // be updated if we refine that motion vector.
+  // For NEARMV and GLOBALMV, this will be derived from the base warp model,
+  // and may differ from mbmi->mv[0]. But in these cases it won't be refined.
+  int_mv center_mv;
+
+  av1_get_warp_base_params(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                           mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                           &base_params, &center_mv);
 
   MV *best_mv = &mbmi->mv[0].as_mv;
   WarpedMotionParams best_wm_params;
@@ -5319,11 +5340,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   // Set up initial model by copying global motion model
   // and adjusting for the chosen motion vector
   params->wmtype = ROTZOOM;
-  params->wmmat[2] = global_params->wmmat[2];
-  params->wmmat[3] = global_params->wmmat[3];
+  params->wmmat[2] = base_params.wmmat[2];
+  params->wmmat[3] = base_params.wmmat[3];
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
-  av1_set_warp_translation(mi_row, mi_col, bsize, *best_mv, params);
+  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
   int valid = av1_get_shear_params(params);
   params->invalid = !valid;
   if (!valid) {
@@ -5333,7 +5354,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   // Calculate initial error
   best_wm_params = *params;
-  rate = av1_cost_warp_delta(xd, mbmi, mode_costs);
+  rate = av1_cost_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                             mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                             mode_costs);
   sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
   best_rd = sse + (int)ROUND_POWER_OF_TWO_64(
                       (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
@@ -5362,7 +5387,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
       // Cost up the non-translational part of the model. Again, this will
       // not change between iterations of the following loop
-      rate = av1_cost_warp_delta(xd, mbmi, mode_costs);
+      rate = av1_cost_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                 mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                                 mode_costs);
 
       for (int idx = start; idx < start + 4; ++idx) {
         MV this_mv = { best_mv->row + neighbors[idx].row,
@@ -5393,6 +5422,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         // Commit to this motion vector
         best_mv->row += neighbors[best_idx].row;
         best_mv->col += neighbors[best_idx].col;
+        center_mv.as_mv = *best_mv;
       }
     }
 
@@ -5400,17 +5430,22 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // Try increasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] += step_size;
-      delta = params->wmmat[param_index] - global_params->wmmat[param_index];
+      delta = params->wmmat[param_index] - base_params.wmmat[param_index];
       if (abs(delta) > WARP_DELTA_MAX) {
         inc_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_set_warp_translation(mi_row, mi_col, bsize, *best_mv, params);
+        av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
+                                 params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
-          rate = av1_cost_warp_delta(xd, mbmi, mode_costs);
+          rate = av1_cost_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                     mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                                     mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           inc_rd =
               sse + (int)ROUND_POWER_OF_TWO_64(
@@ -5426,17 +5461,22 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // Try decreasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] -= step_size;
-      delta = params->wmmat[param_index] - global_params->wmmat[param_index];
+      delta = params->wmmat[param_index] - base_params.wmmat[param_index];
       if (abs(delta) > WARP_DELTA_MAX) {
         dec_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_set_warp_translation(mi_row, mi_col, bsize, *best_mv, params);
+        av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
+                                 params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
-          rate = av1_cost_warp_delta(xd, mbmi, mode_costs);
+          rate = av1_cost_warp_delta(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                     mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
+                                     mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           dec_rd =
               sse + (int)ROUND_POWER_OF_TWO_64(

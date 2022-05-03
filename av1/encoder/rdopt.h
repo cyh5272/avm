@@ -105,7 +105,11 @@ void av1_rd_pick_inter_mode_sb_seg_skip(
 #if CONFIG_WARP_DELTA
 // Internal function, shared by rdopt.c and mcomp.c
 // Calculate the rate cost of directly signaling a warp model
-int av1_cost_warp_delta(const MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
+int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                        const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                        const MB_MODE_INFO_EXT *mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
                         const ModeCosts *mode_costs);
 #endif  // CONFIG_WARP_DELTA
 

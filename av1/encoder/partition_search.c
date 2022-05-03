@@ -874,15 +874,22 @@ static void update_warp_delta_param_stats(int index, int value,
 #endif  // CONFIG_ENTROPY_STATS
 }
 
-static void update_warp_delta_stats(const MACROBLOCKD *xd,
+static void update_warp_delta_stats(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                                     const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                                    const MB_MODE_INFO_EXT *mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
 #if CONFIG_ENTROPY_STATS
                                     FRAME_COUNTS *counts,
 #endif  // CONFIG_ENTROPY_STATS
                                     FRAME_CONTEXT *fc) {
-  const WarpedMotionParams *global_params =
-      &xd->global_motion[mbmi->ref_frame[0]];
   const WarpedMotionParams *params = &mbmi->wm_params[0];
+  WarpedMotionParams base_params;
+  av1_get_warp_base_params(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                           mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                           &base_params, NULL);
 
   // The RDO stage should not give us a model which is not warpable.
   // Such models can still be signalled, but are effectively useless
@@ -890,12 +897,12 @@ static void update_warp_delta_stats(const MACROBLOCKD *xd,
   assert(!params->invalid);
 
   // TODO(rachelbarker): Allow signaling warp type?
-  update_warp_delta_param_stats(2, params->wmmat[2] - global_params->wmmat[2],
+  update_warp_delta_param_stats(2, params->wmmat[2] - base_params.wmmat[2],
 #if CONFIG_ENTROPY_STATS
                                 counts,
 #endif  // CONFIG_ENTROPY_STATS
                                 fc);
-  update_warp_delta_param_stats(3, params->wmmat[3] - global_params->wmmat[3],
+  update_warp_delta_param_stats(3, params->wmmat[3] - base_params.wmmat[3],
 #if CONFIG_ENTROPY_STATS
                                 counts,
 #endif  // CONFIG_ENTROPY_STATS
@@ -1352,7 +1359,10 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif
         update_cdf(fc->warp_delta_cdf[bsize], motion_mode == WARP_DELTA, 2);
         if (motion_mode == WARP_DELTA) {
-          update_warp_delta_stats(xd, mbmi,
+          update_warp_delta_stats(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                                  mbmi_ext,
+#endif  // CONFIG_WARP_EXTEND
 #if CONFIG_ENTROPY_STATS
                                   counts,
 #endif  // CONFIG_ENTROPY_STATS

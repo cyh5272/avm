@@ -308,23 +308,29 @@ static int read_warp_delta_param(const MACROBLOCKD *xd, int index,
   return (coded_value - WARP_DELTA_CODED_MAX) * WARP_DELTA_STEP;
 }
 
-static void read_warp_delta(const MACROBLOCKD *xd, MB_MODE_INFO *mbmi,
-                            aom_reader *r) {
-  const WarpedMotionParams *global_params =
-      &xd->global_motion[mbmi->ref_frame[0]];
+static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                            MB_MODE_INFO *mbmi, aom_reader *r) {
   WarpedMotionParams *params = &mbmi->wm_params[0];
   int mi_row = xd->mi_row;
   int mi_col = xd->mi_col;
-  const MV mv = mbmi->mv[0].as_mv;
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+
+  // Figure out what parameters to use as a base
+  WarpedMotionParams base_params;
+  int_mv center_mv;
+  av1_get_warp_base_params(cm, xd, mbmi,
+#if CONFIG_WARP_EXTEND
+                           xd->ref_mv_stack[mbmi->ref_frame[0]],
+#endif  // CONFIG_WARP_EXTEND
+                           &base_params, &center_mv);
 
   // TODO(rachelbarker): Allow signaling warp type?
   params->wmtype = ROTZOOM;
-  params->wmmat[2] = global_params->wmmat[2] + read_warp_delta_param(xd, 2, r);
-  params->wmmat[3] = global_params->wmmat[3] + read_warp_delta_param(xd, 3, r);
+  params->wmmat[2] = base_params.wmmat[2] + read_warp_delta_param(xd, 2, r);
+  params->wmmat[3] = base_params.wmmat[3] + read_warp_delta_param(xd, 3, r);
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
-  av1_set_warp_translation(mi_row, mi_col, bsize, mv, params);
+  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
 
   int valid = av1_get_shear_params(params);
   params->invalid = !valid;
@@ -408,7 +414,7 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
     int use_warp_delta =
         aom_read_symbol(r, xd->tile_ctx->warp_delta_cdf[bsize], 2, ACCT_STR);
     if (use_warp_delta) {
-      read_warp_delta(xd, mbmi, r);
+      read_warp_delta(cm, xd, mbmi, r);
       return WARP_DELTA;
     }
   }

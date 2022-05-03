@@ -736,6 +736,113 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi);
 #endif  // CONFIG_REF_MV_BANK
 
+#if CONFIG_WARP_DELTA
+// Decide what the base warp model should be when using WARP_DELTA.
+// The warp model to use is signalled as a delta from this.
+// The base model is stored into `params`, and can be modified further
+// from there
+//
+// The MV which should be used at the center of this block is stored in
+// `center_mv`. Once the non-translational parameters have been set,
+// the translational part of the model can be set correctly using:
+//   av1_set_warp_translation(mi_row, mi_col, bsize, mv, params);
+//
+// If `center_mv` is not needed, the pointer can be set to NULL.
+#if CONFIG_WARP_EXTEND
+// The logic behind doing this is as follows:
+// * If the current block is GLOBALMV, then we want to use the motion vector
+//   inferred from the global model. Conveniently, in this case that is already
+//   stored in mbmi->mv[0]
+//
+// * If the current block is NEWMV, then we want to use the signaled
+//   motion vector at the center of the block, regardless of the source
+//   of the base warp model.
+//
+// * If the mode is NEARMV, then we need to consider the source of the
+//   base params and the motion vector carefully:
+//
+//   * If we're extending from a neighboring block, then the predicted
+//     motion vector (in mbmi->mv[0]) does *not* match the prediction
+//     from the base warp model. This because the predicted MV is
+//     set to the MV at the center of the *neighboring* block, to avoid
+//     having motion vector prediction depend on the construction of the
+//     neighbor's warp model.
+//     So in this case, we want to re-calculate the motion vector at
+//     the center of this block from the neighbor's warp model. This is
+//     okay, and does not introduce a similar parsing dependency, because
+//     this only affects the resulting warp parameters, not any of the syntax.
+//
+//   * However, if we're not extending from a neighboring block, then we
+//     use the global warp as a base. In this case, taking the predicted
+//     MV from whatever ref block we used, is probably better than using the
+//     predicted MV from the global model, because if we wanted the latter
+//     then we would have used the GLOBALMV mode.
+#endif  // CONFIG_WARP_EXTEND
+static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
+                                            const MACROBLOCKD *xd,
+                                            const MB_MODE_INFO *mbmi,
+#if CONFIG_WARP_EXTEND
+                                            const CANDIDATE_MV *ref_mv_stack,
+#endif  // CONFIG_WARP_EXTEND
+                                            WarpedMotionParams *params,
+                                            int_mv *center_mv) {
+#if CONFIG_WARP_EXTEND
+  if (mbmi->mode != GLOBALMV) {
+    // Look at the reference block selected via the DRL.
+    // If it is warped, use that warp model as a base; otherwise, use global
+    // motion
+    const CANDIDATE_MV *ref = &ref_mv_stack[mbmi->ref_mv_idx];
+
+#if WARP_DELTA_REQUIRES_NEIGHBOR
+    bool ref_is_above =
+        xd->up_available && (ref->row_offset == -1 && ref->col_offset >= 0);
+    bool ref_is_left =
+        xd->left_available && (ref->col_offset == -1 && ref->row_offset >= 0);
+    bool ref_is_adjacent = ref_is_above || ref_is_left;
+    bool can_use_ref = ref_is_adjacent;
+#else
+    bool ref_is_spatial = (ref->row_offset != OFFSET_NONSPATIAL) &&
+                          (ref->col_offset != OFFSET_NONSPATIAL);
+    bool can_use_ref = ref_is_spatial;
+#endif
+
+    if (can_use_ref) {
+      const MB_MODE_INFO *ref_mi =
+          xd->mi[ref->row_offset * xd->mi_stride + ref->col_offset];
+
+      bool ref_is_warped = is_warp_mode(ref_mi->motion_mode);
+
+      if (ref_is_warped) {
+        *params = ref_mi->wm_params[0];
+        if (center_mv != NULL) {
+          if (mbmi->mode == NEARMV) {
+            BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+            int mi_row = xd->mi_row;
+            int mi_col = xd->mi_col;
+            const int allow_high_precision_mv =
+                cm->features.allow_high_precision_mv;
+            const int force_integer_mv =
+                cm->features.cur_frame_force_integer_mv;
+            *center_mv = get_warp_motion_vector(
+                &ref_mi->wm_params[0], allow_high_precision_mv, bsize, mi_col,
+                mi_row, force_integer_mv);
+
+          } else {
+            *center_mv = mbmi->mv[0];
+          }
+        }
+        return;
+      }
+    }
+  }
+#endif  // CONFIG_WARP_EXTEND
+  *params = xd->global_motion[mbmi->ref_frame[0]];
+  if (center_mv != NULL) {
+    *center_mv = mbmi->mv[0];
+  }
+}
+#endif  // CONFIG_WARP_DELTA
+
 #if CONFIG_WARP_EXTEND
 static INLINE void av1_get_neighbor_warp_model(const AV1_COMMON *cm,
                                                const MB_MODE_INFO *neighbor_mi,
