@@ -329,4 +329,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   }
 
 #endif  // CONFIG_FLEX_MVRES
+#if CONFIG_CROSS_CHROMA_TX
+  RESET_CDF_COUNTER(fc->cctx_type_cdf, CCTX_TYPES_ALLOWED);
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
