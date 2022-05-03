@@ -3019,8 +3019,7 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
          sizeof(tran_low_t) * max_eob);
 
   // Iterate through all transform type candidates.
-  for (CctxType cctx_type = CCTX_NONE + 1; cctx_type < CCTX_TYPES;
-       ++cctx_type) {
+  for (CctxType cctx_type = CCTX_START; cctx_type < CCTX_TYPES; ++cctx_type) {
     RD_STATS this_rd_stats;
     av1_invalid_rd_stats(&this_rd_stats);
 
