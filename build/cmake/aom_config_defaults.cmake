@@ -208,6 +208,8 @@ set_aom_config_var(CONFIG_DST7_16X16 0 NUMBER "AV2 DST7 16x16 experiment flag.")
 set_aom_config_var(CONFIG_DST_32X32 0 NUMBER "AV2 DST7 32x32 experiment flag.")
 set_aom_config_var(CONFIG_DDT_INTER 0 NUMBER
                    "AV2 data-driven inter transform experiment flag.")
+set_aom_config_var(CONFIG_CROSS_CHROMA_TX 0
+                   "AV2 cross chroma component transform experiment flag.")
 #
 # Variables in this section control optional features of the build system.
 #
