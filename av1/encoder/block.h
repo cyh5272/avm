@@ -828,11 +828,23 @@ typedef struct {
   //! txfm_partition_cost
   int txfm_partition_cost[TXFM_PARTITION_CONTEXTS][2];
 #endif  // CONFIG_NEW_TX_PARTITION
+#if CONFIG_DDT_INTER
+  //! use_ddtx_inter_costs
+  int use_ddtx_inter_costs[EXT_TX_SIZES][2];
+  //! ddtx_type_inter_costs
+  int ddtx_type_inter_costs[EXT_TX_SIZES][DDT_TYPES];
+  //! inter_tx_type_costs
+  int inter_tx_type_costs[EXT_TX_SETS_INTER][EXT_TX_SIZES][TX_TYPES_TRIG];
+  //! intra_tx_type_costs
+  int intra_tx_type_costs[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
+                         [TX_TYPES_TRIG];
+#else
   //! inter_tx_type_costs
   int inter_tx_type_costs[EXT_TX_SETS_INTER][EXT_TX_SIZES][TX_TYPES];
   //! intra_tx_type_costs
   int intra_tx_type_costs[EXT_TX_SETS_INTRA][EXT_TX_SIZES][INTRA_MODES]
                          [TX_TYPES];
+#endif  // CONFIG_DDT_INTER
   /**@}*/
 
   /*****************************************************************************

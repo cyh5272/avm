@@ -674,6 +674,47 @@ void av1_fdct32(const int32_t *input, int32_t *output, int8_t cos_bit,
   av1_range_check_buf(stage, input, bf1, size, stage_range[stage]);
 }
 
+#if CONFIG_DDT_INTER
+void av1_fklt4(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range) {
+  (void)cos_bit;
+  (void)stage_range;
+  for (int32_t i = 0; i < 4; i++) {
+    int32_t sum = 0;
+    for (int32_t j = 0; j < 4; j++) {
+      sum += input[j] * klt4_inter[i * 4 + j];
+    }
+    output[i] = ROUND_POWER_OF_TWO_SIGNED(sum, KLT_PREC_BITS);
+  }
+}
+
+void av1_fklt8(const int32_t *input, int32_t *output, int8_t cos_bit,
+               const int8_t *stage_range) {
+  (void)cos_bit;
+  (void)stage_range;
+  for (int32_t i = 0; i < 8; i++) {
+    int32_t sum = 0;
+    for (int32_t j = 0; j < 8; j++) {
+      sum += input[j] * klt8_inter[i * 8 + j];
+    }
+    output[i] = ROUND_POWER_OF_TWO_SIGNED(sum, KLT_PREC_BITS);
+  }
+}
+
+void av1_fklt16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                const int8_t *stage_range) {
+  (void)cos_bit;
+  (void)stage_range;
+  for (int32_t i = 0; i < 16; i++) {
+    int32_t sum = 0;
+    for (int32_t j = 0; j < 16; j++) {
+      sum += input[j] * klt16_inter[i * 16 + j];
+    }
+    output[i] = ROUND_POWER_OF_TWO_SIGNED(sum, KLT_PREC_BITS);
+  }
+}
+#endif  // CONFIG_DDT_INTER
+
 void av1_fadst4(const int32_t *input, int32_t *output, int8_t cos_bit,
                 const int8_t *stage_range) {
   int bit = cos_bit;
@@ -847,6 +888,20 @@ void av1_fadst8(const int32_t *input, int32_t *output, int8_t cos_bit,
   av1_range_check_buf(stage, input, bf1, size, stage_range[stage]);
 }
 
+#if CONFIG_DST7_16X16
+void av1_fadst16(const int32_t *input, int32_t *output, int8_t cos_bit,
+                 const int8_t *stage_range) {
+  (void)cos_bit;
+  (void)stage_range;
+  for (int32_t i = 0; i < 16; i++) {
+    int32_t sum = 0;
+    for (int32_t j = 0; j < 16; j++) {
+      sum += input[j] * dst7_16x16[i][j];
+    }
+    output[i] = ROUND_POWER_OF_TWO_SIGNED(sum, DST_16X16_PREC_BITS);
+  }
+}
+#else
 void av1_fadst16(const int32_t *input, int32_t *output, int8_t cos_bit,
                  const int8_t *stage_range) {
   const int32_t size = 16;
@@ -1061,6 +1116,22 @@ void av1_fadst16(const int32_t *input, int32_t *output, int8_t cos_bit,
   bf1[15] = bf0[0];
   av1_range_check_buf(stage, input, bf1, size, stage_range[stage]);
 }
+#endif  // CONFIG_DST7_16X16
+
+#if CONFIG_DST_32X32
+void av1_fadst32(const int32_t *input, int32_t *output, int8_t cos_bit,
+                 const int8_t *stage_range) {
+  (void)cos_bit;
+  (void)stage_range;
+  for (int32_t i = 0; i < 32; i++) {
+    int32_t sum = 0;
+    for (int32_t j = 0; j < 32; j++) {
+      sum += input[j] * dst7_32x32[i][j];
+    }
+    output[i] = ROUND_POWER_OF_TWO_SIGNED(sum, DST_32X32_PREC_BITS);
+  }
+}
+#endif
 
 void av1_fidentity4_c(const int32_t *input, int32_t *output, int8_t cos_bit,
                       const int8_t *stage_range) {

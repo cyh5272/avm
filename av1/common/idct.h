@@ -33,6 +33,11 @@ typedef struct {
 #define MAX_TX_SCALE 1
 int av1_get_tx_scale(const TX_SIZE tx_size);
 
+#if CONFIG_CROSS_CHROMA_TX
+void av1_inv_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
+                                   TX_SIZE tx_size);
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #if CONFIG_IST
                                  tran_low_t *dqcoeff,

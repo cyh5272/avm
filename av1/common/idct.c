@@ -334,8 +334,28 @@ void av1_inv_txfm_add_c(const tran_low_t *dqcoeff, uint8_t *dst, int stride,
     }
   }
 
+#if CONFIG_DDT_INTER
+  av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                            txfm_param);
+#elif CONFIG_DST_32X32
+  if (tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32 ||
+      tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16)
+    av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                              txfm_param);
+  else
+    av1_highbd_inv_txfm_add(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                            txfm_param);
+#elif CONFIG_DST7_16X16
+  if (tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16)
+    av1_highbd_inv_txfm_add_c(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                              txfm_param);
+  else
+    av1_highbd_inv_txfm_add(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
+                            txfm_param);
+#else
   av1_highbd_inv_txfm_add(dqcoeff, CONVERT_TO_BYTEPTR(tmp), tmp_stride,
                           txfm_param);
+#endif  // CONFIG_DDT_INTER
 
   for (int r = 0; r < h; ++r) {
     for (int c = 0; c < w; ++c) {
@@ -343,6 +363,29 @@ void av1_inv_txfm_add_c(const tran_low_t *dqcoeff, uint8_t *dst, int stride,
     }
   }
 }
+
+#if CONFIG_CROSS_CHROMA_TX
+void av1_inv_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
+                                   TX_SIZE tx_size) {
+#if CCTX_DC_ONLY
+  const int ncoeffs = 1;
+#else
+  const int ncoeffs = av1_get_max_eob(tx_size);
+#endif
+  // TODO(kslu): check if there is any overflow issue
+  // TODO(kslu): keep track of the EOB before fwd and after inv cctx
+  int32_t *src_u = (int32_t *)dqcoeff_u;
+  int32_t *src_v = (int32_t *)dqcoeff_v;
+  int32_t tmp[2] = { 0, 0 };
+
+  for (int i = 0; i < ncoeffs; i++) {
+    tmp[0] = cctx_mtx[0] * src_u[i] + cctx_mtx[2] * src_v[i];
+    tmp[1] = cctx_mtx[1] * src_u[i] + cctx_mtx[3] * src_v[i];
+    src_u[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[0], CCTX_PREC_BITS);
+    src_v[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[1], CCTX_PREC_BITS);
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #if CONFIG_IST
@@ -362,6 +405,11 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
                   &txfm_param);
   assert(av1_ext_tx_used[txfm_param.tx_set_type][txfm_param.tx_type]);
 
+#if CONFIG_DST7_16X16 || CONFIG_DST_32X32
+  uint16_t allowed_tx_mask = 0xF1FE;
+  allowed_tx_mask &= (1 << txfm_param.tx_type);
+#endif
+
 #if CONFIG_IST
   MB_MODE_INFO *const mbmi = xd->mi[0];
   PREDICTION_MODE intra_mode =
@@ -374,9 +422,43 @@ void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #endif
 
   if (txfm_param.is_hbd) {
+#if CONFIG_DDT_INTER
+    av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST_32X32
+    if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
+         tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
+        allowed_tx_mask)
+      av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+    else
+      av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST7_16X16
+    if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16) &&
+        allowed_tx_mask)
+      av1_highbd_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+    else
+      av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#else
     av1_highbd_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#endif  // CONFIG_DDT_INTER
   } else {
+#if CONFIG_DDT_INTER
+    av1_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST_32X32
+    if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16 ||
+         tx_size_wide[tx_size] == 32 || tx_size_high[tx_size] == 32) &&
+        allowed_tx_mask)
+      av1_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+    else
+      av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#elif CONFIG_DST7_16X16
+    if ((tx_size_wide[tx_size] == 16 || tx_size_high[tx_size] == 16) &&
+        allowed_tx_mask)
+      av1_inv_txfm_add_c(dqcoeff, dst, stride, &txfm_param);
+    else
+      av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#else
     av1_inv_txfm_add(dqcoeff, dst, stride, &txfm_param);
+#endif  // CONFIG_DDT_INTER
   }
 }
 

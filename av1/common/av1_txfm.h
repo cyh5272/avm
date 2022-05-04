@@ -35,6 +35,26 @@ extern "C" {
 extern const int32_t av1_cospi_arr_data[7][64];
 extern const int32_t av1_sinpi_arr_data[7][5];
 
+#if CONFIG_DST7_16X16
+extern const int16_t dst7_16x16[16][16];
+#define DST_16X16_PREC_BITS 7
+#endif  // CONFIG_DST7_16X16
+
+#if CONFIG_DST_32X32
+extern const int16_t dst7_32x32[32][32];
+#define DST_32X32_PREC_BITS 7
+#endif  // CONFIG_DST_32X32
+
+#if CONFIG_DDT_INTER
+#define KLT_PREC_BITS 10
+#endif  // CONFIG_DDT_INTER
+
+#if CONFIG_CROSS_CHROMA_TX
+#define CCTX_DC_ONLY 0
+#define CCTX_PREC_BITS 8
+extern const int32_t cctx_mtx[4];
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 #define MAX_TXFM_STAGE_NUM 12
 
 static const int cos_bit_min = 10;
@@ -126,9 +146,35 @@ enum {
   TXFM_TYPE_IDENTITY8,
   TXFM_TYPE_IDENTITY16,
   TXFM_TYPE_IDENTITY32,
+#if CONFIG_DDT_INTER
+  TXFM_TYPE_DDT4,
+  TXFM_TYPE_DDT8,
+  TXFM_TYPE_DDT16,  // DST type 7
+#endif              // CONFIG_DDT_INTER
+#if CONFIG_DST_32X32
+  TXFM_TYPE_ADST32,
+#endif
   TXFM_TYPES,
   TXFM_TYPE_INVALID,
 } UENUM1BYTE(TXFM_TYPE);
+
+#if CONFIG_DDT_INTER
+static INLINE int idx_flip(const int txw, const int txh, const int idxr,
+                           const int idxc, const int ud_flip,
+                           const int lr_flip) {
+  if (ud_flip == 1 && lr_flip == 1) {
+    // return (txh - idxr - 1) * txw + txw - idxc - 1;
+    return (txh - idxr) * txw - idxc - 1;
+  } else if (ud_flip == 1 && lr_flip == 0) {
+    return (txh - idxr - 1) * txw + idxc;
+  } else if (ud_flip == 0 && lr_flip == 1) {
+    // return idxr * txw + txw - idxc - 1;
+    return (idxr + 1) * txw - idxc - 1;
+  } else {
+    return idxr * txw + idxc;
+  }
+}
+#endif  // CONFIG_DDT_INTER
 
 typedef struct TXFM_2D_FLIP_CFG {
   TX_SIZE tx_size;
@@ -159,22 +205,38 @@ static INLINE void get_flip_cfg(TX_TYPE tx_type, int *ud_flip, int *lr_flip) {
     case H_DCT:
     case V_ADST:
     case H_ADST:
+#if CONFIG_DDT_INTER
+    case DDT_DDT:
+    case DDT_DCT:
+    case DCT_DDT:
+#endif  // CONFIG_DDT_INTER
       *ud_flip = 0;
       *lr_flip = 0;
       break;
     case FLIPADST_DCT:
     case FLIPADST_ADST:
     case V_FLIPADST:
+#if CONFIG_DDT_INTER
+    case FLIPDDT_DCT:
+    case FLIPDDT_DDT:
+#endif  // CONFIG_DDT_INTER
       *ud_flip = 1;
       *lr_flip = 0;
       break;
     case DCT_FLIPADST:
     case ADST_FLIPADST:
     case H_FLIPADST:
+#if CONFIG_DDT_INTER
+    case DCT_FLIPDDT:
+    case DDT_FLIPDDT:
+#endif  // CONFIG_DDT_INTER
       *ud_flip = 0;
       *lr_flip = 1;
       break;
     case FLIPADST_FLIPADST:
+#if CONFIG_DDT_INTER
+    case FLIPDDT_FLIPDDT:
+#endif  // CONFIG_DDT_INTER
       *ud_flip = 1;
       *lr_flip = 1;
       break;
