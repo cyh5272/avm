@@ -229,13 +229,19 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
       mv_search_params->search_site_cfg[SS_CFG_SRC];
 #if CONFIG_FLEX_MVRES
   const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 0;
+#endif
 #endif
 
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
 #if CONFIG_FLEX_MVRES
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
-                                     pb_mv_precision, src_search_sites,
-                                     fine_search_interval);
+                                     pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                     is_ibc_cost,
+#endif
+                                     src_search_sites, fine_search_interval);
 #else
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
                                      src_search_sites, fine_search_interval);
@@ -488,8 +494,17 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
   lower_mv_precision(&ref_mv_low_prec, mbmi->pb_mv_precision);
   const MV ref_mv = ref_mv_low_prec;
 
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 0;
+#endif
+
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
-                                     pb_mv_precision, NULL, 0);
+                                     pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                     is_ibc_cost,
+#endif
+
+                                     NULL, 0);
 
   if (pb_mv_precision < MV_PRECISION_ONE_PEL)
     bestsme = av1_refining_search_8p_c_low_precision(
@@ -712,12 +727,19 @@ void av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     // Do full-pixel compound motion search on the current reference frame.
     if (id) xd->plane[plane].pre[0] = ref_yv12[id];
 
+#if CONFIG_FLEX_MVRES && CONFIG_BVCOST_UPDATE
+    const int is_ibc_cost = 0;
+#endif
+
     // Make motion search params
     FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
     av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize,
                                        &ref_mv[id].as_mv,
 #if CONFIG_FLEX_MVRES
                                        pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                       is_ibc_cost,
+#endif
 #endif
                                        NULL,
                                        /*fine_search_interval=*/0);
@@ -914,6 +936,9 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   const MvCosts *mv_costs = &x->mv_costs;
 #if CONFIG_FLEX_MVRES
   const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 0;
+#endif
 #endif
 
 #if CONFIG_JOINT_MVD
@@ -1052,10 +1077,14 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif  // CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
     // Make motion search params
     FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
+
     av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize,
                                        &ref_mv.as_mv,
 #if CONFIG_FLEX_MVRES
                                        pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                       is_ibc_cost,
+#endif
 #endif
                                        NULL,
                                        /*fine_search_interval=*/0);
@@ -1369,12 +1398,18 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
   const int fine_search_interval = use_fine_search_interval(cpi);
 #if CONFIG_FLEX_MVRES
   const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 0;
+#endif
 #endif
 
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &ref_mv,
 #if CONFIG_FLEX_MVRES
                                      pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                     is_ibc_cost,
+#endif
 #endif
                                      src_search_sites, fine_search_interval);
 #if CONFIG_FLEX_MVRES

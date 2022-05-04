@@ -4319,6 +4319,9 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   set_default_precision_set(cm, mbmi, bsize);
 #endif
   set_most_probable_mv_precision(cm, mbmi, bsize);
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 1;
+#endif
 #endif
 
   const int mi_row = xd->mi_row;
@@ -4390,6 +4393,9 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_FLEX_MVRES
   av1_make_default_fullpel_ms_params(&fullms_params, cpi, x, bsize,
                                      &dv_ref.as_mv, mbmi->max_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                     is_ibc_cost,
+#endif
                                      lookahead_search_sites,
                                      /*fine_search_interval=*/0);
 #else

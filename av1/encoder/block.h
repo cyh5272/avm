@@ -898,6 +898,14 @@ typedef struct {
   int *amvd_nmv_cost[2];
 #endif  // CONFIG_ADAPTIVE_MVD
 
+#if CONFIG_BVCOST_UPDATE
+  /*! Costs for coding the zero components of dv cost. */
+  int *dv_joint_cost;
+
+  /*! Points to the middle of dvcost. */
+  int *dv_nmv_cost[2];
+#endif
+
 #else
   /*****************************************************************************
    * \name Encoding Costs

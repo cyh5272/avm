@@ -93,7 +93,9 @@ typedef struct {
 #if CONFIG_ADAPTIVE_MVD
   int is_adaptive_mvd;
 #endif  // CONFIG_ADAPTIVE_MVD
-
+#if CONFIG_BVCOST_UPDATE
+  int is_ibc_cost;
+#endif
 #endif
 
 } MV_COST_PARAMS;
@@ -244,6 +246,9 @@ void av1_make_default_fullpel_ms_params(
     const MACROBLOCK *x, BLOCK_SIZE bsize, const MV *ref_mv,
 #if CONFIG_FLEX_MVRES
     const MvSubpelPrecision pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+    const int is_ibc_cost,
+#endif
 #endif
     const search_site_config search_sites[NUM_DISTINCT_SEARCH_METHODS],
     int fine_search_interval);
