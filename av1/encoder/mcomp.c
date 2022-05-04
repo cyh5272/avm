@@ -617,16 +617,41 @@ static INLINE int mvsad_err_cost(const FULLPEL_MV mv,
   const MvCosts *mv_costs = mv_cost_params->mv_costs;
 
 #if CONFIG_BVCOST_UPDATE
-  const int *mvjcost = mv_cost_params->is_ibc_cost ? mv_costs->dv_joint_cost
-                                                   : mv_costs->nmv_joint_cost;
+  const int *mvjcost =
+      mv_cost_params->is_ibc_cost
+          ? mv_costs->dv_joint_cost
+#if CONFIG_ADAPTIVE_MVD
+          : (mv_cost_params->is_adaptive_mvd ? mv_costs->amvd_nmv_joint_cost
+                                             : mv_costs->nmv_joint_cost);
+#else
+          : mv_costs->nmv_joint_cost;
+#endif
+
   const int *const *mvcost =
       mv_cost_params->is_ibc_cost
           ? CONVERT_TO_CONST_MVCOST(mv_costs->dv_nmv_cost)
+#if CONFIG_ADAPTIVE_MVD
+          : (mv_cost_params->is_adaptive_mvd
+                 ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
+                 : CONVERT_TO_CONST_MVCOST(
+                       mv_costs->nmv_costs[pb_mv_precision]));
+#else
+          : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
+#else
+#if CONFIG_ADAPTIVE_MVD
+  const int *mvjcost = mv_cost_params->is_adaptive_mvd
+                           ? mv_costs->amvd_nmv_joint_cost
+                           : mv_costs->nmv_joint_cost;
+  const int *const *mvcost =
+      mv_cost_params->is_adaptive_mvd
+          ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
           : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
 #else
   const int *mvjcost = mv_costs->nmv_joint_cost;
   const int *const *mvcost =
       CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
 #endif
 
   const int sad_per_bit = mv_costs->sadperbit;
