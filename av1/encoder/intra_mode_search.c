@@ -861,7 +861,12 @@ static AOM_INLINE int intra_block_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
     // in the tokenonly rate, but for intra blocks, tx_size is always coded
     // (prediction granularity), so we account for it in the full rate,
     // not the tokenonly rate.
-    this_rate_tokenonly -= tx_size_cost(x, bsize, mbmi->tx_size);
+    this_rate_tokenonly -=
+        tx_size_cost(x,
+#if CONFIG_NEW_TX_PARTITION
+                     cpi->common.seq_params.enable_tx_split_4way,
+#endif  // CONFIG_NEW_TX_PARTITION
+                     bsize, mbmi->tx_size);
   }
   const int this_rate =
       rd_stats.rate + intra_mode_info_cost_y(cpi, x, mbmi, bsize,
@@ -1157,7 +1162,11 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
     // in the tokenonly rate, but for intra blocks, tx_size is always coded
     // (prediction granularity), so we account for it in the full rate,
     // not the tokenonly rate.
-    rd_stats_y->rate -= tx_size_cost(x, bsize, mbmi->tx_size);
+    rd_stats_y->rate -= tx_size_cost(x,
+#if CONFIG_NEW_TX_PARTITION
+                                     cm->seq_params.enable_tx_split_4way,
+#endif  // CONFIG_NEW_TX_PARTITION
+                                     bsize, mbmi->tx_size);
   }
   if (num_planes > 1 && xd->is_chroma_ref) {
     const int uv_mode_cost =
@@ -1225,6 +1234,10 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
   uint8_t best_fsc_mode = 0;
   PREDICTION_MODE best_intra_mode = best_mbmi->mode;
   TX_SIZE best_tx_size = best_mbmi->tx_size;
+#if CONFIG_NEW_TX_PARTITION
+  TX_PARTITION_TYPE best_partition_type[INTER_TX_SIZE_BUF_LEN];
+  av1_copy(best_partition_type, best_mbmi->partition_type);
+#endif  // CONFIG_NEW_TX_PARTITION
   uint8_t best_filt = mbmi->filter_intra_mode_info.use_filter_intra;
   uint8_t best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   int8_t best_angle_delta = best_mbmi->angle_delta[PLANE_TYPE_Y];
@@ -1341,6 +1354,9 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
       if (this_rd < *best_rd) {
         *best_rd = this_rd;
         best_tx_size = mbmi->tx_size;
+#if CONFIG_NEW_TX_PARTITION
+        av1_copy(best_partition_type, mbmi->partition_type);
+#endif  // CONFIG_NEW_TX_PARTITION
         best_intra_mode = mbmi->mode;
 #if CONFIG_AIMC
         best_y_mode_idx = mbmi->y_mode_idx;
@@ -1368,6 +1384,9 @@ void search_fsc_mode(const AV1_COMP *const cpi, MACROBLOCK *x, int *rate,
     mbmi->joint_y_mode_delta_angle = best_joint_ymode;
 #endif  // CONFIG_AIMC
     mbmi->tx_size = best_tx_size;
+#if CONFIG_NEW_TX_PARTITION
+    av1_copy(mbmi->partition_type, best_partition_type);
+#endif  // CONFIG_NEW_TX_PARTITION
     mbmi->mrl_index = best_mrl;
     mbmi->filter_intra_mode_info.use_filter_intra = best_filt;
     mbmi->angle_delta[PLANE_TYPE_Y] = best_angle_delta;
@@ -1529,7 +1548,12 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         // tx_size in the tokenonly rate, but for intra blocks, tx_size is
         // always coded (prediction granularity), so we account for it in the
         // full rate, not the tokenonly rate.
-        this_rate_tokenonly -= tx_size_cost(x, bsize, mbmi->tx_size);
+        this_rate_tokenonly -=
+            tx_size_cost(x,
+#if CONFIG_NEW_TX_PARTITION
+                         cpi->common.seq_params.enable_tx_split_4way,
+#endif  // CONFIG_NEW_TX_PARTITION
+                         bsize, mbmi->tx_size);
       }
       this_rate =
           this_rd_stats.rate + intra_mode_info_cost_y(cpi, x, mbmi, bsize

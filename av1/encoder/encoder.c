@@ -473,6 +473,13 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #if CONFIG_ORIP
   seq->enable_orip = oxcf->intra_mode_cfg.enable_orip;
 #endif
+#if CONFIG_NEW_TX_PARTITION
+#if CONFIG_EXT_RECUR_PARTITIONS
+  seq->enable_tx_split_4way = 0;
+#else
+  seq->enable_tx_split_4way = oxcf->txfm_cfg.enable_tx_split_4way;
+#endif
+#endif
 #if CONFIG_IST
   seq->enable_ist = oxcf->txfm_cfg.enable_ist;
 #endif
