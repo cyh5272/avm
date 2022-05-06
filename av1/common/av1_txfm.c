@@ -197,8 +197,17 @@ const int16_t
 #endif  // CONFIG_DST_32X32
 
 #if CONFIG_CROSS_CHROMA_TX
-// Haar transform [1, 1; 1, -1] * 1/sqrt(2) * (1<<CCTX_PREC_BITS)
-const int32_t cctx_mtx[4] = { 181, 181, 181, -181 };
+// Given a rotation angle t, the CCTX is defined as
+// [cos(t), sin(t); sin(t), -cos(t)] * 1<<CCTX_PREC_BITS)
+const int32_t cctx_mtx[CCTX_TYPES - 1][4] = {
+  { 181, 181, 181, -181 },  // t = 45 degrees
+  { 222, 128, 128, -222 },  // t = 30 degrees
+  { 128, 222, 222, -128 },  // t = 60 degrees
+  //  { 232, 108, 108, -232 },  // t = 25 degrees
+  //  { 108, 232, 232, -108 },  // t = 65 degrees
+  //  { 241, 87, 87, -241 },  // t = 20 degrees
+  //  { 87, 241, 241, -87 },  // t = 70 degrees
+};
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 // av1_sinpi_arr_data[i][j] = (int)round((sqrt(2) * sin(j*Pi/9) * 2 / 3) * (1

@@ -78,7 +78,11 @@ void av1_setup_xform(const AV1_COMMON *cm, MACROBLOCK *x,
 #if CONFIG_IST
                      int plane,
 #endif
-                     TX_SIZE tx_size, TX_TYPE tx_type, TxfmParam *txfm_param);
+                     TX_SIZE tx_size, TX_TYPE tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                     CctxType cctx_Type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                     TxfmParam *txfm_param);
 void av1_setup_quant(TX_SIZE tx_size, int use_optimize_b, int xform_quant_idx,
                      int use_quant_b_adapt, QUANT_PARAM *qparam);
 
@@ -110,7 +114,8 @@ void av1_xform(MACROBLOCK *x, int plane, int block, int blk_row, int blk_col,
 );
 
 #if CONFIG_CROSS_CHROMA_TX
-void forward_cross_chroma_transform(MACROBLOCK *x, int block, TX_SIZE tx_size);
+void forward_cross_chroma_transform(MACROBLOCK *x, int block, TX_SIZE tx_size,
+                                    CctxType cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
@@ -118,6 +123,9 @@ void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
 
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *mb, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                   CctxType cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
                    const TXB_CTX *const txb_ctx, int *rate_cost);
 
 // This function can be used as (i) a further optimization to reduce the

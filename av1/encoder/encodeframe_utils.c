@@ -171,6 +171,10 @@ static void reset_tx_size(MACROBLOCK *x, MB_MODE_INFO *mbmi,
   for (int row = 0; row < mi_size_high[mbmi->sb_type[plane_index]]; ++row) {
     memset(xd->tx_type_map + row * stride, DCT_DCT,
            bw * sizeof(xd->tx_type_map[0]));
+#if CONFIG_CROSS_CHROMA_TX
+    memset(xd->cctx_type_map + row * stride, CCTX_NONE,
+           bw * sizeof(xd->cctx_type_map[0]));
+#endif  // CONFIG_CROSS_CHROMA_TX
   }
   av1_zero(txfm_info->blk_skip);
   txfm_info->skip_txfm = 0;
@@ -226,18 +230,32 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   txfm_info->skip_txfm = ctx->rd_stats.skip_txfm;
   if (xd->tree_type != CHROMA_PART) {
     xd->tx_type_map = ctx->tx_type_map;
+#if CONFIG_CROSS_CHROMA_TX
+    xd->cctx_type_map = ctx->cctx_type_map;
+#endif  // CONFIG_CROSS_CHROMA_TX
     xd->tx_type_map_stride = mi_size_wide[bsize];
     // If not dry_run, copy the transform type data into the frame level buffer.
     // Encoder will fetch tx types when writing bitstream.
     if (!dry_run) {
       const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
       TX_TYPE *const tx_type_map = mi_params->tx_type_map + grid_idx;
+#if CONFIG_CROSS_CHROMA_TX
+      CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
+#endif  // CONFIG_CROSS_CHROMA_TX
       const int mi_stride = mi_params->mi_stride;
       for (int blk_row = 0; blk_row < bh; ++blk_row) {
         av1_copy_array(tx_type_map + blk_row * mi_stride,
                        xd->tx_type_map + blk_row * xd->tx_type_map_stride, bw);
+#if CONFIG_CROSS_CHROMA_TX
+        av1_copy_array(cctx_type_map + blk_row * mi_stride,
+                       xd->cctx_type_map + blk_row * xd->tx_type_map_stride,
+                       bw);
+#endif  // CONFIG_CROSS_CHROMA_TX
       }
       xd->tx_type_map = tx_type_map;
+#if CONFIG_CROSS_CHROMA_TX
+      xd->cctx_type_map = cctx_type_map;
+#endif  // CONFIG_CROSS_CHROMA_TX
       xd->tx_type_map_stride = mi_stride;
     }
   }
@@ -1335,6 +1353,10 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVG_CDF_STRIDE(ctx_left->stx_cdf, ctx_tr->stx_cdf, STX_TYPES,
                  CDF_SIZE(STX_TYPES));
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  AVG_CDF_STRIDE(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf, CCTX_TYPES,
+                 CDF_SIZE(CCTX_TYPES));
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 // Memset the mbmis at the current superblock to 0
@@ -1362,6 +1384,10 @@ void av1_reset_mbmi(CommonModeInfoParams *const mi_params, BLOCK_SIZE sb_size,
            sb_size_mi * sizeof(*mi_params->mi_grid_base));
     memset(&mi_params->tx_type_map[mi_grid_idx], 0,
            sb_size_mi * sizeof(*mi_params->tx_type_map));
+#if CONFIG_CROSS_CHROMA_TX
+    memset(&mi_params->cctx_type_map[mi_grid_idx], 0,
+           sb_size_mi * sizeof(*mi_params->cctx_type_map));
+#endif  // CONFIG_CROSS_CHROMA_TX
     if (cur_mi_row % mi_alloc_size_1d == 0) {
       memset(&mi_params->mi_alloc[alloc_mi_idx], 0,
              sb_size_alloc_mi * sizeof(*mi_params->mi_alloc));

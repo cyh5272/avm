@@ -280,16 +280,16 @@ static AOM_INLINE void inverse_cross_chroma_transform_block(
     const AV1_COMMON *const cm, DecoderCodingBlock *dcb, aom_reader *const r,
     const int plane, const int blk_row, const int blk_col,
     const TX_SIZE tx_size) {
-  (void)cm;
   (void)r;
   (void)plane;
-  (void)blk_row;
-  (void)blk_col;
   tran_low_t *dqcoeff_u =
       dcb->dqcoeff_block[AOM_PLANE_U] + dcb->cb_offset[AOM_PLANE_U];
   tran_low_t *dqcoeff_v =
       dcb->dqcoeff_block[AOM_PLANE_V] + dcb->cb_offset[AOM_PLANE_V];
-  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size);
+  MACROBLOCKD *const xd = &dcb->xd;
+  const CctxType cctx_type = av1_get_cctx_type(
+      xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -1800,6 +1800,10 @@ static AOM_INLINE void set_offsets_for_pred_and_recon(AV1Decoder *const pbi,
   xd->mi = mi_params->mi_grid_base + offset;
   xd->tx_type_map =
       &mi_params->tx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map =
+      &mi_params->cctx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 
   set_plane_n4(xd, bw, bh, num_planes);
