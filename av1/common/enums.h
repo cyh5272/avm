@@ -32,26 +32,12 @@ extern "C" {
 #if CONFIG_FLEX_MVRES
 #define DEBUG_FLEX_MV 0
 #define ADAPTIVE_PRECISION_SETS \
-  0                             // Enable adaptive precision sets for each block
+  1                             // Enable adaptive precision sets for each block
 #define FAST_FLEX_MV_ENCODER 1  // Enable fast encoder searching algorithms
-
-#if FAST_FLEX_MV_ENCODER
-#define REUSE_PREV_MV 2  // 1 for partial MV reuse, 2 for full MV reuse
-#define SKIP_NEW_MV_ET \
-  0  // Terminate early if similar MV was not better in earlier
-#define SKIP_REPEATED_FULL_NEW_MV \
-  0  // Skip repeated newMV of previous ref_mv_idx during motion search for
-     // higher precisions
-#define ENABLE_SKIP_NEW_MV_FOR_HIGH_PRECISIONS \
-  0  // Skip RDO of the repeated newMV for higher precisions.
-#define MODEL_RDO_BASED_SEARCH 0  // Use model based RD for precision search
-
-#if REUSE_PREV_MV == 2
-#define FAST_MV_REFINEMENT \
-  0  // Fast refinement of MV for low precision. 1 means only less than int pel;
-     // 2 means 1 + all precisions in the single ref mode; 3 means 1 + 2 + all
-#endif  // REUSE_PREV_MV
-#endif  // FAST_ALGORITHMS
+#define DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION \
+  1  // 0 means do not disable, 1 means normatively disable, 2 means encoder
+     // does not search
+#define DISABLE_NEW_NEAR_MODES_FOR_FLEX_MV 0
 
 #if ADAPTIVE_PRECISION_SETS
 #define MODE_BASED_PRECISION_ADAPTATION \

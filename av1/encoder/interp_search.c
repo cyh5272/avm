@@ -366,6 +366,14 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
     if (*skip_hor == 0 && *skip_ver == 1) *skip_ver = 0;
   }
 }
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+int skip_interpolation_filter_search_precision(const AV1_COMMON *const cm,
+                                               const MB_MODE_INFO *mbmi,
+                                               BLOCK_SIZE bsize) {
+  return (is_pb_mv_precision_active(cm, mbmi, bsize) &&
+          (mbmi->pb_mv_precision < mbmi->max_mv_precision));
+}
+#endif
 
 /*!\brief AV1 interpolation filter search
  *
@@ -415,7 +423,12 @@ int64_t av1_interpolation_filter_search(
   const int num_planes = av1_num_planes(cm);
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
-  const int need_search = av1_is_interp_needed(cm, xd);
+  const int need_search =
+      av1_is_interp_needed(cm, xd)
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 2
+      && !skip_interpolation_filter_search_precision(cm, mbmi, bsize)
+#endif
+      ;
 #if CONFIG_NEW_REF_SIGNALING || CONFIG_TIP
   const int ref_frame = COMPACT_INDEX0_NRS(xd->mi[0]->ref_frame[0]);
 #else

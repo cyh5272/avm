@@ -98,6 +98,9 @@ static void tf_motion_search(AV1_COMP *cpi,
   // Save input state.
 #if CONFIG_FLEX_MVRES
   const AV1_COMMON *cm = &cpi->common;
+#if CONFIG_BVCOST_UPDATE
+  const int is_ibc_cost = 0;
+#endif
 #endif
   MACROBLOCK *const mb = &cpi->td.mb;
   MACROBLOCKD *const mbd = &mb->e_mbd;
@@ -150,6 +153,9 @@ static void tf_motion_search(AV1_COMP *cpi,
                                      &baseline_mv,
 #if CONFIG_FLEX_MVRES
                                      pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                     is_ibc_cost,
+#endif
 #endif
                                      search_site_cfg,
                                      /*fine_search_interval=*/0);
@@ -219,6 +225,9 @@ static void tf_motion_search(AV1_COMP *cpi,
                                            subblock_size, &baseline_mv,
 #if CONFIG_FLEX_MVRES
                                            pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+                                           is_ibc_cost,
+#endif
 #endif
                                            search_site_cfg,
                                            /*fine_search_interval=*/0);

@@ -25,10 +25,6 @@ typedef struct {
   int64_t rd;
   int drl_cost;
 
-#if CONFIG_FLEX_MVRES && SKIP_NEW_MV_ET
-  int flex_mv_cost;
-#endif
-
   int rate_mv;
   int_mv mv;
 
@@ -40,7 +36,7 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
                               BLOCK_SIZE bsize, int ref_idx, int *rate_mv,
                               int search_range, inter_mode_info *mode_info,
                               int_mv *best_mv);
-#if CONFIG_FLEX_MVRES && REUSE_PREV_MV
+#if CONFIG_FLEX_MVRES
 void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
                                              MACROBLOCK *x, BLOCK_SIZE bsize,
                                              int ref_idx, int *rate_mv,

@@ -1610,12 +1610,8 @@ static const aom_cdf_prob
     };
 
 static const aom_cdf_prob
-    default_pb_mv_most_probable_precision_cdf[NUM_MV_PREC_MPP_CONTEXT]
-                                             [CDF_SIZE(2)] = {
-                                               { AOM_CDF2(24320) },
-                                               { AOM_CDF2(24320) },
-                                               { AOM_CDF2(24320) },
-                                             };
+    default_pb_mv_most_probable_precision_cdf[NUM_MV_PREC_MPP_CONTEXT][CDF_SIZE(
+        2)] = { { AOM_CDF2(26227) }, { AOM_CDF2(22380) }, { AOM_CDF2(15446) } };
 #if ADAPTIVE_PRECISION_SETS
 #if MODE_BASED_PRECISION_ADAPTATION
 static const aom_cdf_prob default_pb_mv_precision_cdf
@@ -1646,21 +1642,14 @@ static const aom_cdf_prob default_pb_mv_precision_cdf
       }
     };
 #elif MAX_NUM_OF_SUPPORTED_PRECISIONS == 4
-static const aom_cdf_prob
-    default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]
-                               [NUM_PB_FLEX_QUALIFIED_MAX_PREC]
-                               [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = {
-                                 {
-                                     { AOM_CDF3(24000, 29000) },
-                                     { AOM_CDF3(24000, 29000) },
-                                     { AOM_CDF3(24000, 29000) },
-                                 },
-                                 {
-                                     { AOM_CDF3(24000, 29000) },
-                                     { AOM_CDF3(24000, 29000) },
-                                     { AOM_CDF3(24000, 29000) },
-                                 },
-                               };
+static const aom_cdf_prob default_pb_mv_precision_cdf
+    [MV_PREC_DOWN_CONTEXTS][NUM_PB_FLEX_QUALIFIED_MAX_PREC]
+    [CDF_SIZE(FLEX_MV_COSTS_SIZE)] = { { { AOM_CDF3(10923, 21845) },
+                                         { AOM_CDF3(25702, 31870) },
+                                         { AOM_CDF3(18150, 31007) } },
+                                       { { AOM_CDF3(10923, 21845) },
+                                         { AOM_CDF3(25055, 31858) },
+                                         { AOM_CDF3(21049, 31413) } } };
 #elif MAX_NUM_OF_SUPPORTED_PRECISIONS == 5
 static const aom_cdf_prob
     default_pb_mv_precision_cdf[MV_PREC_DOWN_CONTEXTS]

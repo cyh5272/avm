@@ -741,6 +741,11 @@ static AOM_INLINE int get_smart_mv_prec(AV1_COMP *cpi, const MV_STATS *mv_stats,
   const int order_diff = order_hint - mv_stats->order;
   aom_clear_system_state();
   const float area = (float)(cm->width * cm->height);
+#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER && DEBUG_FLEX_MV
+  assert(AOMMIN(cm->width, cm->height) < 1080);
+  CHECK_FLEX_MV((AOMMIN(cm->width, cm->height) >= 1080),
+                "1/8-th pel should be be allowed for 1080p or larger");
+#endif
   float features[MV_PREC_FEATURE_SIZE] = {
     (float)current_q,
     (float)mv_stats->q,

@@ -147,6 +147,17 @@ static void set_good_speed_feature_framesize_dependent(
   const int is_1080p_or_larger = AOMMIN(cm->width, cm->height) >= 1080;
   const int is_4k_or_larger = AOMMIN(cm->width, cm->height) >= 2160;
 
+#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+  if (is_1080p_or_larger) {
+    sf->hl_sf.high_precision_mv_usage = QTR_ONLY;
+  }
+
+  if (!is_1080p_or_larger) {
+    sf->flexmv_sf.do_not_search_8_pel_precision = 1;
+  }
+  if (!is_480p_or_larger) sf->flexmv_sf.do_not_search_4_pel_precision = 1;
+#endif
+
   if (is_480p_or_larger) {
     sf->part_sf.use_square_partition_only_threshold = BLOCK_128X128;
     if (is_720p_or_larger)
@@ -304,6 +315,15 @@ static void set_good_speed_features_framesize_independent(
   if (!cpi->oxcf.tile_cfg.enable_large_scale_tile) {
     sf->hl_sf.high_precision_mv_usage = LAST_MV_DATA;
   }
+
+#if CONFIG_FLEX_MVRES && FAST_FLEX_MV_ENCODER
+  sf->flexmv_sf.terminate_early_4_pel_precision = 1;
+  sf->flexmv_sf.low_prec_obmc_full_pixel_search_level = 1;
+  sf->flexmv_sf.skip_similar_ref_mv = 1;
+  sf->flexmv_sf.skip_repeated_newmv_low_prec = 1;
+  sf->flexmv_sf.fast_mv_refinement = 1;
+  sf->flexmv_sf.fast_motion_search_low_precision = 1;
+#endif
 
   // Speed 0 for all speed features that give neutral coding performance change.
   sf->gm_sf.gm_disable_recode = 1;
@@ -723,6 +743,20 @@ static AOM_INLINE void init_mv_sf(MV_SPEED_FEATURES *mv_sf) {
   mv_sf->use_downsampled_sad = 0;
 }
 
+#if CONFIG_FLEX_MVRES
+static AOM_INLINE void init_flexmv_sf(
+    FLEXMV_PRECISION_SPEED_FEATURES *flexmv_sf) {
+  flexmv_sf->do_not_search_4_pel_precision = 0;
+  flexmv_sf->do_not_search_8_pel_precision = 0;
+  flexmv_sf->terminate_early_4_pel_precision = 0;
+  flexmv_sf->low_prec_obmc_full_pixel_search_level = 0;
+  flexmv_sf->skip_similar_ref_mv = 0;
+  flexmv_sf->skip_repeated_newmv_low_prec = 0;
+  flexmv_sf->fast_mv_refinement = 0;
+  flexmv_sf->fast_motion_search_low_precision = 0;
+}
+#endif
+
 static AOM_INLINE void init_inter_sf(INTER_MODE_SPEED_FEATURES *inter_sf) {
   inter_sf->comp_inter_joint_search_thresh = BLOCK_4X4;
   inter_sf->adaptive_rd_thresh = 0;
@@ -936,6 +970,10 @@ void av1_set_speed_features_framesize_independent(AV1_COMP *cpi, int speed) {
   init_rd_sf(&sf->rd_sf, oxcf);
   init_winner_mode_sf(&sf->winner_mode_sf);
   init_lpf_sf(&sf->lpf_sf);
+
+#if CONFIG_FLEX_MVRES
+  init_flexmv_sf(&sf->flexmv_sf);
+#endif
 
   if (oxcf->mode == GOOD)
     set_good_speed_features_framesize_independent(cpi, sf, speed);
