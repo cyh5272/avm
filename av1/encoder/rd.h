@@ -389,12 +389,11 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv, int usehp,
                        MvCosts *mv_costs);
 #endif
 
-#if CONFIG_BVCOST_UPDATE
 #if CONFIG_FLEX_MVRES
-void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc);
-#else
+void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc,
+                   MvCosts *mv_costs);
+#elif CONFIG_BVCOST_UPDATE
 void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMVCosts *dv_costs);
-#endif
 #endif
 
 int av1_get_adaptive_rdmult(const struct AV1_COMP *cpi, double beta);

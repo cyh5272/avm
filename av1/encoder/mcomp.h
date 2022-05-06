@@ -93,7 +93,9 @@ typedef struct {
 #if CONFIG_ADAPTIVE_MVD
   int is_adaptive_mvd;
 #endif  // CONFIG_ADAPTIVE_MVD
-
+#if CONFIG_BVCOST_UPDATE
+  int is_ibc_cost;
+#endif
 #endif
 
 } MV_COST_PARAMS;
@@ -244,6 +246,9 @@ void av1_make_default_fullpel_ms_params(
     const MACROBLOCK *x, BLOCK_SIZE bsize, const MV *ref_mv,
 #if CONFIG_FLEX_MVRES
     const MvSubpelPrecision pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+    const int is_ibc_cost,
+#endif
 #endif
     const search_site_config search_sites[NUM_DISTINCT_SEARCH_METHODS],
     int fine_search_interval);
@@ -339,16 +344,11 @@ unsigned int av1_int_pro_motion_estimation(const struct AV1_COMP *cpi,
                                            const MV *ref_mv);
 
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                             ,
-                             const int fast_mv_refinement
-#endif
-);
+                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv);
 #if CONFIG_FLEX_MVRES
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv);
+    FULLPEL_MV *best_mv, int fast_mv_refinement);
 #endif
 
 int av1_full_pixel_search(const FULLPEL_MV start_mv,

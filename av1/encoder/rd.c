@@ -829,9 +829,9 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
 #endif  // CONFIG_FORWARDSKIP
 }
 
-#if CONFIG_BVCOST_UPDATE
 #if CONFIG_FLEX_MVRES
-void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc) {
+void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc,
+                   MvCosts *mv_costs) {
   dv_costs->dv_costs[0] = &dv_costs->dv_costs_alloc[0][MV_MAX];
   dv_costs->dv_costs[1] = &dv_costs->dv_costs_alloc[1][MV_MAX];
   av1_build_nmv_cost_table(dv_costs->joint_mv, dv_costs->dv_costs, &fc->ndvc,
@@ -841,8 +841,17 @@ void fill_dv_costs(IntraBCMvCosts *dv_costs, const FRAME_CONTEXT *fc) {
                            0
 #endif
   );
-}
+
+#if CONFIG_BVCOST_UPDATE
+  // Copy the pointer of the dv cost to the mvcost
+  mv_costs->dv_joint_cost = &dv_costs->joint_mv[0];
+  mv_costs->dv_nmv_cost[0] = dv_costs->dv_costs[0];
+  mv_costs->dv_nmv_cost[1] = dv_costs->dv_costs[1];
 #else
+  (void)mv_costs;
+#endif
+}
+#elif CONFIG_BVCOST_UPDATE
 void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMVCosts *dv_costs) {
   int *dvcost[2] = { &dv_costs->mv_component[0][MV_MAX],
                      &dv_costs->mv_component[1][MV_MAX] };
@@ -853,8 +862,6 @@ void av1_fill_dv_costs(const FRAME_CONTEXT *fc, IntraBCMVCosts *dv_costs) {
                            dvcost, &fc->ndvc, MV_SUBPEL_NONE);
 }
 #endif
-
-#endif  // CONFIG_BVCOST_UPDATE
 
 #if CONFIG_FLEX_MVRES
 void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv,
@@ -958,7 +965,7 @@ void av1_initialize_rd_consts(AV1_COMP *cpi) {
 #endif  // !CONFIG_BVCOST_UPDATE
       !is_stat_generation_stage(cpi)) {
 #if CONFIG_FLEX_MVRES
-    fill_dv_costs(&cpi->dv_costs, cm->fc);
+    fill_dv_costs(&cpi->dv_costs, cm->fc, mv_costs);
 #else
     IntraBCMVCosts *const dv_costs = &cpi->dv_costs;
     int *dvcost[2] = { &dv_costs->mv_component[0][MV_MAX],

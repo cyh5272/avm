@@ -622,8 +622,8 @@ static INLINE int av1_is_interp_needed(const AV1_COMMON *const cm,
   (void)cm;
   const MB_MODE_INFO *const mbmi = xd->mi[0];
 
-#if CONFIG_FLEX_MVRES
-  if (mbmi->pb_mv_precision <= MV_PRECISION_ONE_PEL) return 0;
+#if CONFIG_FLEX_MVRES && DISABLE_OBMC_WARPED_INTER_INTRA_LOWER_PRECISION == 1
+  if (mbmi->pb_mv_precision < mbmi->max_mv_precision) return 0;
 #endif
 
   if (mbmi->skip_mode) return 0;

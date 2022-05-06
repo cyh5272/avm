@@ -42,6 +42,10 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
 #if CONFIG_FLEX_MVRES
                                        ,
                                        MvSubpelPrecision pb_mv_precision
+#if CONFIG_BVCOST_UPDATE
+                                       ,
+                                       const int is_ibc_cost
+#endif
 #endif
 ) {
   mv_cost_params->ref_mv = ref_mv;
@@ -55,6 +59,10 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
 #if CONFIG_ADAPTIVE_MVD
   mv_cost_params->is_adaptive_mvd = is_adaptive_mvd;
 #endif  // CONFIG_ADAPTIVE_MVD
+
+#if CONFIG_BVCOST_UPDATE
+  mv_cost_params->is_ibc_cost = is_ibc_cost;
+#endif
 
 #else
   mv_cost_params->error_per_bit = mv_costs->errorperbit;
@@ -111,12 +119,15 @@ void av1_make_default_fullpel_ms_params(
     const MACROBLOCK *x, BLOCK_SIZE bsize, const MV *ref_mv,
 #if CONFIG_FLEX_MVRES
     const MvSubpelPrecision pb_mv_precision,
+#if CONFIG_BVCOST_UPDATE
+    const int is_ibc_cost,
+#endif
 #endif
     const search_site_config search_sites[NUM_DISTINCT_SEARCH_METHODS],
     int fine_search_interval) {
   const MV_SPEED_FEATURES *mv_sf = &cpi->sf.mv_sf;
 
-#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP
+#if CONFIG_ADAPTIVE_MVD || CONFIG_TIP || CONFIG_FLEX_MVRES
   const MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
 #endif  // CONFIG_ADAPTIVE_MVD || CONFIG_TIP
@@ -159,10 +170,11 @@ void av1_make_default_fullpel_ms_params(
   ms_params->fine_search_interval = fine_search_interval;
 
   ms_params->is_intra_mode = 0;
-#if CONFIG_FLEX_MVRES && REUSE_PREV_MV == 2
-  ms_params->fast_obmc_search = (pb_mv_precision == mbmi->max_mv_precision)
-                                    ? mv_sf->obmc_full_pixel_search_level
-                                    : 1;
+#if CONFIG_FLEX_MVRES
+  ms_params->fast_obmc_search =
+      (pb_mv_precision == mbmi->max_mv_precision)
+          ? mv_sf->obmc_full_pixel_search_level
+          : cpi->sf.flexmv_sf.low_prec_obmc_full_pixel_search_level;
 #else
   ms_params->fast_obmc_search = mv_sf->obmc_full_pixel_search_level;
 #endif
@@ -189,7 +201,13 @@ void av1_make_default_fullpel_ms_params(
                       is_adaptive_mvd,
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-                      ref_mv, pb_mv_precision);
+                      ref_mv, pb_mv_precision
+#if CONFIG_BVCOST_UPDATE
+                      ,
+                      is_ibc_cost
+#endif
+
+  );
 #else
                       ref_mv);
 #endif
@@ -210,6 +228,10 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
 
 #if !CONFIG_FLEX_MVRES
   ms_params->allow_hp = cm->features.allow_high_precision_mv;
+#endif
+
+#if CONFIG_BVCOST_UPDATE && CONFIG_FLEX_MVRES
+  const int is_ibc_cost = 0;
 #endif
 
 #if CONFIG_ADAPTIVE_MVD || CONFIG_TIP
@@ -250,7 +272,13 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                       is_adaptive_mvd,
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-                      ref_mv, pb_mv_precision);
+                      ref_mv, pb_mv_precision
+
+#if CONFIG_BVCOST_UPDATE
+                      ,
+                      is_ibc_cost
+#endif
+  );
 #else
                       ref_mv);
 #endif
@@ -405,19 +433,44 @@ static INLINE int get_mv_cost_with_precision(
 #if CONFIG_ADAPTIVE_MVD
     const int is_adaptive_mvd,
 #endif
+#if CONFIG_BVCOST_UPDATE
+    const int is_ibc_cost,
+#endif
     const MvCosts *mv_costs, int weight, int round_bits) {
 
 #if CONFIG_ADAPTIVE_MVD
-  const int *mvjcost = is_adaptive_mvd ? mv_costs->amvd_nmv_joint_cost
-                                       : mv_costs->nmv_joint_cost;
+  const int *mvjcost =
+      is_adaptive_mvd
+          ? mv_costs->amvd_nmv_joint_cost
+#if CONFIG_BVCOST_UPDATE
+          : (is_ibc_cost ? mv_costs->dv_joint_cost : mv_costs->nmv_joint_cost);
+#else
+          : mv_costs->nmv_joint_cost;
+#endif
   const int *const *mvcost =
       is_adaptive_mvd
           ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
+#if CONFIG_BVCOST_UPDATE
+          : (is_ibc_cost ? CONVERT_TO_CONST_MVCOST(mv_costs->dv_nmv_cost)
+                         : CONVERT_TO_CONST_MVCOST(
+                               mv_costs->nmv_costs[pb_mv_precision]));
+#else
           : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
+
+#else
+#if CONFIG_BVCOST_UPDATE
+  const int *mvjcost =
+      (is_ibc_cost ? mv_costs->dv_joint_cost : mv_costs->nmv_joint_cost);
+  const int *const *mvcost =
+      (is_ibc_cost
+           ? CONVERT_TO_CONST_MVCOST(mv_costs->dv_nmv_cost)
+           : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]));
 #else
   const int *mvjcost = mv_costs->nmv_joint_cost;
   const int *const *mvcost =
       CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
 #endif
 
   MV low_prec_ref_mv = ref_mv;
@@ -455,9 +508,17 @@ int av1_mv_bit_cost(const MV *mv, const MV *ref_mv,
                     const int is_adaptive_mvd
 #endif
 ) {
+#if CONFIG_BVCOST_UPDATE
+  // For ibc block this function should not be called
+  const int is_ibc_cost = 0;
+#endif
+
   return get_mv_cost_with_precision(*mv, *ref_mv, pb_mv_precision,
 #if CONFIG_ADAPTIVE_MVD
                                     is_adaptive_mvd,
+#endif
+#if CONFIG_BVCOST_UPDATE
+                                    is_ibc_cost,
 #endif
                                     mv_costs, weight, 7);
 }
@@ -498,6 +559,9 @@ static INLINE int mv_err_cost(const MV mv,
           mv, ref_mv, mv_cost_params->pb_mv_precision,
 #if CONFIG_ADAPTIVE_MVD
           mv_cost_params->is_adaptive_mvd,
+#endif
+#if CONFIG_BVCOST_UPDATE
+          mv_cost_params->is_ibc_cost,
 #endif
           mv_costs, mv_costs->errorperbit,
           RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
@@ -551,9 +615,45 @@ static INLINE int mvsad_err_cost(const FULLPEL_MV mv,
   const MV abs_diff = { abs(diff.row), abs(diff.col) };
 
   const MvCosts *mv_costs = mv_cost_params->mv_costs;
+
+#if CONFIG_BVCOST_UPDATE
+  const int *mvjcost =
+      mv_cost_params->is_ibc_cost
+          ? mv_costs->dv_joint_cost
+#if CONFIG_ADAPTIVE_MVD
+          : (mv_cost_params->is_adaptive_mvd ? mv_costs->amvd_nmv_joint_cost
+                                             : mv_costs->nmv_joint_cost);
+#else
+          : mv_costs->nmv_joint_cost;
+#endif
+
+  const int *const *mvcost =
+      mv_cost_params->is_ibc_cost
+          ? CONVERT_TO_CONST_MVCOST(mv_costs->dv_nmv_cost)
+#if CONFIG_ADAPTIVE_MVD
+          : (mv_cost_params->is_adaptive_mvd
+                 ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
+                 : CONVERT_TO_CONST_MVCOST(
+                       mv_costs->nmv_costs[pb_mv_precision]));
+#else
+          : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
+#else
+#if CONFIG_ADAPTIVE_MVD
+  const int *mvjcost = mv_cost_params->is_adaptive_mvd
+                           ? mv_costs->amvd_nmv_joint_cost
+                           : mv_costs->nmv_joint_cost;
+  const int *const *mvcost =
+      mv_cost_params->is_adaptive_mvd
+          ? CONVERT_TO_CONST_MVCOST(mv_costs->amvd_nmv_cost)
+          : CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#else
   const int *mvjcost = mv_costs->nmv_joint_cost;
   const int *const *mvcost =
       CONVERT_TO_CONST_MVCOST(mv_costs->nmv_costs[pb_mv_precision]);
+#endif
+#endif
+
   const int sad_per_bit = mv_costs->sadperbit;
 
   const MV_COST_TYPE mv_cost_type = mv_cost_params->mv_cost_type;
@@ -2273,12 +2373,7 @@ static int full_pixel_exhaustive(const FULLPEL_MV start_mv,
 // This function is called when we do joint motion search in comp_inter_inter
 // mode, or when searching for one component of an ext-inter compound mode.
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-                             ,
-                             const int fast_mv_refinement
-#endif
-) {
+                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv) {
   static const search_neighbors neighbors[8] = {
     { { -1, 0 }, -1 * SEARCH_GRID_STRIDE_8P + 0 },
     { { 0, -1 }, 0 * SEARCH_GRID_STRIDE_8P - 1 },
@@ -2315,10 +2410,6 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
   best_sad += mvsad_err_cost(*best_mv, mv_cost_params);
 #else
   best_sad += mvsad_err_cost_(best_mv, mv_cost_params);
-#endif
-
-#if CONFIG_FLEX_MVRES && FAST_MV_REFINEMENT > 1
-  if (fast_mv_refinement) return best_sad;
 #endif
 
   do_refine_search_grid[grid_coord] = 1;
@@ -2377,7 +2468,7 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
 // compound mode.
 int av1_refining_search_8p_c_low_precision(
     const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv) {
+    FULLPEL_MV *best_mv, int fast_mv_refinement) {
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
   const int search_range =
       1 << (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
@@ -2398,11 +2489,9 @@ int av1_refining_search_8p_c_low_precision(
   };
 
   int grid_center = search_range * search_grid_stride + search_range;
-#if FAST_MV_REFINEMENT
-  const int num_of_search_steps = 1;
-#else
-  const int num_of_search_steps = 3;
-#endif
+
+  const int num_of_search_steps = fast_mv_refinement ? 1 : 3;
+
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
   const MV_COST_PARAMS *mv_cost_params = &ms_params->mv_cost_params;
   const FullMvLimits *mv_limits = &ms_params->mv_limits;

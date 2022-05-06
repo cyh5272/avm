@@ -2921,14 +2921,20 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi,
                                     const BLOCK_SIZE bsize) {
   (void)bsize;
+
+#if !ADAPTIVE_PRECISION_SETS
   mbmi->most_probable_pb_mv_precision =
       cm->features.most_probable_fr_mv_precision;
   assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
-
-#if ADAPTIVE_PRECISION_SETS && DEBUG_FLEX_MV
-  int mpp_found = 0;
+#else
+  (void)cm;
   const PRECISION_SET *precision_def =
       &av1_mv_precision_sets[mbmi->mb_precision_set];
+  mbmi->most_probable_pb_mv_precision =
+      precision_def->precision[precision_def->num_precisions - 1];
+
+#if DEBUG_FLEX_MV
+  int mpp_found = 0;
   for (int precision_dx = precision_def->num_precisions - 1; precision_dx >= 0;
        precision_dx--) {
     MvSubpelPrecision pb_mv_precision = precision_def->precision[precision_dx];
@@ -2938,6 +2944,8 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
     }
   }
   CHECK_FLEX_MV(!mpp_found, "MPP is not found in the preceision set");
+  assert(mpp_found);
+#endif
 #endif
 }
 
@@ -3005,6 +3013,16 @@ int is_pb_mv_precision_active(const AV1_COMMON *const cm,
 #if CONFIG_ADAPTIVE_MVD
   if (enable_adaptive_mvd_resolution(cm, mbmi)) return 0;
 #endif
+
+#if DISABLE_NEW_NEAR_MODES_FOR_FLEX_MV
+  if (mbmi->mode == NEW_NEARMV || mbmi->mode == NEAR_NEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+      || mbmi->mode == NEAR_NEWMV_OPTFLOW || mbmi->mode == NEW_NEARMV_OPTFLOW
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+  )
+    return 0;
+#endif
+
   return mbmi->max_mv_precision >= MV_PRECISION_HALF_PEL &&
          cm->features.use_pb_mv_precision &&
          have_newmv_in_inter_mode(mbmi->mode);
