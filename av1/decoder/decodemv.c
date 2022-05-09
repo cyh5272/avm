@@ -2357,16 +2357,15 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
   }
 
-  const int mv_corrupted_flag =
-      !assign_mv(cm, xd, mbmi->mode, mbmi->ref_frame, mbmi->mv, ref_mv,
-                 is_compound,
+  const int mv_corrupted_flag = !assign_mv(cm, xd, mbmi->mode, mbmi->ref_frame,
+                                           mbmi->mv, ref_mv, is_compound,
 #if CONFIG_FLEX_MVRES
-                 mbmi->pb_mv_precision,
+                                           mbmi->pb_mv_precision,
 #else
-                 allow_hp,
+                                           allow_hp,
 #endif
 
-                 r);
+                                           r);
   aom_merge_corrupted_flag(&dcb->corrupted, mv_corrupted_flag);
 
 #if CONFIG_DERIVED_MV
