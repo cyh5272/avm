@@ -136,11 +136,12 @@ void av1_alloc_quadtree_buffers(struct AV1Common *cm) {
   av1_alloc_quadtree_struct(cm, &cm->cur_quad_info);
   av1_alloc_quadtree_struct(cm, &cm->postcnn_quad_info);
 }
+
 void av1_free_quadtree_buffers(struct AV1Common *cm) {
   av1_free_quadtree_struct(&cm->cur_quad_info);
   av1_free_quadtree_struct(&cm->postcnn_quad_info);
 }
-#endif  // CONFIG_CNN_CRLC_GUIDED
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 void av1_free_above_context_buffers(CommonContexts *above_contexts) {
   int i;

@@ -43,7 +43,7 @@ void av1_free_restoration_buffers(struct AV1Common *cm);
 #if CONFIG_CNN_GUIDED_QUADTREE
 void av1_alloc_quadtree_buffers(struct AV1Common *cm);
 void av1_free_quadtree_buffers(struct AV1Common *cm);
-#endif  // CONFIG_CNN_CRLC_GUIDED
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 int av1_alloc_state_buffers(struct AV1Common *cm, int width, int height);
 void av1_free_state_buffers(struct AV1Common *cm);

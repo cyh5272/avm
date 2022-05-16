@@ -493,6 +493,7 @@ void av1_alloc_quadtree_struct(struct AV1Common *cm, QUADInfo *quad_info) {
       cm, quad_info->unit_info,
       (QUADUnitInfo *)aom_memalign(16, sizeof(*quad_info->unit_info) * A_size));
 }
+
 void av1_free_quadtree_struct(QUADInfo *quad_info) {
   if (quad_info->unit_info != NULL) {
     aom_free(quad_info->unit_info);

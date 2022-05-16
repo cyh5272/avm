@@ -94,7 +94,7 @@
 FRAME_COUNTS aggregate_fc;
 #endif  // CONFIG_ENTROPY_STATS
 
-#define OUTPUT_YUV_REC
+// #define OUTPUT_YUV_REC
 #ifdef OUTPUT_YUV_REC
 FILE *yuv_rec_file;
 #define FILE_NAME_LEN 100
@@ -2357,7 +2357,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
           cnn_RDcosts < cm->quad_rdcost) {
         // Enable CNN for Y and copy CNN restored Y plane.
         cm->use_quadtree = 1;
-         printf("using quadtree!!!!!!!!!\n");
         cm->postcnn_quad_info.is_write = 0;
         cm->use_cnn[0] = 1;
         cm->cnn_indices[0] = cnn_indices[0];
@@ -2365,7 +2364,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
         // printf("cnn_index:%d\n", cnn_indices[0]);
         aom_yv12_copy_y(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
-         printf("drop quadtree!!!!!!!!!\n");
+        printf("drop quadtree!!!!!!!!!\n");
         cm->use_quadtree = 0;
         aom_yv12_copy_y(&cpi->precnn_buffer, &cm->cur_frame->buf);
       }
@@ -2443,7 +2442,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
         // Enable CNN for Y and copy CNN restored Y plane.
         cm->use_cnn[0] = 1;
         cm->cnn_indices[0] = cnn_indices[0];
-        printf("Y_cnn_index:%d\n", cm->cnn_indices[0]);
         aom_yv12_copy_y(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
         aom_yv12_copy_y(&cpi->precnn_buffer, &cm->cur_frame->buf);

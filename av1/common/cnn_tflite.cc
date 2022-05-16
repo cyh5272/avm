@@ -577,8 +577,6 @@ void deTree_tflite(QUADInfo *quad_info, int *Aindex, int *A, int *Sindex,
     A[(*Aindex)++] = a1;
 
   } else if (flag0 == 0 && flag1 == 0) {
-    //²»·Ö
-
     *(Split + (*Sindex)) = 0;
     (*Sindex)++;
 

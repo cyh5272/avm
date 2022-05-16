@@ -55,8 +55,6 @@ list(
   "${AOM_ROOT}/av1/common/filter.h"
   "${AOM_ROOT}/av1/common/frame_buffers.c"
   "${AOM_ROOT}/av1/common/frame_buffers.h"
-  "${AOM_ROOT}/av1/common/guided_quadtree.c"
-  "${AOM_ROOT}/av1/common/guided_quadtree.h"
   "${AOM_ROOT}/av1/common/idct.c"
   "${AOM_ROOT}/av1/common/idct.h"
   "${AOM_ROOT}/av1/common/mv.h"
@@ -521,6 +519,8 @@ if(CONFIG_CNN_RESTORATION)
     list(
       APPEND
       AOM_AV1_COMMON_SOURCES
+      "${AOM_ROOT}/av1/common/guided_quadtree.c"
+      "${AOM_ROOT}/av1/common/guided_quadtree.h"
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp85_quadtree.cc"
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp85_quadtree.h"
       "${AOM_ROOT}/av1/tflite_models/intra_frame_model/qp110_quadtree.cc"

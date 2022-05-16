@@ -694,6 +694,7 @@ typedef struct {
 typedef struct {
   int xqd[2];
 } QUADUnitInfo;
+
 typedef struct {
   int split;
 } QUADSplitInfo;
