@@ -1375,7 +1375,6 @@ void av1_convolve_nonsep(const uint8_t *dgd, int width, int height, int stride,
 
 #define USE_CONV_SYM_VERSIONS 0
 
-
 // Convolves a block of pixels with origin-symmetric, non-separable filters.
 // This routine is intended as a starting point for SIMD and other acceleration
 // work. The filters are assumed to have num_sym_taps unique taps if they sum to
