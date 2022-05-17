@@ -691,6 +691,9 @@ typedef struct {
 } SgrprojInfo;
 
 #if CONFIG_CNN_GUIDED_QUADTREE
+
+/*!\cond */
+
 typedef struct {
   int xqd[2];
 } QUADUnitInfo;
@@ -698,6 +701,9 @@ typedef struct {
 typedef struct {
   int split;
 } QUADSplitInfo;
+
+/*!\endcond */
+
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #if CONFIG_WIENER_NONSEP

@@ -66,6 +66,15 @@ macro(fix_experiment_configs)
                            CONFIG_SAVE_CNN_RESTORATION_DATA)
   endif()
 
+  if(CONFIG_CNN_GUIDED_QUADTREE_RDCOST)
+    change_config_and_warn(CONFIG_CNN_GUIDED_QUADTREE 1
+                           CONFIG_CNN_GUIDED_QUADTREE_RDCOST)
+  endif()
+
+  if(CONFIG_CNN_GUIDED_QUADTREE)
+    change_config_and_warn(CONFIG_CNN_RESTORATION 1 CONFIG_CNN_GUIDED_QUADTREE)
+  endif()
+
   if(CONFIG_CNN_RESTORATION)
     change_config_and_warn(CONFIG_TENSORFLOW_LITE 1 CONFIG_CNN_RESTORATION)
   endif()

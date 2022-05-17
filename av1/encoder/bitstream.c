@@ -2320,7 +2320,7 @@ static AOM_INLINE void write_modes_sb(
   }
 #if CONFIG_CNN_GUIDED_QUADTREE
   if (cm->use_quadtree && !cm->postcnn_quad_info.is_write) {
-    QUADInfo *qi = &cm->postcnn_quad_info;
+    QUADInfo *qi = (QUADInfo *)&cm->postcnn_quad_info;
     int superres_denom = cm->superres_scale_denominator;
     write_filter_quadtree(cm->quant_params.base_qindex, cm->cnn_index,
                           superres_denom, qi, w);
@@ -3017,12 +3017,12 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
 
   aom_wb_write_bit(wb, cm->use_quadtree);
 
-  //°ÑsplitÒ²ÔÚÕâÀïÐ´½øÈ¥
+  //ï¿½ï¿½splitÒ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½È¥
   if (cm->use_quadtree) {
     printf("writing pamrater\n");
     aom_wb_write_bit(wb, cm->use_quad_level);
     /*
-    ½«Á½¸ölength×ª³É&Î»³¤¶ÈµÄ¶þ½øÖÆ ´«µÝ
+    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½length×ªï¿½ï¿½&Î»ï¿½ï¿½ï¿½ÈµÄ¶ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     */
     int flag;
     int unit_length = cm->postcnn_quad_info.unit_info_length;

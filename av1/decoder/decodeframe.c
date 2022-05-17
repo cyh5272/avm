@@ -2133,7 +2133,7 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
     cm->cnn_index = cm->cnn_indices[0];
     cm->use_quad_level = aom_rb_read_bit(rb);
     cm->postcnn_quad_info.unit_size = 512 >> cm->use_quad_level;
-    cm->postcnn_quad_info.is_write = FALSE;
+    cm->postcnn_quad_info.is_write = false;
 
     int flag = 1;
     int unit_info_length = 0;
@@ -2157,7 +2157,7 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
     cm->postcnn_quad_info.split_info_index = 0;
     cm->postcnn_quad_info.unit_info_length = unit_info_length;
     cm->postcnn_quad_info.split_info_index = 0;
-    cm->postcnn_quad_info.is_write = FALSE;
+    cm->postcnn_quad_info.is_write = false;
 
     CHECK_MEM_ERROR(
         cm, cm->postcnn_quad_info.split_info,

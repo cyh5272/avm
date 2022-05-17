@@ -1764,16 +1764,7 @@ static void set_restoration_unit_size(int width, int height, int sx, int sy,
 }
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-static void set_quadtree_unit_size(int unit_size, int sx, int sy,
-                                   QUADInfo *quadinfo) {
-  (void)sx;
-  (void)sy;
-#if COUPLED_CHROMA_FROM_LUMA_RESTORATION
-  int s = AOMMIN(sx, sy);
-#else
-  int s = 0;
-#endif  // !COUPLED_CHROMA_FROM_LUMA_RESTORATION
-
+static void set_quadtree_unit_size(int unit_size, QUADInfo *quadinfo) {
   quadinfo->unit_size = unit_size;
 }
 
@@ -1907,8 +1898,7 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
 #if CONFIG_CNN_GUIDED_QUADTREE
   if (cm->use_quad_level != 1) cm->use_quad_level = 1;
   const int guided_unit_size = 512 >> cm->use_quad_level;
-  set_quadtree_unit_size(guided_unit_size, seq_params->subsampling_x,
-                         seq_params->subsampling_y, &cm->cur_quad_info);
+  set_quadtree_unit_size(guided_unit_size, &cm->cur_quad_info);
   av1_alloc_quadtree_buffers(cm);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
   if (!is_stat_generation_stage(cpi)) alloc_util_frame_buffers(cpi);
