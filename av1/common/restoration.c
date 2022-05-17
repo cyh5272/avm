@@ -34,10 +34,10 @@
 #define AOM_WIENERNS_COEFF(p, b, m, k) \
   { (b) + (p)-6, (m) * (1 << ((p)-6)), k }
 
-#define AOM_MAKE_WIENERNS_CONFIG(prec, config, coeff)                     \
-  {                                                                       \
-    { (prec), sizeof(config) / sizeof(config[0]), 0, (config), NULL, 0 }, \
-        sizeof(coeff) / sizeof(coeff[0]), (coeff)                         \
+#define AOM_MAKE_WIENERNS_CONFIG(prec, config, coeff)                        \
+  {                                                                          \
+    { (prec), sizeof(config) / sizeof(config[0]), 0, (config), NULL, 0, 1 }, \
+        sizeof(coeff) / sizeof(coeff[0]), (coeff)                            \
   }
 
 #define AOM_MAKE_WIENERNS_CONFIG2(prec, config, config2, coeff) \
@@ -47,7 +47,8 @@
       sizeof(config2) / sizeof(config2[0]),                     \
       (config),                                                 \
       (config2),                                                \
-      0 },                                                      \
+      0,                                                        \
+      1 },                                                      \
         sizeof(coeff) / sizeof(coeff[0]), (coeff)               \
   }
 
@@ -1392,9 +1393,9 @@ static int combined_tap_positions[MAX_NUM_TAPS][4] = { 0 };
 static int combined_total_taps = 0;
 static int32_t combined_filter[MAX_NUM_TAPS] = { 0 };
 static int combined_tap_config[MAX_NUM_TAPS][3] = { 0 };
-static NonsepFilterConfig combined_filter_config = { 0,    0,
-                                                     0,    combined_tap_config,
-                                                     NULL, 0 };
+static NonsepFilterConfig combined_filter_config = {
+  0, 0, 0, combined_tap_config, NULL, 0, 0
+};
 
 // Correction factor to account for nsfilters filtering pixel differences.
 static int32_t combined_filter_correction = 0;
@@ -1596,6 +1597,8 @@ static void rotate_feature_line_buffers(int feature_len) {
     feature_line_buffers[row_begin + feature_len - 1] = buffer_0;
   }
 }
+
+// add this to the request.
 
 // Calculates and accumulates the gradients over a window around row. If
 // use_strict_bounds is false dgd must have valid data on this column extending
@@ -2059,14 +2062,15 @@ void apply_pc_wiener(const uint8_t *dgd, int width, int height, int stride,
                                            sizeof(pcwiener_tap_config_chroma[0])
                                      : sizeof(pcwiener_tap_config_luma) /
                                            sizeof(pcwiener_tap_config_luma[0]);
-  const NonsepFilterConfig pcfilter_config = {
-    PC_WIENER_PREC_FILTER,
-    pc_filter_num_taps,
-    0,
-    is_uv ? pcwiener_tap_config_chroma : pcwiener_tap_config_luma,
-    NULL,
-    0,
-  };
+  const NonsepFilterConfig pcfilter_config = { PC_WIENER_PREC_FILTER,
+                                               pc_filter_num_taps,
+                                               0,
+                                               is_uv
+                                                   ? pcwiener_tap_config_chroma
+                                                   : pcwiener_tap_config_luma,
+                                               NULL,
+                                               0,
+                                               0 };
 
   const NonsepFilterConfig *filter_config = &pcfilter_config;
   bool multiply_here = true;
@@ -2245,14 +2249,15 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                                            sizeof(pcwiener_tap_config_chroma[0])
                                      : sizeof(pcwiener_tap_config_luma) /
                                            sizeof(pcwiener_tap_config_luma[0]);
-  const NonsepFilterConfig pcfilter_config = {
-    PC_WIENER_PREC_FILTER,
-    pc_filter_num_taps,
-    0,
-    is_uv ? pcwiener_tap_config_chroma : pcwiener_tap_config_luma,
-    NULL,
-    0,
-  };
+  const NonsepFilterConfig pcfilter_config = { PC_WIENER_PREC_FILTER,
+                                               pc_filter_num_taps,
+                                               0,
+                                               is_uv
+                                                   ? pcwiener_tap_config_chroma
+                                                   : pcwiener_tap_config_luma,
+                                               NULL,
+                                               0,
+                                               0 };
 
   const NonsepFilterConfig *filter_config = &pcfilter_config;
   bool multiply_here = true;
@@ -2373,8 +2378,6 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // PC_WIENER_BLOCK_SIZE > 1
 
 #if USE_CONVOLVE_SYM
-      // Have to set #define SUBTRACT_CENTER 0 in convolve.c with current
-      // filter parametrization.
       av1_convolve_symmetric_highbd_c(
           dgd, stride, filter_config, filter, dst, dst_stride, bit_depth,
           block_row_begin, block_row_end, block_col_begin, block_col_end);
