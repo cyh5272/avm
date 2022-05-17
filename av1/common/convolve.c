@@ -1373,7 +1373,166 @@ void av1_convolve_nonsep(const uint8_t *dgd, int width, int height, int stride,
   }
 }
 
-#define USE_CONV_SYM_VERSIONS 0
+#define USE_CONV_SYM_VERSIONS 1
+
+// Convolves a block of pixels with origin-symmetric, non-separable filters.
+// This routine is intended as a starting point for SIMD and other acceleration
+// work. The filters are assumed to have num_sym_taps unique taps if they sum to
+// zero. Otherwise num_sym_taps + 1 unique taps where the extra tap is the
+// unconstrained center tap.
+//
+// Usage:
+// - For CONFIG_WIENER_NONSEP filters sum to zero. This constrains the
+// center-tap:
+//   singleton_tap = (1 << filter_config->prec_bits) and
+//   num_sym_taps = filter_config->num_pixels / 2
+// - For CONFIG_PC_WIENER center tap is unconstrained:
+//   const int singleton_tap_index =
+//        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+//   singleton_tap = (1 << filter_config->prec_bits)
+//                     + filter[singleton_tap_index] and
+//   num_sym_taps = (filter_config->num_pixels - 1) / 2.
+//
+// Implementation Notes:
+// - The filter taps have precision < 16 bits but the filter multiply
+// filter[pos] * compute_buffer[k] has to be 32-bit, i.e., the result will not
+// fit into a 16-bit register. Any acceleration code needs to ensure the
+// multiply is carried out in 32-bits. The filter tap precisions should
+// guarantee that the result of the convolution, i.e., the result of the entire
+// multiply-add, fits into 32-bits prior to the down-shit and round.
+// - Calling av1_convolve_symmetric_subtract_center_highbd_c allows passing the
+// difference wrto the center pixel through a nonlinearity if one wishes to do
+// so.
+// - Current NonsepFilterConfig supports arbitrary filters and hence the loop
+// over every other tap, e.g., filter_config->config[2 * k].
+void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
+                                     const NonsepFilterConfig *filter_config,
+                                     const int16_t *filter, uint16_t *dst,
+                                     int dst_stride, int bit_depth,
+                                     int block_row_begin, int block_row_end,
+                                     int block_col_begin, int block_col_end) {
+  assert(!filter_config->subtract_center);
+  const int num_sym_taps = filter_config->num_pixels / 2;
+  int32_t singleton_tap = 1 << filter_config->prec_bits;
+
+  if (filter_config->num_pixels % 2) {
+    // Center-tap is unconstrained.
+    const int singleton_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    singleton_tap += filter[singleton_tap_index];
+  }
+
+  // Begin compute conveniences.
+  // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
+  // filter_config will change rarely and the core-functionality block will be
+  // called many times with the same filter_config. If any compute conveniences
+  // are utilzied it is advisable to put them elsewhere to be called when
+  // filter_config changes.
+  assert(num_sym_taps <= 24);
+  int16_t compute_buffer[24];
+  int pixel_offset_diffs[24];
+  for (int k = 0; k < num_sym_taps; ++k) {
+    const int r = filter_config->config[2 * k][NONSEP_ROW_ID];
+    const int c = filter_config->config[2 * k][NONSEP_COL_ID];
+    const int diff = r * stride + c;
+    pixel_offset_diffs[k] = diff;
+  }
+  // End compute conveniences.
+
+  // Begin core-functionality that will be called many times.
+  for (int r = block_row_begin; r < block_row_end; ++r) {
+    for (int c = block_col_begin; c < block_col_end; ++c) {
+      int dgd_id = r * stride + c;
+
+      // Two loops for a potential data cache miss.
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+        const int16_t tmp_sum = dgd[dgd_id - diff];
+        compute_buffer[k] = tmp_sum;  // 16-bit
+      }
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+        const int16_t tmp_sum = dgd[dgd_id + diff];
+        compute_buffer[k] += tmp_sum;  // 16-bit arithmetic.
+      }
+
+      // Handle singleton tap.
+      int32_t tmp = singleton_tap * dgd[dgd_id];
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
+        tmp += (int32_t)filter[pos] * compute_buffer[k];  // 32-bit arithmetic.
+      }
+
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
+
+      int dst_id = r * dst_stride + c;
+      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
+    }
+  }
+  // End core-functionality.
+}
+
+// Same as av1_convolve_symmetric_highbd_c except for the subtraction of the
+// center-pixel and the addition of an offset.
+void av1_convolve_symmetric_subtract_center_highbd_c(
+    const uint16_t *dgd, int stride, const NonsepFilterConfig *filter_config,
+    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
+    int block_row_begin, int block_row_end, int block_col_begin,
+    int block_col_end) {
+  assert(filter_config->subtract_center);
+  const int num_sym_taps = filter_config->num_pixels / 2;
+  int32_t singleton_tap = 1 << filter_config->prec_bits;
+  int32_t dc_offset = 0;
+  if (filter_config->num_pixels % 2) {
+    const int dc_offset_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    dc_offset = filter[dc_offset_tap_index];
+  }
+
+  assert(num_sym_taps <= 24);
+  int16_t compute_buffer[24];
+  int pixel_offset_diffs[24];
+  for (int k = 0; k < num_sym_taps; ++k) {
+    const int r = filter_config->config[2 * k][NONSEP_ROW_ID];
+    const int c = filter_config->config[2 * k][NONSEP_COL_ID];
+    const int diff = r * stride + c;
+    pixel_offset_diffs[k] = diff;
+  }
+
+  for (int r = block_row_begin; r < block_row_end; ++r) {
+    for (int c = block_col_begin; c < block_col_end; ++c) {
+      int dgd_id = r * stride + c;
+
+      // Two loops for a potential data cache miss.
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+        // Subtract center pixel and pass through a fn.
+        const int16_t tmp_sum =
+            clip_base(dgd[dgd_id - diff] - dgd[dgd_id], bit_depth);
+        compute_buffer[k] = tmp_sum;  // 16-bit
+      }
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int diff = pixel_offset_diffs[k];
+        // Subtract center pixel and pass through a fn.
+        const int16_t tmp_sum =
+            clip_base(dgd[dgd_id + diff] - dgd[dgd_id], bit_depth);
+        compute_buffer[k] += tmp_sum;  // 16-bit arithmetic.
+      }
+
+      // Handle singleton tap.
+      int32_t tmp = singleton_tap * dgd[dgd_id] + dc_offset;
+      for (int k = 0; k < num_sym_taps; ++k) {
+        const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
+        tmp += (int32_t)filter[pos] * compute_buffer[k];  // 32-bit arithmetic.
+      }
+
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
+
+      int dst_id = r * dst_stride + c;
+      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
+    }
+  }
+}
 
 void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
                                 int stride, const NonsepFilterConfig *nsfilter,
@@ -1382,7 +1541,13 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
   const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
 #if USE_CONV_SYM_VERSIONS
-  av1_convolve_symmetric_highbd_c(dgd, stride, nsfilter, filter, dst,
+  assert(nsfilter->strict_bounds == false);
+  if (nsfilter->subtract_center)
+    av1_convolve_symmetric_subtract_center_highbd(dgd, stride, nsfilter, filter,
+                                                  dst, dst_stride, bit_depth, 0,
+                                                  height, 0, width);
+  else
+    av1_convolve_symmetric_highbd(dgd, stride, nsfilter, filter, dst,
                                   dst_stride, bit_depth, 0, height, 0, width);
 #else
   for (int i = 0; i < height; ++i) {
@@ -1415,114 +1580,149 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // USE_CONV_SYM_VERSIONS
 }
 
-#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
-#define SUBTRACT_CENTER 0  // 1 for WIENER_NONSEP, 0 for PC_WIENER
-#define UPDATE_DC 0        // 1 for WIENER_NONSEP, 0 for PC_WIENER
+void av1_convolve_nonsep_dual(const uint8_t *dgd, int width, int height,
+                              int stride, const uint8_t *dgd2, int stride2,
+                              const NonsepFilterConfig *nsfilter,
+                              const int16_t *filter, uint8_t *dst,
+                              int dst_stride) {
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+      int dgd_id = i * stride + j;
+      int dgd2_id = i * stride2 + j;
+      int dst_id = i * dst_stride + j;
+      int32_t tmp = (int32_t)dgd[dgd_id] * (1 << nsfilter->prec_bits);
+      for (int k = 0; k < nsfilter->num_pixels; ++k) {
+        const int pos = nsfilter->config[k][NONSEP_BUF_POS];
+        const int r = nsfilter->config[k][NONSEP_ROW_ID];
+        const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
+        const int ir = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                           : i + r;
+        const int jc = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                           : j + c;
+        int16_t diff = clip_base(
+            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
+        tmp += filter[pos] * diff;
+      }
+      for (int k = 0; k < nsfilter->num_pixels2; ++k) {
+        const int pos = nsfilter->config2[k][NONSEP_BUF_POS];
+        const int r = nsfilter->config2[k][NONSEP_ROW_ID];
+        const int c = nsfilter->config2[k][NONSEP_COL_ID];
+        const int ir = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                           : i + r;
+        const int jc = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                           : j + c;
+        int16_t diff = clip_base(
+            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id], 8);
+        tmp += filter[pos] * diff;
+      }
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
+      dst[dst_id] = (uint8_t)clip_pixel(tmp);
+    }
+  }
+}
 
-// Convolves a block of pixels with origin-symmetric, non-separable filters.
-// This routine is intended as a starting point for SIMD and other acceleration
-// work. The filters are assumed to have num_sym_taps unique taps if they sum to
-// zero. Otherwise num_sym_taps + 1 unique taps where the extra tap is the
-// unconstrained center tap.
-//
-// Usage:
-// - For CONFIG_WIENER_NONSEP filters sum to zero. This constrains the
-// center-tap:
-//   singleton_tap = (1 << filter_config->prec_bits) and
-//   num_sym_taps = filter_config->num_pixels / 2
-// - For CONFIG_PC_WIENER center tap is unconstrained:
-//   const int singleton_tap_index =
-//        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
-//   singleton_tap = (1 << filter_config->prec_bits)
-//                     + filter[singleton_tap_index] and
-//   num_sym_taps = (filter_config->num_pixels - 1) / 2.
-//
-// Implementation Notes:
-// - The filter taps have precision < 16 bits but the filter multiply
-// filter[pos] * compute_buffer[k] has to be 32-bit, i.e., the result will not
-// fit into a 16-bit register. Any acceleration code needs to ensure the
-// multiply is carried out in 32-bits. The filter tap precisions should
-// guarantee that the result of the convolution, i.e., the result of the entire
-// multiply-add, fits into 32-bits prior to the down-shit and round.
-// - The calling filters can be adjusted for SUBTRACT_CENTER = 0.
-// SUBTRACT_CENTER = 1 case allows passing the difference through a
-// nonlinearity if one wishes to do so.
-// - TODO(oguleryuz): CONFIG_PC_WIENER filters have to be adjusted to support
-// SUBTRACT_CENTER = 1.
-// - Current NonsepFilterConfig supports arbitrary filters and hence the loop
-// over every other tap, e.g., filter_config->config[2 * k].
-void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
-                                     const NonsepFilterConfig *filter_config,
-                                     const int16_t *filter, uint16_t *dst,
-                                     int dst_stride, int bit_depth,
-                                     int block_row_begin, int block_row_end,
-                                     int block_col_begin, int block_col_end) {
+void av1_convolve_symmetric_dual_highbd_c(
+    const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual,
+    int dgd_dual_stride, const NonsepFilterConfig *filter_config,
+    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
+    int block_row_begin, int block_row_end, int block_col_begin,
+    int block_col_end) {
+  assert(!filter_config->subtract_center);
   const int num_sym_taps = filter_config->num_pixels / 2;
+  const int num_sym_taps_dual = filter_config->num_pixels2 / 2;
   int32_t singleton_tap = 1 << filter_config->prec_bits;
-#if UPDATE_DC
-  int32_t dc_offset = 0;
-#endif  // UPDATE_DC
-
   if (filter_config->num_pixels % 2) {
-#if UPDATE_DC
-    const int dc_offset_tap_index =
-        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
-    dc_offset = filter[dc_offset_tap_index];
-#else
     // Center-tap is unconstrained.
     const int singleton_tap_index =
         filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
     singleton_tap += filter[singleton_tap_index];
-#endif  // UPDATE_DC
   }
+
   // Begin compute conveniences.
   // Based on filter_config allocate/compute once. Relocate elsewhere as needed.
-  // Once finalized, inline this routine.
+  // filter_config will change rarely and the core-functionality block will be
+  // called many times with the same filter_config. If any compute conveniences
+  // are utilzied it is advisable to put them elsewhere to be called when
+  // filter_config changes.
   assert(num_sym_taps <= 24);
   int16_t compute_buffer[24];
   int pixel_offset_diffs[24];
   for (int k = 0; k < num_sym_taps; ++k) {
     const int r = filter_config->config[2 * k][NONSEP_ROW_ID];
     const int c = filter_config->config[2 * k][NONSEP_COL_ID];
-    const int diff = r * stride + c;
+    const int diff = r * dgd_stride + c;
     pixel_offset_diffs[k] = diff;
+  }
+  assert(num_sym_taps_dual <= 24);
+  int16_t compute_buffer_dual[24];
+  int pixel_offset_diffs_dual[24];
+  for (int k = 0; k < num_sym_taps_dual; ++k) {
+    const int r = filter_config->config2[2 * k][NONSEP_ROW_ID];
+    const int c = filter_config->config2[2 * k][NONSEP_COL_ID];
+    const int diff = r * dgd_dual_stride + c;
+    pixel_offset_diffs_dual[k] = diff;
+  }
+  // The dual channel may have a (0, 0) offset, in which case it must be the
+  // last one.
+  if (filter_config->num_pixels2 % 2) {
+    assert(filter_config->config2[num_sym_taps_dual][NONSEP_ROW_ID] == 0 &&
+           filter_config->config2[num_sym_taps_dual][NONSEP_COL_ID] == 0);
+    pixel_offset_diffs_dual[num_sym_taps_dual] = 0;
   }
   // End compute conveniences.
 
+  // Begin core-functionality that will be called many times.
   for (int r = block_row_begin; r < block_row_end; ++r) {
     for (int c = block_col_begin; c < block_col_end; ++c) {
-      int dgd_id = r * stride + c;
+      int dgd_id = r * dgd_stride + c;
+      int dgd_dual_id = r * dgd_dual_stride + c;
 
       // Two loops for a potential data cache miss.
       for (int k = 0; k < num_sym_taps; ++k) {
         const int diff = pixel_offset_diffs[k];
-#if SUBTRACT_CENTER
-        const int16_t tmp_sum =
-            clip_base(dgd[dgd_id - diff] - dgd[dgd_id], bit_depth);
-#else
         const int16_t tmp_sum = dgd[dgd_id - diff];
-#endif                                // SUBTRACT_CENTER
         compute_buffer[k] = tmp_sum;  // 16-bit
       }
       for (int k = 0; k < num_sym_taps; ++k) {
         const int diff = pixel_offset_diffs[k];
-#if SUBTRACT_CENTER
-        const int16_t tmp_sum =
-            clip_base(dgd[dgd_id + diff] - dgd[dgd_id], bit_depth);
-#else
         const int16_t tmp_sum = dgd[dgd_id + diff];
-#endif                                 // SUBTRACT_CENTER
         compute_buffer[k] += tmp_sum;  // 16-bit arithmetic.
       }
-
+      // Two loops for a potential data cache miss.
+      for (int k = 0; k < num_sym_taps_dual; ++k) {
+        const int diff = pixel_offset_diffs_dual[k];
+        const int16_t tmp_sum = dgd_dual[dgd_dual_id - diff];
+        compute_buffer_dual[k] = tmp_sum;  // 16-bit
+      }
+      for (int k = 0; k < num_sym_taps_dual; ++k) {
+        const int diff = pixel_offset_diffs_dual[k];
+        const int16_t tmp_sum = dgd_dual[dgd_dual_id + diff];
+        compute_buffer_dual[k] += tmp_sum;  // 16-bit arithmetic.
+      }
+      if (filter_config->num_pixels2 % 2) {
+        const int16_t tmp_sum = dgd_dual[dgd_dual_id];
+        compute_buffer_dual[num_sym_taps_dual] = tmp_sum;  // 16-bit arithmetic.
+      }
       // Handle singleton tap.
       int32_t tmp = singleton_tap * dgd[dgd_id];
-#if UPDATE_DC
-      tmp += dc_offset;
-#endif  // UPDATE_DC
+
       for (int k = 0; k < num_sym_taps; ++k) {
         const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
         tmp += (int32_t)filter[pos] * compute_buffer[k];  // 32-bit arithmetic.
+      }
+      for (int k = 0; k < num_sym_taps_dual + (filter_config->num_pixels2 % 2);
+           ++k) {
+        const int pos = filter_config->config2[2 * k][NONSEP_BUF_POS];
+        tmp += (int32_t)filter[pos] *
+               compute_buffer_dual[k];  // 32-bit arithmetic.
       }
 
       tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
@@ -1532,55 +1732,39 @@ void av1_convolve_symmetric_highbd_c(const uint16_t *dgd, int stride,
     }
   }
 }
-#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-#define UPDATE_DC_DUAL 1
-#define SUBTRACT_CENTER_DUAL 1
-
-void av1_convolve_symmetric_dual_highbd_c(
+void av1_convolve_symmetric_dual_subtract_center_highbd_c(
     const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual,
     int dgd_dual_stride, const NonsepFilterConfig *filter_config,
     const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
     int block_row_begin, int block_row_end, int block_col_begin,
     int block_col_end) {
+  assert(filter_config->subtract_center);
   const int num_sym_taps = filter_config->num_pixels / 2;
   const int num_sym_taps_dual = filter_config->num_pixels2 / 2;
   int32_t singleton_tap = 1 << filter_config->prec_bits;
-
-#if UPDATE_DC_DUAL
   int32_t dc_offset = 0;
   if (filter_config->num_pixels % 2) {
     const int dc_offset_tap_index =
         filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
     dc_offset = filter[dc_offset_tap_index];
   }
-#endif  // UPDATE_DC_DUAL
 
   for (int i = block_row_begin; i < block_row_end; ++i) {
     for (int j = block_col_begin; j < block_col_end; ++j) {
       int dgd_id = i * dgd_stride + j;
       int dgd_dual_id = i * dgd_dual_stride + j;
       int dst_id = i * dst_stride + j;
-#if UPDATE_DC_DUAL
       int32_t tmp = (int32_t)dgd[dgd_id] * singleton_tap + dc_offset;
-#else
-      int32_t tmp = (int32_t)dgd[dgd_id] * singleton_tap;
-#endif  // UPDATE_DC_DUAL
       for (int k = 0; k < num_sym_taps; ++k) {
         const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
         const int r = filter_config->config[2 * k][NONSEP_ROW_ID];
         const int c = filter_config->config[2 * k][NONSEP_COL_ID];
         const int diff = r * dgd_stride + c;
-#if SUBTRACT_CENTER_DUAL
         int16_t tmp_sum =
             clip_base(dgd[i * dgd_stride + j + diff] - dgd[dgd_id], bit_depth);
         tmp_sum +=
             clip_base(dgd[i * dgd_stride + j - diff] - dgd[dgd_id], bit_depth);
-#else
-        int16_t tmp_sum = dgd[i * dgd_stride + j + diff];
-        tmp_sum += dgd[i * dgd_stride + j - diff];
-#endif  // SUBTRACT_CENTER_DUAL
         tmp += filter[pos] * tmp_sum;
       }
       for (int k = 0; k < num_sym_taps_dual; ++k) {
@@ -1588,17 +1772,12 @@ void av1_convolve_symmetric_dual_highbd_c(
         const int r = filter_config->config2[2 * k][NONSEP_ROW_ID];
         const int c = filter_config->config2[2 * k][NONSEP_COL_ID];
         const int diff = r * dgd_dual_stride + c;
-#if SUBTRACT_CENTER_DUAL
         int16_t tmp_sum = clip_base(
             dgd_dual[i * dgd_dual_stride + j + diff] - dgd_dual[dgd_dual_id],
             bit_depth);
         tmp_sum += clip_base(
             dgd_dual[i * dgd_dual_stride + j - diff] - dgd_dual[dgd_dual_id],
             bit_depth);
-#else
-        int16_t tmp_sum = dgd_dual[i * dgd_dual_stride + j + diff];
-        tmp_sum -= dgd_dual[i * dgd_dual_stride + j - diff];
-#endif  // SUBTRACT_CENTER_DUAL
 
         tmp += filter[pos] * tmp_sum;
       }
@@ -1607,7 +1786,72 @@ void av1_convolve_symmetric_dual_highbd_c(
     }
   }
 }
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+
+void av1_convolve_nonsep_dual_highbd(const uint8_t *dgd8, int width, int height,
+                                     int stride, const uint8_t *dgd28,
+                                     int stride2,
+                                     const NonsepFilterConfig *nsfilter,
+                                     const int16_t *filter, uint8_t *dst8,
+                                     int dst_stride, int bit_depth) {
+  const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
+  const uint16_t *dgd2 = CONVERT_TO_SHORTPTR(dgd28);
+  uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
+#if USE_CONV_SYM_VERSIONS
+  assert(nsfilter->strict_bounds == false);
+  if (nsfilter->subtract_center)
+    av1_convolve_symmetric_dual_subtract_center_highbd(
+        dgd, stride, dgd2, stride2, nsfilter, filter, dst, dst_stride,
+        bit_depth, 0, height, 0, width);
+  else
+    av1_convolve_symmetric_dual_highbd(dgd, stride, dgd2, stride2, nsfilter,
+                                       filter, dst, dst_stride, bit_depth, 0,
+                                       height, 0, width);
+#else
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+      int dgd_id = i * stride + j;
+      int dgd2_id = i * stride2 + j;
+      int dst_id = i * dst_stride + j;
+      int32_t tmp = (int32_t)dgd[dgd_id] * (1 << nsfilter->prec_bits);
+      for (int k = 0; k < nsfilter->num_pixels; ++k) {
+        const int pos = nsfilter->config[k][NONSEP_BUF_POS];
+        const int r = nsfilter->config[k][NONSEP_ROW_ID];
+        const int c = nsfilter->config[k][NONSEP_COL_ID];
+        if (r == 0 && c == 0) {
+          tmp += filter[pos];
+          continue;
+        }
+        const int ir = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                           : i + r;
+        const int jc = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                           : j + c;
+        int16_t diff = clip_base(
+            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], bit_depth);
+        tmp += filter[pos] * diff;
+      }
+      for (int k = 0; k < nsfilter->num_pixels2; ++k) {
+        const int pos = nsfilter->config2[k][NONSEP_BUF_POS];
+        const int r = nsfilter->config2[k][NONSEP_ROW_ID];
+        const int c = nsfilter->config2[k][NONSEP_COL_ID];
+        const int ir = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
+                           : i + r;
+        const int jc = nsfilter->strict_bounds
+                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
+                           : j + c;
+        int16_t diff = clip_base(
+            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id],
+            bit_depth);
+        tmp += filter[pos] * diff;
+      }
+      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
+      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
+    }
+  }
+#endif  // USE_CONV_SYM_VERSIONS
+}
 
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *nsfilter,
@@ -1686,114 +1930,4 @@ void av1_convolve_nonsep_mask_highbd(
       dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
     }
   }
-}
-
-void av1_convolve_nonsep_dual(const uint8_t *dgd, int width, int height,
-                              int stride, const uint8_t *dgd2, int stride2,
-                              const NonsepFilterConfig *nsfilter,
-                              const int16_t *filter, uint8_t *dst,
-                              int dst_stride) {
-  for (int i = 0; i < height; ++i) {
-    for (int j = 0; j < width; ++j) {
-      int dgd_id = i * stride + j;
-      int dgd2_id = i * stride2 + j;
-      int dst_id = i * dst_stride + j;
-      int32_t tmp = (int32_t)dgd[dgd_id] * (1 << nsfilter->prec_bits);
-      for (int k = 0; k < nsfilter->num_pixels; ++k) {
-        const int pos = nsfilter->config[k][NONSEP_BUF_POS];
-        const int r = nsfilter->config[k][NONSEP_ROW_ID];
-        const int c = nsfilter->config[k][NONSEP_COL_ID];
-        if (r == 0 && c == 0) {
-          tmp += filter[pos];
-          continue;
-        }
-        const int ir = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
-                           : i + r;
-        const int jc = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
-                           : j + c;
-        int16_t diff = clip_base(
-            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], 8);
-        tmp += filter[pos] * diff;
-      }
-      for (int k = 0; k < nsfilter->num_pixels2; ++k) {
-        const int pos = nsfilter->config2[k][NONSEP_BUF_POS];
-        const int r = nsfilter->config2[k][NONSEP_ROW_ID];
-        const int c = nsfilter->config2[k][NONSEP_COL_ID];
-        const int ir = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
-                           : i + r;
-        const int jc = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
-                           : j + c;
-        int16_t diff = clip_base(
-            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id], 8);
-        tmp += filter[pos] * diff;
-      }
-      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
-      dst[dst_id] = (uint8_t)clip_pixel(tmp);
-    }
-  }
-}
-
-void av1_convolve_nonsep_dual_highbd(const uint8_t *dgd8, int width, int height,
-                                     int stride, const uint8_t *dgd28,
-                                     int stride2,
-                                     const NonsepFilterConfig *nsfilter,
-                                     const int16_t *filter, uint8_t *dst8,
-                                     int dst_stride, int bit_depth) {
-  const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
-  const uint16_t *dgd2 = CONVERT_TO_SHORTPTR(dgd28);
-  uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
-#if USE_CONV_SYM_VERSIONS
-  assert(nsfilter->strict_bounds == false);
-  av1_convolve_symmetric_dual_highbd_c(dgd, stride, dgd2, stride2, nsfilter,
-                                       filter, dst, dst_stride, bit_depth, 0,
-                                       height, 0, width);
-#else
-  for (int i = 0; i < height; ++i) {
-    for (int j = 0; j < width; ++j) {
-      int dgd_id = i * stride + j;
-      int dgd2_id = i * stride2 + j;
-      int dst_id = i * dst_stride + j;
-      int32_t tmp = (int32_t)dgd[dgd_id] * (1 << nsfilter->prec_bits);
-      for (int k = 0; k < nsfilter->num_pixels; ++k) {
-        const int pos = nsfilter->config[k][NONSEP_BUF_POS];
-        const int r = nsfilter->config[k][NONSEP_ROW_ID];
-        const int c = nsfilter->config[k][NONSEP_COL_ID];
-        if (r == 0 && c == 0) {
-          tmp += filter[pos];
-          continue;
-        }
-        const int ir = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
-                           : i + r;
-        const int jc = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
-                           : j + c;
-        int16_t diff = clip_base(
-            (int16_t)dgd[(ir)*stride + (jc)] - (int16_t)dgd[dgd_id], bit_depth);
-        tmp += filter[pos] * diff;
-      }
-      for (int k = 0; k < nsfilter->num_pixels2; ++k) {
-        const int pos = nsfilter->config2[k][NONSEP_BUF_POS];
-        const int r = nsfilter->config2[k][NONSEP_ROW_ID];
-        const int c = nsfilter->config2[k][NONSEP_COL_ID];
-        const int ir = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(i + r, height - 1), 0)
-                           : i + r;
-        const int jc = nsfilter->strict_bounds
-                           ? AOMMAX(AOMMIN(j + c, width - 1), 0)
-                           : j + c;
-        int16_t diff = clip_base(
-            (int16_t)dgd2[(ir)*stride2 + (jc)] - (int16_t)dgd2[dgd2_id],
-            bit_depth);
-        tmp += filter[pos] * diff;
-      }
-      tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, nsfilter->prec_bits);
-      dst[dst_id] = (uint16_t)clip_pixel_highbd(tmp, bit_depth);
-    }
-  }
-#endif  // USE_CONV_SYM_VERSIONS
 }
