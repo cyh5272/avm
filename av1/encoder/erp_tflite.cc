@@ -121,7 +121,7 @@ static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
   interpreter->SetNumThreads(1);
   tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
 
-  // Dimension order: batch_size, feature_sizee!
+  // Dimension order: batch_size, feature_size
   const std::vector<int> in_out_dims = { 1, 19 };
 
   if (interpreter->AllocateTensors() != kTfLiteOk) {
@@ -168,14 +168,8 @@ extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
   }
 
   const float *output = interpreter->typed_output_tensor<float>(0);
-  // if (bsize == BLOCK_128X128) {
-  //   printf("logits: %f, %f, %f\n", output[0], output[1], output[2]);
-  // }
   float probs[3];
   av1_nn_softmax(output, probs, 3);
-  // if (bsize == BLOCK_128X128) {
-  //   printf("probs: %f, %f, %f\n", probs[0], probs[1], probs[2]);
-  // }
 
   if (probs[1] < 0.05f) {
     *prune_horz = true;
@@ -184,7 +178,6 @@ extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
     *prune_vert = true;
   }
 
-  // IMPORTANT: release the interpreter before destroying the delegate.
   interpreter.reset();
 
   return 1;
