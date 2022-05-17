@@ -1375,7 +1375,6 @@ void av1_convolve_nonsep(const uint8_t *dgd, int width, int height, int stride,
 
 #define USE_CONV_SYM_VERSIONS 0
 
-#if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
 // Convolves a block of pixels with origin-symmetric, non-separable filters.
 // This routine is intended as a starting point for SIMD and other acceleration
@@ -1535,7 +1534,6 @@ void av1_convolve_symmetric_subtract_center_highbd_c(
     }
   }
 }
-#endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
 void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
                                 int stride, const NonsepFilterConfig *nsfilter,
@@ -1583,7 +1581,6 @@ void av1_convolve_nonsep_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // USE_CONV_SYM_VERSIONS
 }
 
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
 void av1_convolve_symmetric_dual_highbd_c(
     const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual,
     int dgd_dual_stride, const NonsepFilterConfig *filter_config,
@@ -1637,7 +1634,6 @@ void av1_convolve_symmetric_dual_highbd_c(
     }
   }
 }
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 
 void av1_convolve_nonsep_mask(const uint8_t *dgd, int width, int height,
                               int stride, const NonsepFilterConfig *nsfilter,
