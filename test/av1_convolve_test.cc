@@ -1030,6 +1030,7 @@ class AV1ConvolveNonSep2DHighbdTest
                                                     0,
                                                     NonsepConfig_,
                                                     NULL,
+                                                    0,
                                                     0 };
 
   // Filters use all unique taps.
@@ -1039,6 +1040,7 @@ class AV1ConvolveNonSep2DHighbdTest
     0,
     NonsepConfig_,
     NULL,
+    0,
     0
   };
   int16_t UniqueTaps_[kNumSymmetricTaps + 1];

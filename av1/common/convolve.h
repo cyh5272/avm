@@ -49,6 +49,7 @@ typedef struct NonsepFilterConfig {
   const int (*config)[3];
   const int (*config2)[3];
   int strict_bounds;
+  int subtract_center;
 } NonsepFilterConfig;
 
 // Nonseparable convolution

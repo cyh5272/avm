@@ -203,6 +203,8 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, MB_MODE_INFO *mbmi,
                              int mi_row, int mi_col, BLOCK_SIZE bsize,
                              uint8_t value, bool is_chroma_ref, int plane_start,
                              int plane_end, FILE *fLog) {
+  (void)mbmi;
+  (void)fLog;
   for (int plane = plane_start; plane < plane_end; plane++) {
     int w = ((cm->width + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2)
             << MAX_SB_SIZE_LOG2;
