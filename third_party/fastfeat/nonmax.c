@@ -21,10 +21,9 @@ xy* aom_nonmax_suppression(const xy* corners, const int* scores, int num_corners
   int point_above = 0;
   int point_below = 0;
 
-
-  if(num_corners < 1)
+  *ret_num_nonmax = 0;
+  if(!(corners && scores) || num_corners < 1)
   {
-    *ret_num_nonmax = 0;
     return 0;
   }
 
