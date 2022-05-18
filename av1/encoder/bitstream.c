@@ -510,6 +510,8 @@ static AOM_INLINE void av1_write_coeffs_txb_facade(
     }
   }
 #else
+  (void)xd;
+  (void)mbmi;
   av1_write_coeffs_txb(cm, x, w, blk_row, blk_col, plane, block, tx_size);
 #endif  // CONFIG_FORWARDSKIP
 }

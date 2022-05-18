@@ -183,31 +183,28 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   }
 #endif  // CONFIG_CONTEXT_DERIVATION
 
+#if CONFIG_CROSS_CHROMA_TX
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+    xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
+    // cctx_type will be read either eob_v > 0 or eob_u > 0
+    eob_info *eob_data_u =
+        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+    const uint16_t eob_u = eob_data_u->eob;
+    if (!all_zero || eob_u > 0)
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
+
   if (all_zero) {
     *max_scan_line = 0;
     if (plane == 0) {
       xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = DCT_DCT;
     }
-#if CONFIG_CROSS_CHROMA_TX
-    if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
-      xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
-      // cctx_type will be read either eob_v > 0 or eob_u > 0
-      eob_info *eob_data_u =
-          dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-      const uint16_t eob_u = eob_data_u->eob;
-      if (eob_u > 0) av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-    }
-#endif  // CONFIG_CROSS_CHROMA_TX
     return 0;
   }
   if (plane == AOM_PLANE_Y) {  // only y plane's tx_type is transmitted
     av1_read_tx_type(cm, xd, blk_row, blk_col, tx_size, r);
   }
-#if CONFIG_CROSS_CHROMA_TX
-  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
-    av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-  }
-#endif  // CONFIG_CROSS_CHROMA_TX
   return 1;
 }
 
@@ -342,6 +339,17 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);
 #endif  // CONFIG_CONTEXT_DERIVATION
+
+#if CONFIG_CROSS_CHROMA_TX
+  if (is_inter_block(mbmi, xd->tree_type) && plane == AOM_PLANE_V) {
+    xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
+    eob_info *eob_data_u =
+        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+    uint16_t eob_u = eob_data_u->eob;
+    if (!all_zero || eob_u > 0)
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
   uint16_t *const eob = &(eob_data->eob);
@@ -378,11 +386,6 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     if (plane == 0) {
       xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = DCT_DCT;
     }
-#if CONFIG_CROSS_CHROMA_TX
-    if (is_inter_block(mbmi, xd->tree_type) && plane == AOM_PLANE_V) {
-      xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
-    }
-#endif  // CONFIG_CROSS_CHROMA_TX
     return 0;
   }
 
@@ -390,11 +393,6 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     // only y plane's tx_type is transmitted
     av1_read_tx_type(cm, xd, blk_row, blk_col, tx_size, r);
   }
-#if CONFIG_CROSS_CHROMA_TX
-  if (is_inter_block(mbmi, xd->tree_type) && plane == AOM_PLANE_V) {
-    av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-  }
-#endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
   const TX_TYPE tx_type =
       av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,

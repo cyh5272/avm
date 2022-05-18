@@ -449,34 +449,25 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
 #endif  // CONFIG_CONTEXT_DERIVATION
 
-  if (eob == 0) {
 #if CONFIG_CROSS_CHROMA_TX
-    // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
-    // plane if either of eob_u and eob_v is > 0.
-    if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
-      const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
-      const uint16_t eob_u = eob_txb_u[block];
-      if (eob_u > 0) {
-        const CctxType cctx_type = av1_get_cctx_type(
-            xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
-        av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
-      }
+  // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
+  // plane if either of eob_u and eob_v is > 0.
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+    const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
+    const uint16_t eob_u = eob_txb_u[block];
+    if (eob > 0 || eob_u > 0) {
+      const CctxType cctx_type = av1_get_cctx_type(
+          xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+      av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
     }
-#endif  // CONFIG_CROSS_CHROMA_TX
-    return 0;
   }
+#endif  // CONFIG_CROSS_CHROMA_TX
+
+  if (eob == 0) return 0;
 
   if (plane == 0) {  // Only y plane's tx_type is transmitted
     av1_write_tx_type(cm, xd, tx_type, tx_size, w);
   }
-#if CONFIG_CROSS_CHROMA_TX
-  // CCTX type is transmitted with V plane
-  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
-    const CctxType cctx_type = av1_get_cctx_type(
-        xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
-    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
-  }
-#endif  // CONFIG_CROSS_CHROMA_TX
   return 1;
 }
 
@@ -588,7 +579,20 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #else
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
 #endif  // CONFIG_CONTEXT_DERIVATION
+
+#if CONFIG_CROSS_CHROMA_TX
+  // CCTX type is transmitted with V plane
+  const CctxType cctx_type = av1_get_cctx_type(
+      xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
+    const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
+    const uint16_t eob_u = eob_txb_u[block];
+    if (eob > 0 || eob_u > 0)
+      av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
+
   if (eob == 0) return;
 
   const PLANE_TYPE plane_type = get_plane_type(plane);
@@ -600,13 +604,6 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   if (plane == 0) {
     av1_write_tx_type(cm, xd, tx_type, tx_size, w);
   }
-#if CONFIG_CROSS_CHROMA_TX
-  // CCTX type is transmitted with V plane
-  const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col, tx_size);
-  if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
-    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
-  }
-#endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
 
 #if DEBUG_EXTQUANT
