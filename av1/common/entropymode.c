@@ -686,10 +686,17 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 #if CONFIG_CROSS_CHROMA_TX
 static const aom_cdf_prob
     default_cctx_type_cdf[EXT_TX_SIZES][CDF_SIZE(CCTX_TYPES)] = {
+#if CCTX_NEG_ANGLES
+      { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
+      { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
+      { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
+      { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
+#else
       { AOM_CDF4(8192, 16384, 24576) },
       { AOM_CDF4(8192, 16384, 24576) },
       { AOM_CDF4(8192, 16384, 24576) },
       { AOM_CDF4(8192, 16384, 24576) },
+#endif  // CCTX_NEG_ANGLES
     };
 #endif  // CONFIG_CROSS_CHROMA_TX
 

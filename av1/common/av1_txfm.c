@@ -204,6 +204,11 @@ const int32_t cctx_mtx[CCTX_TYPES - 1][2] = {
   { 181, 181 },  // t = 45 degrees
   { 222, 128 },  // t = 30 degrees
   { 128, 222 },  // t = 60 degrees
+#if CCTX_NEG_ANGLES
+  { 181, -181 },  // t = -45 degrees
+  { 222, -128 },  // t = -30 degrees
+  { 128, -222 },  // t = -60 degrees
+#endif            // CCTX_NEG_ANGLES
   //  { 232, 108 },  // t = 25 degrees
   //  { 108, 232 },  // t = 65 degrees
   //  { 241, 87 },  // t = 20 degrees
