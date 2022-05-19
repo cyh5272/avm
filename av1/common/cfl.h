@@ -78,6 +78,10 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size);
 void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
                   BLOCK_SIZE bsize);
 
+#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
+                        const uint8_t *input, TX_SIZE tx_size, int use_hbd);
+#endif
 void cfl_store_dc_pred(MACROBLOCKD *const xd, const uint8_t *input,
                        CFL_PRED_TYPE pred_plane, int width);
 

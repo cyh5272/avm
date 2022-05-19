@@ -72,6 +72,16 @@ void av1_predict_intra_block(
     FILTER_INTRA_MODE filter_intra_mode, const uint8_t *ref, int ref_stride,
     uint8_t *dst, int dst_stride, int col_off, int row_off, int plane);
 
+#if CONFIG_IMPLICIT_CFL
+void pred_vitual_cb_hb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                       const uint8_t *ref, int ref_stride, uint8_t *dst,
+                       int dst_stride, TX_SIZE tx_size, int col_off,
+                       int row_off, int plane);
+void av1_virtual_dc_hb(uint16_t *ref, uint16_t *dst, int stride,
+                       uint16_t *idx_map, int bw, int bh);
+void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
+                         TX_SIZE tx_size, int use_hbd);
+#endif
 #if CONFIG_ORIP
 void av1_apply_orip_4x4subblock_hbd(uint16_t *dst, ptrdiff_t stride,
                                     TX_SIZE tx_size, const uint16_t *above,

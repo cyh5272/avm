@@ -638,6 +638,9 @@ typedef struct {
   //! Cost of signaling the forward skip coding mode
   int fsc_cost[FSC_MODE_CONTEXTS][FSC_BSIZE_CONTEXTS][FSC_MODES];
 #endif  // CONFIG_FORWARDSKIP
+#if CONFIG_IMPLICIT_CFL
+  int cfl_index_cost[CFL_IDX_NUMBER];
+#endif
 #if CONFIG_AIMC
   //! y primary flag cost
   int y_primary_flag_cost[INTRA_MODE_SETS];

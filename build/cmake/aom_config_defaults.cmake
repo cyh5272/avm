@@ -207,6 +207,12 @@ set_aom_config_var(CONFIG_MV_SEARCH_RANGE 0
                    "Enable a sufficient MV search range.")
 set_aom_config_var(CONFIG_FIX_CDEF_SYNTAX 1
                    "AV2 experiment flag to fix CDEF syntax.")
+
+set_aom_config_var(CONFIG_IMPROVED_CFL_DC 1
+                   "Enable improved DC for CfL: C037 method 1")
+
+set_aom_config_var(CONFIG_IMPLICIT_CFL 1 "Enable implicit CfL: C037 method 2")
+
 #
 # Variables in this section control optional features of the build system.
 #

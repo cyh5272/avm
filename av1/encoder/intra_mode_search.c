@@ -607,9 +607,21 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   // Search through all non-palette modes.
 #if CONFIG_AIMC
   get_uv_intra_mode_set(mbmi);
+#if CONFIG_IMPLICIT_CFL
+  for (int mode_idx = 0; mode_idx < UV_INTRA_MODES + 1; ++mode_idx) {
+    int real_mode_idx = mode_idx;
+    mbmi->cfl_idx = 0;
+    if (mode_idx == UV_INTRA_MODES) {
+      real_mode_idx = mode_idx - 1;
+      mbmi->cfl_idx = 1;
+    }
+    mbmi->uv_mode_idx = real_mode_idx;
+    mbmi->uv_mode = mbmi->uv_intra_mode_list[real_mode_idx];
+#else
   for (int mode_idx = 0; mode_idx < UV_INTRA_MODES; ++mode_idx) {
     mbmi->uv_mode_idx = mode_idx;
     mbmi->uv_mode = mbmi->uv_intra_mode_list[mode_idx];
+#endif
     if (mbmi->uv_mode == mbmi->mode)
       mbmi->angle_delta[PLANE_TYPE_UV] = mbmi->angle_delta[PLANE_TYPE_Y];
     else
@@ -636,14 +648,26 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     // Init variables for cfl and angle delta
     int cfl_alpha_rate = 0;
+#if CONFIG_IMPLICIT_CFL
+    int cfl_idx_rate = 0;
+#endif
     if (mode == UV_CFL_PRED) {
       if (!is_cfl_allowed(xd) || !intra_mode_cfg->enable_cfl_intra) continue;
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
-      cfl_alpha_rate = cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd);
+      if (mbmi->cfl_idx == 0) {
+        cfl_alpha_rate = cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd);
+      }
+#if CONFIG_IMPLICIT_CFL
+      cfl_idx_rate = x->mode_costs.cfl_index_cost[mbmi->cfl_idx];
+#endif
       if (cfl_alpha_rate == INT_MAX) continue;
     }
 #if CONFIG_AIMC
+#if CONFIG_IMPLICIT_CFL
+    mode_cost += cfl_alpha_rate + cfl_idx_rate;
+#else
     mode_cost += cfl_alpha_rate;
+#endif
     if (!av1_txfm_uvrd(cpi, x, &tokenonly_rd_stats, bsize, best_rd)) {
       continue;
     }
@@ -1158,7 +1182,7 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
                                      bsize, mbmi->tx_size);
   }
   if (num_planes > 1 && xd->is_chroma_ref) {
-    const int uv_mode_cost =
+    int uv_mode_cost =
 #if CONFIG_AIMC
         get_uv_mode_cost(mbmi, x->mode_costs, is_cfl_allowed(xd),
                          mbmi->uv_mode_idx);

@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
@@ -40,7 +41,6 @@ extern "C" {
 #define MAX_DIFFWTD_MASK_BITS 1
 
 #define INTERINTRA_WEDGE_SIGN 0
-
 /*!\cond */
 
 // DIFFWTD_MASK_TYPES should not surpass 1 << MAX_DIFFWTD_MASK_BITS
@@ -420,6 +420,7 @@ typedef struct MB_MODE_INFO {
   int8_t cfl_alpha_signs;
   /*! \brief Chroma from Luma: Index of the alpha Cb and alpha Cr combination */
   uint8_t cfl_alpha_idx;
+  uint8_t cfl_idx;
   /*! \brief Stores the size and colors of palette mode */
   PALETTE_MODE_INFO palette_mode_info;
   /*! \brief Reference line index for multiple reference line selection. */
@@ -751,6 +752,15 @@ typedef struct cfl_ctx {
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
 
+#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+  // improved dc prediction related buffer
+  uint16_t recon_above_buf[CFL_BUF_LINE * 2];
+  uint16_t recon_left_buf[CFL_BUF_LINE * 2];
+
+  uint16_t luma_pos_idx[CFL_BUF_SQUARE];
+  bool has_top;
+  bool has_left;
+#endif
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
   // for every scaling parameter
   int dc_pred_is_cached[CFL_PRED_PLANES];
