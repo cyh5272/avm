@@ -338,9 +338,9 @@ void av1_inv_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
   const int angle_idx = cctx_type - CCTX_START;
   for (int i = 0; i < ncoeffs; i++) {
     tmp[0] =
-        cctx_mtx[angle_idx][0] * src_u[i] + cctx_mtx[angle_idx][2] * src_v[i];
+        cctx_mtx[angle_idx][0] * src_u[i] + cctx_mtx[angle_idx][1] * src_v[i];
     tmp[1] =
-        cctx_mtx[angle_idx][1] * src_u[i] + cctx_mtx[angle_idx][3] * src_v[i];
+        cctx_mtx[angle_idx][1] * src_u[i] - cctx_mtx[angle_idx][0] * src_v[i];
     src_u[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[0], CCTX_PREC_BITS);
     src_v[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[1], CCTX_PREC_BITS);
   }
