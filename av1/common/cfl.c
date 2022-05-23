@@ -374,11 +374,12 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
 #if CONFIG_CFL_DS_1_2_1
-  if (sub_x && sub_y)
-     cfl_luma_subsampling_420_hbd_121_c(
-       CONVERT_TO_SHORTPTR(input), input_stride, recon_buf_q3, width, height);
+    if (sub_x && sub_y)
+      cfl_luma_subsampling_420_hbd_121_c(
+        CONVERT_TO_SHORTPTR(input), input_stride, recon_buf_q3, width, height);
+    else
 #endif
-  cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
+      cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
                                                input_stride, recon_buf_q3);
 }
 
