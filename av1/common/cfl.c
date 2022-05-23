@@ -249,6 +249,23 @@ static void cfl_luma_subsampling_420_hbd_c(const uint16_t *input,
   }
 }
 
+#if CONFIG_CFL_DS_1_2_1
+void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input,
+                                         int input_stride, uint16_t *output_q3,
+                                         int width, int height) {
+  for (int j = 0; j < height; j += 2) {
+    for (int i = 0; i < width; i += 2) {
+      const int bot = i + input_stride;
+      output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
+                          input[i + 1] + input[bot + AOMMAX(-1, -i)] +
+                          2 * input[bot] + input[bot + 1];
+    }
+    input += input_stride << 1;
+    output_q3 += CFL_BUF_LINE;
+  }
+}
+#endif
+
 #if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
 static void cfl_luma_subsampling_420_neighbor_hbd_c(const uint16_t *input,
                                                     int input_stride,
@@ -257,8 +274,18 @@ static void cfl_luma_subsampling_420_neighbor_hbd_c(const uint16_t *input,
   for (int j = 0; j < height; j += 2) {
     for (int i = 0; i < width; i += 2) {
       const int bot = i + input_stride;
-      output_q3[i >> 1] =
+#if CONFIG_CFL_DS_1_2_1
+    if (width > 2) // top edge
+      output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
+                          input[i + 1] + input[bot + AOMMAX(-1, -i)] +
+                          2 * input[bot] + input[bot + 1];
+    else   // left edge
+      output_q3[i >> 1] = input[i - 1] + 2 * input[i] + input[i + 1]
+                          + input[bot - 1] + 2 * input[bot] + input[bot + 1];
+#else
+    output_q3[i >> 1] =
           (input[i] + input[i + 1] + input[bot] + input[bot + 1]) << 1;
+#endif
     }
     input += input_stride << 1;
     output_q3 += (width >> 1);
@@ -346,8 +373,13 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
   // Store the input into the CfL pixel buffer
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
+#if CONFIG_CFL_DS_1_2_1
+  if (sub_x && sub_y)
+     cfl_luma_subsampling_420_hbd_121_c(
+       CONVERT_TO_SHORTPTR(input), input_stride, recon_buf_q3, width, height);
+#endif
   cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
-                                             input_stride, recon_buf_q3);
+                                               input_stride, recon_buf_q3);
 }
 
 #if (CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC)

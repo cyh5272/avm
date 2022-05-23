@@ -210,7 +210,8 @@ set_aom_config_var(CONFIG_FIX_CDEF_SYNTAX 1
 
 set_aom_config_var(CONFIG_IMPROVED_CFL_DC 1
                    "Enable improved DC for CfL: C037 method 1")
-
+set_aom_config_var(CONFIG_CFL_DS_1_2_1 1
+  "Use [1 2 1; 1 2 1] downsampling filter for luma samples in CfL mode")
 set_aom_config_var(CONFIG_IMPLICIT_CFL 1 "Enable implicit CfL: C037 method 2")
 
 #
