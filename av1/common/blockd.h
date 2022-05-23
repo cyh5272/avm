@@ -420,7 +420,9 @@ typedef struct MB_MODE_INFO {
   int8_t cfl_alpha_signs;
   /*! \brief Chroma from Luma: Index of the alpha Cb and alpha Cr combination */
   uint8_t cfl_alpha_idx;
+#if CONFIG_IMPLICIT_CFL
   uint8_t cfl_idx;
+#endif
   /*! \brief Stores the size and colors of palette mode */
   PALETTE_MODE_INFO palette_mode_info;
   /*! \brief Reference line index for multiple reference line selection. */

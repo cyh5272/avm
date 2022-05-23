@@ -1713,10 +1713,9 @@ static INLINE BLOCK_SIZE scale_chroma_bsize(BLOCK_SIZE bsize, int subsampling_x,
 }
 
 #if CONFIG_IMPLICIT_CFL
-void pred_vitual_cb_hb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
-                       const uint8_t *ref8, int ref_stride, uint8_t *dst8,
-                       int dst_stride, TX_SIZE tx_size, int col_off,
-                       int row_off, int plane) {
+void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
+                       int ref_stride, uint8_t *dst8, int dst_stride,
+                       TX_SIZE tx_size, int col_off, int row_off, int plane) {
   int i;
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
   uint16_t *ref = CONVERT_TO_SHORTPTR(ref8);
@@ -1753,16 +1752,12 @@ void pred_vitual_cb_hb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   // base+1   G      H  ..     S      T      T      T      T      T
 
   const struct macroblockd_plane *const pd = &xd->plane[plane];
-  const int txw = tx_size_wide_unit[tx_size];
-  const int txh = tx_size_high_unit[tx_size];
   const int ss_x = pd->subsampling_x;
   const int ss_y = pd->subsampling_y;
   const int have_top =
       row_off || (ss_y ? xd->chroma_up_available : xd->up_available);
   const int have_left =
       col_off || (ss_x ? xd->chroma_left_available : xd->left_available);
-  const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-  const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
 
   // Distance between the right edge of this prediction block to
   // the frame right edge
@@ -1774,12 +1769,7 @@ void pred_vitual_cb_hb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   // Distance between the bottom edge of this prediction block to
   // the frame bottom edge
   const int yd = (xd->mb_to_bottom_edge >> (3 + ss_y)) + hpx - y - txhpx;
-  const int right_available =
-      mi_col + ((col_off + txw) << ss_x) < xd->tile.mi_col_end;
-  const int bottom_available =
-      (yd > 0) && (mi_row + ((row_off + txh) << ss_y) < xd->tile.mi_row_end);
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-  const PARTITION_TYPE partition = mbmi->partition;
   BLOCK_SIZE bsize = mbmi->sb_type[plane > 0];
 
   // force 4x4 chroma component block size.
@@ -1787,30 +1777,11 @@ void pred_vitual_cb_hb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
   }
 
-  const int have_top_right =
-      has_top_right(cm, bsize, mi_row, mi_col, have_top, right_available,
-                    partition, tx_size, row_off, col_off, ss_x, ss_y);
-  const int have_bottom_left =
-      has_bottom_left(cm, bsize, mi_row, mi_col, bottom_available, have_left,
-                      partition, tx_size, row_off, col_off, ss_x, ss_y);
-
-  const int disable_edge_filter = !cm->seq_params.enable_intra_edge_filter;
-
-  const int seq_intra_pred_filter_flag = 0;
-  int apply_sub_block_based_refinement_filter = seq_intra_pred_filter_flag;
-  int angle_delta = 0;
-  bool seq_ibp_flag =
-      false;  //@todo find the correct setting, currently set false;
-
   if (use_filter_intra) need_left = need_above = need_above_left = 1;
   int n_top_px = have_top ? AOMMIN(txwpx, xr + txwpx) : 0;
-  int n_topright_px = have_top_right ? AOMMIN(txwpx, xr) : 0;
   int n_left_px = have_left ? AOMMIN(txhpx, yd + txhpx) : 0;
-  int n_bottomleft_px = have_bottom_left ? AOMMIN(txhpx, yd) : 0;
   assert(n_top_px >= 0);
-  assert(n_topright_px >= 0);
   assert(n_left_px >= 0);
-  assert(n_bottomleft_px >= 0);
 
   // NEED_LEFT
   if (need_left) {
@@ -1881,9 +1852,8 @@ static int get_distance(int delta_x, int delta_y) {
 }
 
 void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
-                         TX_SIZE tx_size, int use_hbd) {
+                         TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
-  struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
   const int width = tx_size_wide[tx_size];
   const int height = tx_size_high[tx_size];
   const int tx_off_log2 = MI_SIZE_LOG2;
@@ -1893,10 +1863,7 @@ void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
   const int store_col = col << (tx_off_log2 - sub_x);
   int store_height = height >> sub_y;
   int store_width = width >> sub_x;
-  const int have_top =
-      row || (sub_y ? xd->chroma_up_available : xd->up_available);
-  const int have_left =
-      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
   // Store the input into the CfL pixel buffer
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
@@ -1917,7 +1884,6 @@ void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
 
   for (int i = 0; i < cfl->buf_height; i++) {
     for (int j = 0; j < cfl->buf_width; j++) {
-      int idx = 0;
       int min_error = INT16_MAX;
       int min_dis = INT16_MAX;
       for (int k = 0; k < store_width + store_height; k++) {
@@ -2049,6 +2015,20 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
   const int angle_delta = mbmi->angle_delta[plane != AOM_PLANE_Y] * ANGLE_STEP;
 
   if (plane != AOM_PLANE_Y && mbmi->uv_mode == UV_CFL_PRED) {
+#if CONFIG_DEBUG
+    assert(is_cfl_allowed(xd));
+    const BLOCK_SIZE plane_bsize =
+        get_plane_block_size(mbmi->sb_type[xd->tree_type == CHROMA_PART],
+                             pd->subsampling_x, pd->subsampling_y);
+    (void)plane_bsize;
+    assert(plane_bsize < BLOCK_SIZES_ALL);
+    if (!xd->lossless[mbmi->segment_id]) {
+      assert(blk_col == 0);
+      assert(blk_row == 0);
+      assert(block_size_wide[plane_bsize] == tx_size_wide[tx_size]);
+      assert(block_size_high[plane_bsize] == tx_size_high[tx_size]);
+    }
+#endif
 #if !CONFIG_IMPLICIT_CFL
     CFL_CTX *const cfl = &xd->cfl;
     CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
@@ -2076,10 +2056,6 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
 #endif
 #if CONFIG_IMPLICIT_CFL
     if (mbmi->cfl_idx == 0) {
-      const int width = tx_size_wide[tx_size];
-      const int height = tx_size_high[tx_size];
-      const int mi_col = xd->mi_col * 2;
-      const int mi_row = xd->mi_row * 2;
       CFL_CTX *const cfl = &xd->cfl;
       CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
       if (cfl->dc_pred_is_cached[pred_plane] == 0) {
@@ -2096,20 +2072,13 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       }
       cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
     } else if (mbmi->cfl_idx == 1) {
-      const int width = tx_size_wide[tx_size];
-      const int height = tx_size_high[tx_size];
-      const int mi_col = xd->mi_col * 2;
-      const int mi_row = xd->mi_row * 2;
-      CFL_CTX *const cfl = &xd->cfl;
-      CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
       const int luma_tx_size =
           av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
       // cfl_store_neighbor(xd, blk_row, blk_col, luma_tx_size,
       //  is_cur_buf_hbd(xd));
-      cfl_pred_y_neighbor(xd, blk_row, blk_col, luma_tx_size,
-                          is_cur_buf_hbd(xd));
-      pred_vitual_cb_hb(cm, xd, dst, dst_stride, dst, dst_stride, tx_size,
-                        blk_col, blk_row, plane);
+      cfl_pred_y_neighbor(xd, blk_row, blk_col, luma_tx_size);
+      pred_vitual_cb_hb(xd, dst, dst_stride, dst, dst_stride, tx_size, blk_col,
+                        blk_row, plane);
     }
 #endif
     return;
