@@ -1626,7 +1626,7 @@ static void build_intra_predictors_high(
   }
   // predict
   if (mode == DC_PRED) {
-#if !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if 0
     if (xd->mi[0]->uv_mode == UV_CFL_PRED && n_left_px > 0 && n_top_px > 0) {
       if (xd->mi[0]->cfl_idx == 1) {  // ??????????????? waht's this?
         n_top_px = 0;

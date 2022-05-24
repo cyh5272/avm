@@ -655,9 +655,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     if (mode == UV_CFL_PRED) {
       if (!is_cfl_allowed(xd) || !intra_mode_cfg->enable_cfl_intra) continue;
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
-      if (mbmi->cfl_idx == 0) {
+#if CONFIG_IMPLICIT_CFL
+      if (mbmi->cfl_idx == 0)
+#endif
         cfl_alpha_rate = cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd);
-      }
 #if CONFIG_IMPLICIT_CFL
       cfl_idx_rate = x->mode_costs.cfl_index_cost[0][mbmi->cfl_idx > 0];
 #if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
