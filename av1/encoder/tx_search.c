@@ -1300,8 +1300,7 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   aom_highbd_convolve_copy(CONVERT_TO_SHORTPTR(dst_v), pd_v->dst.stride,
                            CONVERT_TO_SHORTPTR(recon_v), MAX_TX_SIZE, bsw, bsh);
 
-  CctxType cctx_type = av1_get_cctx_type(
-      xd, blk_row, blk_col, tx_size, cpi->common.features.reduced_tx_set_used);
+  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
   TX_TYPE tx_type =
       av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
                       cpi->common.features.reduced_tx_set_used);

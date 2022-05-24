@@ -560,8 +560,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 
   TX_TYPE tx_type = DCT_DCT;
 #if CONFIG_CROSS_CHROMA_TX
-  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col, tx_size,
-                                         cm->features.reduced_tx_set_used);
+  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,

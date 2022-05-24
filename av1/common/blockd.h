@@ -1766,12 +1766,7 @@ static INLINE TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
 
 #if CONFIG_CROSS_CHROMA_TX
 static INLINE CctxType av1_get_cctx_type(const MACROBLOCKD *xd, int blk_row,
-                                         int blk_col, TX_SIZE tx_size,
-                                         int reduced_tx_set) {
-  const MB_MODE_INFO *const mbmi = xd->mi[0];
-  const TxSetType tx_set_type = av1_get_ext_tx_set_type(
-      tx_size, is_inter_block(mbmi, xd->tree_type), reduced_tx_set);
-  if (tx_set_type == EXT_TX_SET_DCTONLY) return CCTX_NONE;
+                                         int blk_col) {
   return xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
 }
 #endif  // CONFIG_CROSS_CHROMA_TX

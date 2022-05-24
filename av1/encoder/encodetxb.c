@@ -456,8 +456,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
     if (eob > 0 || eob_u > 0) {
-      const CctxType cctx_type = av1_get_cctx_type(
-          xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+      const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
       av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
     }
   }
@@ -582,8 +581,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
   // CCTX type is transmitted with V plane
-  const CctxType cctx_type = av1_get_cctx_type(
-      xd, blk_row, blk_col, tx_size, cm->features.reduced_tx_set_used);
+  const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
   if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
@@ -2165,8 +2163,7 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     const int eset = get_ext_tx_set(tx_size, is_inter, reduced_tx_set_used);
     if (eset > 0) {
-      const CctxType cctx_type =
-          av1_get_cctx_type(xd, blk_row, blk_col, tx_size, reduced_tx_set_used);
+      const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
       if (allow_update_cdf)
         update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
                    CCTX_TYPES);
