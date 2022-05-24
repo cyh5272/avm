@@ -421,6 +421,7 @@ typedef struct MB_MODE_INFO {
   /*! \brief Chroma from Luma: Index of the alpha Cb and alpha Cr combination */
   uint8_t cfl_alpha_idx;
 #if CONFIG_IMPLICIT_CFL
+  /*! \brief Chroma from Luma: Index of the CfL mode */
   uint8_t cfl_idx;
 #endif
   /*! \brief Stores the size and colors of palette mode */
@@ -755,12 +756,15 @@ typedef struct cfl_ctx {
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
 
 #if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
-  // improved dc prediction related buffer
+  // improved dc prediction above related buffer
   uint16_t recon_above_buf[CFL_BUF_LINE * 2];
+  // improved dc prediction left related buffer
   uint16_t recon_left_buf[CFL_BUF_LINE * 2];
-
+  // luma mapping table
   uint16_t luma_pos_idx[CFL_BUF_SQUARE];
+  // flag to indicate if top available
   bool has_top;
+  // flag to indicate if left available
   bool has_left;
 #endif
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
