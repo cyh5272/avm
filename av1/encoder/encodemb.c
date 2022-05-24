@@ -722,8 +722,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
                .buf[(blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2];
       mismatch_record_block_tx(dst_u, pd_u->dst.stride,
                                cm->current_frame.order_hint, AOM_PLANE_U,
-                               pixel_c, pixel_r, blk_w, blk_h,
-                               xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH);
+                               pixel_c, pixel_r, blk_w, blk_h);
     }
 #endif  // CONFIG_CROSS_CHROMA_TX
     mismatch_record_block_tx(dst, pd->dst.stride, cm->current_frame.order_hint,

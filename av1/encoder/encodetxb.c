@@ -581,12 +581,13 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
   // CCTX type is transmitted with V plane
-  const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
   if (is_inter_block(xd->mi[0], xd->tree_type) && plane == AOM_PLANE_V) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
-    if (eob > 0 || eob_u > 0)
+    if (eob > 0 || eob_u > 0) {
+      const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
       av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+    }
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
