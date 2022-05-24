@@ -1626,15 +1626,15 @@ static void build_intra_predictors_high(
   }
   // predict
   if (mode == DC_PRED) {
-    if (xd->mi[0]->uv_mode == UV_CFL_PRED && n_left_px > 0 && n_top_px > 0) {
 #if !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+    if (xd->mi[0]->uv_mode == UV_CFL_PRED && n_left_px > 0 && n_top_px > 0) {
       if (xd->mi[0]->cfl_idx == 1) {  // ??????????????? waht's this?
         n_top_px = 0;
       } else if (xd->mi[0]->cfl_idx == 2) { // ??????????????? waht's this?
         n_left_px = 0;
       }
-#endif
     }
+#endif
     dc_pred_high[n_left_px > 0][n_top_px > 0][tx_size](
         dst, dst_stride, above_row, left_col, xd->bd);
 #if CONFIG_IBP_DC

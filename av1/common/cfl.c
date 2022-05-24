@@ -314,10 +314,10 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     c = cfl->recon_chroma_buf_above[plane - 1];
 
     for (int i = 0; i < width; i++) {
-      sum_x += l[i];
+      sum_x += l[i] >> 3;
       sum_y += c[i];
-      sum_xy += l[i] * c[i];
-      sum_xx += l[i] * l[i];
+      sum_xy += (l[i] >> 3) * c[i];
+      sum_xx += (l[i] >> 3) * (l[i] >> 3);
     }
     count += width;
   }
@@ -327,10 +327,10 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     c = cfl->recon_chroma_buf_left[plane - 1];
 
     for (int i = 0; i < height; i++) {
-      sum_x += l[i];
+      sum_x += l[i] >> 3;
       sum_y += c[i];
-      sum_xy += l[i] * c[i];
-      sum_xx += l[i] * l[i];
+      sum_xy += (l[i] >> 3) * c[i];
+      sum_xx += (l[i] >> 3) * (l[i] >> 3);
     }
     count += height;
   }
