@@ -1626,15 +1626,6 @@ static void build_intra_predictors_high(
   }
   // predict
   if (mode == DC_PRED) {
-#if 0
-    if (xd->mi[0]->uv_mode == UV_CFL_PRED && n_left_px > 0 && n_top_px > 0) {
-      if (xd->mi[0]->cfl_idx == 1) {  // ??????????????? waht's this?
-        n_top_px = 0;
-      } else if (xd->mi[0]->cfl_idx == 2) { // ??????????????? waht's this?
-        n_left_px = 0;
-      }
-    }
-#endif
     dc_pred_high[n_left_px > 0][n_top_px > 0][tx_size](
         dst, dst_stride, above_row, left_col, xd->bd);
 #if CONFIG_IBP_DC
@@ -2076,11 +2067,12 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       }
 
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-    if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
-      implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col,
-                                      tx_size);
-      cfl_derive_implicit_scaling_factor(xd, plane, blk_row, blk_col, tx_size);
-    }
+      if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
+        implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col,
+                                        tx_size);
+        cfl_derive_implicit_scaling_factor(xd, plane, blk_row, blk_col,
+                                           tx_size);
+      }
 #endif
 
       cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
