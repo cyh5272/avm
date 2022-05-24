@@ -16,6 +16,10 @@
 
 #include "config/av1_rtcd.h"
 
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#include "av1/common/warped_motion.h"
+#endif
+
 void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params) {
   assert(block_size_wide[CFL_MAX_BLOCK_SIZE] == CFL_BUF_LINE);
   assert(block_size_high[CFL_MAX_BLOCK_SIZE] == CFL_BUF_LINE);
@@ -217,6 +221,133 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   cfl->are_parameters_computed = 1;
 }
 
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
+                                     MACROBLOCKD *const xd, int plane, int row,
+                                     int col, TX_SIZE tx_size) {
+  assert(is_cur_buf_hbd(xd));
+  CFL_CTX *const cfl = &xd->cfl;
+  struct macroblockd_plane *const pd = &xd->plane[plane];
+  int input_stride = pd->dst.stride;
+  uint8_t *dst = &pd->dst.buf[(row * pd->dst.stride + col) << MI_SIZE_LOG2];
+
+  const int width = tx_size_wide[tx_size];
+  const int height = tx_size_high[tx_size];
+  const int sub_x = cfl->subsampling_x;
+  const int sub_y = cfl->subsampling_y;
+
+  int pic_width_c = cm->width >> sub_x;
+  int pic_height_c = cm->height >> sub_y;
+
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
+  memset(cfl->recon_chroma_buf_above[plane - 1], 0, sizeof(cfl->recon_chroma_buf_above[plane - 1]));
+  memset(cfl->recon_chroma_buf_left[plane - 1], 0, sizeof(cfl->recon_chroma_buf_left[plane - 1]));
+
+  // top boundary
+  uint16_t *output_q3 = cfl->recon_chroma_buf_above[plane - 1];
+  if (have_top) {
+    uint16_t *input = CONVERT_TO_SHORTPTR(dst) - input_stride;
+    for (int i = 0; i < width; i++) {
+      output_q3[i] = input[i];
+    }
+    if (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) >
+        pic_width_c) {
+      int temp =
+          width - (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) -
+                   pic_width_c);
+      assert(temp > 0 && temp < width);
+      for (int i = temp; i < width; i++) {
+        output_q3[i] = output_q3[i - 1];
+      }
+    }
+  }
+
+  // left boundary
+  output_q3 = cfl->recon_chroma_buf_left[plane - 1];
+  if (have_left) {
+    uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
+    for (int j = 0; j < height; j++) {
+      output_q3[j] = input[0];
+      input += input_stride;
+    }
+
+    if (((((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2) + height) >
+        pic_height_c) {
+      int temp =
+          height - (((((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2) + height) -
+                    pic_height_c);
+      assert(temp > 0 && temp < height);
+      for (int j = temp; j < height; j++) {
+        output_q3[j] = output_q3[j - 1];
+      }
+    }
+  }
+}
+
+void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
+                            int row, int col, TX_SIZE tx_size) {
+  CFL_CTX *const cfl = &xd->cfl;
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  const int width = tx_size_wide[tx_size];
+  const int height = tx_size_high[tx_size];
+  const int sub_x = cfl->subsampling_x;
+  const int sub_y = cfl->subsampling_y;
+
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
+  int count = 0;
+  int sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
+
+  assert (have_top == cfl->has_top);
+  assert (have_left == cfl->has_left);
+
+  uint16_t *l, *c;
+  if (have_top) {
+    l = cfl->recon_above_buf;
+    c = cfl->recon_chroma_buf_above[plane - 1];
+
+    for (int i = 0; i < width; i++) {
+      sum_x += l[i];
+      sum_y += c[i];
+      sum_xy += l[i] * c[i];
+      sum_xx += l[i] * l[i];
+    }
+    count += width;
+  }
+
+  if (have_left) {
+    l = cfl->recon_left_buf;
+    c = cfl->recon_chroma_buf_left[plane - 1];
+
+    for (int i = 0; i < height; i++) {
+      sum_x += l[i];
+      sum_y += c[i];
+      sum_xy += l[i] * c[i];
+      sum_xx += l[i] * l[i];
+    }
+    count += height;
+  }
+
+  if (count > 0) {
+      int der = sum_xx - sum_x * sum_x / count;
+      int nor = sum_xy - sum_x * sum_y / count;
+      int shift = 3 + CFL_ADD_BITS_ALPHA;
+
+      mbmi->cfl_implicit_alpha[plane - 1] =
+          resolve_divisor_32_CfL(nor, der, shift);
+  } else {
+    mbmi->cfl_implicit_alpha[plane - 1] = 0;
+  }
+}
+#endif
+
 void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
                        TX_SIZE tx_size, int plane) {
   CFL_CTX *const cfl = &xd->cfl;
@@ -225,8 +356,18 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
 
   if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
 
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  int alpha_q3;
+  if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
+    alpha_q3 = mbmi->cfl_implicit_alpha[plane - 1];
+  else
+    alpha_q3 =
+        cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1)
+        << CFL_ADD_BITS_ALPHA;
+#else
   const int alpha_q3 =
       cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
+#endif
   assert((tx_size_high[tx_size] - 1) * CFL_BUF_LINE + tx_size_wide[tx_size] <=
          CFL_BUF_SQUARE);
   uint16_t *dst_16 = CONVERT_TO_SHORTPTR(dst);
@@ -471,6 +612,7 @@ void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
             height);  // @todo add dsmple for other format
       }
     } else {
+      assert (0);
       if (sub_x == 1) {
         if (sub_y == 1) {
           cfl_luma_subsampling_420_lbd_c(input - 2, input_stride, recon_buf_q3,
@@ -519,6 +661,7 @@ void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
             above_height);  // @todo add dsmple for other format
       }
     } else {
+      assert (0);
       if (sub_x == 1) {
         if (sub_y == 1) {
           cfl_luma_subsampling_420_lbd_c(

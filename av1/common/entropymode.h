@@ -217,7 +217,7 @@ typedef struct frame_contexts {
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_IMPLICIT_CFL
-  aom_cdf_prob cfl_index_cdf[CDF_SIZE(CFL_IDX_NUMBER)];
+  aom_cdf_prob cfl_index_cdf[2][CDF_SIZE(CFL_IDX_NUMBER)];
 #endif
 #if CONFIG_AIMC
   // y mode cdf

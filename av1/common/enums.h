@@ -610,6 +610,18 @@ enum {
   UV_MODE_INVALID,  // For uv_mode in inter blocks
 } UENUM1BYTE(UV_PREDICTION_MODE);
 
+#if CONFIG_IMPLICIT_CFL
+enum {
+  CFL_EXPLICIT,      // av1 cfl
+#if CONFIG_IMPLICIT_CFL_MAPPING
+  CFL_MAPPING,       // implicit chroma-to-luma mapping CfL mode
+#endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  CFL_DERIVED_ALPHA,       //implicit CfL mode with derived scaling factor
+#endif
+} UENUM1BYTE(CFL_TYPE);
+#endif //CONFIG_IMPLICIT_CFL
+
 // Number of top model rd to store for pruning y modes in intra mode decision
 #define TOP_INTRA_MODEL_COUNT 4
 // Total number of luma intra prediction modes (include both directional and

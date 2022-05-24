@@ -372,6 +372,56 @@ static INLINE int16x8x4_t predict_w32(const int16_t *pred_buf_q3,
   return result;
 }
 
+<<<<<<< HEAD
+=======
+static INLINE void cfl_predict_lbd_neon(const int16_t *pred_buf_q3,
+                                        uint8_t *dst, int dst_stride,
+                                        int alpha_q3, int width, int height) {
+#if CFL_ADD_BITS_ALPHA
+  const int16_t abs_alpha_q12 = abs(alpha_q3) << (9 - CFL_ADD_BITS_ALPHA);
+#else
+  const int16_t abs_alpha_q12 = abs(alpha_q3) << 9;
+#endif
+  const int16_t *const end = pred_buf_q3 + height * CFL_BUF_LINE;
+  if (width == 4) {
+    const int16x4_t alpha_sign = vdup_n_s16(alpha_q3);
+    const int16x4_t dc = vdup_n_s16(*dst);
+    do {
+      const int16x4_t pred =
+          predict_w4(pred_buf_q3, alpha_sign, abs_alpha_q12, dc);
+      vsth_u8(dst, vqmovun_s16(vcombine_s16(pred, pred)));
+      dst += dst_stride;
+    } while ((pred_buf_q3 += CFL_BUF_LINE) < end);
+  } else {
+    const int16x8_t alpha_sign = vdupq_n_s16(alpha_q3);
+    const int16x8_t dc = vdupq_n_s16(*dst);
+    do {
+      if (width == 8) {
+        vst1_u8(dst, vqmovun_s16(predict_w8(pred_buf_q3, alpha_sign,
+                                            abs_alpha_q12, dc)));
+      } else if (width == 16) {
+        const int16x8x2_t pred =
+            predict_w16(pred_buf_q3, alpha_sign, abs_alpha_q12, dc);
+        const uint8x8x2_t predun = { { vqmovun_s16(pred.val[0]),
+                                       vqmovun_s16(pred.val[1]) } };
+        vst2_u8(dst, predun);
+      } else {
+        const int16x8x4_t pred =
+            predict_w32(pred_buf_q3, alpha_sign, abs_alpha_q12, dc);
+        const uint8x8x4_t predun = {
+          { vqmovun_s16(pred.val[0]), vqmovun_s16(pred.val[1]),
+            vqmovun_s16(pred.val[2]), vqmovun_s16(pred.val[3]) }
+        };
+        vst4_u8(dst, predun);
+      }
+      dst += dst_stride;
+    } while ((pred_buf_q3 += CFL_BUF_LINE) < end);
+  }
+}
+
+CFL_PREDICT_FN(neon, lbd)
+
+>>>>>>> Rebase: CfL with derived scaling factor
 static INLINE uint16x4_t clamp_s16(int16x4_t a, int16x4_t max) {
   return vreinterpret_u16_s16(vmax_s16(vmin_s16(a, max), vdup_n_s16(0)));
 }
@@ -407,7 +457,11 @@ static INLINE void cfl_predict_hbd_neon(const int16_t *pred_buf_q3,
                                         int alpha_q3, int bd, int width,
                                         int height) {
   const int max = (1 << bd) - 1;
+#if CFL_ADD_BITS_ALPHA
+  const int16_t abs_alpha_q12 = abs(alpha_q3) << (9 - CFL_ADD_BITS_ALPHA);
+#else
   const int16_t abs_alpha_q12 = abs(alpha_q3) << 9;
+#endif
   const int16_t *const end = pred_buf_q3 + height * CFL_BUF_LINE;
   if (width == 4) {
     const int16x4_t alpha_sign = vdup_n_s16(alpha_q3);

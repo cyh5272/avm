@@ -105,8 +105,8 @@ static const aom_cdf_prob
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_IMPLICIT_CFL
-static const aom_cdf_prob default_cfl_index_cdf[CDF_SIZE(CFL_IDX_NUMBER)] = {
-  AOM_CDF2(24756)
+static const aom_cdf_prob default_cfl_index_cdf[2][CDF_SIZE(CFL_IDX_NUMBER)] = {
+  { AOM_CDF2(16384) }, {AOM_CDF2(16384)}
 };
 #endif
 #if CONFIG_AIMC

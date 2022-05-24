@@ -1627,11 +1627,13 @@ static void build_intra_predictors_high(
   // predict
   if (mode == DC_PRED) {
     if (xd->mi[0]->uv_mode == UV_CFL_PRED && n_left_px > 0 && n_top_px > 0) {
-      if (xd->mi[0]->cfl_idx == 1) {
+#if !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+      if (xd->mi[0]->cfl_idx == 1) {  // ??????????????? waht's this?
         n_top_px = 0;
-      } else if (xd->mi[0]->cfl_idx == 2) {
+      } else if (xd->mi[0]->cfl_idx == 2) { // ??????????????? waht's this?
         n_left_px = 0;
       }
+#endif
     }
     dc_pred_high[n_left_px > 0][n_top_px > 0][tx_size](
         dst, dst_stride, above_row, left_col, xd->bd);
@@ -1712,7 +1714,7 @@ static INLINE BLOCK_SIZE scale_chroma_bsize(BLOCK_SIZE bsize, int subsampling_x,
   return bs;
 }
 
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_MAPPING
 void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
                        int ref_stride, uint8_t *dst8, int dst_stride,
                        TX_SIZE tx_size, int col_off, int row_off, int plane) {
@@ -2051,11 +2053,13 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       cfl_store_tx(xd, blk_row, blk_col, luma_tx_size,
                    mbmi->sb_type[PLANE_TYPE_UV]);
     }
-#if !CONFIG_IMPLICIT_CFL
-    cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
-#endif
+
 #if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+    if (mbmi->cfl_idx == CFL_EXPLICIT || mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
+#else
     if (mbmi->cfl_idx == 0) {
+#endif
       CFL_CTX *const cfl = &xd->cfl;
       CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
       if (cfl->dc_pred_is_cached[pred_plane] == 0) {
@@ -2070,8 +2074,19 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       } else {
         cfl_load_dc_pred(xd, dst, dst_stride, tx_size, pred_plane);
       }
+
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+    if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
+      implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col,
+                                      tx_size);
+      cfl_derive_implicit_scaling_factor(xd, plane, blk_row, blk_col, tx_size);
+    }
+#endif
+
       cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
-    } else if (mbmi->cfl_idx == 1) {
+    }
+#if CONFIG_IMPLICIT_CFL_MAPPING
+    else if (mbmi->cfl_idx == CFL_MAPPING) {
       const int luma_tx_size =
           av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
       // cfl_store_neighbor(xd, blk_row, blk_col, luma_tx_size,
@@ -2080,6 +2095,9 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       pred_vitual_cb_hb(xd, dst, dst_stride, dst, dst_stride, tx_size, blk_col,
                         blk_row, plane);
     }
+#endif
+#else
+    cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
 #endif
     return;
   }

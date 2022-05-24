@@ -608,12 +608,13 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_AIMC
   get_uv_intra_mode_set(mbmi);
 #if CONFIG_IMPLICIT_CFL
-  for (int mode_idx = 0; mode_idx < UV_INTRA_MODES + 1; ++mode_idx) {
+  int implicit_cfl_mode_num = CONFIG_IMPLICIT_CFL_MAPPING + CONFIG_IMPLICIT_CFL_DERIVED_ALPHA;
+  for (int mode_idx = 0; mode_idx < UV_INTRA_MODES + implicit_cfl_mode_num; ++mode_idx) {
     int real_mode_idx = mode_idx;
     mbmi->cfl_idx = 0;
-    if (mode_idx == UV_INTRA_MODES) {
-      real_mode_idx = mode_idx - 1;
-      mbmi->cfl_idx = 1;
+    if (mode_idx >= UV_INTRA_MODES) {
+      real_mode_idx = UV_INTRA_MODES - 1;
+      mbmi->cfl_idx = mode_idx - real_mode_idx;
     }
     mbmi->uv_mode_idx = real_mode_idx;
     mbmi->uv_mode = mbmi->uv_intra_mode_list[real_mode_idx];
@@ -658,7 +659,11 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         cfl_alpha_rate = cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd);
       }
 #if CONFIG_IMPLICIT_CFL
-      cfl_idx_rate = x->mode_costs.cfl_index_cost[mbmi->cfl_idx];
+      cfl_idx_rate = x->mode_costs.cfl_index_cost[0][mbmi->cfl_idx > 0];
+#if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+      if (mbmi->cfl_idx)
+        cfl_idx_rate += x->mode_costs.cfl_index_cost[1][mbmi->cfl_idx > 1];
+#endif
 #endif
       if (cfl_alpha_rate == INT_MAX) continue;
     }

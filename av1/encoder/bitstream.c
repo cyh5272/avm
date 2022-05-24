@@ -1189,7 +1189,11 @@ static AOM_INLINE void write_fsc_mode(uint8_t fsc_mode, aom_writer *w,
 #if CONFIG_IMPLICIT_CFL
 static AOM_INLINE void write_cfl_index(FRAME_CONTEXT *ec_ctx, uint8_t cfl_index,
                                        aom_writer *w) {
-  aom_write_symbol(w, cfl_index, ec_ctx->cfl_index_cdf, CFL_IDX_NUMBER);
+  aom_write_symbol(w, cfl_index > 0, ec_ctx->cfl_index_cdf[0], CFL_IDX_NUMBER);
+#if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  if (cfl_index > 0)
+    aom_write_symbol(w, cfl_index > 1, ec_ctx->cfl_index_cdf[1], CFL_IDX_NUMBER);
+#endif
 }
 #endif
 

@@ -423,6 +423,10 @@ typedef struct MB_MODE_INFO {
 #if CONFIG_IMPLICIT_CFL
   /*! \brief Chroma from Luma: Index of the CfL mode */
   uint8_t cfl_idx;
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  /*! \brief The implicitly derived scaling factors*/
+  int cfl_implicit_alpha[2];  //[u/v]
+#endif
 #endif
   /*! \brief Stores the size and colors of palette mode */
   PALETTE_MODE_INFO palette_mode_info;
@@ -767,6 +771,10 @@ typedef struct cfl_ctx {
   // flag to indicate if left available
   bool has_left;
 #endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  uint16_t recon_chroma_buf_above[2][CFL_BUF_LINE];
+  uint16_t recon_chroma_buf_left[2][CFL_BUF_LINE];
+#endif  // CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
   // for every scaling parameter
   int dc_pred_is_cached[CFL_PRED_PLANES];

@@ -220,9 +220,14 @@ static uint8_t read_fsc_mode(aom_reader *r, aom_cdf_prob *fsc_cdf) {
 
 #if CONFIG_IMPLICIT_CFL
 static uint8_t read_cfl_index(FRAME_CONTEXT *ec_ctx, aom_reader *r) {
-  const uint8_t cfl_index =
-      aom_read_symbol(r, ec_ctx->cfl_index_cdf, CFL_IDX_NUMBER, ACCT_STR);
-  return cfl_index == 1;
+  uint8_t cfl_index =
+      aom_read_symbol(r, ec_ctx->cfl_index_cdf[0], CFL_IDX_NUMBER, ACCT_STR);
+#if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  if (cfl_index)
+    cfl_index +=
+        aom_read_symbol(r, ec_ctx->cfl_index_cdf[1], CFL_IDX_NUMBER, ACCT_STR);
+#endif
+  return cfl_index;
 }
 #endif
 

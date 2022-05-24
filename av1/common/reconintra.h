@@ -72,7 +72,7 @@ void av1_predict_intra_block(
     FILTER_INTRA_MODE filter_intra_mode, const uint8_t *ref, int ref_stride,
     uint8_t *dst, int dst_stride, int col_off, int row_off, int plane);
 
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_MAPPING
 void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref,
                        int ref_stride, uint8_t *dst, int dst_stride,
                        TX_SIZE tx_size, int col_off, int row_off, int plane);
