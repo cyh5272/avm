@@ -26,6 +26,17 @@ void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params) {
 
   memset(&cfl->recon_buf_q3, 0, sizeof(cfl->recon_buf_q3));
   memset(&cfl->ac_buf_q3, 0, sizeof(cfl->ac_buf_q3));
+#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+  memset(&cfl->recon_above_buf, 0, sizeof(cfl->recon_above_buf));
+  memset(&cfl->recon_left_buf, 0, sizeof(cfl->recon_left_buf));
+#endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  memset(&cfl->recon_chroma_buf_above[0], 0, sizeof(cfl->recon_chroma_buf_above[0]));
+  memset(&cfl->recon_chroma_buf_above[1], 0, sizeof(cfl->recon_chroma_buf_above[1]));
+  memset(&cfl->recon_chroma_buf_left[0], 0, sizeof(cfl->recon_chroma_buf_left[0]));
+  memset(&cfl->recon_chroma_buf_left[1], 0, sizeof(cfl->recon_chroma_buf_left[1]));
+#endif  // CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+
   cfl->subsampling_x = seq_params->subsampling_x;
   cfl->subsampling_y = seq_params->subsampling_y;
   cfl->are_parameters_computed = 0;
@@ -260,8 +271,10 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           width - (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) -
                    pic_width_c);
       assert(temp > 0 && temp < width);
+      uint16_t *luma_q3 = cfl->recon_above_buf;
       for (int i = temp; i < width; i++) {
         output_q3[i] = output_q3[i - 1];
+        luma_q3[i] = luma_q3[i - 1];
       }
     }
   }
@@ -281,8 +294,10 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           height - (((((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2) + height) -
                     pic_height_c);
       assert(temp > 0 && temp < height);
+      uint16_t *luma_q3 = cfl->recon_left_buf;
       for (int j = temp; j < height; j++) {
         output_q3[j] = output_q3[j - 1];
+        luma_q3[j] = luma_q3[j - 1];
       }
     }
   }
