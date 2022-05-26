@@ -569,7 +569,8 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #endif
       update_cdf(fc->cfl_index_cdf[0], mbmi->cfl_idx > 0, CFL_IDX_NUMBER);
 #if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-      update_cdf(fc->cfl_index_cdf[1], mbmi->cfl_idx > 1, CFL_IDX_NUMBER);
+      if (mbmi->cfl_idx > 0)
+        update_cdf(fc->cfl_index_cdf[1], mbmi->cfl_idx > 1, CFL_IDX_NUMBER);
 #endif
     }
 #endif
