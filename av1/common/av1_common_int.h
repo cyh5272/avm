@@ -1487,6 +1487,17 @@ typedef struct AV1Common {
    * Allocated size of 'tpl_mvs' array. Refer to 'ensure_mv_buffer()' function.
    */
   int tpl_mvs_mem_size;
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  /*!
+   * Motion vectors provided by motion field estimation.
+   * ref_projected_mvs[k][row * stride + col] stores projected MV for block at
+   * [mi_row, mi_col]  of k-th reference frame where: mi_row = 2 * row, mi_col =
+   * 2 * col, and stride = cm->mi_params.mi_stride / 2
+   */
+  TPL_MV_REF *ref_projected_mvs[INTER_REFS_PER_FRAME];
+#endif
+
   /*!
    * ref_frame_sign_bias[k] is 1 if relative distance between reference 'k' and
    * current frame is positive; and 0 otherwise.
@@ -1835,6 +1846,19 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
                     (TPL_MV_REF *)aom_calloc(mem_size, sizeof(*cm->tpl_mvs)));
     cm->tpl_mvs_mem_size = mem_size;
   }
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  for (int ref = 0; ref < INTER_REFS_PER_FRAME; ref++) {
+    realloc = cm->ref_projected_mvs[ref] == NULL;
+    if (cm->ref_projected_mvs[ref]) realloc |= cm->tpl_mvs_mem_size < mem_size;
+    if (realloc) {
+      aom_free(cm->ref_projected_mvs[ref]);
+      CHECK_MEM_ERROR(cm, cm->ref_projected_mvs[ref],
+                      (TPL_MV_REF *)aom_calloc(
+                          mem_size, sizeof(*cm->ref_projected_mvs[ref])));
+    }
+  }
+#endif
 
 #if CONFIG_TIP
   realloc =
@@ -2703,18 +2727,6 @@ static INLINE SB_INFO *av1_get_sb_info(AV1_COMMON *cm, int mi_row, int mi_col) {
          sb_col;
 }
 
-static INLINE void av1_set_sb_info(AV1_COMMON *cm, MACROBLOCKD *xd, int mi_row,
-                                   int mi_col) {
-  SB_INFO *sbi = xd->sbi = av1_get_sb_info(cm, mi_row, mi_col);
-
-  sbi->mi_row = mi_row;
-  sbi->mi_col = mi_col;
-
-#if CONFIG_FLEX_MVRES
-  sbi->sb_mv_precision = cm->features.fr_mv_precision;
-#endif
-}
-
 // Returns true if the frame is fully lossless at the coded resolution.
 // Note: If super-resolution is used, such a frame will still NOT be lossless at
 // the upscaled resolution.
@@ -2921,6 +2933,8 @@ static inline int is_this_mv_precision_compliant(
   return (check_row || check_col) ? 0 : 1;
 }
 #endif  // CONFIG_FLEX_MVRES
+
+void av1_set_sb_info(AV1_COMMON *cm, MACROBLOCKD *xd, int mi_row, int mi_col);
 
 #ifdef __cplusplus
 }  // extern "C"

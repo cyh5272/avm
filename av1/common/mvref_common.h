@@ -692,6 +692,21 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi);
 #endif  // CONFIG_REF_MV_BANK
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+int av1_find_single_ref_projected_samples(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref_frame,
+    const int mi_row, const int mi_col, const int width, const int height,
+    int_mv *projected_mvs, int *pts, int *pts_inref);
+int av1_find_single_ref_projected_samples_sb(const AV1_COMMON *cm,
+                                             const MACROBLOCKD *xd,
+                                             MV_REFERENCE_FRAME ref_frame,
+                                             const int mi_row, const int mi_col,
+                                             int_mv *projected_mvs, int *pts,
+                                             int *pts_inref);
+void av1_set_temporal_global_mvs_sb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                                    const int mi_row, const int mi_col);
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

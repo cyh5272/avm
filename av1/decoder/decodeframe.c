@@ -6431,6 +6431,12 @@ uint32_t av1_decode_frame_headers_and_setup(AV1Decoder *pbi,
     av1_setup_ref_frame_sides(cm);
 #endif  // CONFIG_SMVP_IMPROVEMENT
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  if (cm->features.allow_ref_frame_mvs) {
+    av1_fill_hole_smooth_single_ref_mv_field(cm);
+  }
+#endif
+
 #if CONFIG_TIP
   process_tip_mode(pbi);
   if (cm->features.tip_frame_mode == TIP_FRAME_AS_OUTPUT) {
