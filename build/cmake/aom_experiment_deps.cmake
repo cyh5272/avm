@@ -78,4 +78,12 @@ macro(fix_experiment_configs)
                            !CONFIG_EXTENDED_WARP_PREDICTION)
   endif()
 
+  # CONFIG_TEMPORAL_GLOBAL_MV depends on CONFIG_NEW_REF_SIGNALING and CONFIG_TIP
+  if(NOT CONFIG_NEW_REF_SIGNALING AND CONFIG_TEMPORAL_GLOBAL_MV)
+    change_config_and_warn(CONFIG_TEMPORAL_GLOBAL_MV 0
+                           !CONFIG_NEW_REF_SIGNALING)
+  endif()
+  if(NOT CONFIG_TIP AND CONFIG_TEMPORAL_GLOBAL_MV)
+    change_config_and_warn(CONFIG_TEMPORAL_GLOBAL_MV 0 !CONFIG_TIP)
+  endif()
 endmacro()
