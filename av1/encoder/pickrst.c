@@ -2113,43 +2113,46 @@ static int64_t count_wienerns_bits(int plane, const int (*reduce_cost)[2],
             if (end_feat - beg_feat > 6 &&
                 wienerns_info->nsfilter[end_feat - 6] == 0) {
               reduce_step[WIENERNS_REDUCE_STEPS - 6] = 1;
+              if (end_feat - beg_feat > 7 &&
+                  wienerns_info->nsfilter[end_feat - 7] == 0) {
+                reduce_step[WIENERNS_REDUCE_STEPS - 7] = 1;
+              }
             }
           }
         }
       }
     }
   }
+  const int rodd = is_uv ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
-    if (i == end_feat - 6 && i != beg_feat) {
+    if (rodd && i == end_feat - 7 && i != beg_feat) {
       bits += reduce_cost[0][reduce_step[0]];
       if (reduce_step[0]) break;
     }
-    /*
-    if (i == end_feat - 5 && i != beg_feat) {
+    if (!rodd && i == end_feat - 6 && i != beg_feat) {
       bits += reduce_cost[1][reduce_step[1]];
       if (reduce_step[1]) break;
     }
-    */
-    if (i == end_feat - 4 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       bits += reduce_cost[2][reduce_step[2]];
       if (reduce_step[2]) break;
     }
-    /*
-    if (i == end_feat - 3 && i != beg_feat) {
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
       bits += reduce_cost[3][reduce_step[3]];
       if (reduce_step[3]) break;
     }
-    */
-    if (i == end_feat - 2 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       bits += reduce_cost[4][reduce_step[4]];
       if (reduce_step[4]) break;
     }
-    /*
-    if (i == end_feat - 1 && i != beg_feat) {
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
       bits += reduce_cost[5][reduce_step[5]];
       if (reduce_step[5]) break;
     }
-    */
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
+      bits += reduce_cost[6][reduce_step[6]];
+      if (reduce_step[6]) break;
+    }
 #if CONFIG_LR_4PART_CODE
     bits += aom_count_4part_wref(
         ref_wienerns_info->nsfilter[i] -
@@ -2321,88 +2324,204 @@ static int64_t finer_tile_search_wienerns(
   // printf("Err  int = %"PRId64", cost = %f\n", best_err, best_cost);
 
   // Try reduced filters by forcing trailing 2, 4, 6 coeffs to 0
-  if (end_feat - beg_feat > 2 &&
-      (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0)) {
-    rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
-    const int64_t err =
-        calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-    const int64_t bits = count_wienerns_bits(
-        rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+  const int rodd = is_uv ? 0 : (end_feat & 1);
+  if (rodd) {
+    if (end_feat - beg_feat > 1 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
 #if CONFIG_LR_4PART_CODE
-        x->mode_costs.wiener_nonsep_4part_cost,
+          x->mode_costs.wiener_nonsep_4part_cost,
 #endif  // CONFIG_LR_4PART_CODE
-        &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
-    const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-        x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
-    if (cost < best_cost) {
-      best_err = err;
-      best_cost = cost;
-      best_bits = bits;
-      best = rui->wiener_nonsep_info;
-    } else {
-      rui->wiener_nonsep_info = best;
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
     }
-  }
-  if (end_feat - beg_feat > 4 &&
-      (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0)) {
-    rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
-    const int64_t err =
-        calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-    const int64_t bits = count_wienerns_bits(
-        rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+    if (end_feat - beg_feat > 3 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
 #if CONFIG_LR_4PART_CODE
-        x->mode_costs.wiener_nonsep_4part_cost,
+          x->mode_costs.wiener_nonsep_4part_cost,
 #endif  // CONFIG_LR_4PART_CODE
-        &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
-    const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-        x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
-    if (cost < best_cost) {
-      best_err = err;
-      best_cost = cost;
-      best_bits = bits;
-      best = rui->wiener_nonsep_info;
-    } else {
-      rui->wiener_nonsep_info = best;
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
     }
-  }
-  if (end_feat - beg_feat > 6 &&
-      (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 5] != 0 ||
-       rui->wiener_nonsep_info.nsfilter[end_feat - 6] != 0)) {
-    rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 5] = 0;
-    rui->wiener_nonsep_info.nsfilter[end_feat - 6] = 0;
-    const int64_t err =
-        calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-    const int64_t bits = count_wienerns_bits(
-        rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+    if (end_feat - beg_feat > 5 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 5] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 5] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
 #if CONFIG_LR_4PART_CODE
-        x->mode_costs.wiener_nonsep_4part_cost,
+          x->mode_costs.wiener_nonsep_4part_cost,
 #endif  // CONFIG_LR_4PART_CODE
-        &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
-    const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-        x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
-    if (cost < best_cost) {
-      best_err = err;
-      best_cost = cost;
-      best_bits = bits;
-      best = rui->wiener_nonsep_info;
-    } else {
-      rui->wiener_nonsep_info = best;
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
+    }
+    if (end_feat - beg_feat > 5 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 5] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 6] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 7] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 5] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 6] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 7] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+          x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
+    }
+  } else {
+    if (end_feat - beg_feat > 2 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+          x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
+    }
+    if (end_feat - beg_feat > 4 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+          x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
+    }
+    if (end_feat - beg_feat > 6 &&
+        (rui->wiener_nonsep_info.nsfilter[end_feat - 1] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 2] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 3] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 4] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 5] != 0 ||
+         rui->wiener_nonsep_info.nsfilter[end_feat - 6] != 0)) {
+      rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 5] = 0;
+      rui->wiener_nonsep_info.nsfilter[end_feat - 6] = 0;
+      const int64_t err =
+          calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+      const int64_t bits = count_wienerns_bits(
+          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+          x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+          x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+      if (cost < best_cost) {
+        best_err = err;
+        best_cost = cost;
+        best_bits = bits;
+        best = rui->wiener_nonsep_info;
+      } else {
+        rui->wiener_nonsep_info = best;
+      }
     }
   }
   // printf("Err post = %"PRId64", cost = %f\n", best_err, best_cost);
@@ -2528,8 +2647,10 @@ static int compute_quantized_wienerns_filter(
   double best_cost = DBL_MAX;
 
   // double e[WIENERNS_MAX];
-  const int max_reduce_steps_search = 2;
-  for (int reduce = 0; reduce <= max_reduce_steps_search; reduce += 2) {
+  const int rodd = is_uv ? 0 : (num_feat & 1);
+  const int max_reduce_steps_search = 2 + rodd;
+  for (int reduce = 0; reduce <= max_reduce_steps_search;
+       reduce += (reduce ? 2 : 2 - rodd)) {
     memset(x, 0, sizeof(*x) * num_feat);
     // Try a filter shape with #parameters num_feat - reduce
     int success = 0;

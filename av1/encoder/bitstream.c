@@ -2656,6 +2656,8 @@ static void write_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
       is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
   // printf("Enc %s ", is_uv ? "UV:" : "Y: ");
+  // Check how many trailing coefficients are 0.
+  // TODO(debargha): simplify the logic
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
   if (end_feat - beg_feat > 1 && wienerns_info->nsfilter[end_feat - 1] == 0) {
     reduce_step[WIENERNS_REDUCE_STEPS - 1] = 1;
@@ -2673,51 +2675,63 @@ static void write_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
             if (end_feat - beg_feat > 6 &&
                 wienerns_info->nsfilter[end_feat - 6] == 0) {
               reduce_step[WIENERNS_REDUCE_STEPS - 6] = 1;
+              if (end_feat - beg_feat > 7 &&
+                  wienerns_info->nsfilter[end_feat - 7] == 0) {
+                reduce_step[WIENERNS_REDUCE_STEPS - 7] = 1;
+              }
             }
           }
         }
       }
     }
   }
+  // Whether the number of taps is odd or even. For luma
+  // the #taps can be either odd or even. If odd, the last
+  // tap corresponds to dc offset. For chroma, the #taps is
+  // assumed to be always even.
+  // if #taps is odd, the exit points for signaling are:
+  // #total_taps - 1, #total_taps - 3, #total_taps - 5.
+  // If #taps is even, the exit points for signaling are:
+  // #total_taps - 2, #total_taps - 4, #total_taps - 6.
+  const int rodd = is_uv ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
     // printf("(%d/%d), ", wienerns_info->nsfilter[i],
     //        ref_wienerns_info->nsfilter[i]);
-    if (i == end_feat - 6 && i != beg_feat) {
+    if (rodd && i == end_feat - 7 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[0],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2);
       if (reduce_step[0]) break;
     }
-    /*
-    if (i == end_feat - 5 && i != beg_feat) {
+    if (!rodd && i == end_feat - 6 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[1],
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2); if (reduce_step[1])
-    break;
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2);
+      if (reduce_step[1]) break;
     }
-    */
-    if (i == end_feat - 4 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[2],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2);
       if (reduce_step[2]) break;
     }
-    /*
-    if (i == end_feat - 3 && i != beg_feat) {
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[3],
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2); if (reduce_step[3])
-    break;
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2);
+      if (reduce_step[3]) break;
     }
-    */
-    if (i == end_feat - 2 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[4],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2);
       if (reduce_step[4]) break;
     }
-    /*
-    if (i == end_feat - 1 && i != beg_feat) {
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[5],
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2); if (reduce_step[5])
-    break;
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2);
+      if (reduce_step[5]) break;
     }
-    */
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
+      aom_write_symbol(wb, reduce_step[6],
+                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][6], 2);
+      if (reduce_step[6]) break;
+    }
 #if CONFIG_LR_4PART_CODE
     aom_write_4part_wref(
         wb,
@@ -3227,7 +3241,7 @@ static AOM_INLINE void write_frame_interp_filter(
     aom_wb_write_literal(wb, filter, LOG_SWITCHABLE_FILTERS);
 }
 
-// Same function as write_uniform but writing to uncompresses header wb
+// Same function as write_uniform but writing to uncompressesed header wb
 static AOM_INLINE void wb_write_uniform(struct aom_write_bit_buffer *wb, int n,
                                         int v) {
   const int l = get_unsigned_bits(n);

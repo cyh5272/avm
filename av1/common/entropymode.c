@@ -1532,14 +1532,16 @@ static const aom_cdf_prob
                                         { AOM_CDF2(20000) },
                                         { AOM_CDF2(17500) },
                                         { AOM_CDF2(15000) },
-                                        { AOM_CDF2(12500) } },
+                                        { AOM_CDF2(13000) },
+                                        { AOM_CDF2(11000) } },
 #if CONFIG_MULTIQ_LR_SIGNALING
                                       { { AOM_CDF2(20000) },
                                         { AOM_CDF2(17500) },
                                         { AOM_CDF2(15000) },
                                         { AOM_CDF2(12500) },
                                         { AOM_CDF2(10000) },
-                                        { AOM_CDF2(7500) } },
+                                        { AOM_CDF2(8000) },
+                                        { AOM_CDF2(6000) } },
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
                                     };
 #if CONFIG_LR_4PART_CODE

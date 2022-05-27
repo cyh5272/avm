@@ -2318,43 +2318,51 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
   memset(wienerns_info->nsfilter + beg_feat, 0,
          (end_feat - beg_feat) * sizeof(wienerns_info->nsfilter[0]));
+  // Whether the number of taps is odd or even. For luma
+  // the #taps can be either odd or even. If odd, the last
+  // tap corresponds to dc offset. For chroma, the #taps is
+  // assumed to be always even.
+  // if #taps is odd, the exit points for signaling are:
+  // #total_taps - 1, #total_taps - 3, #total_taps - 5.
+  // If #taps is even, the exit points for signaling are:
+  // #total_taps - 2, #total_taps - 4, #total_taps - 6.
+  const int rodd = is_uv ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
-    if (i == end_feat - 6 && i != beg_feat) {
+    if (rodd && i == end_feat - 7 && i != beg_feat) {
       reduce_step[0] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2, ACCT_STR);
       if (reduce_step[0]) break;
     }
-    /*
-    if (i == end_feat - 5 && i != beg_feat) {
-      reduce_step[1] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR); if
-    (reduce_step[1]) break;
+    if (!rodd && i == end_feat - 6 && i != beg_feat) {
+      reduce_step[1] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR);
+      if (reduce_step[1]) break;
     }
-    */
-    if (i == end_feat - 4 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       reduce_step[2] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2, ACCT_STR);
       if (reduce_step[2]) break;
     }
-    /*
-    if (i == end_feat - 3 && i != beg_feat) {
-      reduce_step[3] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR); if
-    (reduce_step[3]) break;
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
+      reduce_step[3] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR);
+      if (reduce_step[3]) break;
     }
-    */
-    if (i == end_feat - 2 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       reduce_step[4] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2, ACCT_STR);
       if (reduce_step[4]) break;
     }
-    /*
-    if (i == end_feat - 1 && i != beg_feat) {
-      reduce_step[5] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2, ACCT_STR); if
-    (reduce_step[5]) break;
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
+      reduce_step[5] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2, ACCT_STR);
+      if (reduce_step[5]) break;
     }
-    */
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
+      reduce_step[6] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][6], 2, ACCT_STR);
+      if (reduce_step[6]) break;
+    }
 #if CONFIG_LR_4PART_CODE
     wienerns_info->nsfilter[i] =
         aom_read_4part_wref(
@@ -3095,7 +3103,7 @@ static AOM_INLINE void setup_frame_size_with_refs(
   setup_buffer_pool(cm);
 }
 
-// Same function as av1_read_uniform but reading from uncompresses header wb
+// Same function as av1_read_uniform but reading from uncompressesed header rb
 static int rb_read_uniform(struct aom_read_bit_buffer *const rb, int n) {
   const int l = get_unsigned_bits(n);
   const int m = (1 << l) - n;
