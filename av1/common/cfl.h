@@ -98,6 +98,8 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input,
                                          int width, int height);
 #endif
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
+                                   int row, int col, TX_SIZE tx_size);
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size);

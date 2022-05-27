@@ -26,16 +26,6 @@ void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params) {
 
   memset(&cfl->recon_buf_q3, 0, sizeof(cfl->recon_buf_q3));
   memset(&cfl->ac_buf_q3, 0, sizeof(cfl->ac_buf_q3));
-#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
-  memset(&cfl->recon_above_buf, 0, sizeof(cfl->recon_above_buf));
-  memset(&cfl->recon_left_buf, 0, sizeof(cfl->recon_left_buf));
-#endif
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-  memset(&cfl->recon_chroma_buf_above[0], 0, sizeof(cfl->recon_chroma_buf_above[0]));
-  memset(&cfl->recon_chroma_buf_above[1], 0, sizeof(cfl->recon_chroma_buf_above[1]));
-  memset(&cfl->recon_chroma_buf_left[0], 0, sizeof(cfl->recon_chroma_buf_left[0]));
-  memset(&cfl->recon_chroma_buf_left[1], 0, sizeof(cfl->recon_chroma_buf_left[1]));
-#endif  // CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 
   cfl->subsampling_x = seq_params->subsampling_x;
   cfl->subsampling_y = seq_params->subsampling_y;
@@ -233,6 +223,108 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 }
 
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm,
+                                     MACROBLOCKD *const xd, int row,
+                                     int col, TX_SIZE tx_size) {
+  CFL_CTX *const cfl = &xd->cfl;
+  struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
+  int input_stride = pd->dst.stride;
+  uint8_t *dst = &pd->dst.buf[(row * pd->dst.stride + col) << MI_SIZE_LOG2];
+
+  const int width = tx_size_wide[tx_size];
+  const int height = tx_size_high[tx_size];
+  const int sub_x = cfl->subsampling_x;
+  const int sub_y = cfl->subsampling_y;
+
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
+  memset(cfl->recon_yuv_buf_above[0], 0, sizeof(cfl->recon_yuv_buf_above[0]));
+  memset(cfl->recon_yuv_buf_left[0], 0, sizeof(cfl->recon_yuv_buf_left[0]));
+  // top boundary
+  uint16_t *output_q3 = cfl->recon_yuv_buf_above[0];
+  if (have_top) {
+    if (sub_x && sub_y) {
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2 * input_stride;
+      for (int i = 0; i < width; i += 2) {
+        const int bot = i + input_stride;
+#if CONFIG_CFL_DS_1_2_1
+        output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
+                             input[i + 1] + input[bot + AOMMAX(-1, -i)] +
+                             2 * input[bot] + input[bot + 1];
+#else
+        output_q3[i >> 1] =
+            (input[i] + input[i + 1] + input[bot] + input[bot + 1] + 2) << 1;
+#endif
+      }
+    }
+    else if (sub_y){
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2 * input_stride;
+      for (int i = 0; i < width; i++) {
+        const int bot = i + input_stride;
+        output_q3[i] = (input[i] + input[bot]) << 2;
+      }
+    }
+    else {
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - input_stride;
+      for (int i = 0; i < width; i++)
+        output_q3[i] = input[i] << 3;
+    }
+
+    if ((((xd->mi_col + col) << MI_SIZE_LOG2) + width) > cm->width) {
+      int temp =
+          width - ((((xd->mi_col + col) << MI_SIZE_LOG2) + width) - cm->width);
+      assert(temp > 0 && temp < width);
+      for (int i = temp >> sub_x; i < width >> sub_x; i++) {
+        output_q3[i] = output_q3[i - 1];
+      }
+    }
+  }
+
+  // left boundary
+  output_q3 = cfl->recon_yuv_buf_left[0];
+  if (have_left) {
+    if (sub_x && sub_y) {
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2;
+      for (int j = 0; j < height; j += 2) {
+        const int bot = input_stride;
+#if CONFIG_CFL_DS_1_2_1
+        output_q3[j >> 1] = input[-1] + 2 * input[0] + input[1] +
+                            input[bot - 1] + 2 * input[bot] + input[bot + 1];
+#else
+        output_q3[j >> 1] = (input[0] + input[1] + input[bot] + input[bot + 1])
+                            << 1;
+#endif
+        input += input_stride * 2;
+      }
+    }
+    else if (sub_y){
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
+      for (int j = 0; j < height; j ++) {
+        output_q3[j] = (input[0] + input[input_stride]) << 2;
+        input += input_stride*2;
+      }
+    }
+    else
+    {
+      uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
+      for (int j = 0; j < height; j ++)
+        output_q3[j] = input[j*input_stride] << 3;
+    }
+
+    if ((((xd->mi_row + row) << MI_SIZE_LOG2) + height) > cm->height) {
+      int temp = height -
+                 ((((xd->mi_row + row) << MI_SIZE_LOG2) + height) - cm->height);
+      assert(temp > 0 && temp < height);
+      for (int j = temp >> sub_y; j < height >> sub_y; j++) {
+        output_q3[j] = output_q3[j - 1];
+      }
+    }
+  }
+}
+
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size) {
@@ -255,11 +347,11 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
   const int have_left =
       col || (sub_x ? xd->chroma_left_available : xd->left_available);
 
-  memset(cfl->recon_chroma_buf_above[plane - 1], 0, sizeof(cfl->recon_chroma_buf_above[plane - 1]));
-  memset(cfl->recon_chroma_buf_left[plane - 1], 0, sizeof(cfl->recon_chroma_buf_left[plane - 1]));
+  memset(cfl->recon_yuv_buf_above[plane], 0, sizeof(cfl->recon_yuv_buf_above[plane]));
+  memset(cfl->recon_yuv_buf_left[plane], 0, sizeof(cfl->recon_yuv_buf_left[plane]));
 
   // top boundary
-  uint16_t *output_q3 = cfl->recon_chroma_buf_above[plane - 1];
+  uint16_t *output_q3 = cfl->recon_yuv_buf_above[plane];
   if (have_top) {
     uint16_t *input = CONVERT_TO_SHORTPTR(dst) - input_stride;
     for (int i = 0; i < width; i++) {
@@ -271,16 +363,14 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           width - (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) -
                    pic_width_c);
       assert(temp > 0 && temp < width);
-      uint16_t *luma_q3 = cfl->recon_above_buf;
       for (int i = temp; i < width; i++) {
         output_q3[i] = output_q3[i - 1];
-        luma_q3[i] = luma_q3[i - 1];
       }
     }
   }
 
   // left boundary
-  output_q3 = cfl->recon_chroma_buf_left[plane - 1];
+  output_q3 = cfl->recon_yuv_buf_left[plane];
   if (have_left) {
     uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
     for (int j = 0; j < height; j++) {
@@ -294,10 +384,8 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           height - (((((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2) + height) -
                     pic_height_c);
       assert(temp > 0 && temp < height);
-      uint16_t *luma_q3 = cfl->recon_left_buf;
       for (int j = temp; j < height; j++) {
         output_q3[j] = output_q3[j - 1];
-        luma_q3[j] = luma_q3[j - 1];
       }
     }
   }
@@ -320,13 +408,13 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
   int count = 0;
   int sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
 
-  assert (have_top == cfl->has_top);
-  assert (have_left == cfl->has_left);
+//  assert (have_top == cfl->has_top);
+//  assert (have_left == cfl->has_left);
 
   uint16_t *l, *c;
   if (have_top) {
-    l = cfl->recon_above_buf;
-    c = cfl->recon_chroma_buf_above[plane - 1];
+    l = cfl->recon_yuv_buf_above[0];
+    c = cfl->recon_yuv_buf_above[plane];
 
     for (int i = 0; i < width; i++) {
       sum_x += l[i] >> 3;
@@ -338,8 +426,8 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
   }
 
   if (have_left) {
-    l = cfl->recon_left_buf;
-    c = cfl->recon_chroma_buf_left[plane - 1];
+    l = cfl->recon_yuv_buf_left[0];
+    c = cfl->recon_yuv_buf_left[plane];
 
     for (int i = 0; i < height; i++) {
       sum_x += l[i] >> 3;
