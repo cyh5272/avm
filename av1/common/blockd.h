@@ -776,6 +776,7 @@ typedef struct cfl_ctx {
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
   uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
+  uint16_t avg_l;
 #endif  // CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
   // for every scaling parameter
