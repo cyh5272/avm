@@ -223,7 +223,7 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 }
 
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-static void subtract_average_neighbor_c_temp(CFL_CTX *cfl, const uint16_t *src,
+static void subtract_average_neighbor_c_temp(const uint16_t *src,
                                         int16_t *dst, int width, int height,
                                         int avg) {
   for (int j = 0; j < height; j++) {
@@ -238,7 +238,7 @@ static void cfl_compute_parameters_temp(MACROBLOCKD *const xd, TX_SIZE tx_size) 
   CFL_CTX *const cfl = &xd->cfl;
   cfl_pad(cfl, tx_size_wide[tx_size], tx_size_high[tx_size]);
 
-  subtract_average_neighbor_c_temp(cfl, cfl->recon_buf_q3, cfl->ac_buf_q3,
+  subtract_average_neighbor_c_temp(cfl->recon_buf_q3, cfl->ac_buf_q3,
                               tx_size_wide[tx_size], tx_size_high[tx_size],
                               cfl->avg_l);
   cfl->are_parameters_computed = 0;
@@ -467,7 +467,7 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
       mbmi->cfl_implicit_alpha[plane - 1] =
           resolve_divisor_32_CfL(nor, der, shift);
 
-      cfl->avg_l = (sum_y + count/2) / count;
+      cfl->avg_l = (sum_x + count/2) / count;
   } else {
     mbmi->cfl_implicit_alpha[plane - 1] = 0;
       cfl->avg_l = 1 << (xd->bd - 1);
