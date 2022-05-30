@@ -2354,7 +2354,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
         // printf("cnn_index:%d\n", cnn_indices[0]);
         aom_yv12_copy_y(&cpi->postcnn_buffer, &cm->cur_frame->buf);
       } else {
-        printf("drop quadtree!!!!!!!!!\n");
+        // printf("drop quadtree!!!!!!!!!\n");
         cm->use_quadtree = 0;
         aom_yv12_copy_y(&cpi->precnn_buffer, &cm->cur_frame->buf);
       }

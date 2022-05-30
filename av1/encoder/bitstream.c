@@ -3019,7 +3019,7 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
 
   //��splitҲ������д��ȥ
   if (cm->use_quadtree) {
-    printf("writing pamrater\n");
+    // printf("writing pamrater\n");
     aom_wb_write_bit(wb, cm->use_quad_level);
     /*
     ������lengthת��&λ���ȵĶ����� ����
