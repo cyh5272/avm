@@ -72,12 +72,27 @@ static uint8_t calculate_next_resize_scale(const AV1_COMP *cpi) {
   return new_denom;
 }
 
+#if CONFIG_EXT_SUPERRES
+static bool superres_in_recode_allowed_qp(const AV1_COMP *const cpi) {
+  const int qp = cpi->oxcf.rc_cfg.qp;
+  const int q_thresh_kf = 160;
+  const int q_thresh_non_kf = 185;
+
+  return (frame_is_intra_only(&cpi->common) && qp > q_thresh_kf) ||
+         qp > q_thresh_non_kf;
+}
+#endif  // CONFIG_EXT_SUPERRES
+
 int av1_superres_in_recode_allowed(const AV1_COMP *const cpi) {
   const AV1EncoderConfig *const oxcf = &cpi->oxcf;
   // Empirically found to not be beneficial for image coding.
   return oxcf->superres_cfg.superres_mode == AOM_SUPERRES_AUTO &&
-         cpi->sf.hl_sf.superres_auto_search_type != SUPERRES_AUTO_SOLO &&
-         cpi->rc.frames_to_key > 1;
+#if CONFIG_EXT_SUPERRES
+         superres_in_recode_allowed_qp(cpi) &&
+#else   // CONFIG_EXT_SUPERRES
+         cpi->rc.frames_to_key > 1 &&
+#endif  // CONFIG_EXT_SUPERRES
+         cpi->sf.hl_sf.superres_auto_search_type != SUPERRES_AUTO_SOLO;
 }
 
 #define SUPERRES_ENERGY_BY_Q2_THRESH_KEYFRAME_SOLO 0.012
