@@ -3394,11 +3394,16 @@ static int encode_with_and_without_superres(AV1_COMP *cpi, size_t *size,
     const GF_GROUP *const gf_group = &cpi->gf_group;
     if (gf_group->update_type[gf_group->index] != OVERLAY_UPDATE &&
         gf_group->update_type[gf_group->index] != INTNL_OVERLAY_UPDATE) {
+#if CONFIG_EXT_SUPERRES
+      for (int this_index = 0; this_index < SUPERRES_SCALES; ++this_index) {
+        const int denom = superres_scales[this_index].scale_denom;
+#else   // CONFIG_EXT_SUPERRES
       for (int denom = SCALE_NUMERATOR + 1; denom <= 2 * SCALE_NUMERATOR;
            ++denom) {
+        const int this_index = denom - (SCALE_NUMERATOR + 1);
+#endif  // CONFIG_EXT_SUPERRES
         superres_cfg->superres_scale_denominator = denom;
         superres_cfg->superres_kf_scale_denominator = denom;
-        const int this_index = denom - (SCALE_NUMERATOR + 1);
 
         cpi->superres_mode = AOM_SUPERRES_AUTO;  // Super-res on for this loop.
         err = encode_with_recode_loop_and_filter(
@@ -3413,9 +3418,13 @@ static int encode_with_and_without_superres(AV1_COMP *cpi, size_t *size,
       superres_cfg->superres_scale_denominator = SCALE_NUMERATOR;
       superres_cfg->superres_kf_scale_denominator = SCALE_NUMERATOR;
     } else {
+#if CONFIG_EXT_SUPERRES
+      for (int this_index = 0; this_index < SUPERRES_SCALES; ++this_index) {
+#else   // CONFIG_EXT_SUPERRES
       for (int denom = SCALE_NUMERATOR + 1; denom <= 2 * SCALE_NUMERATOR;
            ++denom) {
         const int this_index = denom - (SCALE_NUMERATOR + 1);
+#endif  // CONFIG_EXT_SUPERRES
         superres_sses[this_index] = INT64_MAX;
         superres_rates[this_index] = INT64_MAX;
       }
@@ -3432,9 +3441,14 @@ static int encode_with_and_without_superres(AV1_COMP *cpi, size_t *size,
 
     // Find the best rdcost among all superres denoms.
     int best_denom = -1;
+#if CONFIG_EXT_SUPERRES
+    for (int this_index = 0; this_index < SUPERRES_SCALES; ++this_index) {
+      const int denom = superres_scales[this_index].scale_denom;
+#else   // CONFIG_EXT_SUPERRES
     for (int denom = SCALE_NUMERATOR + 1; denom <= 2 * SCALE_NUMERATOR;
          ++denom) {
       const int this_index = denom - (SCALE_NUMERATOR + 1);
+#endif  // CONFIG_EXT_SUPERRES
       const int64_t this_sse = superres_sses[this_index];
       const int64_t this_rate = superres_rates[this_index];
       const int this_largest_tile_id = superres_largest_tile_ids[this_index];
