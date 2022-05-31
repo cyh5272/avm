@@ -467,10 +467,10 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
       mbmi->cfl_implicit_alpha[plane - 1] =
           resolve_divisor_32_CfL(nor, der, shift);
 
-      cfl->avg_l = (sum_x + count/2) / count;
+      cfl->avg_l = (sum_x * 8 + count/2) / count;
   } else {
     mbmi->cfl_implicit_alpha[plane - 1] = 0;
-      cfl->avg_l = 1 << (xd->bd - 1);
+      cfl->avg_l = 8 << (xd->bd - 1);
   }
 }
 #endif
