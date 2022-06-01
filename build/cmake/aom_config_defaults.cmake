@@ -217,7 +217,8 @@ set_aom_config_var(CONFIG_IMPLICIT_CFL 1
 set_aom_config_var(CONFIG_IMPLICIT_CFL_MAPPING 1
         "Enable implicit chroma-to-luma mapping CfL mode: method 3")
 set_aom_config_var(CONFIG_IMPLICIT_CFL_DERIVED_ALPHA 1
-        "Enable implicit CfL mode with derived scaling factor: method 4")
+        "Enable implicit CfL mode with derived scaling factor and luma DC from
+        neighboring samples: method 1 and 4")
 
 #
 # Variables in this section control optional features of the build system.

@@ -223,7 +223,7 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 }
 
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-static void subtract_average_neighbor_c_temp(const uint16_t *src,
+static void subtract_average_neighbor_c_backup(const uint16_t *src,
                                         int16_t *dst, int width, int height,
                                         int avg) {
   for (int j = 0; j < height; j++) {
@@ -234,14 +234,14 @@ static void subtract_average_neighbor_c_temp(const uint16_t *src,
     dst += CFL_BUF_LINE;
   }
 }
-static void cfl_compute_parameters_temp(MACROBLOCKD *const xd, TX_SIZE tx_size) {
+static void cfl_compute_parameters_backup(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   cfl_pad(cfl, tx_size_wide[tx_size], tx_size_high[tx_size]);
 
-  subtract_average_neighbor_c_temp(cfl->recon_buf_q3, cfl->ac_buf_q3,
+  subtract_average_neighbor_c_backup(cfl->recon_buf_q3, cfl->ac_buf_q3,
                               tx_size_wide[tx_size], tx_size_high[tx_size],
                               cfl->avg_l);
-  cfl->are_parameters_computed = 0;
+  cfl->are_parameters_computed = 1;
 }
 
 void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm,
@@ -411,6 +411,46 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
     }
   }
 }
+void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane,
+                            int row, int col, TX_SIZE tx_size){
+  CFL_CTX *const cfl = &xd->cfl;
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  const int width = tx_size_wide[tx_size];
+  const int height = tx_size_high[tx_size];
+  const int sub_x = cfl->subsampling_x;
+  const int sub_y = cfl->subsampling_y;
+
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
+  int count = 0;
+  int sum_x = 0;
+
+  uint16_t *l;
+  if (have_top) {
+    l = cfl->recon_yuv_buf_above[0];
+    for (int i = 0; i < width; i++) {
+      sum_x += l[i];
+    }
+    count += width;
+  }
+
+  if (have_left) {
+    l = cfl->recon_yuv_buf_left[0];
+    for (int i = 0; i < height; i++) {
+      sum_x += l[i];
+    }
+    count += height;
+  }
+
+  if (count > 0) {
+      cfl->avg_l = (sum_x + count/2) / count;
+  } else {
+      cfl->avg_l = 8 << (xd->bd - 1);
+  }
+}
 
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
                             int row, int col, TX_SIZE tx_size) {
@@ -428,9 +468,6 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
 
   int count = 0;
   int sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
-
-//  assert (have_top == cfl->has_top);
-//  assert (have_left == cfl->has_left);
 
   uint16_t *l, *c;
   if (have_top) {
@@ -470,7 +507,7 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
       cfl->avg_l = (sum_x * 8 + count/2) / count;
   } else {
     mbmi->cfl_implicit_alpha[plane - 1] = 0;
-      cfl->avg_l = 8 << (xd->bd - 1);
+    cfl->avg_l = 8 << (xd->bd - 1);
   }
 }
 #endif
@@ -482,15 +519,7 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   assert(is_cfl_allowed(xd));
 
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-  if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
-  {
-    cfl_compute_parameters_temp(xd, tx_size);
-  }
-  else
-#endif
-    if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
-
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  cfl_compute_parameters_backup(xd, tx_size);
   int alpha_q3;
   if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
     alpha_q3 = mbmi->cfl_implicit_alpha[plane - 1];
@@ -499,6 +528,7 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
         cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1)
         << CFL_ADD_BITS_ALPHA;
 #else
+  if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
   const int alpha_q3 =
       cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
 #endif
@@ -541,7 +571,7 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input,
 }
 #endif
 
-#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC
 static void cfl_luma_subsampling_420_neighbor_hbd_c(const uint16_t *input,
                                                     int input_stride,
                                                     uint16_t *output_q3,
@@ -658,7 +688,7 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
                                                input_stride, recon_buf_q3);
 }
 
-#if (CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC)
+#if (CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC)
 void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
                         const uint8_t *input, TX_SIZE tx_size, int use_hbd) {
   CFL_CTX *const cfl = &xd->cfl;

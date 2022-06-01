@@ -759,7 +759,7 @@ typedef struct cfl_ctx {
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
 
-#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC
   // improved dc prediction above related buffer
   uint16_t recon_above_buf[CFL_BUF_LINE * 2];
   // improved dc prediction left related buffer
