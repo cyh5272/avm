@@ -884,6 +884,9 @@ typedef enum {
 #else
 #define MULTIQ_LR_LEVELS 1
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
+#if CONFIG_LR_FLEX_SYNTAX
+#define MAX_LR_FLEX_SWITCHABLE_BITS 4
+#endif  // CONFIG_LR_FLEX_SYNTAX
 
 // Picture prediction structures (0-12 are predefined) in scalability metadata.
 enum {
