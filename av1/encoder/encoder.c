@@ -658,6 +658,19 @@ static void set_max_drl_bits(struct AV1_COMP *cpi) {
          cm->features.max_drl_bits <= MAX_MAX_DRL_BITS);
 }
 
+#if CONFIG_LR_FLEX_SYNTAX
+static void set_lr_tools_mask(SequenceHeader *const seq_params,
+                              const AV1EncoderConfig *oxcf) {
+  (void)oxcf;
+  seq_params->lr_tools_disable_mask = 0;  // default - no tools disabled
+
+  // Parse oxcf here to disable tools as requested through cmd lines
+  seq_params->lr_tools_disable_mask |= (1 << RESTORE_SGRPROJ);
+
+  av1_set_lr_tools(seq_params);
+}
+#endif  // CONFIG_LR_FLEX_SYNTAX
+
 void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   AV1_COMMON *const cm = &cpi->common;
   SequenceHeader *const seq_params = &cm->seq_params;
@@ -742,6 +755,9 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
     seq_params->enable_tip = 0;
   }
 #endif  // CONFIG_TIP
+#if CONFIG_LR_FLEX_SYNTAX
+  if (seq_params->enable_restoration) set_lr_tools_mask(seq_params, oxcf);
+#endif  // CONFIG_LR_FLEX_SYNTAX
   x->e_mbd.bd = (int)seq_params->bit_depth;
   x->e_mbd.global_motion = cm->global_motion;
 

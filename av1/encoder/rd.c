@@ -458,8 +458,14 @@ void av1_fill_lr_rates(ModeCosts *mode_costs, FRAME_CONTEXT *fc,
   (void)qindex;
   const int ql = 0;
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
+#if CONFIG_LR_FLEX_SYNTAX
+  for (int c = 0; c < MAX_LR_FLEX_SWITCHABLE_BITS; ++c)
+    av1_cost_tokens_from_cdf(mode_costs->switchable_flex_restore_cost[c],
+                             fc->switchable_flex_restore_cdf[ql][c], NULL);
+#else
   av1_cost_tokens_from_cdf(mode_costs->switchable_restore_cost,
                            fc->switchable_restore_cdf[ql], NULL);
+#endif  // CONFIG_LR_FLEX_SYNTAX
   av1_cost_tokens_from_cdf(mode_costs->wiener_restore_cost,
                            fc->wiener_restore_cdf[ql], NULL);
   av1_cost_tokens_from_cdf(mode_costs->sgrproj_restore_cost,

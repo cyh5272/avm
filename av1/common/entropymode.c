@@ -1466,6 +1466,21 @@ static const aom_cdf_prob default_filter_intra_cdfs[BLOCK_SIZES_ALL][CDF_SIZE(
             { AOM_CDF2(20229) }, { AOM_CDF2(18101) }, { AOM_CDF2(16384) },
             { AOM_CDF2(16384) } };
 
+#if CONFIG_LR_FLEX_SYNTAX
+static const aom_cdf_prob default_switchable_flex_restore_cdf
+    [MULTIQ_LR_LEVELS][MAX_LR_FLEX_SWITCHABLE_BITS][CDF_SIZE(2)] = {
+      { { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) } },
+#if CONFIG_MULTIQ_LR_SIGNALING
+      { { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) },
+        { AOM_CDF2(16384) } },
+#endif  // CONFIG_MULTIQ_LR_SIGNALING
+    };
+#else
 #if CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
 static const aom_cdf_prob
     default_switchable_restore_cdf[MULTIQ_LR_LEVELS]
@@ -1502,7 +1517,8 @@ static const aom_cdf_prob
                                     { AOM_CDF3(9413, 22581) },
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
                                   };
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_WIENER_NONSEP && CONFIG_PC_WIENER
+#endif  // CONFIG_LR_FLEX_SYNTAX
 
 static const aom_cdf_prob default_wiener_restore_cdf[MULTIQ_LR_LEVELS]
                                                     [CDF_SIZE(2)] = {
@@ -1949,7 +1965,12 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->seg.tree_cdf, default_seg_tree_cdf);
   av1_copy(fc->filter_intra_cdfs, default_filter_intra_cdfs);
   av1_copy(fc->filter_intra_mode_cdf, default_filter_intra_mode_cdf);
+#if CONFIG_LR_FLEX_SYNTAX
+  av1_copy(fc->switchable_flex_restore_cdf,
+           default_switchable_flex_restore_cdf);
+#else
   av1_copy(fc->switchable_restore_cdf, default_switchable_restore_cdf);
+#endif  // CONFIG_LR_FLEX_SYNTAX
   av1_copy(fc->wiener_restore_cdf, default_wiener_restore_cdf);
 #if CONFIG_CCSO_EXT
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {

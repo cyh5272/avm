@@ -2437,6 +2437,31 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
   }
 }
 
+// Same function as write_uniform but writing to uncompresses header wb
+static AOM_INLINE void wb_write_uniform(struct aom_write_bit_buffer *wb, int n,
+                                        int v) {
+  const int l = get_unsigned_bits(n);
+  const int m = (1 << l) - n;
+  if (l == 0) return;
+  if (v < m) {
+    aom_wb_write_literal(wb, v, l - 1);
+  } else {
+    aom_wb_write_literal(wb, m + ((v - m) >> 1), l - 1);
+    aom_wb_write_literal(wb, (v - m) & 1, 1);
+  }
+}
+
+#if CONFIG_LR_FLEX_SYNTAX
+static int frame_restoration_type_to_index(
+    const AV1_COMMON *const cm, RestorationType frame_restoration_type) {
+  int ndx = 0;
+  for (RestorationType r = RESTORE_NONE; r < frame_restoration_type; ++r) {
+    if (((cm->seq_params.lr_tools_disable_mask >> r) & 1) == 0) ndx++;
+  }
+  return ndx;
+}
+#endif  // CONFIG_LR_FLEX_SYNTAX
+
 static AOM_INLINE void encode_restoration_mode(
     AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   assert(!cm->features.all_lossless);
@@ -2456,6 +2481,13 @@ static AOM_INLINE void encode_restoration_mode(
       all_none = 0;
       chroma_none &= p == 0;
     }
+#if CONFIG_LR_FLEX_SYNTAX
+    assert(IMPLIES(cm->seq_params.lr_tools_count < 2,
+                   rsi->frame_restoration_type != RESTORE_SWITCHABLE));
+    const int ndx =
+        frame_restoration_type_to_index(cm, rsi->frame_restoration_type);
+    wb_write_uniform(wb, cm->seq_params.lr_frame_tools_count, ndx);
+#else
     switch (rsi->frame_restoration_type) {
       case RESTORE_NONE: aom_wb_write_bit(wb, 0); aom_wb_write_bit(wb, 0);
 #if CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
@@ -2496,6 +2528,7 @@ static AOM_INLINE void encode_restoration_mode(
         break;
       default: assert(0);
     }
+#endif  // CONFIG_LR_FLEX_SYNTAX
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
@@ -2768,6 +2801,10 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #endif  // CONFIG_WIENER_NONSEP
 
   RestorationType unit_rtype = rui->restoration_type;
+#if CONFIG_LR_FLEX_SYNTAX
+  assert(((cm->seq_params.lr_tools_disable_mask >> rui->restoration_type) &
+          1) == 0);
+#endif  // CONFIG_LR_FLEX_SYNTAX
 #if CONFIG_MULTIQ_LR_SIGNALING
   const int ql = get_multiq_lr_level(cm->quant_params.base_qindex);
 #else
@@ -2775,11 +2812,24 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
 
   if (frame_rtype == RESTORE_SWITCHABLE) {
+#if CONFIG_LR_FLEX_SYNTAX
+    int found = 0;
+    for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
+      if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+      found = (re == (int)unit_rtype);
+      aom_write_symbol(w, found,
+                       xd->tile_ctx->switchable_flex_restore_cdf[ql][re], 2);
+      if (found) break;
+    }
+    assert(IMPLIES(!found, (int)unit_rtype ==
+                               cm->seq_params.lr_last_switchable_ndx_0_type));
+#else
     aom_write_symbol(w, unit_rtype, xd->tile_ctx->switchable_restore_cdf[ql],
                      RESTORE_SWITCHABLE_TYPES);
 #if CONFIG_ENTROPY_STATS
     ++counts->switchable_restore[unit_rtype];
 #endif  // CONFIG_ENTROPY_STATS
+#endif  // CONFIG_LR_FLEX_SYNTAX
 
     switch (unit_rtype) {
       case RESTORE_WIENER:
@@ -3229,20 +3279,6 @@ static AOM_INLINE void write_frame_interp_filter(
   aom_wb_write_bit(wb, filter == SWITCHABLE);
   if (filter != SWITCHABLE)
     aom_wb_write_literal(wb, filter, LOG_SWITCHABLE_FILTERS);
-}
-
-// Same function as write_uniform but writing to uncompresses header wb
-static AOM_INLINE void wb_write_uniform(struct aom_write_bit_buffer *wb, int n,
-                                        int v) {
-  const int l = get_unsigned_bits(n);
-  const int m = (1 << l) - n;
-  if (l == 0) return;
-  if (v < m) {
-    aom_wb_write_literal(wb, v, l - 1);
-  } else {
-    aom_wb_write_literal(wb, m + ((v - m) >> 1), l - 1);
-    aom_wb_write_literal(wb, (v - m) & 1, 1);
-  }
 }
 
 static AOM_INLINE void write_tile_info_max_tile(
@@ -3806,6 +3842,13 @@ static AOM_INLINE void write_sequence_header(
   aom_wb_write_bit(wb, seq_params->enable_superres);
   aom_wb_write_bit(wb, seq_params->enable_cdef);
   aom_wb_write_bit(wb, seq_params->enable_restoration);
+#if CONFIG_LR_FLEX_SYNTAX
+  if (seq_params->enable_restoration) {
+    for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+      aom_wb_write_bit(wb, (seq_params->lr_tools_disable_mask >> i) & 1);
+    }
+  }
+#endif  // CONFIG_LR_FLEX_SYNTAX
 }
 
 static AOM_INLINE void write_sequence_header_beyond_av1(

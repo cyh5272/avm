@@ -3251,6 +3251,24 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 }
 #endif  // CONFIG_WIENER_NONSEP
 
+static int get_switchable_restore_cost(const AV1_COMMON *const cm,
+                                       const MACROBLOCK *const x,
+                                       int rest_type) {
+  (void)cm;
+#if CONFIG_LR_FLEX_SYNTAX
+  int cost = 0;
+  for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
+    if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+    const int found = (re == rest_type);
+    cost += x->mode_costs.switchable_flex_restore_cost[re][found];
+    if (found) break;
+  }
+  return cost;
+#else
+  return x->mode_costs.switchable_restore_cost[rest_type];
+#endif  // CONFIG_LR_FLEX_SYNTAX
+}
+
 static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
                                      RestUnitSearchInfo *rusi) {
   const MACROBLOCK *const x = rsc->x;
@@ -3292,7 +3310,7 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
     default: assert(0); break;
   }
   int64_t bits;
-  bits = x->mode_costs.switchable_restore_cost[rest_type] + coeff_bits;
+  bits = get_switchable_restore_cost(rsc->cm, x, rest_type) + coeff_bits;
 #if CONFIG_RST_MERGECOEFFS
   // RESTORE_NONE and RESTORE_CNN units don't have a merge parameter.
   int merged = 0;
@@ -3747,6 +3765,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
                        highbd);
 
       for (RestorationType r = 0; r < num_rtypes; ++r) {
+#if CONFIG_LR_FLEX_SYNTAX
+        if (cpi->common.seq_params.lr_tools_disable_mask & (1 << r)) continue;
+#endif  // CONFIG_LR_FLEX_SYNTAX
+
         if ((force_restore_type != RESTORE_TYPES) && (r != RESTORE_NONE) &&
             (r != force_restore_type))
           continue;
