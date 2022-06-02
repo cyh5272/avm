@@ -2138,6 +2138,33 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
 }
 #endif  // CONFIG_CNN_RESTORATION
 
+// Same function as av1_read_uniform but reading from uncompresses header wb
+static int rb_read_uniform(struct aom_read_bit_buffer *const rb, int n) {
+  const int l = get_unsigned_bits(n);
+  const int m = (1 << l) - n;
+  const int v = aom_rb_read_literal(rb, l - 1);
+  assert(l != 0);
+  if (v < m)
+    return v;
+  else
+    return (v << 1) - m + aom_rb_read_bit(rb);
+}
+
+#if CONFIG_LR_FLEX_SYNTAX
+static RestorationType index_to_frame_restoration_type(
+    const AV1_COMMON *const cm, int ndx) {
+  RestorationType r = RESTORE_NONE;
+  for (r = RESTORE_NONE; r < RESTORE_TYPES; ++r) {
+    if (((cm->seq_params.lr_tools_disable_mask >> r) & 1) == 0) {
+      ndx--;
+      if (ndx < 0) break;
+    }
+  }
+  assert(r < RESTORE_TYPES);
+  return r;
+}
+#endif  // CONFIG_LR_FLEX_SYNTAX
+
 static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
                                                struct aom_read_bit_buffer *rb) {
   assert(!cm->features.all_lossless);
@@ -2152,6 +2179,10 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       continue;
     }
 #endif  // CONFIG_CNN_RESTORATION
+#if CONFIG_LR_FLEX_SYNTAX
+    const int ndx = rb_read_uniform(rb, cm->seq_params.lr_frame_tools_count);
+    rsi->frame_restoration_type = index_to_frame_restoration_type(cm, ndx);
+#else
     if (aom_rb_read_bit(rb)) {
       if (aom_rb_read_bit(rb)) {
         rsi->frame_restoration_type = RESTORE_SGRPROJ;
@@ -2184,6 +2215,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
 #endif  // CONFIG_PC_WIENER
       }
     }
+#endif  // CONFIG_LR_FLEX_SYNTAX
     if (rsi->frame_restoration_type != RESTORE_NONE) {
       all_none = 0;
       chroma_none &= p == 0;
@@ -2372,43 +2404,43 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
   memset(wienerns_info->nsfilter + beg_feat, 0,
          (end_feat - beg_feat) * sizeof(wienerns_info->nsfilter[0]));
+  const int rodd = is_uv ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
-    if (i == end_feat - 6 && i != beg_feat) {
+    if (rodd && i == end_feat - 7 && i != beg_feat) {
       reduce_step[0] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2, ACCT_STR);
       if (reduce_step[0]) break;
     }
-    /*
-    if (i == end_feat - 5 && i != beg_feat) {
-      reduce_step[1] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR); if
-    (reduce_step[1]) break;
+    if (!rodd && i == end_feat - 6 && i != beg_feat) {
+      reduce_step[1] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR);
+      if (reduce_step[1]) break;
     }
-    */
-    if (i == end_feat - 4 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       reduce_step[2] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2, ACCT_STR);
       if (reduce_step[2]) break;
     }
-    /*
-    if (i == end_feat - 3 && i != beg_feat) {
-      reduce_step[3] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR); if
-    (reduce_step[3]) break;
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
+      reduce_step[3] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR);
+      if (reduce_step[3]) break;
     }
-    */
-    if (i == end_feat - 2 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       reduce_step[4] = aom_read_symbol(
           rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2, ACCT_STR);
       if (reduce_step[4]) break;
     }
-    /*
-    if (i == end_feat - 1 && i != beg_feat) {
-      reduce_step[5] = aom_read_symbol(rb,
-    xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2, ACCT_STR); if
-    (reduce_step[5]) break;
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
+      reduce_step[5] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2, ACCT_STR);
+      if (reduce_step[5]) break;
     }
-    */
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
+      reduce_step[6] = aom_read_symbol(
+          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][6], 2, ACCT_STR);
+      if (reduce_step[6]) break;
+    }
 #if CONFIG_LR_4PART_CODE
     wienerns_info->nsfilter[i] =
         aom_read_4part_wref(
@@ -2463,9 +2495,22 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
+#if CONFIG_LR_FLEX_SYNTAX
+    rui->restoration_type = cm->seq_params.lr_last_switchable_ndx_0_type;
+    for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
+      if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+      const int found = aom_read_symbol(
+          r, xd->tile_ctx->switchable_flex_restore_cdf[ql][re], 2, ACCT_STR);
+      if (found) {
+        rui->restoration_type = re;
+        break;
+      }
+    }
+#else
     rui->restoration_type =
         aom_read_symbol(r, xd->tile_ctx->switchable_restore_cdf[ql],
                         RESTORE_SWITCHABLE_TYPES, ACCT_STR);
+#endif  // CONFIG_LR_FLEX_SYNTAX
     switch (rui->restoration_type) {
       case RESTORE_WIENER:
         read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
@@ -2523,6 +2568,10 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     }
 #endif  // CONFIG_PC_WIENER
   }
+#if CONFIG_LR_FLEX_SYNTAX
+  assert(((cm->seq_params.lr_tools_disable_mask >> rui->restoration_type) &
+          1) == 0);
+#endif  // CONFIG_LR_FLEX_SYNTAX
 }
 #if CONFIG_NEW_DF
 static AOM_INLINE void setup_loopfilter(AV1_COMMON *cm,
@@ -3148,18 +3197,6 @@ static AOM_INLINE void setup_frame_size_with_refs(
                          "Referenced frame has incompatible color format");
   }
   setup_buffer_pool(cm);
-}
-
-// Same function as av1_read_uniform but reading from uncompresses header wb
-static int rb_read_uniform(struct aom_read_bit_buffer *const rb, int n) {
-  const int l = get_unsigned_bits(n);
-  const int m = (1 << l) - n;
-  const int v = aom_rb_read_literal(rb, l - 1);
-  assert(l != 0);
-  if (v < m)
-    return v;
-  else
-    return (v << 1) - m + aom_rb_read_bit(rb);
 }
 
 static AOM_INLINE void read_tile_info_max_tile(
@@ -5377,6 +5414,15 @@ void av1_read_sequence_header(AV1_COMMON *cm, struct aom_read_bit_buffer *rb,
   seq_params->enable_superres = aom_rb_read_bit(rb);
   seq_params->enable_cdef = aom_rb_read_bit(rb);
   seq_params->enable_restoration = aom_rb_read_bit(rb);
+#if CONFIG_LR_FLEX_SYNTAX
+  if (seq_params->enable_restoration) {
+    seq_params->lr_tools_disable_mask = 0;  // default - no tools disabled
+    for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+      seq_params->lr_tools_disable_mask |= (aom_rb_read_bit(rb) << i);
+    }
+    av1_set_lr_tools(seq_params);
+  }
+#endif  // CONFIG_LR_FLEX_SYNTAX
 }
 
 void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,

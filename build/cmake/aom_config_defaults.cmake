@@ -221,6 +221,7 @@ set_aom_config_var(CONFIG_NEW_DF 1
 set_aom_config_var(CONFIG_TIP 1 "Enable temporal interpolated prediction (TIP)")
 set_aom_config_var(CONFIG_MULTIQ_LR_SIGNALING 0 "Enable Multi-Q LR Signaling")
 set_aom_config_var(CONFIG_LR_4PART_CODE 0 "Enable 4-part code for LR Signaling")
+set_aom_config_var(CONFIG_LR_FLEX_SYNTAX 0 "Enable flexible syntax for LR")
 
 #
 # Variables in this section control optional features of the build system.

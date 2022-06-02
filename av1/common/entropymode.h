@@ -79,7 +79,7 @@ extern "C" {
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_WIENER_NONSEP
-#define WIENERNS_REDUCE_STEPS 6
+#define WIENERNS_REDUCE_STEPS 7
 #if CONFIG_LR_4PART_CODE
 #define WIENERNS_4PART_CTX_MAX 4
 #endif  // CONFIG_LR_4PART_CODE
@@ -209,8 +209,14 @@ typedef struct frame_contexts {
   struct segmentation_probs seg;
   aom_cdf_prob filter_intra_cdfs[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob filter_intra_mode_cdf[CDF_SIZE(FILTER_INTRA_MODES)];
+#if CONFIG_LR_FLEX_SYNTAX
+  aom_cdf_prob switchable_flex_restore_cdf[MULTIQ_LR_LEVELS]
+                                          [MAX_LR_FLEX_SWITCHABLE_BITS]
+                                          [CDF_SIZE(2)];
+#else
   aom_cdf_prob switchable_restore_cdf[MULTIQ_LR_LEVELS]
                                      [CDF_SIZE(RESTORE_SWITCHABLE_TYPES)];
+#endif  // CONFIG_LR_FLEX_SYNTAX
   aom_cdf_prob wiener_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)];
 #if CONFIG_CCSO_EXT
   aom_cdf_prob ccso_cdf[3][CDF_SIZE(2)];
