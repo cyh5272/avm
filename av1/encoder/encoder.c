@@ -1937,13 +1937,11 @@ static void yv12_copy_all_planes(const YV12_BUFFER_CONFIG *src,
 /*!\brief Returns SSE between 'a' and 'b' for each plane.
  */
 static void get_sse_planes(const YV12_BUFFER_CONFIG *a,
-                           const YV12_BUFFER_CONFIG *b, int highbd,
-                           int64_t *sse, int num_planes) {
-  sse[0] = aom_get_sse_plane(a, b, AOM_PLANE_Y, highbd);
-  sse[1] = (num_planes > 1) ? aom_get_sse_plane(a, b, AOM_PLANE_U, highbd)
-                            : INT64_MAX;
-  sse[2] = (num_planes > 2) ? aom_get_sse_plane(a, b, AOM_PLANE_V, highbd)
-                            : INT64_MAX;
+                           const YV12_BUFFER_CONFIG *b, int64_t *sse,
+                           int num_planes) {
+  sse[0] = aom_get_sse_plane(a, b, AOM_PLANE_Y);
+  sse[1] = (num_planes > 1) ? aom_get_sse_plane(a, b, AOM_PLANE_U) : INT64_MAX;
+  sse[2] = (num_planes > 2) ? aom_get_sse_plane(a, b, AOM_PLANE_V) : INT64_MAX;
 }
 #endif  // CONFIG_CNN_RESTORATION
 
@@ -2234,8 +2232,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 
       // Calculate errors for unrestored planes from source.
       int64_t dgd_errors[MAX_MB_PLANE];
-      get_sse_planes(cpi->source, &cm->cur_frame->buf,
-                     cm->seq_params.use_highbitdepth, dgd_errors, num_planes);
+      get_sse_planes(cpi->source, &cm->cur_frame->buf, dgd_errors, num_planes);
 
       // Try CNN restoration on all planes.
       int cnn_indices[MAX_MB_PLANE] = { 0, 0, 0 };
@@ -2253,8 +2250,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 
         // Calculate errors after applying cnn from source.
         int64_t curr_cnn_errors[MAX_MB_PLANE];
-        get_sse_planes(cpi->source, &cm->cur_frame->buf,
-                       cm->seq_params.use_highbitdepth, curr_cnn_errors,
+        get_sse_planes(cpi->source, &cm->cur_frame->buf, curr_cnn_errors,
                        num_planes);
 
         // Save CNN restored frame.
@@ -2285,8 +2281,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
 
       // Calculate errors after LR from source.
       int64_t res_errors[MAX_MB_PLANE];
-      get_sse_planes(cpi->source, &cm->cur_frame->buf,
-                     cm->seq_params.use_highbitdepth, res_errors, num_planes);
+      get_sse_planes(cpi->source, &cm->cur_frame->buf, res_errors, num_planes);
 
       // For each plane, pick either CNN or LR (mutually exclusive).
       if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
