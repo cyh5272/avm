@@ -381,15 +381,15 @@ static AOM_INLINE void alloc_util_frame_buffers(AV1_COMP *cpi) {
   if (aom_realloc_frame_buffer(
           &cpi->precnn_buffer, cm->superres_upscaled_width,
           cm->superres_upscaled_height, seq_params->subsampling_x,
-          seq_params->subsampling_y, seq_params->use_highbitdepth,
-          cpi->oxcf.border_in_pixels, byte_alignment, NULL, NULL, NULL))
+          seq_params->subsampling_y, cpi->oxcf.border_in_pixels, byte_alignment,
+          NULL, NULL, NULL))
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate CNN frame buffer");
   if (aom_realloc_frame_buffer(
           &cpi->postcnn_buffer, cm->superres_upscaled_width,
           cm->superres_upscaled_height, seq_params->subsampling_x,
-          seq_params->subsampling_y, seq_params->use_highbitdepth,
-          cpi->oxcf.border_in_pixels, byte_alignment, NULL, NULL, NULL))
+          seq_params->subsampling_y, cpi->oxcf.border_in_pixels, byte_alignment,
+          NULL, NULL, NULL))
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate CNN frame buffer");
 #endif  // CONFIG_CNN_RESTORATION
