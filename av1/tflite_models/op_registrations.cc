@@ -17,4 +17,6 @@ void RegisterSelectedOpsAllQps(::tflite::MutableOpResolver *resolver) {
                        ::tflite::ops::builtin::Register_PAD(), 1, 2);
   resolver->AddBuiltin(::tflite::BuiltinOperator_QUANTIZE,
                        ::tflite::ops::builtin::Register_QUANTIZE());
+  resolver->AddBuiltin(::tflite::BuiltinOperator_RESIZE_BILINEAR,
+                       ::tflite::ops::builtin::Register_RESIZE_BILINEAR(), 2);
 }
