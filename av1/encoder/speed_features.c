@@ -930,6 +930,37 @@ static void av1_disable_ml_based_partition_sf(
   }
 }
 
+#if CONFIG_EXT_RECUR_PARTITIONS
+static AOM_INLINE void set_erp_speed_features_framesize_dependent(
+    AV1_COMP *cpi) {
+  SPEED_FEATURES *const sf = &cpi->sf;
+  const AV1_COMMON *const cm = &cpi->common;
+  const int is_1080p_or_larger = AOMMIN(cm->width, cm->height) >= 1080;
+  const unsigned int erp_pruning_level = cpi->oxcf.part_cfg.erp_pruning_level;
+
+  switch (erp_pruning_level) {
+    case 4: AOM_FALLTHROUGH_INTENDED;
+    case 3: AOM_FALLTHROUGH_INTENDED;
+    case 2:
+      if (is_1080p_or_larger) {
+        sf->part_sf.partition_search_breakout_dist_thr = (1 << 23);
+        sf->part_sf.partition_search_breakout_rate_thr = 110;
+      } else {
+        sf->part_sf.partition_search_breakout_dist_thr = (1 << 22);
+        sf->part_sf.partition_search_breakout_rate_thr = 100;
+      }
+      AOM_FALLTHROUGH_INTENDED;
+    case 1: AOM_FALLTHROUGH_INTENDED;
+    case 0: break;
+    default: assert(0 && "Invalid ERP pruning level.");
+  }
+
+  if (cpi->oxcf.part_cfg.use_ml_erp_pruning) {
+    sf->part_sf.prune_rect_with_ml = 1;
+  }
+}
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+
 void av1_set_speed_features_framesize_dependent(AV1_COMP *cpi, int speed) {
   SPEED_FEATURES *const sf = &cpi->sf;
   const AV1EncoderConfig *const oxcf = &cpi->oxcf;
