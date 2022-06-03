@@ -3166,6 +3166,7 @@ static void rectangular_partition_search(
         continue;
       }
     }
+
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
     // Sub-partition idx.
@@ -3975,6 +3976,9 @@ static void none_partition_search(
   *pb_source_variance = x->source_variance;
   if (none_rd) *none_rd = this_rdc->rdcost;
   part_search_state->none_rd = this_rdc->rdcost;
+#if CONFIG_EXT_RECUR_PARTITIONS
+  pc_tree->none_rd = *this_rdc;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   if (this_rdc->rate != INT_MAX) {
     // Record picked ref frame to prune ref frames for other partition types.
     if (cpi->sf.inter_sf.prune_ref_frame_for_rect_partitions) {
@@ -4900,6 +4904,18 @@ BEGIN_PARTITION_SEARCH:
                           &part_search_state, &best_rdc, &pb_source_variance,
                           none_rd, &part_none_rd);
 #if CONFIG_EXT_RECUR_PARTITIONS
+  }
+
+  if (cpi->sf.part_sf.end_part_search_after_consec_failures && x->is_whole_sb &&
+      !frame_is_intra_only(cm) && forced_partition == PARTITION_INVALID &&
+      pc_tree->parent && pc_tree->parent->parent) {
+    if (pc_tree->none_rd.rate == INT_MAX &&
+        pc_tree->parent->none_rd.rate == INT_MAX &&
+        pc_tree->parent->parent->none_rd.rate == INT_MAX &&
+        part_search_state.partition_none_allowed &&
+        best_rdc.rdcost < INT64_MAX) {
+      part_search_state.terminate_partition_search = 1;
+    }
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
