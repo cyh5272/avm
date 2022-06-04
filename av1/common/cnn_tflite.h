@@ -58,7 +58,7 @@ static INLINE bool av1_allow_cnn_for_plane(const AV1_COMMON *cm, int plane) {
     return false;
 #endif  // CONFIG_EXT_SUPERRES
   } else {
-    return true;
+    return (plane == 0);
   }
 }
 
