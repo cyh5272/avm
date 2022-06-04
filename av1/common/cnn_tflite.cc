@@ -78,6 +78,9 @@
 #include "common/tf_lite_includes.h"
 
 #if CONFIG_CNN_RESTORATION
+
+#define USE_XNNPACK 0
+
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_intra_model_from_qindex(int qindex,
                                                         int superres_denom,
@@ -365,18 +368,24 @@ static const unsigned char *get_inter_model_from_qindex(int qindex,
   return nullptr;
 }
 
+#if USE_XNNPACK
 static TfLiteDelegate *get_tflite_xnnpack_delegate(int num_threads) {
   TfLiteXNNPackDelegateOptions xnnpack_options =
       TfLiteXNNPackDelegateOptionsDefault();
   xnnpack_options.num_threads = AOMMAX(num_threads, 1);
   return TfLiteXNNPackDelegateCreate(&xnnpack_options);
 }
+#endif  // USE_XNNPACK
 
 // Builds and returns the TFlite interpreter.
 static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
     int qindex, int superres_denom, int width, int height, int num_threads,
-    int is_intra_only, int is_luma, int cnn_index,
-    TfLiteDelegate *xnnpack_delegate) {
+    int is_intra_only, int is_luma, int cnn_index
+#if USE_XNNPACK
+    ,
+    TfLiteDelegate *xnnpack_delegate
+#endif  // USE_XNNPACK
+) {
   const unsigned char *const model_tflite_data =
       is_intra_only ? get_intra_model_from_qindex(qindex, superres_denom,
                                                   is_luma, cnn_index)
@@ -410,10 +419,12 @@ static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
     return nullptr;
   }
 
+#if USE_XNNPACK
   if (interpreter->ModifyGraphWithDelegate(xnnpack_delegate) != kTfLiteOk) {
     reporter->Report("Failed at modifying graph with XNNPack delegate");
     return nullptr;
   }
+#endif  // USE_XNNPACK
 
   return interpreter;
 }
@@ -422,10 +433,17 @@ extern "C" int av1_restore_cnn_img_tflite_highbd(
     int qindex, int superres_denom, const uint16_t *dgd, int width, int height,
     int dgd_stride, uint16_t *rst, int rst_stride, int num_threads,
     int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      qindex, superres_denom, width, height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(qindex, superres_denom, width, height, num_threads,
+                             is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -460,9 +478,12 @@ extern "C" int av1_restore_cnn_img_tflite_highbd(
     }
   }
 
-  // IMPORTANT: release the interpreter before destroying the delegate.
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -593,10 +614,17 @@ extern "C" int TFlite_Predict_quadtree_hbd(
     int dgd_stride, int src_stride, int QP, int unit_width, int unit_height,
     uint16_t *rePic, int rec_stride, int superres_denom, int num_threads,
     int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, width, height, num_threads, is_intra_only, is_luma,
-      cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, width, height, num_threads,
+                             is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -951,9 +979,12 @@ extern "C" int TFlite_Predict_quadtree_hbd(
   // cv::waitKey();
   // cv::imwrite("../../res/pre_Image.jpg", image);
 
-  // IMPORTANT: release the interpreter before destroying the delegate.
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -963,10 +994,17 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
     uint16_t *rePic, int rec_stride, int QP, int *A, int *Split, int block_size,
     int superres_denom, int num_threads, int bit_depth, int is_intra_only,
     int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, img_width, img_height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, img_width, img_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -1251,8 +1289,13 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
   }
   delete[] repic;
   repic = NULL;
+
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -1262,10 +1305,17 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
     uint16_t *rePic, int rec_stride, int QP, int *A, int *regular_A, int *Split,
     int block_size, int superres_denom, int num_threads, int bit_depth,
     int is_intra_only, int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, img_width, img_height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, img_width, img_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -1505,7 +1555,11 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
   }
 
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
