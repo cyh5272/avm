@@ -78,14 +78,6 @@ static INLINE void cfl_pad(CFL_CTX *cfl, int width, int height) {
   if (diff_width > 0) {
     const int min_height = height - diff_height;
     uint16_t *recon_buf_q3 = cfl->recon_buf_q3 + (width - diff_width);
-#if CONFIG_IMPROVED_CFL_DC
-    uint16_t *recon_above_neighbor =
-        cfl->recon_above_buf + (width - diff_width);
-    last_pixel = recon_above_neighbor[-1];
-    for (int i = 0; i < diff_width; i++) {
-      recon_above_neighbor[i] = last_pixel;
-    }
-#endif
     for (int j = 0; j < min_height; j++) {
       last_pixel = recon_buf_q3[-1];
       assert(recon_buf_q3 + diff_width <= cfl->recon_buf_q3 + CFL_BUF_SQUARE);
@@ -99,14 +91,6 @@ static INLINE void cfl_pad(CFL_CTX *cfl, int width, int height) {
   if (diff_height > 0) {
     uint16_t *recon_buf_q3 =
         cfl->recon_buf_q3 + ((height - diff_height) * CFL_BUF_LINE);
-#if CONFIG_IMPROVED_CFL_DC
-    uint16_t *recon_left_neighbor =
-        cfl->recon_left_buf + (height - diff_height);
-    const uint16_t last_left_pixel = recon_left_neighbor[-1];
-    for (int i = 0; i < diff_height; i++) {
-      recon_left_neighbor[i] = last_left_pixel;
-    }
-#endif
     for (int j = 0; j < diff_height; j++) {
       const uint16_t *last_row_q3 = recon_buf_q3 - CFL_BUF_LINE;
       assert(recon_buf_q3 + width <= cfl->recon_buf_q3 + CFL_BUF_SQUARE);
@@ -138,46 +122,6 @@ static void subtract_average_c(const uint16_t *src, int16_t *dst, int width,
     dst += CFL_BUF_LINE;
   }
 }
-
-#if CONFIG_IMPROVED_CFL_DC
-static void subtract_average_neighbor_c(CFL_CTX *cfl, const uint16_t *src,
-                                        int16_t *dst, int width, int height,
-                                        int bitdepth) {
-  int sum = 1;
-  int avg = 0;
-  const uint16_t *recon_above = cfl->recon_above_buf;
-  const uint16_t *recon_left = cfl->recon_left_buf;
-  if (cfl->has_left && cfl->has_top) {
-    for (int j = 0; j < height; j++) {
-      sum += recon_left[j];
-    }
-    for (int j = 0; j < width; j++) {
-      sum += recon_above[j];
-    }
-    avg = (sum + ((height + width) >> 1)) / (height + width);
-  } else if (cfl->has_left) {
-    for (int j = 0; j < height; j++) {
-      sum += recon_left[j];
-    }
-    avg = (sum + (height >> 1)) / (height);
-  } else if (cfl->has_top) {
-    for (int j = 0; j < width; j++) {
-      sum += recon_above[j];
-    }
-    avg = (sum + (width >> 1)) / (width);
-  } else {
-    int base = (128 << (bitdepth - 8)) << 3;
-    avg = base;
-  }
-  for (int j = 0; j < height; j++) {
-    for (int i = 0; i < width; i++) {
-      dst[i] = src[i] - avg;
-    }
-    src += CFL_BUF_LINE;
-    dst += CFL_BUF_LINE;
-  }
-}
-#endif
 
 CFL_SUB_AVG_FN(c)
 
@@ -212,17 +156,11 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 
   cfl_pad(cfl, tx_size_wide[tx_size], tx_size_high[tx_size]);
 
-#if CONFIG_IMPROVED_CFL_DC
-  subtract_average_neighbor_c(cfl, cfl->recon_buf_q3, cfl->ac_buf_q3,
-                              tx_size_wide[tx_size], tx_size_high[tx_size],
-                              xd->bd);
-#else
   cfl_get_subtract_average_fn(tx_size)(cfl->recon_buf_q3, cfl->ac_buf_q3);
-#endif
   cfl->are_parameters_computed = 1;
 }
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPLICIT_CFL
 static void subtract_average_neighbor_c_backup(const uint16_t *src,
                                                int16_t *dst, int width,
                                                int height, int avg) {
@@ -338,34 +276,6 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       }
     }
   }
-#if DEBUG_CFL
-  if (is_final_encode)
-    fprintf(enc_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  if (is_final_decode)
-    fprintf(dec_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  for (int k = 0; k < width; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", cfl->recon_yuv_buf_above[0][k]);
-      if (k > 0 && k == width - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", cfl->recon_yuv_buf_above[0][k]);
-      if (k > 0 && k == width - 1) fprintf(dec_log, "\n");
-    }
-  }
-  for (int k = 0; k < height; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", cfl->recon_yuv_buf_left[0][k]);
-      if (k > 0 && k == height - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", cfl->recon_yuv_buf_left[0][k]);
-      if (k > 0 && k == height - 1) fprintf(dec_log, "\n");
-    }
-  }
-#endif
 }
 
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
@@ -434,35 +344,6 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
       }
     }
   }
-
-#if DEBUG_CFL
-  if (is_final_encode)
-    fprintf(enc_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  if (is_final_decode)
-    fprintf(dec_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  for (int k = 0; k < width; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", cfl->recon_yuv_buf_above[plane][k]);
-      if (k > 0 && k == width - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", cfl->recon_yuv_buf_above[plane][k]);
-      if (k > 0 && k == width - 1) fprintf(dec_log, "\n");
-    }
-  }
-  for (int k = 0; k < height; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", cfl->recon_yuv_buf_left[plane][k]);
-      if (k > 0 && k == height - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", cfl->recon_yuv_buf_left[plane][k]);
-      if (k > 0 && k == height - 1) fprintf(dec_log, "\n");
-    }
-  }
-#endif
 }
 void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane, int row, int col,
                       TX_SIZE tx_size) {
@@ -503,19 +384,8 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane, int row, int col,
   } else {
     cfl->avg_l = 8 << (xd->bd - 1);
   }
-
-#if DEBUG_CFL
-  const int txwpx = tx_size_wide[tx_size];
-  const int txhpx = tx_size_high[tx_size];
-  if (is_final_encode)
-    fprintf(enc_log, "luma neighbor (%d, %d) [%d, %d], avg = %d\n",
-            xd->mi_col * 4, xd->mi_row * 4, txwpx, txhpx, cfl->avg_l);
-  if (is_final_decode)
-    fprintf(dec_log, "luma neighbor (%d, %d) [%d, %d], avg = %d\n",
-            xd->mi_col * 4, xd->mi_row * 4, txwpx, txhpx, cfl->avg_l);
-#endif
 }
-
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
                                         int row, int col, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
@@ -573,24 +443,8 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     mbmi->cfl_implicit_alpha[plane - 1] = 0;
     cfl->avg_l = 8 << (xd->bd - 1);
   }
-
-#if DEBUG_CFL
-  const int txwpx = tx_size_wide[tx_size];
-  const int txhpx = tx_size_high[tx_size];
-  if (is_final_encode)
-    fprintf(
-        enc_log,
-        "luma neighbor (%d, %d) [%d, %d], plane = %d, avg = %d, alpha = %d\n",
-        xd->mi_col * 4, xd->mi_row * 4, txwpx, txhpx, plane, cfl->avg_l,
-        mbmi->cfl_implicit_alpha[plane - 1]);
-  if (is_final_decode)
-    fprintf(
-        dec_log,
-        "luma neighbor (%d, %d) [%d, %d], plane = %d, avg = %d, alpha = %d\n",
-        xd->mi_col * 4, xd->mi_row * 4, txwpx, txhpx, plane, cfl->avg_l,
-        mbmi->cfl_implicit_alpha[plane - 1]);
-#endif
 }
+#endif
 #endif
 
 void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
@@ -608,6 +462,11 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
     alpha_q3 =
         cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1)
         << CFL_ADD_BITS_ALPHA;
+
+#elif CONFIG_IMPROVED_CFL_DC
+  cfl_compute_parameters_backup(xd, tx_size);
+  const int alpha_q3 =
+      cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
 #else
   if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
   const int alpha_q3 =
@@ -615,11 +474,9 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
 #endif
   assert((tx_size_high[tx_size] - 1) * CFL_BUF_LINE + tx_size_wide[tx_size] <=
          CFL_BUF_SQUARE);
-<<<<<<< HEAD
   uint16_t *dst_16 = CONVERT_TO_SHORTPTR(dst);
   cfl_get_predict_hbd_fn(tx_size)(cfl->ac_buf_q3, dst_16, dst_stride, alpha_q3,
                                   xd->bd);
-=======
 #if DEBUG_CFL
   const int width = tx_size_wide[tx_size];
   const int height = tx_size_high[tx_size];
@@ -666,58 +523,6 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
     }
   }
 #endif
-
-  if (is_cur_buf_hbd(xd)) {
-    uint16_t *dst_16 = CONVERT_TO_SHORTPTR(dst);
-    cfl_get_predict_hbd_fn(tx_size)(cfl->ac_buf_q3, dst_16, dst_stride,
-                                    alpha_q3, xd->bd);
-    return;
-  }
-  cfl_get_predict_lbd_fn(tx_size)(cfl->ac_buf_q3, dst, dst_stride, alpha_q3);
-}
-
-static void cfl_luma_subsampling_420_lbd_c(const uint8_t *input,
-                                           int input_stride,
-                                           uint16_t *output_q3, int width,
-                                           int height) {
-  for (int j = 0; j < height; j += 2) {
-    for (int i = 0; i < width; i += 2) {
-      const int bot = i + input_stride;
-      output_q3[i >> 1] =
-          (input[i] + input[i + 1] + input[bot] + input[bot + 1]) << 1;
-    }
-    input += input_stride << 1;
-    output_q3 += CFL_BUF_LINE;
-  }
-}
-
-static void cfl_luma_subsampling_422_lbd_c(const uint8_t *input,
-                                           int input_stride,
-                                           uint16_t *output_q3, int width,
-                                           int height) {
-  assert((height - 1) * CFL_BUF_LINE + width <= CFL_BUF_SQUARE);
-  for (int j = 0; j < height; j++) {
-    for (int i = 0; i < width; i += 2) {
-      output_q3[i >> 1] = (input[i] + input[i + 1]) << 2;
-    }
-    input += input_stride;
-    output_q3 += CFL_BUF_LINE;
-  }
-}
-
-static void cfl_luma_subsampling_444_lbd_c(const uint8_t *input,
-                                           int input_stride,
-                                           uint16_t *output_q3, int width,
-                                           int height) {
-  assert((height - 1) * CFL_BUF_LINE + width <= CFL_BUF_SQUARE);
-  for (int j = 0; j < height; j++) {
-    for (int i = 0; i < width; i++) {
-      output_q3[i] = input[i] << 3;
-    }
-    input += input_stride;
-    output_q3 += CFL_BUF_LINE;
-  }
->>>>>>> Support test5
 }
 
 static void cfl_luma_subsampling_420_hbd_c(const uint16_t *input,
@@ -860,196 +665,15 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
 #if CONFIG_CFL_DS_1_2_1
-    if (sub_x && sub_y)
-      cfl_luma_subsampling_420_hbd_121_c(CONVERT_TO_SHORTPTR(input),
-                                         input_stride, recon_buf_q3, width,
-                                         height);
-    else
+  if (sub_x && sub_y)
+    cfl_luma_subsampling_420_hbd_121_c(CONVERT_TO_SHORTPTR(input), input_stride,
+                                       recon_buf_q3, width, height);
+  else
 #endif
-      cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
-<<<<<<< HEAD
+    cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
                                                input_stride, recon_buf_q3);
-=======
-                                                 input_stride, recon_buf_q3);
-  } else {
-    cfl_subsampling_lbd(tx_size, sub_x, sub_y)(input, input_stride,
-                                               recon_buf_q3);
-  }
->>>>>>> Support test5
 }
 
-#if (CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC) && !CFL_BUGFIX
-void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
-                        const uint8_t *input, TX_SIZE tx_size, int use_hbd) {
-  CFL_CTX *const cfl = &xd->cfl;
-  struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
-  // uint8_t *input = &pd->dst.buf[(row * pd->dst.stride + col) <<
-  // MI_SIZE_LOG2];
-  int input_stride = pd->dst.stride;
-  const int width = tx_size_wide[tx_size];
-  const int height = tx_size_high[tx_size];
-  const int tx_off_log2 = MI_SIZE_LOG2;
-  const int sub_x = cfl->subsampling_x;
-  const int sub_y = cfl->subsampling_y;
-  const int store_row = row << (tx_off_log2 - sub_y);
-  const int store_col = col << (tx_off_log2 - sub_x);
-  const int store_height = height >> sub_y;
-  const int store_width = width >> sub_x;
-  const int have_top =
-      row || (sub_y ? xd->chroma_up_available : xd->up_available);
-  cfl->has_top = have_top ? true : false;
-  const int have_left =
-      col || (sub_x ? xd->chroma_left_available : xd->left_available);
-  cfl->has_left = have_left ? true : false;
-  // Invalidate current parameters
-  cfl->are_parameters_computed = 0;
-
-#if CONFIG_IMPROVED_CFL_DC
-  bool copy_left = false;
-  bool copy_above = false;
-  if (row == 0 && col == 0) {
-    copy_left = true;
-    copy_above = true;
-  } else if (row == 0 && col != 0) {
-    copy_above = true;
-  } else if (row != 0 && col == 0) {
-    copy_left = true;
-  }
-#endif
-  // Store the surface of the pixel buffer that was written to, this way we
-  // can manage chroma overrun (e.g. when the chroma surfaces goes beyond the
-  // frame boundary)
-  if (col == 0 && row == 0) {
-    cfl->buf_width = store_width;
-    cfl->buf_height = store_height;
-  } else {
-    cfl->buf_width = OD_MAXI(store_col + store_width, cfl->buf_width);
-    cfl->buf_height = OD_MAXI(store_row + store_height, cfl->buf_height);
-  }
-
-  if (xd->tree_type == CHROMA_PART || xd->tree_type == SHARED_PART) {
-    const struct macroblockd_plane *const pd2 = &xd->plane[PLANE_TYPE_UV];
-    if (xd->mb_to_right_edge < 0)
-      cfl->buf_width += xd->mb_to_right_edge >> (3 + pd2->subsampling_x);
-    if (xd->mb_to_bottom_edge < 0)
-      cfl->buf_height += xd->mb_to_bottom_edge >> (3 + pd2->subsampling_y);
-  }
-
-  // Check that we will remain inside the pixel buffer.
-  assert(store_row + store_height <= CFL_BUF_LINE);
-  assert(store_col + store_width <= CFL_BUF_LINE);
-  int base = 128 << (xd->bd - 8);
-  // Store the left input into the CfL pixel buffer
-  uint16_t *recon_left_buf = cfl->recon_left_buf + (store_row);
-  if (copy_left) {
-    aom_memset16(recon_left_buf, (base + 1) << 3, store_height);
-  }
-  uint16_t *recon_buf_q3 = recon_left_buf;
-  const int left_width = 2;
-  if (have_left && copy_left) {
-    if (use_hbd) {
-      if (sub_x == 1) {
-        if (sub_y == 1) {
-          cfl_luma_subsampling_420_neighbor_hbd_c(
-              CONVERT_TO_SHORTPTR(input) - 2, input_stride, recon_buf_q3,
-              left_width, cfl->buf_height * 2);
-        } else {
-          cfl_luma_subsampling_422_hbd_c(
-              CONVERT_TO_SHORTPTR(input) - 2, input_stride, recon_buf_q3,
-              left_width,
-              cfl->buf_height * 2);  // @todo add dsmple for other format
-        }
-      } else {
-        cfl_luma_subsampling_444_hbd_c(
-            CONVERT_TO_SHORTPTR(input) - 2, input_stride, recon_buf_q3,
-            left_width,
-            height);  // @todo add dsmple for other format
-      }
-    } else {
-      assert(0);
-      if (sub_x == 1) {
-        if (sub_y == 1) {
-          cfl_luma_subsampling_420_lbd_c(input - 2, input_stride, recon_buf_q3,
-                                         left_width, height);
-        } else {
-          cfl_luma_subsampling_422_lbd_c(
-              input - 2, input_stride, recon_buf_q3, left_width,
-              height);  // @todo add dsmple for other format
-        }
-      } else {
-        cfl_luma_subsampling_444_lbd_c(
-            input - 2, input_stride, recon_buf_q3, left_width,
-            height);  // @todo add dsmple for other format
-      }
-    }
-    if (cfl->buf_height < store_height) {
-      for (int i = cfl->buf_height; i < store_height; i++) {
-        recon_left_buf[i] = recon_left_buf[i - 1];
-      }
-    }
-  }
-
-  uint16_t *recon_above_buf = cfl->recon_above_buf + (store_col);
-  if (copy_above) {
-    aom_memset16(recon_above_buf, (base - 1) << 3, store_width);
-  }
-  recon_buf_q3 = recon_above_buf;
-  const int above_height = 2;
-  if (have_top && copy_above) {
-    if (use_hbd) {
-      uint16_t *ref = CONVERT_TO_SHORTPTR(input);
-      if (sub_x == 1) {
-        if (sub_y == 1) {
-          cfl_luma_subsampling_420_neighbor_hbd_c(
-              ref - input_stride, input_stride, recon_buf_q3,
-              cfl->buf_width * 2, above_height);
-        } else {
-          cfl_luma_subsampling_422_hbd_c(
-              ref - (input_stride), input_stride, recon_buf_q3,
-              cfl->buf_width * 2,
-              above_height);  // @todo add dsmple for other format
-        }
-      } else {
-        cfl_luma_subsampling_444_hbd_c(
-            ref - (input_stride), input_stride, recon_buf_q3, width,
-            above_height);  // @todo add dsmple for other format
-      }
-    } else {
-      assert(0);
-      if (sub_x == 1) {
-        if (sub_y == 1) {
-          cfl_luma_subsampling_420_lbd_c(
-              input - (input_stride >> sub_x), input_stride, recon_buf_q3,
-              width,
-              store_height);  // @todo add dsmple for other format
-        } else {
-          cfl_luma_subsampling_422_lbd_c(
-              input - (input_stride >> sub_x), input_stride, recon_buf_q3,
-              width,
-              store_height);  // @todo add dsmple for other format
-        }
-      } else {
-        cfl_luma_subsampling_444_lbd_c(
-            input - (input_stride >> sub_x), input_stride, recon_buf_q3, width,
-            store_height);  // @todo add dsmple for other format
-      }
-    }
-    if (cfl->buf_width < store_width) {
-      for (int i = cfl->buf_width; i < store_width; i++) {
-        recon_above_buf[i] = recon_above_buf[i - 1];
-      }
-    }
-  }
-  if (have_top && !have_left) {
-    uint16_t val = recon_above_buf[0];
-    aom_memset16(&recon_left_buf[0], val, store_height);
-  }
-  if (!have_top && have_left) {
-    uint16_t val = recon_left_buf[0];
-    aom_memset16(&recon_above_buf[0], val, store_width);
-  }
-}
-#endif
 // Adjust the row and column of blocks smaller than 8X8, as chroma-referenced
 // and non-chroma-referenced blocks are stored together in the CfL buffer.
 static INLINE void sub8x8_adjust_offset(const CFL_CTX *cfl, int mi_row,
@@ -1080,15 +704,7 @@ void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
     assert(!((row & 1) && tx_size_high[tx_size] != 4));
     sub8x8_adjust_offset(cfl, xd->mi_row, xd->mi_col, &row, &col);
   }
-<<<<<<< HEAD
   cfl_store(xd, cfl, dst, pd->dst.stride, row, col, tx_size);
-=======
-  cfl_store(xd, cfl, dst, pd->dst.stride, row, col, tx_size,
-            is_cur_buf_hbd(xd));
-#if (CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC) && !CFL_BUGFIX
-  cfl_store_neighbor(xd, row, col, dst, tx_size, is_cur_buf_hbd(xd));
-#endif
->>>>>>> Support test5
 }
 
 static INLINE int max_intra_block_width(const MACROBLOCKD *xd,

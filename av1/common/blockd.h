@@ -42,12 +42,7 @@ extern "C" {
 
 #define INTERINTRA_WEDGE_SIGN 0
 /*!\cond */
-#if DEBUG_CFL
-extern bool is_final_decode;
-extern FILE *dec_log;
-extern bool is_final_encode;
-extern FILE *enc_log;
-#endif
+
 // DIFFWTD_MASK_TYPES should not surpass 1 << MAX_DIFFWTD_MASK_BITS
 enum {
   DIFFWTD_38 = 0,
@@ -764,21 +759,11 @@ typedef struct cfl_ctx {
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
 
-#if CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC
-  // improved dc prediction above related buffer
-  uint16_t recon_above_buf[CFL_BUF_LINE * 2];
-  // improved dc prediction left related buffer
-  uint16_t recon_left_buf[CFL_BUF_LINE * 2];
-  // flag to indicate if top available
-  bool has_top;
-  // flag to indicate if left available
-  bool has_left;
-#endif
 #if CONFIG_IMPLICIT_CFL_MAPPING
   // luma mapping table
   uint16_t luma_pos_idx[CFL_BUF_SQUARE];
 #endif
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA || CONFIG_IMPROVED_CFL_DC
   uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
   uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
   uint16_t avg_l;

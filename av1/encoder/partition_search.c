@@ -3552,20 +3552,11 @@ BEGIN_PARTITION_SEARCH:
       const int emit_output = multi_pass_mode != SB_DRY_PASS;
       const RUN_TYPE run_type = emit_output ? OUTPUT_ENABLED : DRY_RUN_NORMAL;
       x->cb_offset[xd->tree_type == CHROMA_PART] = 0;
-#if DEBUG_CFL
-      if (run_type ==
-          OUTPUT_ENABLED /*&& cm->current_frame.absolute_poc == 3*/) {
-        is_final_encode = true;
-      }
-#endif
       encode_sb(cpi, td, tile_data, tp, mi_row, mi_col, run_type, bsize,
                 pc_tree, NULL);
       // Dealloc the whole PC_TREE after a superblock is done.
       av1_free_pc_tree_recursive(pc_tree, num_planes, 0, 0);
       pc_tree_dealloc = 1;
-#if DEBUG_CFL
-      is_final_encode = false;
-#endif
     } else {
       // Encode the smaller blocks in DRY_RUN mode.
       encode_sb(cpi, td, tile_data, tp, mi_row, mi_col, DRY_RUN_NORMAL, bsize,

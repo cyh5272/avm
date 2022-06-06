@@ -614,9 +614,6 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
        ++mode_idx) {
     int real_mode_idx = mode_idx;
     mbmi->cfl_idx = 0;
-#if CFL_MODIFIED_ENCODER_DEBUG
-    if (is_cfl_allowed(xd) && mode_idx < UV_INTRA_MODES) continue;
-#endif
     if (mode_idx >= UV_INTRA_MODES) {
       real_mode_idx = UV_INTRA_MODES - 1;
       mbmi->cfl_idx = mode_idx - real_mode_idx;

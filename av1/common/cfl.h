@@ -87,17 +87,13 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size);
 
 void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
                   BLOCK_SIZE bsize);
-
-#if (CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC) && !CFL_BUGFIX
-void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
-                        const uint8_t *input, TX_SIZE tx_size, int use_hbd);
-#endif
 #if CONFIG_CFL_DS_1_2_1
 void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height);
 #endif
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA || CONFIG_IMPROVED_CFL_DC || \
+    CONFIG_IMPLICIT_CFL
 void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
                                    int row, int col, TX_SIZE tx_size);
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,

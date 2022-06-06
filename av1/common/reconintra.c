@@ -1775,64 +1775,14 @@ void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
   int n_left_px = have_left ? AOMMIN(txhpx, yd + txhpx) : 0;
   assert(n_top_px >= 0);
   assert(n_left_px >= 0);
-#if 0
-  // NEED_LEFT
-  if (need_left) {
-    const int num_left_pixels_needed = txhpx;
-    i = 0;
-    if (n_left_px > 0) {
-      for (; i < n_left_px; i++) left_col[i] = left_ref[i * ref_stride];
-      if (i < num_left_pixels_needed)
-        aom_memset16(&left_col[i], left_col[i - 1], num_left_pixels_needed - i);
-    } else if (n_top_px > 0) {
-      aom_memset16(left_col, above_ref[0], num_left_pixels_needed);
-    }
-  }
 
-  // NEED_ABOVE
-  if (need_above) {
-    const int num_top_pixels_needed = txwpx;
-    if (n_top_px > 0) {
-      memcpy(above_row, above_ref, n_top_px * sizeof(above_ref[0]));
-      i = n_top_px;
-      if (i < num_top_pixels_needed)
-        aom_memset16(&above_row[i], above_row[i - 1],
-                     num_top_pixels_needed - i);
-    } else if (n_left_px > 0) {
-      aom_memset16(above_row, left_ref[0], num_top_pixels_needed);
-    }
-  }
-
-  if (need_above_left) {
-    if (n_top_px > 0 && n_left_px > 0) {
-      above_row[-1] = above_ref[-1];
-    } else if (n_top_px > 0) {
-      above_row[-1] = above_ref[0];
-    } else if (n_left_px > 0) {
-      above_row[-1] = left_ref[0];
-    } else {
-      above_row[-1] = base;
-    }
-    left_col[-1] = above_row[-1];
-  }
-#endif
   uint16_t recon_neighbor_buf[CFL_BUF_LINE * 2] = { 0 };
-#if 0
-  if (have_left) {
-    for (int j = n_left_px - 1; j >= 0; --j)
-      recon_neighbor_buf[n_left_px - 1 - j] = left_col[j];
-  }
-  if (have_top) {
-    for (int j = n_left_px; j < n_left_px + n_top_px; ++j)
-      recon_neighbor_buf[j] = above_row[j - n_left_px];
-  }
-#endif
+
   uint16_t *neighbor_ref = recon_neighbor_buf + (row_off + col_off);
+  assert(row_off != 0 || col_off != 0);
   CFL_CTX *const cfl = &xd->cfl;
-  uint16_t *recon_above_buf =
-      cfl->recon_yuv_buf_above[plane];  // cfl->recon_above_buf + (store_col);
-  uint16_t *recon_left_buf =
-      cfl->recon_yuv_buf_left[plane];  // cfl->recon_left_buf + (store_row);
+  uint16_t *recon_above_buf = cfl->recon_yuv_buf_above[plane];
+  uint16_t *recon_left_buf = cfl->recon_yuv_buf_left[plane];
   int store_height = cfl->buf_height;
   int store_width = cfl->buf_width;
   int left_count = 0;
@@ -1849,24 +1799,6 @@ void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
       above_count++;
     }
   }
-#if DEBUG_CFL
-  if (is_final_encode)
-    fprintf(enc_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, txwpx, txhpx);
-  if (is_final_decode)
-    fprintf(dec_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, txwpx, txhpx);
-  for (int k = 0; k < n_left_px + n_top_px; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", neighbor_ref[k]);
-      if (k > 0 && k == n_left_px + n_top_px - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", neighbor_ref[k]);
-      if (k > 0 && k == n_left_px + n_top_px - 1) fprintf(dec_log, "\n");
-    }
-  }
-#endif
   uint16_t *idx_map = cfl->luma_pos_idx + (row_off * CFL_BUF_LINE + col_off);
   av1_virtual_dc_hb(neighbor_ref, dst, dst_stride, idx_map, txwpx, txhpx);
 }
@@ -1935,24 +1867,6 @@ void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
       above_count++;
     }
   }
-#if DEBUG_CFL
-  if (is_final_encode)
-    fprintf(enc_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  if (is_final_decode)
-    fprintf(dec_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
-            xd->mi_row * 4, width, height);
-  for (int k = 0; k < store_width + store_height; k++) {
-    if (is_final_encode) {
-      fprintf(enc_log, "%d ", neighbor_pix[k]);
-      if (k > 0 && k == store_width + store_height - 1) fprintf(enc_log, "\n");
-    }
-    if (is_final_decode) {
-      fprintf(dec_log, "%d ", neighbor_pix[k]);
-      if (k > 0 && k == store_width + store_height - 1) fprintf(dec_log, "\n");
-    }
-  }
-#endif
   for (int i = 0; i < cfl->buf_height; i++) {
     for (int j = 0; j < cfl->buf_width; j++) {
       int min_error = INT16_MAX;
@@ -2153,6 +2067,13 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
     } else {
       cfl_load_dc_pred(xd, dst, dst_stride, tx_size, pred_plane);
     }
+#if CONFIG_IMPROVED_CFL_DC
+    const int luma_tx_size =
+        av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
+    implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
+                                  blk_col << cfl->subsampling_x, luma_tx_size);
+    cfl_calc_luma_dc(xd, plane, blk_row, blk_col, tx_size);
+#endif
 #endif
     if (xd->tree_type == CHROMA_PART) {
       const int luma_tx_size =
@@ -2182,13 +2103,15 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
         cfl_load_dc_pred(xd, dst, dst_stride, tx_size, pred_plane);
       }
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL_DC
       const int luma_tx_size =
           av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
       implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
                                     blk_col << cfl->subsampling_x,
                                     luma_tx_size);
       cfl_calc_luma_dc(xd, plane, blk_row, blk_col, tx_size);
+#endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
       if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
         implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col,
                                         tx_size);
@@ -2216,56 +2139,6 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
 #else
     cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
 #endif  // CONFIG_IMPLICIT_CFL
-#if DEBUG_CFL
-    const int mi_col = xd->mi_col * 2;
-    const int mi_row = xd->mi_row * 2;
-    const int width = tx_size_wide[tx_size];
-    const int height = tx_size_high[tx_size];
-    int frame = is_final_decode ? cm->current_frame.frame_number
-                                : cm->current_frame.absolute_poc;
-
-    // if (mbmi->cfl_idx == CFL_DERIVED_ALPHA && plane != AOM_PLANE_Y) {
-    //  struct macroblockd_plane* const pd_luma = &xd->plane[0];
-    //  const int dst_luma_stride = pd_luma->dst.stride;
-    //  uint8_t* dst_luma = &pd_luma->dst.buf[(blk_row * dst_stride + blk_col)
-    //  << MI_SIZE_LOG2];
-
-    //}
-
-    if (is_final_encode && plane != AOM_PLANE_Y) {
-      const int width = tx_size_wide[tx_size];
-      const int height = tx_size_high[tx_size];
-      fprintf(enc_log,
-              "chroma poc %d cfl intra cu(%d, %d) [%d, %d] mbmi->cfl_idx %d "
-              "palette %d \n",
-              frame, xd->mi_col * 2, xd->mi_row * 2, width, height,
-              mbmi->cfl_idx, use_palette);
-      uint16_t *recon_buf_tmp = CONVERT_TO_SHORTPTR(dst);
-      for (int j = 0; j < height; j++) {
-        for (int i = 0; i < width; i++) {
-          fprintf(enc_log, "%d ", recon_buf_tmp[i + j * dst_stride]);
-        }
-        fprintf(enc_log, "\n");
-      }
-    }
-
-    if (is_final_decode && plane != AOM_PLANE_Y) {
-      const int width = tx_size_wide[tx_size];
-      const int height = tx_size_high[tx_size];
-      fprintf(dec_log,
-              "chroma poc %d cfl intra cu(%d, %d) [%d, %d] mbmi->cfl_idx %d "
-              "palette %d \n",
-              frame, xd->mi_col * 2, xd->mi_row * 2, width, height,
-              mbmi->cfl_idx, use_palette);
-      uint16_t *recon_buf_tmp = CONVERT_TO_SHORTPTR(dst);
-      for (int j = 0; j < height; j++) {
-        for (int i = 0; i < width; i++) {
-          fprintf(dec_log, "%d ", recon_buf_tmp[i + j * dst_stride]);
-        }
-        fprintf(dec_log, "\n");
-      }
-    }
-#endif
     return;
   }
 
