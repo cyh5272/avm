@@ -42,7 +42,12 @@ extern "C" {
 
 #define INTERINTRA_WEDGE_SIGN 0
 /*!\cond */
-
+#if DEBUG_CFL
+extern bool is_final_decode;
+extern FILE *dec_log;
+extern bool is_final_encode;
+extern FILE *enc_log;
+#endif
 // DIFFWTD_MASK_TYPES should not surpass 1 << MAX_DIFFWTD_MASK_BITS
 enum {
   DIFFWTD_38 = 0,

@@ -225,6 +225,10 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
     const AV1_COMMON *const cm, DecoderCodingBlock *dcb, aom_reader *const r,
     const int plane, const int row, const int col, const TX_SIZE tx_size) {
   (void)r;
+#if DEBUG_CFL
+  /*if(cm->current_frame.absolute_poc == 3)*/
+  is_final_decode = true;
+#endif
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   PLANE_TYPE plane_type = get_plane_type(plane);
@@ -247,6 +251,10 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
       xd->tree_type == SHARED_PART) {
     cfl_store_tx(xd, row, col, tx_size, mbmi->sb_type[AOM_PLANE_Y]);
   }
+#if DEBUG_CFL
+  /*if(cm->current_frame.absolute_poc == 3)*/
+  is_final_decode = false;
+#endif
 }
 
 static AOM_INLINE void inverse_transform_inter_block(
@@ -1080,9 +1088,18 @@ static AOM_INLINE void dec_build_obmc_inter_predictors_sb(
 static AOM_INLINE void cfl_store_inter_block(AV1_COMMON *const cm,
                                              MACROBLOCKD *const xd) {
   MB_MODE_INFO *mbmi = xd->mi[0];
+#if DEBUG_CFL
+  /*if(cm->current_frame.absolute_poc == 3)*/
+  is_final_decode = true;
+#endif
+
   if (store_cfl_required(cm, xd) && xd->tree_type == SHARED_PART) {
     cfl_store_block(xd, mbmi->sb_type[PLANE_TYPE_Y], mbmi->tx_size);
   }
+#if DEBUG_CFL
+  /*if(cm->current_frame.absolute_poc == 3)*/
+  is_final_decode = false;
+#endif
 }
 
 static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,

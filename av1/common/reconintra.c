@@ -1775,7 +1775,7 @@ void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
   int n_left_px = have_left ? AOMMIN(txhpx, yd + txhpx) : 0;
   assert(n_top_px >= 0);
   assert(n_left_px >= 0);
-
+#if 0
   // NEED_LEFT
   if (need_left) {
     const int num_left_pixels_needed = txhpx;
@@ -1815,14 +1815,58 @@ void pred_vitual_cb_hb(MACROBLOCKD *const xd, const uint8_t *ref8,
     }
     left_col[-1] = above_row[-1];
   }
-
-  uint16_t recon_neighbor_buf[CFL_BUF_LINE * 2];
-  for (int j = txhpx - 1; j >= 0; --j)
-    recon_neighbor_buf[txhpx - 1 - j] = left_col[j];
-  for (int j = txhpx; j < txhpx + txwpx; ++j)
-    recon_neighbor_buf[j] = above_row[j - txhpx];
+#endif
+  uint16_t recon_neighbor_buf[CFL_BUF_LINE * 2] = { 0 };
+#if 0
+  if (have_left) {
+    for (int j = n_left_px - 1; j >= 0; --j)
+      recon_neighbor_buf[n_left_px - 1 - j] = left_col[j];
+  }
+  if (have_top) {
+    for (int j = n_left_px; j < n_left_px + n_top_px; ++j)
+      recon_neighbor_buf[j] = above_row[j - n_left_px];
+  }
+#endif
   uint16_t *neighbor_ref = recon_neighbor_buf + (row_off + col_off);
   CFL_CTX *const cfl = &xd->cfl;
+  uint16_t *recon_above_buf =
+      cfl->recon_yuv_buf_above[plane];  // cfl->recon_above_buf + (store_col);
+  uint16_t *recon_left_buf =
+      cfl->recon_yuv_buf_left[plane];  // cfl->recon_left_buf + (store_row);
+  int store_height = cfl->buf_height;
+  int store_width = cfl->buf_width;
+  int left_count = 0;
+  int above_count = 0;
+  if (have_left) {
+    for (int j = store_height - 1; j >= 0; --j) {
+      neighbor_ref[store_height - 1 - j] = recon_left_buf[j];
+      left_count++;
+    }
+  }
+  if (have_top) {
+    for (int j = left_count; j < left_count + store_width; ++j) {
+      neighbor_ref[j] = recon_above_buf[j - left_count];
+      above_count++;
+    }
+  }
+#if DEBUG_CFL
+  if (is_final_encode)
+    fprintf(enc_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
+            xd->mi_row * 4, txwpx, txhpx);
+  if (is_final_decode)
+    fprintf(dec_log, "chroma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
+            xd->mi_row * 4, txwpx, txhpx);
+  for (int k = 0; k < n_left_px + n_top_px; k++) {
+    if (is_final_encode) {
+      fprintf(enc_log, "%d ", neighbor_ref[k]);
+      if (k > 0 && k == n_left_px + n_top_px - 1) fprintf(enc_log, "\n");
+    }
+    if (is_final_decode) {
+      fprintf(dec_log, "%d ", neighbor_ref[k]);
+      if (k > 0 && k == n_left_px + n_top_px - 1) fprintf(dec_log, "\n");
+    }
+  }
+#endif
   uint16_t *idx_map = cfl->luma_pos_idx + (row_off * CFL_BUF_LINE + col_off);
   av1_virtual_dc_hb(neighbor_ref, dst, dst_stride, idx_map, txwpx, txhpx);
 }
@@ -1857,6 +1901,11 @@ void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
   int store_height = height >> sub_y;
   int store_width = width >> sub_x;
 
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
   // Store the input into the CfL pixel buffer
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
@@ -1864,35 +1913,102 @@ void cfl_pred_y_neighbor(MACROBLOCKD *const xd, int row, int col,
       cfl->luma_pos_idx + (store_row * CFL_BUF_LINE + store_col);
   aom_memset16(cfl->luma_pos_idx, 0, CFL_BUF_SQUARE);
   // Store the input into the CfL pixel buffer
-  uint16_t recon_buf[CFL_BUF_LINE * 2];
+  uint16_t recon_buf[CFL_BUF_LINE * 2] = { 0 };
   uint16_t *neighbor_pix = recon_buf + (store_row + store_col);
-  uint16_t *recon_above_buf = cfl->recon_above_buf + (store_col);
-  uint16_t *recon_left_buf = cfl->recon_left_buf + (store_row);
+  uint16_t *recon_above_buf =
+      cfl->recon_yuv_buf_above[0];  // cfl->recon_above_buf + (store_col);
+  uint16_t *recon_left_buf =
+      cfl->recon_yuv_buf_left[0];  // cfl->recon_left_buf + (store_row);
   store_height = cfl->buf_height;
   store_width = cfl->buf_width;
-  for (int j = store_height - 1; j >= 0; --j)
-    neighbor_pix[store_height - 1 - j] = recon_left_buf[j];
-  for (int j = store_height; j < store_height + store_width; ++j)
-    neighbor_pix[j] = recon_above_buf[j - store_height];
-
+  int left_count = 0;
+  int above_count = 0;
+  if (have_left) {
+    for (int j = store_height - 1; j >= 0; --j) {
+      neighbor_pix[store_height - 1 - j] = recon_left_buf[j];
+      left_count++;
+    }
+  }
+  if (have_top) {
+    for (int j = left_count; j < left_count + store_width; ++j) {
+      neighbor_pix[j] = recon_above_buf[j - left_count];
+      above_count++;
+    }
+  }
+#if DEBUG_CFL
+  if (is_final_encode)
+    fprintf(enc_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
+            xd->mi_row * 4, width, height);
+  if (is_final_decode)
+    fprintf(dec_log, "luma intra neighbor(%d, %d) [%d, %d]\n", xd->mi_col * 4,
+            xd->mi_row * 4, width, height);
+  for (int k = 0; k < store_width + store_height; k++) {
+    if (is_final_encode) {
+      fprintf(enc_log, "%d ", neighbor_pix[k]);
+      if (k > 0 && k == store_width + store_height - 1) fprintf(enc_log, "\n");
+    }
+    if (is_final_decode) {
+      fprintf(dec_log, "%d ", neighbor_pix[k]);
+      if (k > 0 && k == store_width + store_height - 1) fprintf(dec_log, "\n");
+    }
+  }
+#endif
   for (int i = 0; i < cfl->buf_height; i++) {
     for (int j = 0; j < cfl->buf_width; j++) {
       int min_error = INT16_MAX;
       int min_dis = INT16_MAX;
-      for (int k = 0; k < store_width + store_height; k++) {
-        int j_temp = k < store_height ? 0 : k - store_height;
-        int i_temp = k >= store_height ? 0 : store_height - k;
-        int diff = abs(recon_buf_q3[i * CFL_BUF_LINE + j] - neighbor_pix[k]);
+      if (left_count && above_count) {
+        for (int k = 0; k < left_count + above_count; k++) {
+          int j_temp = k < left_count ? 0 : k - left_count;
+          int i_temp = k >= left_count ? 0 : left_count - k;
+          int diff = abs(recon_buf_q3[i * CFL_BUF_LINE + j] - neighbor_pix[k]);
 
-        if (diff < min_error) {
-          min_error = diff;
-          index_map[i * CFL_BUF_LINE + j] = k;
-          min_dis = get_distance(abs(i - i_temp), abs(j - j_temp));
-        } else if (diff == min_error) {
-          int temp = get_distance(abs(i - i_temp), abs(j - j_temp));
-          if (temp < min_dis) {
+          if (diff < min_error) {
+            min_error = diff;
             index_map[i * CFL_BUF_LINE + j] = k;
-            min_dis = temp;
+            min_dis = get_distance(abs(i - i_temp), abs(j - j_temp));
+          } else if (diff == min_error) {
+            int temp = get_distance(abs(i - i_temp), abs(j - j_temp));
+            if (temp < min_dis) {
+              index_map[i * CFL_BUF_LINE + j] = k;
+              min_dis = temp;
+            }
+          }
+        }
+      } else if (left_count) {
+        for (int k = 0; k < left_count; k++) {
+          int j_temp = j;
+          int i_temp = left_count - k;
+          int diff = abs(recon_buf_q3[i * CFL_BUF_LINE + j] - neighbor_pix[k]);
+
+          if (diff < min_error) {
+            min_error = diff;
+            index_map[i * CFL_BUF_LINE + j] = k;
+            min_dis = get_distance(abs(i - i_temp), abs(j - j_temp));
+          } else if (diff == min_error) {
+            int temp = get_distance(abs(i - i_temp), abs(j - j_temp));
+            if (temp < min_dis) {
+              index_map[i * CFL_BUF_LINE + j] = k;
+              min_dis = temp;
+            }
+          }
+        }
+      } else if (above_count) {
+        for (int k = 0; k < above_count; k++) {
+          int j_temp = k;
+          int i_temp = i;
+          int diff = abs(recon_buf_q3[i * CFL_BUF_LINE + j] - neighbor_pix[k]);
+
+          if (diff < min_error) {
+            min_error = diff;
+            index_map[i * CFL_BUF_LINE + j] = k;
+            min_dis = get_distance(abs(i - i_temp), abs(j - j_temp));
+          } else if (diff == min_error) {
+            int temp = get_distance(abs(i - i_temp), abs(j - j_temp));
+            if (temp < min_dis) {
+              index_map[i * CFL_BUF_LINE + j] = k;
+              min_dis = temp;
+            }
           }
         }
       }
@@ -2070,11 +2186,10 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       const int luma_tx_size =
           av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
       implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
-                                      blk_col << cfl->subsampling_x,
-                                      luma_tx_size);
+                                    blk_col << cfl->subsampling_x,
+                                    luma_tx_size);
       cfl_calc_luma_dc(xd, plane, blk_row, blk_col, tx_size);
-      if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
-      {
+      if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
         implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col,
                                         tx_size);
         cfl_derive_implicit_scaling_factor(xd, plane, blk_row, blk_col,
@@ -2086,18 +2201,71 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
     }
 #if CONFIG_IMPLICIT_CFL_MAPPING
     else if (mbmi->cfl_idx == CFL_MAPPING) {
+      CFL_CTX *const cfl = &xd->cfl;
       const int luma_tx_size =
           av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
-      // cfl_store_neighbor(xd, blk_row, blk_col, luma_tx_size,
-      //  is_cur_buf_hbd(xd));
+      implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
+                                    blk_col << cfl->subsampling_x,
+                                    luma_tx_size);
       cfl_pred_y_neighbor(xd, blk_row, blk_col, luma_tx_size);
+      implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col, tx_size);
       pred_vitual_cb_hb(xd, dst, dst_stride, dst, dst_stride, tx_size, blk_col,
                         blk_row, plane);
     }
 #endif
 #else
     cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
-#endif // CONFIG_IMPLICIT_CFL
+#endif  // CONFIG_IMPLICIT_CFL
+#if DEBUG_CFL
+    const int mi_col = xd->mi_col * 2;
+    const int mi_row = xd->mi_row * 2;
+    const int width = tx_size_wide[tx_size];
+    const int height = tx_size_high[tx_size];
+    int frame = is_final_decode ? cm->current_frame.frame_number
+                                : cm->current_frame.absolute_poc;
+
+    // if (mbmi->cfl_idx == CFL_DERIVED_ALPHA && plane != AOM_PLANE_Y) {
+    //  struct macroblockd_plane* const pd_luma = &xd->plane[0];
+    //  const int dst_luma_stride = pd_luma->dst.stride;
+    //  uint8_t* dst_luma = &pd_luma->dst.buf[(blk_row * dst_stride + blk_col)
+    //  << MI_SIZE_LOG2];
+
+    //}
+
+    if (is_final_encode && plane != AOM_PLANE_Y) {
+      const int width = tx_size_wide[tx_size];
+      const int height = tx_size_high[tx_size];
+      fprintf(enc_log,
+              "chroma poc %d cfl intra cu(%d, %d) [%d, %d] mbmi->cfl_idx %d "
+              "palette %d \n",
+              frame, xd->mi_col * 2, xd->mi_row * 2, width, height,
+              mbmi->cfl_idx, use_palette);
+      uint16_t *recon_buf_tmp = CONVERT_TO_SHORTPTR(dst);
+      for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+          fprintf(enc_log, "%d ", recon_buf_tmp[i + j * dst_stride]);
+        }
+        fprintf(enc_log, "\n");
+      }
+    }
+
+    if (is_final_decode && plane != AOM_PLANE_Y) {
+      const int width = tx_size_wide[tx_size];
+      const int height = tx_size_high[tx_size];
+      fprintf(dec_log,
+              "chroma poc %d cfl intra cu(%d, %d) [%d, %d] mbmi->cfl_idx %d "
+              "palette %d \n",
+              frame, xd->mi_col * 2, xd->mi_row * 2, width, height,
+              mbmi->cfl_idx, use_palette);
+      uint16_t *recon_buf_tmp = CONVERT_TO_SHORTPTR(dst);
+      for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+          fprintf(dec_log, "%d ", recon_buf_tmp[i + j * dst_stride]);
+        }
+        fprintf(dec_log, "\n");
+      }
+    }
+#endif
     return;
   }
 

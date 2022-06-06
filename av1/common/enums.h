@@ -55,6 +55,13 @@ extern "C" {
 #endif  // CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
 
 #define CFL_IDX_NUMBER 2
+#define DEBUG_CFL 0
+
+#if CONFIG_IMPLICIT_CFL
+// for debug purpose
+#define CFL_MODIFIED_ENCODER_DEBUG 0
+#define CFL_BUGFIX 1
+#endif
 
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
@@ -612,15 +619,15 @@ enum {
 
 #if CONFIG_IMPLICIT_CFL
 enum {
-  CFL_EXPLICIT,      // av1 cfl
+  CFL_EXPLICIT,  // av1 cfl
 #if CONFIG_IMPLICIT_CFL_MAPPING
-  CFL_MAPPING,       // implicit chroma-to-luma mapping CfL mode
+  CFL_MAPPING,  // implicit chroma-to-luma mapping CfL mode
 #endif
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-  CFL_DERIVED_ALPHA,       //implicit CfL mode with derived scaling factor
+  CFL_DERIVED_ALPHA,  // implicit CfL mode with derived scaling factor
 #endif
 } UENUM1BYTE(CFL_TYPE);
-#endif //CONFIG_IMPLICIT_CFL
+#endif  // CONFIG_IMPLICIT_CFL
 
 // Number of top model rd to store for pruning y modes in intra mode decision
 #define TOP_INTRA_MODEL_COUNT 4

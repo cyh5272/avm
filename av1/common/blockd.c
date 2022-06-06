@@ -39,7 +39,12 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
   return above_mi->mode;
 }
 #endif  // CONFIG_AIMC
-
+#if DEBUG_CFL
+bool is_final_decode = false;
+FILE *dec_log;
+bool is_final_encode = false;
+FILE *enc_log;
+#endif
 #if CONFIG_IBC_SR_EXT
 void av1_reset_is_mi_coded_map(MACROBLOCKD *xd, int stride) {
   av1_zero(xd->is_mi_coded);

@@ -88,14 +88,14 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size);
 void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
                   BLOCK_SIZE bsize);
 
-#if CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC
+#if (CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC) && !CFL_BUGFIX
 void cfl_store_neighbor(MACROBLOCKD *const xd, int row, int col,
                         const uint8_t *input, TX_SIZE tx_size, int use_hbd);
 #endif
 #if CONFIG_CFL_DS_1_2_1
-void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input,
-                                         int input_stride, uint16_t *output_q3,
-                                         int width, int height);
+void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
+                                        uint16_t *output_q3, int width,
+                                        int height);
 #endif
 #if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
@@ -104,9 +104,9 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size);
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
-                            int row, int col, TX_SIZE tx_size);
-void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane,
-                            int row, int col, TX_SIZE tx_size);
+                                        int row, int col, TX_SIZE tx_size);
+void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane, int row, int col,
+                      TX_SIZE tx_size);
 #endif
 void cfl_store_dc_pred(MACROBLOCKD *const xd, const uint8_t *input,
                        CFL_PRED_TYPE pred_plane, int width);
