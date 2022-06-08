@@ -224,6 +224,7 @@ set_aom_config_var(CONFIG_MV_SEARCH_RANGE 0
                    "Enable a sufficient MV search range.")
 set_aom_config_var(CONFIG_MULTIQ_LR_SIGNALING 0 "Enable Multi-Q LR Signaling")
 set_aom_config_var(CONFIG_LR_4PART_CODE 0 "Enable 4-part code for LR Signaling")
+set_aom_config_var(CONFIG_LR_FLEX_SYNTAX 0 "Enable flexible syntax for LR")
 
 #
 # Variables in this section control optional features of the build system.
