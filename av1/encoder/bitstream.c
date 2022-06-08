@@ -3052,7 +3052,7 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
 
   // ��splitҲ������д��ȥ
   if (cm->use_quadtree) {
-    // printf("writing pamrater\n");
+    printf("writing pamrater\n");
     aom_wb_write_bit(wb, cm->use_quad_level);
     /*
     ������lengthת��&λ���ȵĶ����� ����
@@ -3083,21 +3083,20 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
     for (int i = 0; i < cm->postcnn_quad_info.split_info_length; i++) {
       aom_wb_write_bit(wb, cm->postcnn_quad_info.split_info[i].split);
       // printf("flag:%d\n", cm->quad_info->split_info[i].split);
-      /*if (i % 2 == 0) {
+      if (i % 2 == 0) {
         if (cm->postcnn_quad_info.split_info[i].split == 0 &&
             cm->postcnn_quad_info.split_info[i + 1].split == 1)
-            printf("writing split\n");
+          printf("writing split\n");
         else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
                  cm->postcnn_quad_info.split_info[i + 1].split == 1)
-           printf("writing horz\n");
+          printf("writing horz\n");
         else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
                  cm->postcnn_quad_info.split_info[i + 1].split == 0)
           printf("writing vert\n");
         else if (cm->postcnn_quad_info.split_info[i].split == 0 &&
                  cm->postcnn_quad_info.split_info[i + 1].split == 0)
           printf("writing all\n");
-
-      }*/
+      }
     }
   }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE

@@ -28,30 +28,6 @@
 
 // utils
 
-int computeSSE_buf_tflite(uint8_t *buf_all, uint8_t *src, int startx,
-                          int starty, int buf_width, int buf_height, int height,
-                          int width, int buf_stride, int src_stride) {
-  int uiSSDtemp = 0;
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      if (y >= starty && y < starty + buf_height && x >= startx &&
-          x < startx + buf_width) {
-        int iDiff =
-            (int)(buf_all[y * buf_stride + x] - src[y * src_stride + x]);
-        // c[y][x] = (buf_all[y][x]);
-        // c[y][x]=0;
-        uiSSDtemp += iDiff * iDiff;
-      } else {
-        // int iDiff = (int)(dgd[y * dgd_stride + x] -
-        //                  src[y * src_stride + x]);  //遍历获取diff
-        //// c[y][x] = (int)(dgd[y * dgd_stride + x]);
-        // uiSSDtemp += iDiff * iDiff;  // diff的平方
-      }
-    }
-  }
-  return uiSSDtemp;
-}
-
 int computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
                               int starty, int buf_width, int buf_height,
                               int height, int width, int buf_stride,
@@ -85,16 +61,6 @@ double min_tflite(double a, double b, double c, double d) {
   return res;
 }
 
-void replace_tflite(int startx, int starty, int width, int height, uint8_t *rec,
-                    uint8_t *buf, int stride) {
-  for (int i = starty; i < starty + height; i++) {
-    for (int j = startx; j < startx + width; j++) {
-      rec[i * stride + j] = buf[i * stride + j];
-    }
-  }
-  return;
-}
-
 void replace_tflite_hbd(int startx, int starty, int width, int height,
                         uint16_t *rec, uint16_t *buf, int stride) {
   for (int i = starty; i < starty + height; i++) {
@@ -103,47 +69,6 @@ void replace_tflite_hbd(int startx, int starty, int width, int height,
     }
   }
   return;
-}
-
-double computePSNR_buf_tflite(uint8_t *buf_all, uint8_t *dgd, uint8_t *src,
-                              int startx, int starty, int buf_width,
-                              int buf_height, int height, int width,
-                              int buf_stride, int dgd_stride, int src_stride) {
-  int iSize = height * width;  // m*nd
-  double uiSSDtemp = 0;
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      if (y >= starty && y < starty + buf_height && x >= startx &&
-          x < startx + buf_width) {
-        int iDiff =
-            (int)(buf_all[y * buf_stride + x] - src[y * src_stride + x]);
-        // c[y][x] = (buf_all[y][x]);
-        // c[y][x]=0;
-        uiSSDtemp += iDiff * iDiff;
-      } else {
-        int iDiff = (int)(dgd[y * dgd_stride + x] -
-                          src[y * src_stride + x]);  //遍历获取diff
-        // c[y][x] = (int)(dgd[y * dgd_stride + x]);
-        uiSSDtemp += iDiff * iDiff;  // diff的平方
-      }
-    }
-  }
-  // cv::Mat image;
-  // image = cv::Mat(480, 832, CV_8UC1, (void *)c);
-  // cv::imshow("psnr", image);
-  // cv::waitKey();
-  const int maxval = 255;  // MAXI是表示图像点颜色的最大数值，如果每个采样点用 8
-                           // 位表示，那么就是
-                           // 255。现在获取当前ch的采样点比特位数，并进行位移
-  const double fRefValue =
-      (double)maxval * maxval *
-      iSize;  // MAXi的平方除以MSE，MSE=diff*diff/size，因此psnr等价于
-              // （MAXi的平方*size）/（diff*diff）
-  double psnr =
-      (uiSSDtemp
-           ? 10.0 * log10(fRefValue / (double)uiSSDtemp)
-           : 999.99);  //这块没看懂为什么有个999.99，大概是设个INF，防止读取时为空吧
-  return psnr;
 }
 
 double computePSNR_buf_tflite_hbd(uint16_t *buf_all, uint16_t *dgd,
@@ -178,34 +103,6 @@ double computePSNR_buf_tflite_hbd(uint16_t *buf_all, uint16_t *dgd,
                       1);  // MAXI是表示图像点颜色的最大数值，如果每个采样点用 8
                            // 位表示，那么就是
                            // 255。现在获取当前ch的采样点比特位数，并进行位移
-  const double fRefValue =
-      (double)maxval * maxval *
-      iSize;  // MAXi的平方除以MSE，MSE=diff*diff/size，因此psnr等价于
-              // （MAXi的平方*size）/（diff*diff）
-  double psnr =
-      (uiSSDtemp
-           ? 10.0 * log10(fRefValue / (double)uiSSDtemp)
-           : 999.99);  //这块没看懂为什么有个999.99，大概是设个INF，防止读取时为空吧
-  return psnr;
-}
-
-double computePSNR_tflite(uint8_t *dgd, uint8_t *src, int height, int width,
-                          int dgd_stride, int src_stride) {
-  int iSize = height * width;  // m*nd
-
-  double uiSSDtemp = 0;
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      int iDiff = (int)(dgd[x] - src[x]);  //遍历获取diff
-      uiSSDtemp += iDiff * iDiff;          // diff的平方
-    }
-    dgd += dgd_stride;  //算上图像的stride边界 边界没有内容，但是会在图像中
-    src += src_stride;
-  }
-  int maxval;
-  maxval = 255;  // MAXI是表示图像点颜色的最大数值，如果每个采样点用 8
-                 // 位表示，那么就是
-                 // 255。现在获取当前ch的采样点比特位数，并进行位移
   const double fRefValue =
       (double)maxval * maxval *
       iSize;  // MAXi的平方除以MSE，MSE=diff*diff/size，因此psnr等价于
