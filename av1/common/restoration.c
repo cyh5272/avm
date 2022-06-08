@@ -2366,7 +2366,7 @@ void av1_loop_restoration_filter_unit(
     return;
   }
 
-  const int filter_idx = (unit_rtype == RESTORE_SGRPROJ);
+  const int filter_idx = ((int)unit_rtype - 1);
   assert(filter_idx < NUM_STRIPE_FILTERS);
   const stripe_filter_fun stripe_filter = stripe_filters[filter_idx];
 
