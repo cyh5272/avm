@@ -56,44 +56,27 @@
 // First filter configuration
 ///////////////////////////////////////////////////////////////////////////
 const int wienerns_config_y[][3] = {
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 0 },  { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
-  { -2, 0, 2 }, { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
-  { -1, 1, 5 }, { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
-  { -2, 1, 7 }, { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
-  { 3, 0, 10 }, { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 }, { 0, 0, 12 },
-#else
   { 1, 0, 0 },  { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
   { -2, 0, 2 }, { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
   { -1, 1, 5 }, { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
   { -2, 1, 7 }, { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
   { 3, 0, 10 }, { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 },
+#if USE_CENTER_WIENER_NONSEP
+  { 0, 0, 12 },
 #endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_uv[][3] = {
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
-  { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
-  { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
-#else
   { 1, 0, 0 }, { -1, 0, 0 },  { 0, 1, 1 },  { 0, -1, 1 },
   { 1, 1, 2 }, { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 },
   { 2, 0, 4 }, { -2, 0, 4 },  { 0, 2, 5 },  { 0, -2, 5 },
-#endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_y[][3] = {
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 7 },  { -1, 0, 7 },  { 0, 1, 8 },   { 0, -1, 8 },
-  { 1, 1, 9 },  { -1, -1, 9 }, { -1, 1, 10 }, { 1, -1, 10 },
-  { 2, 0, 11 }, { -2, 0, 11 }, { 0, 2, 12 },  { 0, -2, 12 },
-#else
   { 1, 0, 6 },  { -1, 0, 6 },  { 0, 1, 7 },  { 0, -1, 7 },
   { 1, 1, 8 },  { -1, -1, 8 }, { -1, 1, 9 }, { 1, -1, 9 },
   { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
-#endif  // USE_CENTER_WIENER_NONSEP
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 };
 
@@ -143,9 +126,6 @@ const int wienerns_coeff_uv[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -7, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 1),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -16, 0),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 1),
@@ -161,9 +141,6 @@ const int wienerns_coeff_uv[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -7, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 5, -16, 3),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv, 4, -8, 3),
@@ -189,43 +166,26 @@ const WienernsFilterConfigPairType wienerns_filters_midqp = {
 // Second filter configuration
 ///////////////////////////////////////////////////////////////////////////
 const int wienerns_config_y2[][3] = {
-#if USE_CENTER_WIENER_NONSEP
   { 1, 0, 0 },  { -1, 0, 0 }, { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
   { -2, 0, 2 }, { 0, 2, 3 },  { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
   { -1, 1, 5 }, { 1, -1, 5 }, { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
   { -2, 1, 7 }, { 1, 2, 8 },  { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
+#if USE_CENTER_WIENER_NONSEP
   { 0, 0, 10 },
-#else
-  { 1, 0, 0 },  { -1, 0, 0 }, { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
-  { -2, 0, 2 }, { 0, 2, 3 },  { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
-  { -1, 1, 5 }, { 1, -1, 5 }, { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
-  { -2, 1, 7 }, { 1, 2, 8 },  { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 }
 #endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_uv2[][3] = {
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
-  { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
-  { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
-#else
   { 1, 0, 0 }, { -1, 0, 0 },  { 0, 1, 1 },  { 0, -1, 1 },
   { 1, 1, 2 }, { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 },
   { 2, 0, 4 }, { -2, 0, 4 },  { 0, 2, 5 },  { 0, -2, 5 },
-#endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_y2[][3] = {
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 7 },  { -1, 0, 7 },  { 0, 1, 8 },   { 0, -1, 8 },
-  { 1, 1, 9 },  { -1, -1, 9 }, { -1, 1, 10 }, { 1, -1, 10 },
-  { 2, 0, 11 }, { -2, 0, 11 }, { 0, 2, 12 },  { 0, -2, 12 },
-#else
   { 1, 0, 6 },  { -1, 0, 6 },  { 0, 1, 7 },  { 0, -1, 7 },
   { 1, 1, 8 },  { -1, -1, 8 }, { -1, 1, 9 }, { 1, -1, 9 },
   { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
-#endif  // USE_CENTER_WIENER_NONSEP
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 };
 
@@ -271,9 +231,6 @@ const int wienerns_coeff_uv2[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -7, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -16, 0),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
@@ -289,9 +246,6 @@ const int wienerns_coeff_uv2[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -7, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 5, -16, 3),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 3),
@@ -317,46 +271,28 @@ const WienernsFilterConfigPairType wienerns_filters_highqp = {
 // Third filter configuration
 ///////////////////////////////////////////////////////////////////////////
 const int wienerns_config_y3[][3] = {
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 0 },    { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
-  { -2, 0, 2 },   { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
-  { -1, 1, 5 },   { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
-  { -2, 1, 7 },   { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
-  { 3, 0, 10 },   { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 }, { 2, 2, 12 },
-  { -2, -2, 12 }, { -2, 2, 13 }, { 2, -2, 13 }, { 0, 0, 14 },
-#else
   { 1, 0, 0 },    { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
   { -2, 0, 2 },   { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
   { -1, 1, 5 },   { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
   { -2, 1, 7 },   { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
   { 3, 0, 10 },   { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 }, { 2, 2, 12 },
   { -2, -2, 12 }, { -2, 2, 13 }, { 2, -2, 13 },
+#if USE_CENTER_WIENER_NONSEP
+  { 0, 0, 14 },
 #endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_uv3[][3] = {
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
-  { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
-  { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
-#else
   { 1, 0, 0 }, { -1, 0, 0 },  { 0, 1, 1 },  { 0, -1, 1 },
   { 1, 1, 2 }, { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 },
   { 2, 0, 4 }, { -2, 0, 4 },  { 0, 2, 5 },  { 0, -2, 5 },
-#endif  // USE_CENTER_WIENER_NONSEP
 };
 
 const int wienerns_config_uv_from_y3[][3] = {
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-#if USE_CENTER_WIENER_NONSEP
-  { 1, 0, 7 },  { -1, 0, 7 },  { 0, 1, 8 },   { 0, -1, 8 },
-  { 1, 1, 9 },  { -1, -1, 9 }, { -1, 1, 10 }, { 1, -1, 10 },
-  { 2, 0, 11 }, { -2, 0, 11 }, { 0, 2, 12 },  { 0, -2, 12 },
-#else
   { 1, 0, 6 },  { -1, 0, 6 },  { 0, 1, 7 },  { 0, -1, 7 },
   { 1, 1, 8 },  { -1, -1, 8 }, { -1, 1, 9 }, { 1, -1, 9 },
   { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
-#endif  // USE_CENTER_WIENER_NONSEP
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 };
 
@@ -410,9 +346,6 @@ const int wienerns_coeff_uv3[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -7, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv2, 4, -8, 1),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 5, -16, 0),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 1),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 1),
@@ -428,9 +361,6 @@ const int wienerns_coeff_uv3[][WIENERNS_COEFCFG_LEN] = {
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -7, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 3),
-#if USE_CENTER_WIENER_NONSEP
-  AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 5, -16, 3),
-#endif  // USE_CENTER_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 3),
   AOM_WIENERNS_COEFF(wienerns_prec_bits_uv3, 4, -8, 3),
@@ -2366,7 +2296,7 @@ void av1_loop_restoration_filter_unit(
     return;
   }
 
-  const int filter_idx = (unit_rtype == RESTORE_SGRPROJ);
+  const int filter_idx = ((int)unit_rtype - 1);
   assert(filter_idx < NUM_STRIPE_FILTERS);
   const stripe_filter_fun stripe_filter = stripe_filters[filter_idx];
 
