@@ -1337,10 +1337,9 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
 
   for (int i = 0; i < img_height; i += block_size) {
     for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height ||
-          j + block_size > img_width) {  //非规则块 直接替换
+      if (i + block_size > img_height || j + block_size > img_width) {
         continue;
-      } else {  //规则块，进行比较
+      } else {
         int starty = i;
         int startx = j;
         int buf_height;
@@ -1667,7 +1666,7 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
                 clip_pixel_highbd(repic[i][j], bit_depth);
           }
         }
-      } else {  //规则块，进行比较
+      } else {
         int starty = i;
         int startx = j;
         int buf_height;
@@ -1893,10 +1892,9 @@ extern "C" int TFlite_recon_quadtree_regular(uint8_t *dgd, int dgd_stride,
 
   for (int i = 0; i < img_height; i += block_size) {
     for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height ||
-          j + block_size > img_width) {  //非规则块 直接替换
+      if (i + block_size > img_height || j + block_size > img_width) {
         continue;
-      } else {  //规则块，进行比较
+      } else {
         int starty = i;
         int startx = j;
         int buf_height;
@@ -2189,7 +2187,7 @@ extern "C" int TFlite_recon_quadtree_unregular(
             rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
           }
         }
-      } else {  //规则块，进行比较
+      } else {
         int starty = i;
         int startx = j;
         int buf_height;
@@ -3075,171 +3073,6 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
   return 1;
 }
 
-extern "C" int av1_restore_cnn_quadtree_img_tflite(
-    YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
-    int RDMULT, int num_threads, int is_intra_only, int is_luma,
-    int cnn_index) {
-  // save Split flag
-  std::vector<int> Split;
-  // save a0 a1
-  std::vector<std::pair<int, int>> A;
-
-  YV12_BUFFER_CONFIG *pcPicYuvRec = &cm->cur_frame->buf;
-  uint8_t *dgr = pcPicYuvRec->y_buffer;
-  uint8_t *src = source_frame->y_buffer;
-
-  int quadtree_max_size = cm->cur_quad_info.unit_size;
-  int height = pcPicYuvRec->y_crop_height;
-  int width = pcPicYuvRec->y_crop_width;
-  int dgr_stride = pcPicYuvRec->y_stride;
-  int src_stride = source_frame->y_stride;
-  int qp = cm->quant_params.base_qindex;
-
-  // temp buf
-  uint8_t *rec = new uint8_t[height * width];
-  uint8_t *buf_level_0 = new uint8_t[height * width];
-  uint8_t *buf_level_1 = new uint8_t[height * width];
-  uint8_t *buf_level_1_horz = new uint8_t[height * width];
-  uint8_t *buf_level_1_vert = new uint8_t[height * width];
-
-  // save unfilter frame psnr
-  double dgdpsnr =
-      computePSNR_tflite(dgr, src, height, width, dgr_stride, src_stride);
-  int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
-  int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
-  int block_num_level_0 = (int)ceil(((float)width) / quadtree_max_size) *
-                          (int)ceil(((float)height) / quadtree_max_size);
-  int regularblock_num = regular_height_num * regular_width_num;
-  int un_regularblock_num = block_num_level_0 - regularblock_num;
-
-  int A_num_level_0 = block_num_level_0 * 2;
-  int *A_level_0 = new int[A_num_level_0];
-
-  int A_num_level_1 = regularblock_num * 4 * 2;
-  int *A_level_1 = new int[A_num_level_1];
-
-  int A_num_level_1_horz = regularblock_num * 2 * 2;
-  int *A_level_1_horz = new int[A_num_level_1_horz];
-
-  int A_num_level_1_vert = regularblock_num * 2 * 2;
-  int *A_level_1_vert = new int[A_num_level_1_vert];
-
-  // loopfilter all frame
-  TFlite_Predict_quadtree(dgr, src, A_level_0, A_num_level_0, height, width,
-                          dgr_stride, src_stride, qp, quadtree_max_size,
-                          quadtree_max_size, buf_level_0, width, superres_denom,
-                          num_threads, is_intra_only, is_luma, cnn_index);
-  double psnr_level_0 =
-      computePSNR_tflite(buf_level_0, src, height, width, width, src_stride);
-
-  replace_tflite(0, 0, width, height, rec, buf_level_0, width);
-
-  double delta_level_1 = 0;
-  double delta_level_1_horz = 0;
-  double delta_level_1_vert = 0;
-  if (regularblock_num != 0) {  // start quadtree
-    TFlite_Predict_quadtree(
-        dgr, src, A_level_1, A_num_level_1,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size / 2, quadtree_max_size / 2, buf_level_1, width,
-        superres_denom, num_threads, is_intra_only, is_luma, cnn_index);
-    double psnr_level_1 =
-        computePSNR_tflite(buf_level_1, src, height, width, width, src_stride);
-    double num_level_1 = regular_height_num * regular_width_num * 4;
-    delta_level_1 = ((psnr_level_1 - dgdpsnr) * 1000) / num_level_1;
-
-    TFlite_Predict_quadtree(
-        dgr, src, A_level_1_horz, A_num_level_1_horz,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size, quadtree_max_size / 2, buf_level_1_horz, width,
-        superres_denom, num_threads, is_intra_only, is_luma, cnn_index);
-    double psnr_buf_level_1_horz = computePSNR_tflite(
-        buf_level_1_horz, src, height, width, width, src_stride);
-    double rate_buf_level_1_horz = regular_height_num * regular_width_num * 2;
-    delta_level_1_horz =
-        ((psnr_buf_level_1_horz - dgdpsnr) * 1000) / rate_buf_level_1_horz;
-
-    TFlite_Predict_quadtree(
-        dgr, src, A_level_1_vert, A_num_level_1_vert,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size / 2, quadtree_max_size, buf_level_1_vert, width,
-        superres_denom, num_threads, is_intra_only, is_luma, cnn_index);
-    double psnr_buf_level_1_vert = computePSNR_tflite(
-        buf_level_1_vert, src, height, width, width, src_stride);
-    double rate_buf_level_1_vert = regular_height_num * regular_width_num * 2;
-    delta_level_1_vert =
-        ((psnr_buf_level_1_vert - dgdpsnr) * 1000) / rate_buf_level_1_vert;
-  }
-
-  int index = 0;
-  for (int i = 0; i < height; i += quadtree_max_size) {
-    for (int j = 0; j < width; j += quadtree_max_size) {
-      if (i + quadtree_max_size > height ||
-          j + quadtree_max_size > width) {  // unretular block  replace
-        index =
-            CalculateIndex_tflite(width, quadtree_max_size, quadtree_max_size,
-                                  i, j, quadtree_max_size);
-        int a0 = A_level_0[index * 2];
-        int a1 = A_level_0[index * 2 + 1];
-        std::pair<int, int> A0A1(a0, a1);
-        A.push_back(A0A1);
-      } else {  // retular block  start   judge
-        Tree_tflite(rec, buf_level_0, buf_level_1, buf_level_1_horz,
-                    buf_level_1_vert, dgr, src, dgr_stride, src_stride,
-                    A_level_0, A_level_1, A_level_1_horz, A_level_1_vert,
-                    height, width, dgdpsnr, delta_level_1, delta_level_1_horz,
-                    delta_level_1_vert, 0, quadtree_max_size, i, j, &Split, &A,
-                    RDMULT);
-      }
-      index++;
-    }
-  }
-
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      *(dgr + i * dgr_stride + j) =
-          *(rec + i * width + j);  // Fill in the luma buffer again
-    }
-  }
-
-  delete[] rec;
-  delete[] buf_level_0;
-  delete[] buf_level_1;
-  delete[] buf_level_1_horz;
-  delete[] buf_level_1_vert;
-  delete[] A_level_0;
-  delete[] A_level_1;
-  delete[] A_level_1_horz;
-  delete[] A_level_1_vert;
-  rec = NULL;
-  buf_level_0 = NULL;
-  buf_level_1 = NULL;
-  buf_level_1_horz = NULL;
-  buf_level_1_vert = NULL;
-  A_level_0 = NULL;
-  A_level_1 = NULL;
-  A_level_1_horz = NULL;
-  A_level_1_vert = NULL;
-
-  //用av1的申请内存空间的代码
-  cm->cur_quad_info.split_info_length = (int)Split.size();
-  cm->cur_quad_info.unit_info_length = (int)A.size();
-
-  for (unsigned int i = 0; i < Split.size(); ++i) {
-    cm->cur_quad_info.split_info[i].split = Split[i];
-  }
-
-  for (unsigned int i = 0; i < A.size(); ++i) {
-    cm->cur_quad_info.unit_info[i].xqd[0] = A[i].first;
-    cm->cur_quad_info.unit_info[i].xqd[1] = A[i].second;
-  }
-
-  return 1;
-}
-
 extern "C" int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
     AV1_COMMON *cm, int superres_denom, int num_threads, int bit_depth,
     int is_intra_only, int is_luma, int cnn_index) {
@@ -3280,16 +3113,14 @@ extern "C" int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
   int index = 0;
   for (int i = 0; i < height; i += quadtree_max_size) {
     for (int j = 0; j < width; j += quadtree_max_size) {
-      if (i + quadtree_max_size > height ||
-          j + quadtree_max_size > width) {  //非规则块 直接替换
-        //传A0A1和dgd块得到恢复的buf
+      if (i + quadtree_max_size > height || j + quadtree_max_size > width) {
         int a0 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[0];
         int a1 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[1];
         quadinfo.unit_info_index++;
         A_unregular[unregular_index++] = a0;
         A_unregular[unregular_index++] = a1;
 
-      } else {  //规则块，进行比较
+      } else {
         deTree_tflite(&quadinfo, &regular_index, A_regular, &split_index,
                       Split);
       }
@@ -3326,86 +3157,6 @@ extern "C" int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
   return 1;
 }
 
-extern "C" int av1_restore_cnn_quadtree_decode_img_tflite(
-    AV1_COMMON *cm, int superres_denom, int num_threads, int is_intra_only,
-    int is_luma, int cnn_index) {
-  YV12_BUFFER_CONFIG *pcPicYuvRec = &cm->cur_frame->buf;
-  uint8_t *dgr = pcPicYuvRec->y_buffer;
-  int height = pcPicYuvRec->y_crop_height;
-  int width = pcPicYuvRec->y_crop_width;
-  int dgr_stride = pcPicYuvRec->y_stride;
-  int qp = cm->quant_params.base_qindex;
-
-  int quadtree_max_size = cm->postcnn_quad_info.unit_size;
-  int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
-  int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
-  int block_size_256 = (int)ceil(((float)width) / quadtree_max_size) *
-                       (int)ceil(((float)height) / quadtree_max_size);
-  int regularblock_num = regular_height_num * regular_width_num;
-  int un_regularblock_num = block_size_256 - regularblock_num;
-
-  QUADInfo quadinfo = cm->cur_quad_info;
-  QUADSplitInfo *split_info = quadinfo.split_info;
-  QUADUnitInfo *unit_info = quadinfo.unit_info;
-  quadinfo.split_info_index = 0;
-  quadinfo.unit_info_index = 0;
-
-  uint8_t *rec = new uint8_t[height * width];
-
-  int A_num_unregular = un_regularblock_num * 2;
-  int unregular_index = 0;
-  int *A_unregular = new int[A_num_unregular];
-
-  int A_num_regular = quadinfo.unit_info_length * 2;
-  int regular_index = 0;
-  int *A_regular = new int[A_num_regular];
-
-  int split_index = 0;
-  int *Split = new int[quadinfo.split_info_length / 2];
-
-  int index = 0;
-  for (int i = 0; i < height; i += quadtree_max_size) {
-    for (int j = 0; j < width; j += quadtree_max_size) {
-      if (i + quadtree_max_size > height ||
-          j + quadtree_max_size > width) {  //非规则块 直接替换
-        //传A0A1和dgd块得到恢复的buf
-        int a0 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[0];
-        int a1 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[1];
-        quadinfo.unit_info_index++;
-        A_unregular[unregular_index++] = a0;
-        A_unregular[unregular_index++] = a1;
-
-      } else {  //规则块，进行比较
-        deTree_tflite(&quadinfo, &regular_index, A_regular, &split_index,
-                      Split);
-      }
-      index++;
-    }
-  }
-
-  TFlite_recon_quadtree_regular(
-      dgr, dgr_stride, regular_height_num * quadtree_max_size,
-      regular_width_num * quadtree_max_size, rec, width, qp, A_regular, Split,
-      quadtree_max_size, superres_denom, num_threads, is_intra_only, is_luma,
-      cnn_index);
-
-  TFlite_recon_quadtree_unregular(
-      dgr, dgr_stride, height, width, rec, width, qp, A_unregular, A_regular,
-      Split, quadtree_max_size, superres_denom, num_threads, is_intra_only,
-      is_luma, cnn_index);
-
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      *(dgr + i * dgr_stride + j) =
-          *(rec + i * width + j);  // Fill in the luma buffer again
-    }
-  }
-
-  delete[] rec;
-  rec = NULL;
-  return 1;
-}
-
 extern "C" void av1_restore_cnn_quadtree_tflite(
     struct AV1Common *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
     int num_threads, const int apply_cnn[MAX_MB_PLANE],
@@ -3418,56 +3169,30 @@ extern "C" void av1_restore_cnn_quadtree_tflite(
     const int cnn_index = cnn_indices[plane];
     assert(cnn_index >= 0 &&
            cnn_index < av1_num_cnn_indices_for_plane(cm, plane));
-    if (cm->seq_params.use_highbitdepth) {
-      switch (plane) {
-        case AOM_PLANE_Y:
-          av1_restore_cnn_quadtree_img_tflite_highbd(
-              source_frame, cm, cm->superres_scale_denominator, RDMULT,
-              num_threads, cm->seq_params.bit_depth, is_intra_only, is_luma,
-              cnn_index);
-          break;
-        case AOM_PLANE_U:
-          av1_restore_cnn_img_tflite_highbd(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
-              buf->uv_crop_height, buf->uv_stride,
-              CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_V:
-          av1_restore_cnn_img_tflite_highbd(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
-              buf->uv_crop_height, buf->uv_stride,
-              CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
-          break;
-        default: assert(0 && "Invalid plane index");
-      }
-    } else {
-      assert(cm->seq_params.bit_depth == 8);
-      switch (plane) {
-        case AOM_PLANE_Y:
-          av1_restore_cnn_quadtree_img_tflite(
-              source_frame, cm, cm->superres_scale_denominator, RDMULT,
-              num_threads, is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_U:
-          av1_restore_cnn_img_tflite(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              buf->u_buffer, buf->uv_crop_width, buf->uv_crop_height,
-              buf->uv_stride, buf->u_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_V:
-          av1_restore_cnn_img_tflite(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              buf->v_buffer, buf->uv_crop_width, buf->uv_crop_height,
-              buf->uv_stride, buf->v_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma, cnn_index);
-          break;
-        default: assert(0 && "Invalid plane index");
-      }
+    switch (plane) {
+      case AOM_PLANE_Y:
+        av1_restore_cnn_quadtree_img_tflite_highbd(
+            source_frame, cm, cm->superres_scale_denominator, RDMULT,
+            num_threads, cm->seq_params.bit_depth, is_intra_only, is_luma,
+            cnn_index);
+        break;
+      case AOM_PLANE_U:
+        av1_restore_cnn_img_tflite_highbd(
+            cm->quant_params.base_qindex, cm->superres_scale_denominator,
+            CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
+            buf->uv_crop_height, buf->uv_stride,
+            CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        break;
+      case AOM_PLANE_V:
+        av1_restore_cnn_img_tflite_highbd(
+            cm->quant_params.base_qindex, cm->superres_scale_denominator,
+            CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
+            buf->uv_crop_height, buf->uv_stride,
+            CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        break;
+      default: assert(0 && "Invalid plane index");
     }
   }
 }
@@ -3484,55 +3209,29 @@ extern "C" void av1_restore_cnn_quadtree_decode_tflite(
     const int cnn_index = cnn_indices[plane];
     assert(cnn_index >= 0 &&
            cnn_index < av1_num_cnn_indices_for_plane(cm, plane));
-    if (cm->seq_params.use_highbitdepth) {
-      switch (plane) {
-        case AOM_PLANE_Y:
-          av1_restore_cnn_quadtree_decode_img_tflite_highbd(
-              cm, cm->superres_scale_denominator, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_U:
-          av1_restore_cnn_img_tflite_highbd(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
-              buf->uv_crop_height, buf->uv_stride,
-              CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_V:
-          av1_restore_cnn_img_tflite_highbd(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
-              buf->uv_crop_height, buf->uv_stride,
-              CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
-              cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
-          break;
-        default: assert(0 && "Invalid plane index");
-      }
-    } else {
-      assert(cm->seq_params.bit_depth == 8);
-      switch (plane) {
-        case AOM_PLANE_Y:
-          av1_restore_cnn_quadtree_decode_img_tflite(
-              cm, cm->superres_scale_denominator, num_threads, is_intra_only,
-              is_luma, cnn_index);
-          break;
-        case AOM_PLANE_U:
-          av1_restore_cnn_img_tflite(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              buf->u_buffer, buf->uv_crop_width, buf->uv_crop_height,
-              buf->uv_stride, buf->u_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma, cnn_index);
-          break;
-        case AOM_PLANE_V:
-          av1_restore_cnn_img_tflite(
-              cm->quant_params.base_qindex, cm->superres_scale_denominator,
-              buf->v_buffer, buf->uv_crop_width, buf->uv_crop_height,
-              buf->uv_stride, buf->v_buffer, buf->uv_stride, num_threads,
-              is_intra_only, is_luma, cnn_index);
-          break;
-        default: assert(0 && "Invalid plane index");
-      }
+    switch (plane) {
+      case AOM_PLANE_Y:
+        av1_restore_cnn_quadtree_decode_img_tflite_highbd(
+            cm, cm->superres_scale_denominator, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        break;
+      case AOM_PLANE_U:
+        av1_restore_cnn_img_tflite_highbd(
+            cm->quant_params.base_qindex, cm->superres_scale_denominator,
+            CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
+            buf->uv_crop_height, buf->uv_stride,
+            CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        break;
+      case AOM_PLANE_V:
+        av1_restore_cnn_img_tflite_highbd(
+            cm->quant_params.base_qindex, cm->superres_scale_denominator,
+            CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
+            buf->uv_crop_height, buf->uv_stride,
+            CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        break;
+      default: assert(0 && "Invalid plane index");
     }
   }
 }
