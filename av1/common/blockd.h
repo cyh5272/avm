@@ -1090,6 +1090,10 @@ typedef struct macroblockd {
    */
   bool is_first_horizontal_rect;
 
+#if ADJ_ORDER
+  bool is_last_horizontal_rect;
+  bool is_first_vertical_rect;
+#endif
   /*!
    * Counts of each reference frame in the above and left neighboring blocks.
    * NOTE: Take into account both single and comp references.
