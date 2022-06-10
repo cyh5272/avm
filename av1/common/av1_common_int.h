@@ -1563,6 +1563,16 @@ typedef struct AV1Common {
    */
   int cnn_indices[MAX_MB_PLANE];
 #endif  // CONFIG_CNN_RESTORATION
+
+#if CONFIG_CNN_GUIDED_QUADTREE
+  int use_quad_level;  // 512>>unit_level
+  QUADInfo cur_quad_info;
+  QUADInfo postcnn_quad_info;
+  int cnn_index;
+  int use_quadtree;
+  double lr_y_rdcost;
+#endif  //  CONFIG_CNN_GUIDED_QUADTREE
+
 } AV1_COMMON;
 
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA

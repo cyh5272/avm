@@ -18,7 +18,12 @@ extern "C" {
 
 #include "av1/common/av1_common_int.h"
 #include "av1/common/resize.h"
+
+#include "av1/encoder/rd.h"
 #include "av1/encoder/ratectrl.h"
+#if CONFIG_CNN_GUIDED_QUADTREE
+#include "av1/common/guided_quadtree.h"
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 // Minimum base_qindex needed to run cnn.
 #define MIN_CNN_Q_INDEX 0
@@ -110,6 +115,40 @@ struct AV1Common;
 void av1_restore_cnn_tflite(const struct AV1Common *cm, int num_threads,
                             const int apply_cnn[MAX_MB_PLANE],
                             const int cnn_indices[MAX_MB_PLANE]);
+
+#if CONFIG_CNN_GUIDED_QUADTREE
+int av1_restore_cnn_quadtree_img_tflite(YV12_BUFFER_CONFIG *source_frame,
+                                        AV1_COMMON *cm, int superres_denom,
+                                        int RDMULT, int num_threads,
+                                        int is_intra_only, int is_luma,
+                                        int cnn_index);
+
+int av1_restore_cnn_quadtree_decode_img_tflite(AV1_COMMON *cm,
+                                               int superres_denom,
+                                               int num_threads,
+                                               int is_intra_only, int is_luma,
+                                               int cnn_index);
+
+int av1_restore_cnn_quadtree_img_tflite_highbd(YV12_BUFFER_CONFIG *source_frame,
+                                               AV1_COMMON *cm,
+                                               int superres_denom, int RDMULT,
+                                               int num_threads, int bit_depth,
+                                               int is_intra_only, int is_luma,
+                                               int cnn_index);
+
+int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
+    AV1_COMMON *cm, int superres_denom, int num_threads, int bit_depth,
+    int is_intra_only, int is_luma, int cnn_index);
+
+void av1_restore_cnn_quadtree_tflite(struct AV1Common *cm,
+                                     YV12_BUFFER_CONFIG *source_frame,
+                                     int RDMULT, int num_threads,
+                                     const int apply_cnn[MAX_MB_PLANE],
+                                     const int cnn_indices[MAX_MB_PLANE]);
+void av1_restore_cnn_quadtree_decode_tflite(
+    struct AV1Common *cm, int num_threads, int use_quadtree,
+    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE]);
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #ifdef __cplusplus
 }
