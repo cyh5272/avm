@@ -72,6 +72,12 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, const RestorationUnitInfo *rui,
     aom_writer *const w, int plane, FRAME_COUNTS *counts);
 
+#if CONFIG_CNN_GUIDED_QUADTREE
+// Write crlc coeffs for one frame
+static void write_filter_quadtree(int qp, int cnn_index, int superres_denom,
+                                  const QUADInfo *ci, aom_writer *wb);
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 #if CONFIG_IBC_SR_EXT
 static AOM_INLINE void write_intrabc_info(
     MACROBLOCKD *xd, const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
@@ -2312,7 +2318,15 @@ static AOM_INLINE void write_modes_sb(
       }
     }
   }
-
+#if CONFIG_CNN_GUIDED_QUADTREE
+  if (cm->use_quadtree && !cm->postcnn_quad_info.is_write) {
+    QUADInfo *qi = (QUADInfo *)&cm->postcnn_quad_info;
+    int superres_denom = cm->superres_scale_denominator;
+    write_filter_quadtree(cm->quant_params.base_qindex, cm->cnn_index,
+                          superres_denom, qi, w);
+    qi->is_write = 1;
+  }
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
   write_partition(cm, xd, hbs, mi_row, mi_col, partition, bsize, w);
   switch (partition) {
     case PARTITION_NONE:
@@ -2938,6 +2952,47 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 }
 #endif  // !CONFIG_NEW_DF
 
+#if CONFIG_CNN_GUIDED_QUADTREE
+static void write_filter_quadtree(int QP, int cnn_index, int superres_denom,
+                                  const QUADInfo *ci, aom_writer *wb) {
+  int A0_min, A1_min;
+  int *quadtset;
+  quadtset = get_quadparm_from_qindex(QP, superres_denom, 1, cnn_index);
+  A0_min = quadtset[1];
+  A1_min = quadtset[2];
+  int a0;
+  int a1;
+  int b_a0;
+  int b_a1;
+  int ref_0 = 8;
+  int ref_1 = 8;
+  for (int i = 0; i < ci->unit_info_length; i++) {
+    a0 = ci->unit_info[i].xqd[0];
+
+    b_a0 = a0 - A0_min;
+    if (b_a0 < 0) {
+      b_a0 = 0;
+    }
+    if (b_a0 > 15) {
+      b_a0 = 15;
+    }
+    a1 = ci->unit_info[i].xqd[1];
+    b_a1 = a1 - A1_min;
+    if (b_a1 < 0) {
+      b_a1 = 0;
+    }
+    if (b_a1 > 15) {
+      b_a1 = 15;
+    }
+    // printf("a0:%d  a1:%d\n", a0, a1);
+    aom_write_primitive_refsubexpfin(wb, 16, 1, ref_0, b_a0);
+    aom_write_primitive_refsubexpfin(wb, 16, 1, ref_1, b_a1);
+    ref_0 = b_a0;
+    ref_1 = b_a1;
+  }
+}
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 #if CONFIG_CNN_RESTORATION
 static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
@@ -2958,6 +3013,61 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
       assert(cm->cnn_indices[plane] == 0);
     }
   }
+#if CONFIG_CNN_GUIDED_QUADTREE
+
+  aom_wb_write_bit(wb, cm->use_quadtree);
+
+  //��splitҲ������д��ȥ
+  if (cm->use_quadtree) {
+    // printf("writing pamrater\n");
+    aom_wb_write_bit(wb, cm->use_quad_level);
+    /*
+    ������lengthת��&λ���ȵĶ����� ����
+    */
+    int flag;
+    int unit_length = cm->postcnn_quad_info.unit_info_length;
+    int split_length = cm->postcnn_quad_info.split_info_length;
+    flag = 1;
+    for (int i = 7; i >= 0; i--) {
+      if (unit_length & flag) {
+        aom_wb_write_bit(wb, 1);
+      } else {
+        aom_wb_write_bit(wb, 0);
+      }
+      flag <<= 1;
+    }
+
+    flag = 1;
+    for (int i = 7; i >= 0; i--) {
+      if (split_length & flag) {
+        aom_wb_write_bit(wb, 1);
+      } else {
+        aom_wb_write_bit(wb, 0);
+      }
+      flag <<= 1;
+    }
+
+    for (int i = 0; i < cm->postcnn_quad_info.split_info_length; i++) {
+      aom_wb_write_bit(wb, cm->postcnn_quad_info.split_info[i].split);
+      // printf("flag:%d\n", cm->quad_info->split_info[i].split);
+      /*if (i % 2 == 0) {
+        if (cm->postcnn_quad_info.split_info[i].split == 0 &&
+            cm->postcnn_quad_info.split_info[i + 1].split == 1)
+            printf("writing split\n");
+        else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
+                 cm->postcnn_quad_info.split_info[i + 1].split == 1)
+           printf("writing horz\n");
+        else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
+                 cm->postcnn_quad_info.split_info[i + 1].split == 0)
+          printf("writing vert\n");
+        else if (cm->postcnn_quad_info.split_info[i].split == 0 &&
+                 cm->postcnn_quad_info.split_info[i + 1].split == 0)
+          printf("writing all\n");
+
+      }*/
+    }
+  }
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
 }
 #endif  // CONFIG_CNN_RESTORATION
 

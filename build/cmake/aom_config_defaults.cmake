@@ -141,6 +141,10 @@ set_aom_config_var(CONFIG_FORWARDSKIP 1
                    "AV2 enable forward skip residual coding.")
 set_aom_config_var(CONFIG_CNN_RESTORATION 0 NUMBER
                    "AV2 CNN Restoration experiment flag")
+set_aom_config_var(CONFIG_CNN_GUIDED_QUADTREE 0 NUMBER
+                   "AV2 CNN Guided quadtree flag")
+set_aom_config_var(CONFIG_CNN_GUIDED_QUADTREE_RDCOST 0 NUMBER
+                   "AV2 CNN Guided quadtree use RDcost flag")
 set_aom_config_var(CONFIG_SAVE_CNN_RESTORATION_DATA 0 NUMBER
                    "AV2 flag to save training data for CNN restoration tool")
 set_aom_config_var(CONFIG_WIENER_NONSEP 0 NUMBER
