@@ -3526,6 +3526,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     }
 
     cm->rst_info[plane].frame_restoration_type = best_rtype;
+#if CONFIG_CNN_GUIDED_QUADTREE
+    if (plane == plane_start) cm->lr_y_rdcost = best_cost;
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
     if (force_restore_type != RESTORE_TYPES)
       assert(best_rtype == force_restore_type || best_rtype == RESTORE_NONE);
 
