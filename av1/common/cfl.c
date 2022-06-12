@@ -160,7 +160,7 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   cfl->are_parameters_computed = 1;
 }
 
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
 static void subtract_average_neighbor_c_backup(const uint16_t *src,
                                                int16_t *dst, int width,
                                                int height, int avg) {
@@ -477,52 +477,6 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   uint16_t *dst_16 = CONVERT_TO_SHORTPTR(dst);
   cfl_get_predict_hbd_fn(tx_size)(cfl->ac_buf_q3, dst_16, dst_stride, alpha_q3,
                                   xd->bd);
-#if DEBUG_CFL
-  const int width = tx_size_wide[tx_size];
-  const int height = tx_size_high[tx_size];
-  int16_t *ac_buf_q3 = cfl->ac_buf_q3;
-  int16_t *recon_buf_q3 = cfl->recon_buf_q3;
-  if (is_final_encode && plane != AOM_PLANE_Y) {
-    fprintf(enc_log, "luma recon buffer: \n");
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width; i++) {
-        fprintf(enc_log, "%5d", recon_buf_q3[i]);
-      }
-      fprintf(enc_log, "\n");
-      recon_buf_q3 += CFL_BUF_LINE;
-    }
-  }
-  if (is_final_decode && plane != AOM_PLANE_Y) {
-    fprintf(dec_log, "luma recon buffer: \n");
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width; i++) {
-        fprintf(dec_log, "%5d", recon_buf_q3[i]);
-      }
-      fprintf(dec_log, "\n");
-      recon_buf_q3 += CFL_BUF_LINE;
-    }
-  }
-  if (is_final_encode && plane != AOM_PLANE_Y) {
-    fprintf(enc_log, "luma ac buffer: \n");
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width; i++) {
-        fprintf(enc_log, "%5d", ac_buf_q3[i]);
-      }
-      fprintf(enc_log, "\n");
-      ac_buf_q3 += CFL_BUF_LINE;
-    }
-  }
-  if (is_final_decode && plane != AOM_PLANE_Y) {
-    fprintf(dec_log, "luma ac buffer: \n");
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width; i++) {
-        fprintf(dec_log, "%5d", ac_buf_q3[i]);
-      }
-      fprintf(dec_log, "\n");
-      ac_buf_q3 += CFL_BUF_LINE;
-    }
-  }
-#endif
 }
 
 static void cfl_luma_subsampling_420_hbd_c(const uint16_t *input,

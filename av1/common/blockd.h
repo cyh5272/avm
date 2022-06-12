@@ -763,7 +763,7 @@ typedef struct cfl_ctx {
   // luma mapping table
   uint16_t luma_pos_idx[CFL_BUF_SQUARE];
 #endif
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA || CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPLICIT_CFL
   uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
   uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
   uint16_t avg_l;
