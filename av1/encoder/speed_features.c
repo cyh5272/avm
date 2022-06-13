@@ -954,10 +954,6 @@ static AOM_INLINE void set_erp_speed_features_framesize_dependent(
     case 0: break;
     default: assert(0 && "Invalid ERP pruning level.");
   }
-
-  if (cpi->oxcf.part_cfg.use_ml_erp_pruning) {
-    sf->part_sf.prune_rect_with_ml = 1;
-  }
 }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
@@ -968,6 +964,10 @@ void av1_set_speed_features_framesize_dependent(AV1_COMP *cpi, int speed) {
   if (oxcf->mode == GOOD) {
     set_good_speed_feature_framesize_dependent(cpi, sf, speed);
   }
+
+#if CONFIG_EXT_RECUR_PARTITIONS
+  set_erp_speed_features_framesize_dependent(cpi);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
   // This is only used in motion vector unit test.
   if (cpi->oxcf.unit_test_cfg.motion_vector_unit_test == 1)
