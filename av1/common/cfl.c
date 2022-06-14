@@ -281,7 +281,6 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size) {
-  assert(is_cur_buf_hbd(xd));
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[plane];
   int input_stride = pd->dst.stride;
