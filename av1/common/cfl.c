@@ -149,6 +149,7 @@ void cfl_predict_hbd_c(const int16_t *ac_buf_q3, uint16_t *dst, int dst_stride,
 
 CFL_PREDICT_FN(c, hbd)
 
+#if !CONFIG_IMPROVED_CFL_DC
 static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   // Do not call cfl_compute_parameters multiple time on the same values.
@@ -159,8 +160,9 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   cfl_get_subtract_average_fn(tx_size)(cfl->recon_buf_q3, cfl->ac_buf_q3);
   cfl->are_parameters_computed = 1;
 }
+#endif
 
-#if CONFIG_IMPLICIT_CFL || CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPROVED_CFL_DC
 static void subtract_average_neighbor_c_backup(const uint16_t *src,
                                                int16_t *dst, int width,
                                                int height, int avg) {
@@ -278,6 +280,47 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
   }
 }
 
+void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
+                      TX_SIZE tx_size) {
+  CFL_CTX *const cfl = &xd->cfl;
+  const int width = tx_size_wide[tx_size];
+  const int height = tx_size_high[tx_size];
+  const int sub_x = cfl->subsampling_x;
+  const int sub_y = cfl->subsampling_y;
+
+  const int have_top =
+      row || (sub_y ? xd->chroma_up_available : xd->up_available);
+  const int have_left =
+      col || (sub_x ? xd->chroma_left_available : xd->left_available);
+
+  int count = 0;
+  int sum_x = 0;
+
+  uint16_t *l;
+  if (have_top) {
+    l = cfl->recon_yuv_buf_above[0];
+    for (int i = 0; i < width; i++) {
+      sum_x += l[i];
+    }
+    count += width;
+  }
+
+  if (have_left) {
+    l = cfl->recon_yuv_buf_left[0];
+    for (int i = 0; i < height; i++) {
+      sum_x += l[i];
+    }
+    count += height;
+  }
+
+  if (count > 0) {
+    cfl->avg_l = (sum_x + count / 2) / count;
+  } else {
+    cfl->avg_l = 8 << (xd->bd - 1);
+  }
+}
+#endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size) {
@@ -344,47 +387,7 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
     }
   }
 }
-void cfl_calc_luma_dc(MACROBLOCKD *const xd, int plane, int row, int col,
-                      TX_SIZE tx_size) {
-  CFL_CTX *const cfl = &xd->cfl;
-  MB_MODE_INFO *mbmi = xd->mi[0];
-  const int width = tx_size_wide[tx_size];
-  const int height = tx_size_high[tx_size];
-  const int sub_x = cfl->subsampling_x;
-  const int sub_y = cfl->subsampling_y;
 
-  const int have_top =
-      row || (sub_y ? xd->chroma_up_available : xd->up_available);
-  const int have_left =
-      col || (sub_x ? xd->chroma_left_available : xd->left_available);
-
-  int count = 0;
-  int sum_x = 0;
-
-  uint16_t *l;
-  if (have_top) {
-    l = cfl->recon_yuv_buf_above[0];
-    for (int i = 0; i < width; i++) {
-      sum_x += l[i];
-    }
-    count += width;
-  }
-
-  if (have_left) {
-    l = cfl->recon_yuv_buf_left[0];
-    for (int i = 0; i < height; i++) {
-      sum_x += l[i];
-    }
-    count += height;
-  }
-
-  if (count > 0) {
-    cfl->avg_l = (sum_x + count / 2) / count;
-  } else {
-    cfl->avg_l = 8 << (xd->bd - 1);
-  }
-}
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
                                         int row, int col, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
@@ -443,7 +446,6 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     cfl->avg_l = 8 << (xd->bd - 1);
   }
 }
-#endif
 #endif
 
 void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
@@ -510,32 +512,6 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
 }
 #endif
 
-#if CONFIG_IMPLICIT_CFL_MAPPING || CONFIG_IMPROVED_CFL_DC
-static void cfl_luma_subsampling_420_neighbor_hbd_c(const uint16_t *input,
-                                                    int input_stride,
-                                                    uint16_t *output_q3,
-                                                    int width, int height) {
-  for (int j = 0; j < height; j += 2) {
-    for (int i = 0; i < width; i += 2) {
-      const int bot = i + input_stride;
-#if CONFIG_CFL_DS_1_2_1
-      if (width > 2)  // top edge
-        output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
-                            input[i + 1] + input[bot + AOMMAX(-1, -i)] +
-                            2 * input[bot] + input[bot + 1];
-      else  // left edge
-        output_q3[i >> 1] = input[i - 1] + 2 * input[i] + input[i + 1] +
-                            input[bot - 1] + 2 * input[bot] + input[bot + 1];
-#else
-      output_q3[i >> 1] =
-          (input[i] + input[i + 1] + input[bot] + input[bot + 1]) << 1;
-#endif
-    }
-    input += input_stride << 1;
-    output_q3 += (width >> 1);
-  }
-}
-#endif
 static void cfl_luma_subsampling_422_hbd_c(const uint16_t *input,
                                            int input_stride,
                                            uint16_t *output_q3, int width,

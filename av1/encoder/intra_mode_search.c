@@ -607,9 +607,8 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   // Search through all non-palette modes.
 #if CONFIG_AIMC
   get_uv_intra_mode_set(mbmi);
-#if CONFIG_IMPLICIT_CFL
-  int implicit_cfl_mode_num =
-      CONFIG_IMPLICIT_CFL_MAPPING + CONFIG_IMPLICIT_CFL_DERIVED_ALPHA;
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+  int implicit_cfl_mode_num = CONFIG_IMPLICIT_CFL_DERIVED_ALPHA;
   for (int mode_idx = 0; mode_idx < UV_INTRA_MODES + implicit_cfl_mode_num;
        ++mode_idx) {
     int real_mode_idx = mode_idx;
@@ -651,27 +650,23 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     // Init variables for cfl and angle delta
     int cfl_alpha_rate = 0;
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
     int cfl_idx_rate = 0;
 #endif
     if (mode == UV_CFL_PRED) {
       if (!is_cfl_allowed(xd) || !intra_mode_cfg->enable_cfl_intra) continue;
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
       if (mbmi->cfl_idx == 0)
 #endif
         cfl_alpha_rate = cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd);
-#if CONFIG_IMPLICIT_CFL
-      cfl_idx_rate = x->mode_costs.cfl_index_cost[0][mbmi->cfl_idx > 0];
-#if CONFIG_IMPLICIT_CFL_MAPPING && CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
-      if (mbmi->cfl_idx)
-        cfl_idx_rate += x->mode_costs.cfl_index_cost[1][mbmi->cfl_idx > 1];
-#endif
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+      cfl_idx_rate = x->mode_costs.cfl_index_cost[mbmi->cfl_idx > 0];
 #endif
       if (cfl_alpha_rate == INT_MAX) continue;
     }
 #if CONFIG_AIMC
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
     mode_cost += cfl_alpha_rate + cfl_idx_rate;
 #else
     mode_cost += cfl_alpha_rate;
@@ -704,7 +699,7 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                 intra_mode_info_cost_uv(cpi, x, mbmi, bsize, mode_cost);
     if (mode == UV_CFL_PRED) {
       assert(is_cfl_allowed(xd) && intra_mode_cfg->enable_cfl_intra);
-#if CONFIG_DEBUG && !CONFIG_IMPLICIT_CFL
+#if CONFIG_DEBUG && !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
       if (!xd->lossless[mbmi->segment_id])
         assert(xd->cfl.rate == tokenonly_rd_stats.rate + mode_cost);
 #endif  // CONFIG_DEBUG

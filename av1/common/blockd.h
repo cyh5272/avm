@@ -420,13 +420,11 @@ typedef struct MB_MODE_INFO {
   int8_t cfl_alpha_signs;
   /*! \brief Chroma from Luma: Index of the alpha Cb and alpha Cr combination */
   uint8_t cfl_alpha_idx;
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   /*! \brief Chroma from Luma: Index of the CfL mode */
   uint8_t cfl_idx;
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   /*! \brief The implicitly derived scaling factors*/
   int cfl_implicit_alpha[2];  //[u/v]
-#endif
 #endif
   /*! \brief Stores the size and colors of palette mode */
   PALETTE_MODE_INFO palette_mode_info;
@@ -758,16 +756,11 @@ typedef struct cfl_ctx {
   uint16_t recon_buf_q3[CFL_BUF_SQUARE];
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
-
-#if CONFIG_IMPLICIT_CFL_MAPPING
-  // luma mapping table
-  uint16_t luma_pos_idx[CFL_BUF_SQUARE];
-#endif
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPROVED_CFL_DC
   uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
   uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
   uint16_t avg_l;
-#endif  // CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#endif
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
   // for every scaling parameter
   int dc_pred_is_cached[CFL_PRED_PLANES];

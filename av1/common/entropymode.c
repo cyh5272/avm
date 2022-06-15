@@ -104,9 +104,9 @@ static const aom_cdf_prob
                                                     { AOM_CDF2(32283) } } };
 #endif  // CONFIG_FORWARDSKIP
 
-#if CONFIG_IMPLICIT_CFL
-static const aom_cdf_prob default_cfl_index_cdf[2][CDF_SIZE(CFL_IDX_NUMBER)] = {
-  { AOM_CDF2(16384) }, {AOM_CDF2(16384)}
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+static const aom_cdf_prob default_cfl_index_cdf[CDF_SIZE(CFL_IDX_NUMBER)] = {
+  AOM_CDF2(16384)
 };
 #endif
 #if CONFIG_AIMC
@@ -1897,7 +1897,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->fsc_mode_cdf, default_fsc_mode_cdf);
 #endif  // CONFIG_FORWARDSKIP
 
-#if CONFIG_IMPLICIT_CFL
+#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
   av1_copy(fc->cfl_index_cdf, default_cfl_index_cdf);
 #endif
   av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
