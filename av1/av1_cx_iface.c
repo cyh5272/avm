@@ -438,7 +438,7 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable adaptive mvd resolution
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-  0,    // enable flexible MV precision
+  1,    // enable flexible MV precision
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_JOINT_MVD
   1,    // enable joint mvd coding
@@ -4078,7 +4078,7 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
         1,
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-        0,
+        1,
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_JOINT_MVD
         1,

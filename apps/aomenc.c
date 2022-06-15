@@ -621,7 +621,7 @@ static void init_config(cfg_options_t *config) {
   config->enable_adaptive_mvd = 1;
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-  config->enable_flex_mvres = 0;
+  config->enable_flex_mvres = 1;
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_JOINT_MVD
   config->enable_joint_mvd = 1;
