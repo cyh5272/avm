@@ -7764,28 +7764,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   CHECK_FLEX_MV(
       check_mv_precision(cm, mbmi) == 0,
       " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(mbmi->pb_mv_precision < MV_PRECISION_8_PEL ||
-                         mbmi->pb_mv_precision >= NUM_MV_PRECISIONS,
-                     &cm->error,
-                     " mv precision value is out of bound in the function "
-                     "av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(
-      check_mv_precision(cm, mbmi) == 0, &cm->error,
-      " incorrect mv precision in the function av1_rd_pick_inter_mode_sb");
-
-  if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
-    error_check_flexmv(mbmi->pb_mv_precision > mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb precision is higher than the maximum value at the "
-                       "end of the av1_rd_pick_inter_mode_sb");
-  } else if (!is_intrabc_block(mbmi, xd->tree_type)) {
-    error_check_flexmv(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb and mb precisions are not same at the end of the "
-                       "av1_rd_pick_inter_mode_sb");
-  }
 #endif
 
   txfm_info->skip_txfm |= search_state.best_skip2;
@@ -7814,35 +7792,6 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   CHECK_FLEX_MV(
       check_mv_precision(cm, mbmi) == 0,
       " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(mbmi->pb_mv_precision < MV_PRECISION_8_PEL ||
-                         mbmi->pb_mv_precision >= NUM_MV_PRECISIONS,
-                     &cm->error,
-                     " mv precision value is out of bound in the function "
-                     "av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(
-      check_mv_precision(cm, mbmi) == 0, &cm->error,
-      " incorrect mv precision in the function av1_rd_pick_inter_mode_sb");
-
-  if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
-    error_check_flexmv(mbmi->pb_mv_precision > mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb precision is higher than the maximum value at the "
-                       "end of the av1_rd_pick_inter_mode_sb");
-  } else if (!is_intrabc_block(mbmi, xd->tree_type)) {
-    if (mbmi->pb_mv_precision != mbmi->max_mv_precision)
-      printf(
-          " mbmi->max_mv_precision = %d mbmi->pb_mv_precision= %d, "
-          "mbmi->mode = %d mbmi->ref_mv_idx = %d  \n",
-          mbmi->max_mv_precision, mbmi->pb_mv_precision, mbmi->mode,
-          mbmi->ref_mv_idx);
-
-    error_check_flexmv(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb and mb precisions are not same at the end of the "
-                       "av1_rd_pick_inter_mode_sb");
-  }
 #endif
 
   txfm_info->skip_txfm |= search_state.best_mode_skippable;
@@ -7975,28 +7924,6 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
   CHECK_FLEX_MV(
       check_mv_precision(cm, mbmi) == 0,
       " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(mbmi->pb_mv_precision < MV_PRECISION_8_PEL ||
-                         mbmi->pb_mv_precision >= NUM_MV_PRECISIONS,
-                     &cm->error,
-                     " mv precision value is out of bound in the function "
-                     "av1_rd_pick_inter_mode_sb");
-
-  error_check_flexmv(
-      check_mv_precision(cm, mbmi) == 0, &cm->error,
-      " incorrect mv precision in the function av1_rd_pick_inter_mode_sb");
-
-  if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
-    error_check_flexmv(mbmi->pb_mv_precision > mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb precision is higher than the maximum value at the "
-                       "end of the av1_rd_pick_inter_mode_sb");
-  } else if (!is_intrabc_block(mbmi, xd->tree_type)) {
-    error_check_flexmv(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                       &cm->error,
-                       " pb and mb precisions are not same at the end of the "
-                       "av1_rd_pick_inter_mode_sb");
-  }
 #endif
   const InterpFilter interp_filter = features->interp_filter;
   set_default_interp_filters(mbmi,

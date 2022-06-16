@@ -2105,12 +2105,6 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
   assert(mpp_found);
 #endif
 }
-
-// If n != 0, returns the floor of log base 2 of n. If n == 0, returns 0.
-static INLINE uint8_t av1_log_in_base_2(unsigned int n) {
-  // get_msb() is only valid when n != 0.
-  return n == 0 ? 0 : get_msb(n);
-}
 void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                        MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize,
                        uint8_t ref_mv_idx) {

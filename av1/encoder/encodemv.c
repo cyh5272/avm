@@ -731,39 +731,6 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
       }
 #endif
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-#if CONFIG_ADAPTIVE_MVD
-      error_check_flexmv(
-          is_adaptive_mvd &&
-              is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]),
-          &cpi->common.error,
-          " AMVD and flex MV cannnot be enabled for same block");
-#endif
-      error_check_flexmv(cpi->common.features.cur_frame_force_integer_mv &&
-                             (pb_mv_precision != MV_PRECISION_ONE_PEL),
-                         &cpi->common.error, " wrong mv precision value");
-      error_check_flexmv(
-          (diff.row &
-           ((1 << (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision)) - 1)) != 0,
-          &cpi->common.error,
-          " Error in diff.row in the function av1_encode_mv");
-      error_check_flexmv(
-          (diff.col &
-           ((1 << (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision)) - 1)) != 0,
-          &cpi->common.error,
-          "Error in diff.col in the function av1_encode_mv");
-
-      error_check_flexmv(
-          (ref.row &
-           ((1 << (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision)) - 1)) != 0,
-          &cpi->common.error,
-          " Error in ref.row in the function av1_encode_mv");
-      error_check_flexmv(
-          (ref.col &
-           ((1 << (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision)) - 1)) != 0,
-          &cpi->common.error, "Error in ref.col in the function av1_encode_mv");
-#endif  // CONFIG_FLEX_MVRES
-
 #if CONFIG_ADAPTIVE_MVD
       if (is_adaptive_mvd) {
         assert(j < MV_JOINTS - 1);

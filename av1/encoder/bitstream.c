@@ -1583,8 +1583,6 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
   assert(mbmi->max_mv_precision == xd->sbi->sb_mv_precision);
 
 #if CONFIG_DEBUG
-  error_check_flexmv(xd->sbi->sb_mv_precision != cm->features.fr_mv_precision,
-                     &cm->error, " incorrect value of sb_mv_precision");
   assert(av1_get_mbmi_max_mv_precision(cm, xd->sbi, mbmi) ==
          mbmi->max_mv_precision);
 
@@ -1766,26 +1764,8 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
 #if CONFIG_FLEX_MVRES
     if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
-#if CONFIG_DEBUG
-      error_check_flexmv(mbmi->pb_mv_precision > mbmi->max_mv_precision ||
-                             mbmi->pb_mv_precision < MV_PRECISION_8_PEL,
-                         &cm->error,
-                         " The value of mbmi->pb_mv_precision is out of bound");
-      error_check_flexmv(mbmi->max_mv_precision != xd->sbi->sb_mv_precision,
-                         &cm->error, " Error in max_mv_precision");
-#endif
       write_pb_mv_precision(cm, xd, w);
     }
-#if CONFIG_DEBUG
-    else {
-      error_check_flexmv(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                         &cm->error,
-                         " The value of mbmi->pb_mv_precision is invalid");
-    }
-    error_check_flexmv(
-        check_mv_precision(cm, mbmi) == 0, &cm->error,
-        " incorrect mv precision in the function pack_inter_mode_mvs");
-#endif
 #endif  // CONFIG_FLEX_MVRES
 
     if (have_newmv_in_each_reference(mode)) {
@@ -2547,12 +2527,6 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
               ? 2
               : 1;
       xd->tree_type = (total_loop_num == 1 ? SHARED_PART : LUMA_PART);
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-      if (frame_is_intra_only(cm) || !cm->features.use_sb_mv_precision)
-        error_check_flexmv(
-            xd->sbi->sb_mv_precision != cm->features.fr_mv_precision,
-            &cm->error, " Incorrect value of xd->sbi->sb_mv_precision");
-#endif
       write_modes_sb(cpi, tile, w, &tok, tok_end, mi_row, mi_col,
                      cm->seq_params.sb_size);
       if (total_loop_num == 2) {
@@ -4238,15 +4212,6 @@ static AOM_INLINE void write_uncompressed_header_obu(
                         " frame level precision value should be integer pel");
         }
 
-        if (features->fr_mv_precision > MV_PRECISION_ONE_PEL) {
-          error_check_flexmv(features->use_pb_mv_precision != 1, &cm->error,
-                             " Error in use_pb_level_signaling");
-          error_check_flexmv(features->use_sb_mv_precision != 0, &cm->error,
-                             " Error in use_pb_level_signaling");
-        } else {
-          assert(!features->use_sb_mv_precision);
-          assert(!features->use_pb_mv_precision);
-        }
         assert(IMPLIES(features->cur_frame_force_integer_mv,
                        features->fr_mv_precision == MV_PRECISION_ONE_PEL));
 #endif

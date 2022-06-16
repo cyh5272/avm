@@ -733,32 +733,6 @@ static AOM_INLINE int get_smart_mv_prec(AV1_COMP *cpi, const MV_STATS *mv_stats,
   return use_high_hp;
 }
 
-#if CONFIG_FLEX_MVRES
-static AOM_INLINE int get_most_probable_mv_prec(AV1_COMP *cpi,
-                                                const MV_STATS *mv_stats,
-                                                int current_q) {
-  (void)current_q;
-  aom_clear_system_state();
-  int best_precision = cpi->common.features.fr_mv_precision;
-  if (mv_stats->valid) {
-    int best_count = 0;
-    for (int k = cpi->common.features.fr_mv_precision; k >= MV_PRECISION_8_PEL;
-         k--) {
-      // printf(" %d , ", mv_stats->precision_count[k]);
-      if (mv_stats->precision_count[k] > best_count) {
-        best_count = mv_stats->precision_count[k];
-        best_precision = k;
-      }
-    }
-    // printf("Best precision = %d \n", best_precision);
-  }
-
-  best_precision = AOMMIN(best_precision, cpi->common.features.fr_mv_precision);
-
-  return (MvSubpelPrecision)best_precision;
-}
-#endif
-
 void av1_pick_and_set_high_precision_mv(AV1_COMP *cpi, int qindex) {
   int use_hp = qindex < HIGH_PRECISION_MV_QTHRESH;
 
