@@ -173,8 +173,16 @@ static uint32_t motion_estimation(AV1_COMP *cpi, MACROBLOCK *x,
 #endif
                                      search_site_cfg,
                                      /*fine_search_interval=*/0);
-  av1_set_mv_search_method(&full_ms_params, search_site_cfg,
-                           tpl_sf->search_method);
+  SEARCH_METHODS search_method = tpl_sf->search_method;
+#if CONFIG_FLEX_MVRES
+  // MV search of flex MV precision is supported only for NSTEP or DIAMOND
+  // search
+  if (cpi->common.seq_params.enable_flex_mvres &&
+      (search_method != NSTEP && search_method != DIAMOND))
+    search_method = NSTEP;
+#endif
+
+  av1_set_mv_search_method(&full_ms_params, search_site_cfg, search_method);
 
   av1_full_pixel_search(start_mv, &full_ms_params, step_param,
                         cond_cost_list(cpi, cost_list), &best_mv->as_fullmv,

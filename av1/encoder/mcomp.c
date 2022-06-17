@@ -149,6 +149,13 @@ void av1_make_default_fullpel_ms_params(
       search_method = get_faster_search_method(search_method);
     }
   }
+#if CONFIG_FLEX_MVRES
+  // MV search of flex MV precision is supported only for NSTEP or DIAMOND
+  // search
+  if (cpi->common.seq_params.enable_flex_mvres &&
+      (search_method != NSTEP && search_method != DIAMOND))
+    search_method = NSTEP;
+#endif
 
   av1_set_mv_search_method(ms_params, search_sites, search_method);
 
