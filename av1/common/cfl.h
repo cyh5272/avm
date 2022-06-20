@@ -92,7 +92,7 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height);
 #endif
-#if CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPROVED_CFL_DC || CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
 void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
                                    int row, int col, TX_SIZE tx_size);
 void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size);
