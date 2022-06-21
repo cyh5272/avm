@@ -2003,12 +2003,15 @@ int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
   (void)cm;
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
-  const int above_mpp_flag = (above_mi && is_inter_block(above_mi, SHARED_PART))
-                                 ? (above_mi->most_probable_pb_mv_precision ==
-                                    above_mi->pb_mv_precision)
-                                 : 0;
+  const int above_mpp_flag =
+      (above_mi && is_inter_block(above_mi, SHARED_PART) &&
+       !is_intrabc_block(above_mi, SHARED_PART))
+          ? (above_mi->most_probable_pb_mv_precision ==
+             above_mi->pb_mv_precision)
+          : 0;
   const int left_mpp_flag =
-      (left_mi && is_inter_block(left_mi, SHARED_PART) && !left_mi->skip_mode)
+      (left_mi && is_inter_block(left_mi, SHARED_PART) &&
+       !is_intrabc_block(left_mi, SHARED_PART))
           ? (left_mi->most_probable_pb_mv_precision == left_mi->pb_mv_precision)
           : 0;
 
@@ -2021,11 +2024,13 @@ int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
   const int above_down =
-      (above_mi && is_inter_block(above_mi, SHARED_PART))
+      (above_mi && is_inter_block(above_mi, SHARED_PART) &&
+       !is_intrabc_block(above_mi, SHARED_PART))
           ? above_mi->max_mv_precision - above_mi->pb_mv_precision
           : 0;
   const int left_down =
-      (left_mi && is_inter_block(left_mi, SHARED_PART) && !left_mi->skip_mode)
+      (left_mi && is_inter_block(left_mi, SHARED_PART) &&
+       !is_intrabc_block(left_mi, SHARED_PART))  // && !left_mi->skip_mode)
           ? left_mi->max_mv_precision - left_mi->pb_mv_precision
           : 0;
   assert(above_down >= 0);

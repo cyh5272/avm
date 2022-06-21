@@ -2501,8 +2501,6 @@ int av1_refining_search_8p_c_low_precision(
       search_range * search_grid_stride + search_range }
   };
 
-  int grid_center = search_range * search_grid_stride + search_range;
-
   const int num_of_search_steps = fast_mv_refinement ? 1 : 3;
 
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
@@ -2547,7 +2545,6 @@ int av1_refining_search_8p_c_low_precision(
     } else {
       best_mv->row += neighbors[best_site].coord.row;
       best_mv->col += neighbors[best_site].coord.col;
-      grid_center += neighbors[best_site].coord_offset;
     }
   }
 
@@ -4266,10 +4263,7 @@ int low_precision_joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       search_range * search_grid_stride + search_range }
   };
 
-  int grid_center = search_range * search_grid_stride + search_range;
   const int num_of_search_steps = 3;
-
-  // do_refine_search_grid[grid_coord] = 0;
 
   for (int i = 0; i < num_of_search_steps; ++i) {
     int best_site = -1;
@@ -4306,8 +4300,6 @@ int low_precision_joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     }
     if (best_site == -1) {
       break;
-    } else {
-      grid_center += neighbors[best_site].coord_offset;
     }
   }  // end of full-pel search
 
@@ -4318,7 +4310,7 @@ int low_precision_joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     start_mv->col = ref_mv.col;
   }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#if CONFIG_DEBUG
   const MV xxmv = { bestmv->row, bestmv->col };
   CHECK_FLEX_MV(!is_this_mv_precision_compliant(xxmv, mbmi->pb_mv_precision),
                 " xxmv precision is not compaitable");

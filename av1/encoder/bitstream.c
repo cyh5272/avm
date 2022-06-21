@@ -1760,13 +1760,12 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
             mbmi_ext_frame->mode_context, ec_ctx, mbmi, mbmi_ext_frame, w);
       else
         assert(mbmi->ref_mv_idx == 0);
-    }
-
 #if CONFIG_FLEX_MVRES
-    if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
-      write_pb_mv_precision(cm, xd, w);
-    }
+      if (is_pb_mv_precision_active(cm, mbmi, bsize)) {
+        write_pb_mv_precision(cm, xd, w);
+      }
 #endif  // CONFIG_FLEX_MVRES
+    }
 
     if (have_newmv_in_each_reference(mode)) {
       for (ref = 0; ref < 1 + is_compound; ++ref) {

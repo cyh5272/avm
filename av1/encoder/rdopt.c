@@ -3556,6 +3556,7 @@ static int64_t handle_inter_mode(
     const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
     const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
     set_precision_set(cm, xd, mbmi, bsize, 0);
+    set_most_probable_mv_precision(cm, mbmi, bsize);
     const PRECISION_SET *precision_def =
         &av1_mv_precision_sets[mbmi->mb_precision_set];
     for (int precision_dx = precision_def->num_precisions - 1;
@@ -3623,6 +3624,7 @@ static int64_t handle_inter_mode(
     MvSubpelPrecision best_precision_so_far = mbmi->max_mv_precision;
     int64_t best_precision_rd_so_far = INT64_MAX;
     set_precision_set(cm, xd, mbmi, bsize, ref_mv_idx);
+    set_most_probable_mv_precision(cm, mbmi, bsize);
     const PRECISION_SET *precision_def =
         &av1_mv_precision_sets[mbmi->mb_precision_set];
     for (int precision_dx = precision_def->num_precisions - 1;
@@ -4737,6 +4739,12 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 #if CONFIG_IBC_SR_EXT
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #endif  // CONFIG_IBC_SR_EXT
+#if CONFIG_FLEX_MVRES
+  set_default_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+  set_mv_precision(mbmi, mbmi->max_mv_precision);  // initialize to max
+  set_default_precision_set(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+  set_most_probable_mv_precision(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+#endif  // CONFIG_FLEX_MVRES
   const uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
   if (x->mbmi_ext->ref_mv_count[ref_frame_type] == UINT8_MAX) {
     if (x->mbmi_ext->ref_mv_count[ref_frame] == UINT8_MAX ||
@@ -4779,6 +4787,13 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
   mbmi->motion_mode = SIMPLE_TRANSLATION;
   mbmi->ref_mv_idx = 0;
   mbmi->skip_mode = mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
+
+#if CONFIG_FLEX_MVRES
+  set_default_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+  set_mv_precision(mbmi, mbmi->max_mv_precision);  // initialize to max
+  set_default_precision_set(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+  set_most_probable_mv_precision(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+#endif  // CONFIG_FLEX_MVRES
 
   set_default_interp_filters(mbmi,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -6082,9 +6097,12 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
 #if CONFIG_IBC_SR_EXT
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 #endif  // CONFIG_IBC_SR_EXT
+
 #if CONFIG_FLEX_MVRES
   set_default_max_mv_precision(mbmi, sbi->sb_mv_precision);
   set_mv_precision(mbmi, mbmi->max_mv_precision);
+  set_default_precision_set(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+  set_most_probable_mv_precision(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
 #endif
 }
 

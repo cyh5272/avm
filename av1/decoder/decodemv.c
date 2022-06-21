@@ -2301,6 +2301,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
                        "Prediction mode %d invalid with ref frame %d %d",
                        mbmi->mode, mbmi->ref_frame[0], mbmi->ref_frame[1]);
   }
+
   ref_mv[0] = xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx].this_mv;
   if (is_compound && mbmi->mode != GLOBAL_GLOBALMV) {
     ref_mv[1] = xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx].comp_mv;
@@ -2475,6 +2476,12 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 
   mbmi->mv[0].as_int = 0;
   mbmi->mv[1].as_int = 0;
+#if CONFIG_FLEX_MVRES
+  set_default_max_mv_precision(mbmi, xd->sbi->sb_mv_precision);
+  set_mv_precision(mbmi, mbmi->max_mv_precision);  // initialize to max
+  set_default_precision_set(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+  set_most_probable_mv_precision(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]);
+#endif  // CONFIG_FLEX_MVRES
   mbmi->segment_id = read_inter_segment_id(cm, xd, 1, r);
 
   mbmi->skip_mode = read_skip_mode(cm, xd, mbmi->segment_id, r);
