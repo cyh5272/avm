@@ -1809,6 +1809,7 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
       (ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL)
           ? 0
           : (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
+  const int prec_multiplier = (1 << prec_shift);
 #if CONFIG_DEBUG
   CHECK_FLEX_MV(!is_this_mv_precision_compliant(
                     get_mv_from_fullmv(&start_mv),
@@ -1884,13 +1885,13 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
     all_in &= best_mv->col + site[3].mv.col >= ms_params->mv_limits.col_min;
     all_in &= best_mv->col + site[4].mv.col <= ms_params->mv_limits.col_max;
 #else
-    all_in &= best_mv->row + (site[1].mv.row << prec_shift) >=
+    all_in &= best_mv->row + (site[1].mv.row * prec_multiplier) >=
               ms_params->mv_limits.row_min;
-    all_in &= best_mv->row + (site[2].mv.row << prec_shift) <=
+    all_in &= best_mv->row + (site[2].mv.row * prec_multiplier) <=
               ms_params->mv_limits.row_max;
-    all_in &= best_mv->col + (site[3].mv.col << prec_shift) >=
+    all_in &= best_mv->col + (site[3].mv.col * prec_multiplier) >=
               ms_params->mv_limits.col_min;
-    all_in &= best_mv->col + (site[4].mv.col << prec_shift) <=
+    all_in &= best_mv->col + (site[4].mv.col * prec_multiplier) <=
               ms_params->mv_limits.col_max;
 #endif
 
@@ -1934,8 +1935,8 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
 
 #if CONFIG_FLEX_MVRES
         for (j = 0; j < 4; j++) {
-          int row = (site[idx + j].mv.row << prec_shift);
-          int col = (site[idx + j].mv.col << prec_shift);
+          int row = (site[idx + j].mv.row * prec_multiplier);
+          int col = (site[idx + j].mv.col * prec_multiplier);
           block_offset[j] = (row * ref_stride + col) + best_address;
         }
 #else
@@ -1948,8 +1949,8 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
           if (sads[j] < bestsad) {
 #if CONFIG_FLEX_MVRES
             const FULLPEL_MV this_mv = {
-              best_mv->row + (site[idx + j].mv.row << prec_shift),
-              best_mv->col + (site[idx + j].mv.col << prec_shift)
+              best_mv->row + (site[idx + j].mv.row * prec_multiplier),
+              best_mv->col + (site[idx + j].mv.col * prec_multiplier)
             };
 #else
             const FULLPEL_MV this_mv = { best_mv->row + site[idx + j].mv.row,
@@ -1974,8 +1975,8 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
       for (int idx = 1; idx <= cfg->searches_per_step[step]; idx++) {
 #if CONFIG_FLEX_MVRES
         const FULLPEL_MV this_mv = {
-          best_mv->row + (site[idx].mv.row << prec_shift),
-          best_mv->col + (site[idx].mv.col << prec_shift)
+          best_mv->row + (site[idx].mv.row * prec_multiplier),
+          best_mv->col + (site[idx].mv.col * prec_multiplier)
         };
 #else
         const FULLPEL_MV this_mv = { best_mv->row + site[idx].mv.row,
@@ -2001,8 +2002,8 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
 #endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_FLEX_MVRES
-          int r = (site[idx].mv.row << prec_shift);
-          int c = (site[idx].mv.col << prec_shift);
+          int r = (site[idx].mv.row * prec_multiplier);
+          int c = (site[idx].mv.col * prec_multiplier);
           const uint8_t *const check_here = (r * ref_stride + c) + best_address;
 #else
           const uint8_t *const check_here = site[idx].offset + best_address;
@@ -2039,10 +2040,10 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
         *second_best_mv = *best_mv;
       }
 #if CONFIG_FLEX_MVRES
-      best_mv->row += (site[best_site].mv.row << prec_shift);
-      best_mv->col += (site[best_site].mv.col << prec_shift);
-      best_address += (site[best_site].mv.row << prec_shift) * ref_stride +
-                      (site[best_site].mv.col << prec_shift);
+      best_mv->row += (site[best_site].mv.row * prec_multiplier);
+      best_mv->col += (site[best_site].mv.col * prec_multiplier);
+      best_address += (site[best_site].mv.row * prec_multiplier) * ref_stride +
+                      (site[best_site].mv.col * prec_multiplier);
 #else
       best_mv->row += site[best_site].mv.row;
       best_mv->col += site[best_site].mv.col;
@@ -3314,6 +3315,7 @@ static int obmc_diamond_search_sad(
       (ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL)
           ? 0
           : (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
+  const int prec_multiplier = (1 << prec_shift);
 #endif
 
   for (step = tot_steps; step >= 0; --step) {
@@ -3321,8 +3323,8 @@ static int obmc_diamond_search_sad(
     best_site = 0;
     for (int idx = 1; idx <= cfg->searches_per_step[step]; ++idx) {
 #if CONFIG_FLEX_MVRES
-      int r = (site[idx].mv.row << prec_shift);
-      int c = (site[idx].mv.col << prec_shift);
+      int r = (site[idx].mv.row * prec_multiplier);
+      int c = (site[idx].mv.col * prec_multiplier);
       int offset = r * ref_buf->stride + c;
       const FULLPEL_MV mv = { best_mv->row + r, best_mv->col + c };
 #if CONFIG_DEBUG
@@ -3365,11 +3367,11 @@ static int obmc_diamond_search_sad(
 
     if (best_site != 0) {
 #if CONFIG_FLEX_MVRES
-      best_mv->row += (site[best_site].mv.row << prec_shift);
-      best_mv->col += (site[best_site].mv.col << prec_shift);
+      best_mv->row += (site[best_site].mv.row * prec_multiplier);
+      best_mv->col += (site[best_site].mv.col * prec_multiplier);
       best_address +=
-          ((site[best_site].mv.row << prec_shift) * ref_buf->stride +
-           (site[best_site].mv.col << prec_shift));
+          ((site[best_site].mv.row * prec_multiplier) * ref_buf->stride +
+           (site[best_site].mv.col * prec_multiplier));
 #else
       best_mv->row += site[best_site].mv.row;
       best_mv->col += site[best_site].mv.col;
