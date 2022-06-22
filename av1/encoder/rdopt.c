@@ -2726,6 +2726,8 @@ static int skip_similar_ref_mv(AV1_COMP *const cpi, MACROBLOCK *x,
     const int is_comp_pred = has_second_ref(mbmi);
     const uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
     int_mv this_refmv[2];
+    this_refmv[0].as_int = 0;
+    this_refmv[1].as_int = 0;
     for (int i = 0; i < is_comp_pred + 1; ++i) {
       this_refmv[i] =
           (i == 0)
@@ -2738,6 +2740,9 @@ static int skip_similar_ref_mv(AV1_COMP *const cpi, MACROBLOCK *x,
     for (int prev_ref_mv_idx = 0; prev_ref_mv_idx < mbmi->ref_mv_idx;
          prev_ref_mv_idx++) {
       int_mv prev_refmv[2];
+      prev_refmv[0].as_int = INVALID_MV;
+      prev_refmv[1].as_int = INVALID_MV;
+
       for (int i = 0; i < is_comp_pred + 1; ++i) {
         prev_refmv[i] =
             (i == 0) ? mbmi_ext->ref_mv_stack[ref_frame_type][prev_ref_mv_idx]

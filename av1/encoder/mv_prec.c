@@ -278,14 +278,13 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
     use_fractional_mv = 0;
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-  int frac_part_rate = 0, frac_part_rate_hpel = 0, frac_part_rate_qpel = 0;
+  int frac_part_rate = 0, frac_part_rate_qpel = 0;
   aom_cdf_prob *frac_part_cdf =
       mv_class ? (cur_mvcomp_ctx->fp_cdf[0])
                : (cur_mvcomp_ctx->class0_fp_cdf[int_part][0]);
   if (use_fractional_mv) {
     if (pb_mv_precision > MV_PRECISION_ONE_PEL) {
-      frac_part_rate = frac_part_rate_hpel =
-          get_symbol_cost(frac_part_cdf, frac_part);
+      frac_part_rate = get_symbol_cost(frac_part_cdf, frac_part);
       update_cdf(frac_part_cdf, frac_part >> 1, 2);
     }
 

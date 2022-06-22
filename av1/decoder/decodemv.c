@@ -1279,7 +1279,9 @@ static int read_mv_component_low_precision(aom_reader *r, nmv_component *mvcomp,
 
   int has_offset = (mv_class >= min_class_with_offset[precision]);
 
-  int start_lsb = MV_PRECISION_ONE_PEL - precision;
+  assert(MV_PRECISION_ONE_PEL >= precision);
+  const int precision_diff = MV_PRECISION_ONE_PEL - precision;
+  const uint8_t start_lsb = (precision_diff >= 0) ? (uint8_t)precision_diff : 0;
 
   // Integer part
   if (!has_offset) {
@@ -1293,7 +1295,7 @@ static int read_mv_component_low_precision(aom_reader *r, nmv_component *mvcomp,
     mag = (offset + base);  // int mv data
   }
 
-  const int nonZero_offset = (1 << (MV_PRECISION_ONE_PEL - precision));
+  const int nonZero_offset = (1 << start_lsb);
   mag = (mag + nonZero_offset) << 3;
   return sign ? -mag : mag;
 }

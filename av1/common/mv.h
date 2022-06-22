@@ -514,17 +514,6 @@ static INLINE void clamp_fullmv(FULLPEL_MV *mv, const FullMvLimits *mv_limits) {
   mv->col = clamp(mv->col, mv_limits->col_min, mv_limits->col_max);
   mv->row = clamp(mv->row, mv_limits->row_min, mv_limits->row_max);
 }
-#if 0   // CONFIG_FLEX_MVRES
-static INLINE MvSubpelPrecision
-get_mv_precision(const MV mv, MvSubpelPrecision max_precision) {
-return max_precision;
-}
-static INLINE MvSubpelPrecision
-get_mv_precision2(const MV mv, const MV mv2, MvSubpelPrecision max_precision) {
-  return (MvSubpelPrecision)AOMMAX(get_mv_precision(mv, max_precision),
-                                   get_mv_precision(mv2, max_precision));
-}
-#endif  // CONFIG_FLEX_MVRES
 
 #ifdef __cplusplus
 }  // extern "C"
