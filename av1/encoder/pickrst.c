@@ -2060,14 +2060,6 @@ static int64_t count_wienerns_bits(int plane, const int (*reduce_cost)[2],
           if (end_feat - beg_feat > 5 &&
               wienerns_info->nsfilter[end_feat - 5] == 0) {
             reduce_step[WIENERNS_REDUCE_STEPS - 5] = 1;
-            if (end_feat - beg_feat > 6 &&
-                wienerns_info->nsfilter[end_feat - 6] == 0) {
-              reduce_step[WIENERNS_REDUCE_STEPS - 6] = 1;
-              if (end_feat - beg_feat > 7 &&
-                  wienerns_info->nsfilter[end_feat - 7] == 0) {
-                reduce_step[WIENERNS_REDUCE_STEPS - 7] = 1;
-              }
-            }
           }
         }
       }
@@ -2075,33 +2067,25 @@ static int64_t count_wienerns_bits(int plane, const int (*reduce_cost)[2],
   }
   const int rodd = is_uv ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
-    if (rodd && i == end_feat - 7 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       bits += reduce_cost[0][reduce_step[0]];
       if (reduce_step[0]) break;
     }
-    if (!rodd && i == end_feat - 6 && i != beg_feat) {
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
       bits += reduce_cost[1][reduce_step[1]];
       if (reduce_step[1]) break;
     }
-    if (rodd && i == end_feat - 5 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       bits += reduce_cost[2][reduce_step[2]];
       if (reduce_step[2]) break;
     }
-    if (!rodd && i == end_feat - 4 && i != beg_feat) {
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
       bits += reduce_cost[3][reduce_step[3]];
       if (reduce_step[3]) break;
     }
-    if (rodd && i == end_feat - 3 && i != beg_feat) {
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
       bits += reduce_cost[4][reduce_step[4]];
       if (reduce_step[4]) break;
-    }
-    if (!rodd && i == end_feat - 2 && i != beg_feat) {
-      bits += reduce_cost[5][reduce_step[5]];
-      if (reduce_step[5]) break;
-    }
-    if (rodd && i == end_feat - 1 && i != beg_feat) {
-      bits += reduce_cost[6][reduce_step[6]];
-      if (reduce_step[6]) break;
     }
 #if CONFIG_LR_4PART_CODE
     bits += aom_count_4part_wref(
