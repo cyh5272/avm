@@ -2211,68 +2211,6 @@ static int64_t finer_tile_search_wienerns(
 
   if (!ext_search) return best_err;
 
-  const int src_steps[][2] = {
-    { 1, -1 }, { -1, 1 }, { 1, 1 },  { -1, -1 }, { 2, 1 },   { 1, 2 },
-    { -2, 1 }, { 1, -2 }, { 2, -1 }, { -1, 2 },  { -2, -1 }, { -1, -2 },
-  };
-  const int nsrc_steps = sizeof(src_steps) / (2 * sizeof(src_steps[0][0]));
-  for (int s = 0; s < iter_step; ++s) {
-    int no_improv = 1;
-    for (int i = beg_feat + (num_feat & 1); i < end_feat; i += 2) {
-      int cmin[2] = { wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-                      wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] };
-      int cmax[2] = {
-        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID] +
-            (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-        wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] +
-            (1 << wienerns_coeffs[i + 1 - beg_feat][WIENERNS_BIT_ID])
-      };
-
-      for (int ci = 0; ci < nsrc_steps; ++ci) {
-        rui->wiener_nonsep_info.nsfilter[i] =
-            curr.nsfilter[i] + src_steps[ci][0];
-        rui->wiener_nonsep_info.nsfilter[i + 1] =
-            curr.nsfilter[i + 1] + src_steps[ci][1];
-        if (rui->wiener_nonsep_info.nsfilter[i] < cmin[0] ||
-            rui->wiener_nonsep_info.nsfilter[i] >= cmax[0] ||
-            rui->wiener_nonsep_info.nsfilter[i + 1] < cmin[1] ||
-            rui->wiener_nonsep_info.nsfilter[i + 1] >= cmax[1]) {
-          rui->wiener_nonsep_info = curr;
-          continue;
-        }
-        const int64_t err =
-            calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-        const int64_t bits = count_wienerns_bits(
-            rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-            x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
-        if (cost < best_cost) {
-          no_improv = 0;
-          best_err = err;
-          best_cost = cost;
-          best_bits = bits;
-          best = rui->wiener_nonsep_info;
-        }
-      }
-      curr = best;
-      rui->wiener_nonsep_info.nsfilter[i] = curr.nsfilter[i];
-      rui->wiener_nonsep_info.nsfilter[i + 1] = curr.nsfilter[i + 1];
-    }
-    if (no_improv) {
-      break;
-    }
-    rui->wiener_nonsep_info = best;
-    curr = rui->wiener_nonsep_info;
-  }
-  rui->wiener_nonsep_info = best;
-
-  if (ext_search == 1) return best_err;
-  // printf("Err  int = %"PRId64", cost = %f\n", best_err, best_cost);
-
   // Try reduced filters by forcing trailing 2, 4, 6 coeffs to 0
   const int rodd = is_uv ? 0 : (end_feat & 1);
   if (rodd) {
@@ -2474,6 +2412,68 @@ static int64_t finer_tile_search_wienerns(
       }
     }
   }
+  if (ext_search == 1) return best_err;
+  // printf("Err  int = %"PRId64", cost = %f\n", best_err, best_cost);
+
+  const int src_steps[][2] = {
+    { 1, -1 }, { -1, 1 }, { 1, 1 },  { -1, -1 }, { 2, 1 },   { 1, 2 },
+    { -2, 1 }, { 1, -2 }, { 2, -1 }, { -1, 2 },  { -2, -1 }, { -1, -2 },
+  };
+  const int nsrc_steps = sizeof(src_steps) / (2 * sizeof(src_steps[0][0]));
+  for (int s = 0; s < iter_step; ++s) {
+    int no_improv = 1;
+    for (int i = beg_feat + (num_feat & 1); i < end_feat; i += 2) {
+      int cmin[2] = { wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+                      wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] };
+      int cmax[2] = {
+        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID] +
+            (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+        wienerns_coeffs[i + 1 - beg_feat][WIENERNS_MIN_ID] +
+            (1 << wienerns_coeffs[i + 1 - beg_feat][WIENERNS_BIT_ID])
+      };
+
+      for (int ci = 0; ci < nsrc_steps; ++ci) {
+        rui->wiener_nonsep_info.nsfilter[i] =
+            curr.nsfilter[i] + src_steps[ci][0];
+        rui->wiener_nonsep_info.nsfilter[i + 1] =
+            curr.nsfilter[i + 1] + src_steps[ci][1];
+        if (rui->wiener_nonsep_info.nsfilter[i] < cmin[0] ||
+            rui->wiener_nonsep_info.nsfilter[i] >= cmax[0] ||
+            rui->wiener_nonsep_info.nsfilter[i + 1] < cmin[1] ||
+            rui->wiener_nonsep_info.nsfilter[i + 1] >= cmax[1]) {
+          rui->wiener_nonsep_info = curr;
+          continue;
+        }
+        const int64_t err =
+            calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+        const int64_t bits = count_wienerns_bits(
+            rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
+#if CONFIG_LR_4PART_CODE
+            x->mode_costs.wiener_nonsep_4part_cost,
+#endif  // CONFIG_LR_4PART_CODE
+            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+        if (cost < best_cost) {
+          no_improv = 0;
+          best_err = err;
+          best_cost = cost;
+          best_bits = bits;
+          best = rui->wiener_nonsep_info;
+        }
+      }
+      curr = best;
+      rui->wiener_nonsep_info.nsfilter[i] = curr.nsfilter[i];
+      rui->wiener_nonsep_info.nsfilter[i + 1] = curr.nsfilter[i + 1];
+    }
+    if (no_improv) {
+      break;
+    }
+    rui->wiener_nonsep_info = best;
+    curr = rui->wiener_nonsep_info;
+  }
+  rui->wiener_nonsep_info = best;
+
   // printf("Err post = %"PRId64", cost = %f\n", best_err, best_cost);
   return best_err;
 }
@@ -2577,7 +2577,7 @@ static int compute_quantized_wienerns_filter(
 
   // double e[WIENERNS_MAX];
   const int rodd = is_uv ? 0 : (num_feat & 1);
-  const int max_reduce_steps_search = 2 + rodd;
+  const int max_reduce_steps_search = 4 + rodd;
   for (int reduce = 0; reduce <= max_reduce_steps_search;
        reduce += (reduce ? 2 : 2 - rodd)) {
     memset(x, 0, sizeof(*x) * num_feat);
@@ -2692,7 +2692,7 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     aom_clear_system_state();
 
     rusi->sse[RESTORE_WIENER_NONSEP] =
-        finer_tile_search_wienerns(rsc, limits, tile_rect, &rui, wnsf, 0);
+        finer_tile_search_wienerns(rsc, limits, tile_rect, &rui, wnsf, 1);
     // NOTE: replace with:
     //  calc_finer_tile_search_error(rsc, limits, tile_rect, &rui);
     //  if finer search was already done in compute_quantized_wienerns_filter()
@@ -2825,7 +2825,7 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
       return;
     }
     aom_clear_system_state();
-    finer_tile_search_wienerns(rsc, NULL, tile_rect, &rui_temp, wnsf, 0);
+    finer_tile_search_wienerns(rsc, NULL, tile_rect, &rui_temp, wnsf, 1);
     // Iterate through vector to get sse and bits for each on the new filter.
     double cost_merge = 0;
     VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
