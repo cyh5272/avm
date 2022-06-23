@@ -7326,9 +7326,23 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
           continue;
 
 #if IMPROVED_AMVD
-        if (this_mode == AMVDNEWMV && cm->seq_params.enable_adaptive_mvd == 0)
+        if ((this_mode == AMVDNEWMV
+#if CONFIG_JOINT_MVD
+             || mbmi->mode == JOINT_AMVDNEWMV
+#if CONFIG_OPTFLOW_REFINEMENT
+             || mbmi->mode == JOINT_AMVDNEWMV_OPTFLOW
+#endif
+#endif
+             ) &&
+            cm->seq_params.enable_adaptive_mvd == 0)
           continue;
 #endif  // IMPROVED_AMVD
+
+#if CONFIG_JOINT_MVD
+        if (is_joint_mvd_coding_mode(this_mode) &&
+            cm->seq_params.enable_joint_mvd == 0)
+          continue;
+#endif
 
         // Select prediction reference frames.
         for (i = 0; i < num_planes; i++) {

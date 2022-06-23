@@ -1363,7 +1363,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 
     const int new_mv = have_newmv_in_each_reference(mbmi->mode);
 #if CONFIG_JOINT_MVD
-    const int jmvd_base_ref_list = get_joint_mvd_base_ref_list(cm, mbmi);
+    const int jmvd_base_ref_list = is_joint_mvd_coding_mode(mbmi->mode)
+                                       ? get_joint_mvd_base_ref_list(cm, mbmi)
+                                       : 0;
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
     const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
