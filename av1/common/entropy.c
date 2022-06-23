@@ -284,10 +284,6 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER_STRIDE(fc->stx_cdf, STX_TYPES, CDF_SIZE(STX_TYPES));
 #endif
 #if CONFIG_FLEX_MVRES
-  for (int p = MV_PRECISION_HALF_PEL; p < NUM_MV_PRECISIONS; ++p) {
-    RESET_CDF_COUNTER(fc->sb_mv_precision_cdf[p - MV_PRECISION_HALF_PEL],
-                      p + 1);
-  }
   for (int p = 0; p < NUM_MV_PREC_MPP_CONTEXT; ++p) {
     RESET_CDF_COUNTER(fc->pb_mv_mpp_flag_cdf[p], 2);
   }

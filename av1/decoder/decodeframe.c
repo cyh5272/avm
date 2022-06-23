@@ -1771,29 +1771,10 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   }
 }
 #if CONFIG_FLEX_MVRES
-static MvSubpelPrecision av1_read_sb_mv_precision(AV1_COMMON *const cm,
-                                                  MACROBLOCKD *const xd,
-                                                  aom_reader *r) {
-  const MvSubpelPrecision max_precision = cm->features.fr_mv_precision;
-  const int down = aom_read_symbol(
-      r,
-      xd->tile_ctx->sb_mv_precision_cdf[max_precision - MV_PRECISION_HALF_PEL],
-      max_precision + 1, ACCT_STR);
-  return (MvSubpelPrecision)(max_precision - down);
-}
-
-// Read the superblock level parameters
-static void read_sb_info(SB_INFO *sbi, AV1Decoder *const pbi,
-                         ThreadData *const td, aom_reader *reader) {
+// Set the superblock level parameters
+static void set_sb_mv_precision(SB_INFO *sbi, AV1Decoder *const pbi) {
   AV1_COMMON *const cm = &pbi->common;
   sbi->sb_mv_precision = cm->features.fr_mv_precision;
-  if (cm->features.use_sb_mv_precision && !frame_is_intra_only(cm)) {
-    MACROBLOCKD *const xd = &td->dcb.xd;
-    sbi->sb_mv_precision = av1_read_sb_mv_precision(cm, xd, reader);
-    // printf(" Decoder: sbi->sb_mv_precision = %5d \n", sbi->sb_mv_precision);
-  }
-  (void)reader;
-  (void)td;
 }
 #endif
 
@@ -1836,7 +1817,7 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
   if (parse_decode_flag & 1) {
 #if CONFIG_FLEX_MVRES
     if (is_sb_root) {
-      read_sb_info(sbi, pbi, td, reader);
+      set_sb_mv_precision(sbi, pbi);
     }
 #endif
     const int plane_start = get_partition_plane_start(xd->tree_type);
@@ -6035,10 +6016,8 @@ static int read_uncompressed_header(AV1Decoder *pbi,
           features->most_probable_fr_mv_precision = features->fr_mv_precision;
         }
         if (features->fr_mv_precision == MV_PRECISION_ONE_PEL) {
-          features->use_sb_mv_precision = 0;
           features->use_pb_mv_precision = 0;
         } else {
-          features->use_sb_mv_precision = 0;
           features->use_pb_mv_precision = cm->seq_params.enable_flex_mvres;
         }
 #else

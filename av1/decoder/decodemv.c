@@ -1314,7 +1314,9 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp,
 
 #if CONFIG_FLEX_MVRES
   if (precision < MV_PRECISION_ONE_PEL) {
+#if CONFIG_ADAPTIVE_MVD
     assert(!is_adaptive_mvd);
+#endif
     return read_mv_component_low_precision(r, mvcomp, precision);
   }
 #endif

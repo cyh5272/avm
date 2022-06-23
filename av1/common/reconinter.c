@@ -2136,10 +2136,8 @@ MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
                                                 const SB_INFO *sbi,
                                                 const MB_MODE_INFO *mbmi) {
   (void)mbmi;
-  MvSubpelPrecision precision = cm->features.use_sb_mv_precision
-                                    ? sbi->sb_mv_precision
-                                    : cm->features.fr_mv_precision;
-  return precision;
+  (void)sbi;
+  return cm->features.fr_mv_precision;
 }
 
 int is_pb_mv_precision_active(const AV1_COMMON *const cm,

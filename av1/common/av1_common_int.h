@@ -562,10 +562,6 @@ typedef struct {
   bool cur_frame_force_integer_mv;
 #if CONFIG_FLEX_MVRES
   /*!
-   * If true, allow the mv precision to be changed at the superblock level.
-   */
-  bool use_sb_mv_precision;
-  /*!
    * If true, allow the mv precision to be changed at the prediction block
    * level.
    */

@@ -1567,14 +1567,6 @@ static const aom_cdf_prob default_stx_cdf[TX_SIZES][CDF_SIZE(STX_TYPES)] = {
 
 #if CONFIG_FLEX_MVRES
 static const aom_cdf_prob
-    default_sb_mv_precision_cdf[NUM_PB_FLEX_QUALIFIED_MAX_PREC][CDF_SIZE(
-        FLEX_MV_COSTS_SB_SIZE)] = {
-      { AOM_CDF4(24000, 29000, 31000) },
-      { AOM_CDF5(22980, 25479, 27781, 29986) },
-      { AOM_CDF6(22217, 24567, 26637, 28683, 30548) },
-    };
-
-static const aom_cdf_prob
     default_pb_mv_most_probable_precision_cdf[NUM_MV_PREC_MPP_CONTEXT][CDF_SIZE(
         2)] = { { AOM_CDF2(26227) }, { AOM_CDF2(22380) }, { AOM_CDF2(15446) } };
 static const aom_cdf_prob default_pb_mv_precision_cdf
@@ -1937,7 +1929,6 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->stx_cdf, default_stx_cdf);
 #endif
 #if CONFIG_FLEX_MVRES
-  av1_copy(fc->sb_mv_precision_cdf, default_sb_mv_precision_cdf);
   av1_copy(fc->pb_mv_precision_cdf, default_pb_mv_precision_cdf);
   av1_copy(fc->pb_mv_mpp_flag_cdf, default_pb_mv_most_probable_precision_cdf);
 #endif  // CONFIG_FLEX_MVRES

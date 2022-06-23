@@ -516,60 +516,6 @@ static INLINE void init_encode_rd_sb(AV1_COMP *cpi, ThreadData *td,
   av1_invalid_rd_stats(rd_cost);
 }
 
-#if CONFIG_FLEX_MVRES
-static AOM_INLINE MvSubpelPrecision determine_best_sb_mv_precision(
-    AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data, TokenExtra **tp,
-    const int mi_row, const int mi_col, SIMPLE_MOTION_DATA_TREE *sms_root) {
-  AV1_COMMON *const cm = &cpi->common;
-  const CommonModeInfoParams *mi_params = &cm->mi_params;
-  const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
-
-  const FeatureFlags *features = &cm->features;
-  MvSubpelPrecision best_prec = features->fr_mv_precision;
-  if (!features->use_sb_mv_precision || frame_is_intra_only(cm)) {
-    return best_prec;
-  }
-
-  assert(0);
-
-  SB_FIRST_PASS_STATS sb_fp_stats;
-  av1_backup_sb_state(&sb_fp_stats, cpi, td, tile_data, mi_row, mi_col);
-
-  int64_t best_rdc = INT64_MAX;
-  for (MvSubpelPrecision mv_prec = MV_PRECISION_ONE_PEL;
-       mv_prec <= features->fr_mv_precision; mv_prec++) {
-    PC_TREE *const pc_root = av1_alloc_pc_tree_node(sb_size);
-
-    RD_STATS this_rdc;
-
-    init_encode_rd_sb(cpi, td, tile_data, sms_root, &this_rdc, mi_row, mi_col,
-                      0);
-    av1_reset_mbmi(mi_params, sb_size, mi_row, mi_col);
-    av1_restore_sb_state(&sb_fp_stats, cpi, td, tile_data, mi_row, mi_col);
-
-    SB_INFO *sbi = td->mb.e_mbd.sbi;
-    sbi->sb_mv_precision = mv_prec;
-
-    assert(td->mb.e_mbd.tree_type == SHARED_PART);
-
-    av1_rd_pick_partition(cpi, td, tile_data, tp, mi_row, mi_col, sb_size,
-                          &this_rdc, this_rdc, pc_root, sms_root, NULL,
-                          SB_DRY_PASS, NULL);
-    if (this_rdc.rdcost < best_rdc) {
-      best_rdc = this_rdc.rdcost;
-      best_prec = mv_prec;
-    }
-  }
-
-  RD_STATS this_rdc;
-  init_encode_rd_sb(cpi, td, tile_data, sms_root, &this_rdc, mi_row, mi_col, 0);
-  av1_reset_mbmi(mi_params, sb_size, mi_row, mi_col);
-  av1_restore_sb_state(&sb_fp_stats, cpi, td, tile_data, mi_row, mi_col);
-
-  return best_prec;
-}
-#endif
-
 /*!\brief Encode a superblock (RD-search-based)
  *
  * \ingroup partition_search
@@ -670,12 +616,7 @@ static AOM_INLINE void encode_rd_sb(AV1_COMP *cpi, ThreadData *td,
 
 #if CONFIG_FLEX_MVRES
     // Sets the sb_mv_precision
-    if (cm->features.use_sb_mv_precision && !frame_is_intra_only(cm)) {
-      x->e_mbd.sbi->sb_mv_precision = determine_best_sb_mv_precision(
-          cpi, td, tile_data, tp, mi_row, mi_col, sms_root);
-    } else {
-      x->e_mbd.sbi->sb_mv_precision = cm->features.fr_mv_precision;
-    }
+    x->e_mbd.sbi->sb_mv_precision = cm->features.fr_mv_precision;
 #endif  // CONFIG_FLEX_MVRES
 
     if (num_passes == 1) {

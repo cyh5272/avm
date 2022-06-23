@@ -74,7 +74,9 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
 
 #if CONFIG_FLEX_MVRES
   if (precision < MV_PRECISION_ONE_PEL) {
+#if CONFIG_ADAPTIVE_MVD
     assert(!is_adaptive_mvd);
+#endif
     update_mv_component_stats_lower_precision(comp, mvcomp, precision);
     return;
   }

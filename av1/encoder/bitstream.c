@@ -2330,24 +2330,6 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
   }
 }
 
-#if CONFIG_FLEX_MVRES
-static void write_sb_mv_precision(const AV1_COMMON *const cm,
-                                  MACROBLOCKD *const xd, aom_writer *w) {
-  const MB_MODE_INFO *const mbmi = xd->mi[0];
-  const MvSubpelPrecision max_precision = cm->features.fr_mv_precision;
-  //  assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
-  assert(mbmi->max_mv_precision == xd->sbi->sb_mv_precision);
-  assert(xd->sbi->sb_mv_precision <= max_precision);
-  aom_write_symbol(
-      w, max_precision - xd->sbi->sb_mv_precision,
-      xd->tile_ctx->sb_mv_precision_cdf[max_precision - MV_PRECISION_HALF_PEL],
-      max_precision + 1);
-  // printf(" Encoder: sbi->sb_mv_precision = %5d \n",
-  // xd->sbi->sb_mv_precision);
-  (void)mbmi;
-}
-#endif  // CONFIG_FLEX_MVRES
-
 static AOM_INLINE void write_modes_sb(
     AV1_COMP *const cpi, const TileInfo *const tile, aom_writer *const w,
     const TokenExtra **tok, const TokenExtra *const tok_end, int mi_row,
@@ -2365,14 +2347,6 @@ static AOM_INLINE void write_modes_sb(
 
   if (mi_row >= mi_params->mi_rows || mi_col >= mi_params->mi_cols) return;
 
-#if CONFIG_FLEX_MVRES
-  if (bsize == cm->seq_params.sb_size && !frame_is_intra_only(cm) &&
-      cm->features.use_sb_mv_precision) {
-    const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
-    xd->mi = &mi_params->mi_grid_base[grid_idx];
-    write_sb_mv_precision(cm, xd, w);
-  }
-#endif  // CONFIG_FLEX_MVRES
   const int plane_start = get_partition_plane_start(xd->tree_type);
   const int plane_end =
       get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
