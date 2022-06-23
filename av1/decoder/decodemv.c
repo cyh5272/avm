@@ -1858,9 +1858,8 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(is_adaptive_mvd && is_pb_mv_precision_active(cm, mbmi, bsize),
-                "AMVD and flex MV cannnot be enabled for same block");
+#if CONFIG_FLEX_MVRES
+  assert(!(is_adaptive_mvd && is_pb_mv_precision_active(cm, mbmi, bsize)));
 #endif
 #endif  // CONFIG_ADAPTIVE_MVD
   switch (mode) {
@@ -2172,14 +2171,6 @@ MvSubpelPrecision av1_read_pb_mv_precision(AV1_COMMON *const cm,
   assert(mbmi->most_probable_pb_mv_precision <= mbmi->max_mv_precision);
   assert(mbmi->most_probable_pb_mv_precision ==
          cm->features.most_probable_fr_mv_precision);
-
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(mbmi->most_probable_pb_mv_precision > mbmi->max_mv_precision,
-                " Error in MPP computation");
-  CHECK_FLEX_MV(mbmi->most_probable_pb_mv_precision !=
-                    cm->features.most_probable_fr_mv_precision,
-                " Error in MPP compuation");
-#endif
 
   const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
   const int mpp_flag = aom_read_symbol(

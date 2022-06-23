@@ -245,18 +245,6 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
     const int num_mv_classes = MV_CLASSES -
                                (precision <= MV_PRECISION_FOUR_PEL) -
                                (precision <= MV_PRECISION_8_PEL);
-
-#if CONFIG_DEBUG
-    CHECK_FLEX_MV(mag_int_mv < 0, " Error in computation of mag_int_mv");
-    CHECK_FLEX_MV((offset & ((1 << (MV_PRECISION_ONE_PEL - precision)) - 1)),
-                  " LSBs of offset is not matches with precision");
-    CHECK_FLEX_MV(precision == MV_PRECISION_FOUR_PEL && mv_class == MV_CLASS_1,
-                  " MV_CLASS_1 is not allowed for  MV_PRECISION_FOUR_PEL");
-    CHECK_FLEX_MV(
-        precision == MV_PRECISION_8_PEL &&
-            (mv_class == MV_CLASS_1 || mv_class == MV_CLASS_2),
-        " MV_CLASS_1/MV_CLASS_2 is not allowed for  MV_PRECISION_8_PEL");
-#endif
     // Sign
     aom_write_symbol(w, sign, mvcomp->sign_cdf, 2);
 
@@ -272,12 +260,6 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
       for (i = start_lsb; i < n; ++i)
         aom_write_symbol(w, (offset >> i) & 1, mvcomp->bits_cdf[i], 2);
     }
-#if CONFIG_DEBUG
-    else {
-      const int base = mv_class ? (1 << mv_class) : 0;
-      CHECK_FLEX_MV(mag_int_mv != base, " Error in offset computation");
-    }
-#endif
   }
 #endif
 

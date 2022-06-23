@@ -197,10 +197,8 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
 static inline int check_mv_precision(const AV1_COMMON *cm,
                                      const MB_MODE_INFO *const mbmi) {
   const int is_comp_pred = mbmi->ref_frame[1] > INTRA_FRAME;
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(mbmi->pb_mv_precision > mbmi->max_mv_precision,
-                " pb precision is larger than max precision");
-#endif
+
+  assert(mbmi->pb_mv_precision <= mbmi->max_mv_precision);
 
   const PREDICTION_MODE mode = mbmi->mode;
   if (is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y])) {

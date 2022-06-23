@@ -1579,9 +1579,8 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #if CONFIG_ADAPTIVE_MVD
       if (cm->seq_params.enable_adaptive_mvd) {
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-        CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                      " pb and max mv precision value should be same");
+#if CONFIG_FLEX_MVRES
+        assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
 #endif
         av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
                                                      NULL, 0, rate_mv, 1);
@@ -1682,9 +1681,8 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
 #if CONFIG_ADAPTIVE_MVD
       if (cm->seq_params.enable_adaptive_mvd) {
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-        CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                      " pb and max mv precision value should be same");
+#if CONFIG_FLEX_MVRES
+        assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
 #endif
         av1_compound_single_motion_search_interinter(cpi, x, bsize, cur_mv,
                                                      NULL, 0, rate_mv, 0);
@@ -1725,9 +1723,8 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
   } else if (this_mode == AMVDNEWMV) {
     const int ref_idx = 0;
     int_mv best_mv;
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-    CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                  " pb and max mv precision value should be same");
+#if CONFIG_FLEX_MVRES
+    assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
 #endif
     av1_amvd_single_motion_search(cpi, x, bsize, &best_mv.as_mv, rate_mv,
                                   ref_idx);
@@ -3790,9 +3787,8 @@ static int64_t handle_inter_mode(
         mbmi->mv[i].as_int = cur_mv[i].as_int;
       }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-      CHECK_FLEX_MV(check_mv_precision(cm, mbmi) == 0,
-                    " precision and MV mismatch after handle_newmv");
+#if CONFIG_FLEX_MVRES
+      assert(check_mv_precision(cm, mbmi));
 #endif
 
       const int like_nearest = (mbmi->mode == NEARMV ||
@@ -3839,10 +3835,8 @@ static int64_t handle_inter_mode(
         if (not_best_mode) continue;
       }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-      CHECK_FLEX_MV(check_mv_precision(cm, mbmi) == 0,
-                    " precision and MV mismatch at the end of the "
-                    "process_compound_inter_mode");
+#if CONFIG_FLEX_MVRES
+      assert(check_mv_precision(cm, mbmi));
 #endif
 
 #if CONFIG_COLLECT_COMPONENT_TIMING
@@ -3857,10 +3851,8 @@ static int64_t handle_inter_mode(
           x, cpi, tile_data, bsize, &tmp_dst, &orig_dst, &rd, &rs,
           &skip_build_pred, args, ref_best_rd);
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-      CHECK_FLEX_MV(check_mv_precision(cm, mbmi) == 0,
-                    " precision and MV mismatch at the end of the "
-                    "av1_interpolation_filter_search");
+#if CONFIG_FLEX_MVRES
+      assert(check_mv_precision(cm, mbmi));
 #endif
 #if CONFIG_COLLECT_COMPONENT_TIMING
       end_timing(cpi, interpolation_filter_search_time);
@@ -3919,10 +3911,8 @@ static int64_t handle_inter_mode(
       assert(
           IMPLIES(!av1_check_newmv_joint_nonzero(cm, x), ret_val == INT64_MAX));
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-      CHECK_FLEX_MV(
-          check_mv_precision(cm, mbmi) == 0,
-          " precision and MV mismatch at the end of the motion_mode_rd");
+#if CONFIG_FLEX_MVRES
+      assert(check_mv_precision(cm, mbmi));
 #endif
 
       if (ret_val != INT64_MAX) {
@@ -3970,10 +3960,8 @@ static int64_t handle_inter_mode(
           motion_mode_cand->rate_mv = rate_mv;
           motion_mode_cand->rate2_nocoeff = rate2_nocoeff;
         }
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-        CHECK_FLEX_MV(
-            check_mv_precision(cm, mbmi) == 0,
-            " precision and MV mismatch at the end of the motion_mode_rd");
+#if CONFIG_FLEX_MVRES
+        assert(check_mv_precision(cm, mbmi));
 #endif
 
         if (tmp_rd < ref_best_rd) {
@@ -7796,11 +7784,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   *mbmi = search_state.best_mbmode;
   assert(av1_check_newmv_joint_nonzero(cm, x));
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#if CONFIG_FLEX_MVRES
   assert(check_mv_precision(cm, mbmi));
-  CHECK_FLEX_MV(
-      check_mv_precision(cm, mbmi) == 0,
-      " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
 #endif
 
   txfm_info->skip_txfm |= search_state.best_skip2;
@@ -7824,11 +7809,8 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
     }
   }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#if CONFIG_FLEX_MVRES
   assert(check_mv_precision(cm, mbmi));
-  CHECK_FLEX_MV(
-      check_mv_precision(cm, mbmi) == 0,
-      " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
 #endif
 
   txfm_info->skip_txfm |= search_state.best_mode_skippable;
@@ -7956,11 +7938,8 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
                                              mbmi->num_proj_ref, bsize);
   }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#if CONFIG_FLEX_MVRES
   assert(check_mv_precision(cm, mbmi));
-  CHECK_FLEX_MV(
-      check_mv_precision(cm, mbmi) == 0,
-      " precision and MV mismatch in the funtion av1_rd_pick_inter_mode_sb");
 #endif
   const InterpFilter interp_filter = features->interp_filter;
   set_default_interp_filters(mbmi,

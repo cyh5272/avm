@@ -2059,9 +2059,6 @@ int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi) {
     }
   }
   assert(0);
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(1, " Error in precision value");
-#endif
   return coded_precision_idx;
 }
 
@@ -2081,9 +2078,6 @@ MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
     }
   }
   assert(0);
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(1, " Error in precision value");
-#endif
   return pb_mv_precision;
 }
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
@@ -2106,7 +2100,6 @@ void set_most_probable_mv_precision(const AV1_COMMON *const cm,
       break;
     }
   }
-  CHECK_FLEX_MV(!mpp_found, "MPP is not found in the preceision set");
   assert(mpp_found);
 #endif
 }

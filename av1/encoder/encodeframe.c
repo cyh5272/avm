@@ -530,9 +530,7 @@ static AOM_INLINE MvSubpelPrecision determine_best_sb_mv_precision(
     return best_prec;
   }
 
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(1, " Super block level precision is not supported");
-#endif
+  assert(0);
 
   SB_FIRST_PASS_STATS sb_fp_stats;
   av1_backup_sb_state(&sb_fp_stats, cpi, td, tile_data, mi_row, mi_col);

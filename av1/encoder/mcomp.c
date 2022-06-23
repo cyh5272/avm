@@ -247,10 +247,10 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
 #endif  // CONFIG_ADAPTIVE_MVD  || CONFIG_TIP
 #if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      is_adaptive_mvd && (mbmi->pb_mv_precision != mbmi->max_mv_precision),
-      " pb and max mv precision value should be same");
+
+#if CONFIG_FLEX_MVRES
+  assert(
+      !(is_adaptive_mvd && (mbmi->pb_mv_precision != mbmi->max_mv_precision)));
 #endif
 
 #endif  // CONFIG_ADAPTIVE_MVD
@@ -1810,12 +1810,11 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
           ? 0
           : (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
   const int prec_multiplier = (1 << prec_shift);
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(!is_this_mv_precision_compliant(
-                    get_mv_from_fullmv(&start_mv),
-                    ms_params->mv_cost_params.pb_mv_precision),
-                " best_mv precision is not compaitable");
-#endif
+
+  assert(is_this_mv_precision_compliant(
+      get_mv_from_fullmv(&start_mv),
+      ms_params->mv_cost_params.pb_mv_precision));
+
 #endif
 
   unsigned int bestsad = INT_MAX;
@@ -2013,11 +2012,10 @@ static int diamond_search_sad(FULLPEL_MV start_mv,
           thissad =
               get_mvpred_compound_sad(ms_params, src, check_here, ref_stride);
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-          CHECK_FLEX_MV(!is_this_mv_precision_compliant(
-                            get_mv_from_fullmv(&this_mv),
-                            ms_params->mv_cost_params.pb_mv_precision),
-                        " this_mv precision is not compaitable");
+#if CONFIG_FLEX_MVRES
+          assert(is_this_mv_precision_compliant(
+              get_mv_from_fullmv(&this_mv),
+              ms_params->mv_cost_params.pb_mv_precision));
 #endif
 
           if (thissad < bestsad) {
@@ -2564,12 +2562,10 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
   const int is_intra_mode = ms_params->is_intra_mode;
   int run_mesh_search = ms_params->run_mesh_search;
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(
-          get_mv_from_fullmv(&start_mv),
-          ms_params->mv_cost_params.pb_mv_precision),
-      " start_mv precision is not compaitable in  av1_full_pixel_search");
+#if CONFIG_FLEX_MVRES
+  assert(is_this_mv_precision_compliant(
+      get_mv_from_fullmv(&start_mv),
+      ms_params->mv_cost_params.pb_mv_precision));
 #endif
 
   int var = 0;
@@ -2622,22 +2618,18 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
     default: assert(0 && "Invalid search method.");
   }
 #if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  if (best_mv)
-    CHECK_FLEX_MV(
-        !is_this_mv_precision_compliant(
-            get_mv_from_fullmv(best_mv),
-            ms_params->mv_cost_params.pb_mv_precision),
-        " best_mv precision is not compaitable in  av1_full_pixel_search");
-  if (second_best_mv)
-    CHECK_FLEX_MV(!is_this_mv_precision_compliant(
-                      get_mv_from_fullmv(second_best_mv),
-                      ms_params->mv_cost_params.pb_mv_precision),
-                  " second_best_mv precision is not compaitable in  "
-                  "av1_full_pixel_search");
-  CHECK_FLEX_MV(
-      (ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL &&
-       search_method != NSTEP && search_method != DIAMOND),
-      " mv search method is not supported for 2, and 4 pel precision");
+  if (best_mv) {
+    assert(is_this_mv_precision_compliant(
+        get_mv_from_fullmv(best_mv),
+        ms_params->mv_cost_params.pb_mv_precision));
+  }
+  if (second_best_mv) {
+    assert(is_this_mv_precision_compliant(
+        get_mv_from_fullmv(second_best_mv),
+        ms_params->mv_cost_params.pb_mv_precision));
+  }
+  assert((!(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL &&
+            search_method != NSTEP && search_method != DIAMOND)));
 #endif
 
   // Should we allow a follow on exhaustive search?
@@ -2715,12 +2707,10 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
     var_ex = full_pixel_exhaustive(*best_mv, ms_params, mesh_patterns,
                                    cost_list, &tmp_mv_ex, second_best_mv);
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-    CHECK_FLEX_MV(
-        !is_this_mv_precision_compliant(
-            get_mv_from_fullmv(&tmp_mv_ex),
-            ms_params->mv_cost_params.pb_mv_precision),
-        " tmp_mv_ex precision is not compaitable in  av1_full_pixel_search");
+#if CONFIG_FLEX_MVRES
+    assert(is_this_mv_precision_compliant(
+        get_mv_from_fullmv(&tmp_mv_ex),
+        ms_params->mv_cost_params.pb_mv_precision));
 #endif
     if (var_ex < var) {
       var = var_ex;
@@ -3327,10 +3317,6 @@ static int obmc_diamond_search_sad(
       int c = (site[idx].mv.col * prec_multiplier);
       int offset = r * ref_buf->stride + c;
       const FULLPEL_MV mv = { best_mv->row + r, best_mv->col + c };
-#if CONFIG_DEBUG
-      CHECK_FLEX_MV(prec_shift == 0 && offset != site[idx].offset,
-                    " Error in offset computation");
-#endif
 #else
       const FULLPEL_MV mv = { best_mv->row + site[idx].mv.row,
                               best_mv->col + site[idx].mv.col };
@@ -4314,8 +4300,7 @@ int low_precision_joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
 #if CONFIG_DEBUG
   const MV xxmv = { bestmv->row, bestmv->col };
-  CHECK_FLEX_MV(!is_this_mv_precision_compliant(xxmv, mbmi->pb_mv_precision),
-                " xxmv precision is not compaitable");
+  assert(is_this_mv_precision_compliant(xxmv, mbmi->pb_mv_precision));
 #endif
 
   return besterr;
@@ -4345,8 +4330,7 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
 #if CONFIG_FLEX_MVRES && CONFIG_DEBUG
   MB_MODE_INFO *const mbmi = xd->mi[0];
-  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                " pb mv precision is not same as maximum");
+  assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
 #endif
 
   // How many steps to take. A round of 0 means fullpel search only, 1 means
@@ -4448,10 +4432,7 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
 
 #if CONFIG_FLEX_MVRES
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                " pb mv precision is not same as maximum");
-#endif
+  assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
   lower_mv_precision(other_mv, mbmi->pb_mv_precision);
 #else
   lower_mv_precision(other_mv, allow_hp,

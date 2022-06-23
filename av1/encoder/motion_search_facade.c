@@ -262,19 +262,10 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_FLEX_MVRES
         full_pel_lower_mv_precision(&this_second_best_mv,
                                     mbmi->pb_mv_precision);
-#if CONFIG_DEBUG
-
-        CHECK_FLEX_MV(
-            !is_this_mv_precision_compliant(get_mv_from_fullmv(&this_best_mv),
-                                            pb_mv_precision),
-            " this_best_mv precision is not compaitable in the loop of   "
-            "av1_full_pixel_search");
-        CHECK_FLEX_MV(
-            !is_this_mv_precision_compliant(
-                get_mv_from_fullmv(&this_second_best_mv), pb_mv_precision),
-            " this_second_best_mv precision is not compaitable in the loop "
-            "of   av1_full_pixel_search");
-#endif
+        assert(is_this_mv_precision_compliant(get_mv_from_fullmv(&this_best_mv),
+                                              pb_mv_precision));
+        assert(is_this_mv_precision_compliant(
+            get_mv_from_fullmv(&this_second_best_mv), pb_mv_precision));
 #endif
 
         if (thissme < bestsme) {
@@ -301,11 +292,9 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
-                                      mbmi->pb_mv_precision),
-      " Error in MV precision value after integer search 1");
+#if CONFIG_FLEX_MVRES
+  assert(is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
+                                        mbmi->pb_mv_precision));
 #endif
 
   // Terminate search with the current ref_idx if we have already encountered
@@ -358,11 +347,9 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
-                                      mbmi->pb_mv_precision),
-      " Error in MV precision value after integer search 2");
+#if CONFIG_FLEX_MVRES
+  assert(is_this_mv_precision_compliant(get_mv_from_fullmv(&best_mv->as_fullmv),
+                                        mbmi->pb_mv_precision));
 #endif
 
   if (cpi->common.features.cur_frame_force_integer_mv) {
@@ -440,10 +427,8 @@ void av1_single_motion_search(const AV1_COMP *const cpi, MACROBLOCK *x,
                              mv_costs->mv_cost_stack, MV_COST_WEIGHT);
 #endif
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(best_mv->as_mv, mbmi->pb_mv_precision),
-      " Error in MV precision value in av1_single_motion_search");
+#if CONFIG_FLEX_MVRES
+  assert(is_this_mv_precision_compliant(best_mv->as_mv, mbmi->pb_mv_precision));
 #endif
 }
 
@@ -521,12 +506,8 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
     }
   }
 
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(
-          get_mv_from_fullmv(&curr_best_mv.as_fullmv), mbmi->pb_mv_precision),
-      " Error in MV precision value after integer search 1");
-#endif
+  assert(is_this_mv_precision_compliant(
+      get_mv_from_fullmv(&curr_best_mv.as_fullmv), mbmi->pb_mv_precision));
 
   // Terminate search with the current ref_idx if we have already encountered
   // another ref_mv in the drl such that:
@@ -574,18 +555,8 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
     }
   }
 
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(
-          get_mv_from_fullmv(&curr_best_mv.as_fullmv), mbmi->pb_mv_precision),
-      " Error in MV precision value after integer search 2");
-#endif
-
-#if 0
-  if (cpi->common.features.cur_frame_force_integer_mv) {
-    convert_fullmv_to_mv(&curr_best_mv);
-  }
-#endif
+  assert(is_this_mv_precision_compliant(
+      get_mv_from_fullmv(&curr_best_mv.as_fullmv), mbmi->pb_mv_precision));
 
   const int use_fractional_mv =
       bestsme < INT_MAX && cpi->common.features.cur_frame_force_integer_mv == 0;
@@ -611,11 +582,7 @@ void av1_single_motion_search_high_precision(const AV1_COMP *const cpi,
 #endif
   );
 
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(best_mv->as_mv, mbmi->pb_mv_precision),
-      " Error in MV precision value in av1_single_motion_search");
-#endif
+  assert(is_this_mv_precision_compliant(best_mv->as_mv, mbmi->pb_mv_precision));
 }
 #endif
 
@@ -843,11 +810,9 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   struct macroblockd_plane *const pd = &xd->plane[0];
   const MvCosts *mv_costs = &x->mv_costs;
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(is_pb_mv_precision_active(cm, mbmi, bsize),
-                " AMVD and AMVR can not be enabled for same block");
-  CHECK_FLEX_MV(mbmi->pb_mv_precision != mbmi->max_mv_precision,
-                " pb mv precision should be same as mv precision");
+#if CONFIG_FLEX_MVRES
+  assert(!is_pb_mv_precision_active(cm, mbmi, bsize));
+  assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
 #endif
 
   const YV12_BUFFER_CONFIG *const scaled_ref_frame =

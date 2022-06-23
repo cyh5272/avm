@@ -1582,14 +1582,10 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
   assert(mbmi->pb_mv_precision <= mbmi->max_mv_precision);
   assert(mbmi->max_mv_precision == xd->sbi->sb_mv_precision);
 
-#if CONFIG_DEBUG
   assert(av1_get_mbmi_max_mv_precision(cm, xd->sbi, mbmi) ==
          mbmi->max_mv_precision);
 
-  CHECK_FLEX_MV(
-      check_mv_precision(cm, mbmi) == 0,
-      " precision and MV mismatch in the function write_pb_mv_precision");
-#endif
+  assert(check_mv_precision(cm, mbmi));
 
   const int down_ctx = av1_get_pb_mv_precision_down_context(cm, xd);
 
@@ -1597,13 +1593,6 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
   assert(mbmi->most_probable_pb_mv_precision ==
          cm->features.most_probable_fr_mv_precision);
 
-#if CONFIG_DEBUG
-  CHECK_FLEX_MV(mbmi->most_probable_pb_mv_precision > mbmi->max_mv_precision,
-                " Error in MPP computation");
-  CHECK_FLEX_MV(mbmi->most_probable_pb_mv_precision !=
-                    cm->features.most_probable_fr_mv_precision,
-                " Error in MPP compuation");
-#endif
   const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
   const int mpp_flag =
       (mbmi->pb_mv_precision == mbmi->most_probable_pb_mv_precision);
@@ -1616,12 +1605,6 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
     int down = av1_get_pb_mv_precision_index(mbmi);
     int nsymbs = precision_def->num_precisions - 1;
     assert(down >= 0 && down <= nsymbs);
-#if CONFIG_DEBUG
-    CHECK_FLEX_MV(mbmi->mb_precision_set !=
-                      (mbmi->max_mv_precision == MV_PRECISION_QTR_PEL),
-                  " Error in mb_precision_set");
-    CHECK_FLEX_MV(down < 0 || down >= nsymbs, " Error in down");
-#endif
     aom_write_symbol(
         w, down,
         xd->tile_ctx->pb_mv_precision_cdf[down_ctx][mbmi->max_mv_precision -
@@ -1925,11 +1908,8 @@ static AOM_INLINE void write_intrabc_info(
     assert(mbmi->mode == DC_PRED);
     assert(mbmi->motion_mode == SIMPLE_TRANSLATION);
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-    CHECK_FLEX_MV(
-        mbmi->pb_mv_precision != MV_PRECISION_ONE_PEL,
-        " pb_mv_precision is not same as MV_PRECISION_ONE_PEL for intra-bc "
-        "blocks");
+#if CONFIG_FLEX_MVRES
+    assert(mbmi->pb_mv_precision == MV_PRECISION_ONE_PEL);
 #endif
 
     int_mv dv_ref = mbmi_ext_frame->ref_mv_stack[0].this_mv;
@@ -4198,19 +4178,13 @@ static AOM_INLINE void write_uncompressed_header_obu(
         if (!features->cur_frame_force_integer_mv) {
           aom_wb_write_bit(wb,
                            features->fr_mv_precision > MV_PRECISION_QTR_PEL);
-#if CONFIG_DEBUG
-          CHECK_FLEX_MV(features->fr_mv_precision !=
-                            features->most_probable_fr_mv_precision,
-                        " frame level precision value is not same as most "
-                        "probable precision");
-#endif
+          assert(features->fr_mv_precision ==
+                 features->most_probable_fr_mv_precision);
         }
 #if CONFIG_DEBUG
         else {
-          CHECK_FLEX_MV(features->fr_mv_precision != MV_PRECISION_ONE_PEL,
-                        " frame level precision value should be integer pel");
+          assert(features->fr_mv_precision == MV_PRECISION_ONE_PEL);
         }
-
         assert(IMPLIES(features->cur_frame_force_integer_mv,
                        features->fr_mv_precision == MV_PRECISION_ONE_PEL));
 #endif

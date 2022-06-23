@@ -249,11 +249,9 @@ static AOM_INLINE void first_pass_motion_search(AV1_COMP *cpi, MACROBLOCK *x,
   tmp_err = av1_full_pixel_search(start_mv, &ms_params, step_param, NULL,
                                   &this_best_mv, NULL);
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
-  CHECK_FLEX_MV(
-      !is_this_mv_precision_compliant(get_mv_from_fullmv(&this_best_mv),
-                                      pb_mv_precision),
-      " this_best_mv precision is not compaitable in  av1_full_pixel_search");
+#if CONFIG_FLEX_MVRES
+  assert(is_this_mv_precision_compliant(get_mv_from_fullmv(&this_best_mv),
+                                        pb_mv_precision));
 #endif
 
   if (tmp_err < INT_MAX) {
