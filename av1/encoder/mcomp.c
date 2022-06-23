@@ -5162,11 +5162,19 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                   BLOCK_SIZE bsize, const int *pts0,
                                   const int *pts_inref0, int total_samples) {
   MB_MODE_INFO *mbmi = xd->mi[0];
+  // TODO(rachelbarker): Fix combination here
 #if CONFIG_FLEX_MVRES
   static const MV neighbors[16] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
                                     { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 },
                                     { 0, -4 }, { 4, 0 }, { 0, 4 }, { -4, 0 },
                                     { 0, -8 }, { 8, 0 }, { 0, 8 }, { -8, 0 } };
+#endif
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  static const MV neighbors[16] = {
+    { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
+    { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
+    { 2, -2 },  { 2, 2 },  { -2, -2 }, { -2, 2 }
+  };
 #else
   static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
                                    { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
@@ -5182,11 +5190,15 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
+  // TODO(rachelbarker): Fix combination here
 #if CONFIG_FLEX_MVRES
   assert(ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL);
   const int start = (MV_PRECISION_ONE_EIGHTH_PEL -
                      ms_params->mv_cost_params.pb_mv_precision) *
                     4;
+#endif
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  const int start = ms_params->allow_hp ? 0 : 8;
 #else
   const int start = ms_params->allow_hp ? 0 : 4;
 #endif
@@ -5199,12 +5211,19 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   int pts[SAMPLES_ARRAY_SIZE], pts_inref[SAMPLES_ARRAY_SIZE];
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-  // TODO(Mohammed): increase number of search iterations when flex_mv precision
-  // is ON
+  // TODO(rachelbarker): Fix combination here
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  for (int ite = 0; ite < 8; ++ite) {
+#else
   for (int ite = 0; ite < 2; ++ite) {
+#endif
     int best_idx = -1;
 
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+    for (int idx = start; idx < start + 8; ++idx) {
+#else
     for (int idx = start; idx < start + 4; ++idx) {
+#endif
       unsigned int thismse;
 
       MV this_mv = { best_mv->row + neighbors[idx].row,
@@ -5333,6 +5352,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   int delta;
   uint64_t best_rd, inc_rd, dec_rd;
 
+  // TODO(rachelbarker): Add FLEX_MVRES stuff here
   static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
                                    { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
   const int start = ms_params->allow_hp ? 0 : 4;
@@ -5527,15 +5547,30 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                    bool neighbor_is_above, BLOCK_SIZE bsize,
                                    const WarpedMotionParams *neighbor_params) {
   MB_MODE_INFO *mbmi = xd->mi[0];
+
+  // TODO(rachelbarker): Add FLEX_MVRES stuff here
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  static const MV neighbors[16] = {
+    { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
+    { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
+    { 2, -2 },  { 2, 2 },  { -2, -2 }, { -2, 2 }
+  };
+#else
   static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
                                    { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
+#endif
+
   MV *best_mv = &mbmi->mv[0].as_mv;
 
   WarpedMotionParams best_wm_params = mbmi->wm_params[0];
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  const int start = ms_params->allow_hp ? 0 : 8;
+#else
   const int start = ms_params->allow_hp ? 0 : 4;
+#endif
 
   // Before this function is called, motion_mode_rd will have selected a valid
   // warp model, and stored it into mbmi->wm_params, but we have not yet
@@ -5545,10 +5580,19 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+  for (int ite = 0; ite < 8; ++ite) {
+#else
   for (int ite = 0; ite < 2; ++ite) {
+#endif
+
     int best_idx = -1;
 
+#if CONFIG_MORE_SEARCH_LOCAL_WARP
+    for (int idx = start; idx < start + 8; ++idx) {
+#else
     for (int idx = start; idx < start + 4; ++idx) {
+#endif
       unsigned int thismse;
 
       MV this_mv = { best_mv->row + neighbors[idx].row,
