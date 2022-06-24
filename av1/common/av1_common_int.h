@@ -803,7 +803,21 @@ struct CommonModeInfoParams {
    * tx_skip buffer allocated for each 4x4 block
    */
   uint32_t tx_skip_buf_size[MAX_MB_PLANE];
+  /*!
+   * tx_skip stridie
+   */
+  uint32_t tx_skip_stride[MAX_MB_PLANE];
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER
+  /*!
+   * Buffer that stores pc-wiener classification information.
+   */
+  uint8_t *class_id[MAX_MB_PLANE];
+  /*!
+   * class_id stridie
+   */
+  uint32_t class_id_stride[MAX_MB_PLANE];
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_SAVE_IN_LOOP_DATA
   /*!
    * Useful in saving lr modes.
@@ -1576,7 +1590,7 @@ typedef struct AV1Common {
 } AV1_COMMON;
 
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params);
+void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm);
 void av1_dealloc_txk_skip_array(CommonModeInfoParams *mi_params);
 void av1_reset_txk_skip_array(AV1_COMMON *cm);
 void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params);
@@ -1590,6 +1604,10 @@ void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
 uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
                          int plane, int blk_row, int blk_col);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER
+void av1_alloc_class_id_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm);
+void av1_dealloc_class_id_array(CommonModeInfoParams *mi_params);
+#endif  // CONFIG_PC_WIENER
 
 /*!\cond */
 
