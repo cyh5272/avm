@@ -1282,7 +1282,8 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   }
-  if ((xd->height >> 2) >= xd->width && xd->left_available &&  xd->height > 8)
+#if WITH_MID_POS
+  if ( xd->left_available )
   {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height >> 1), -1, ref_mv_stack,
           ref_mv_weight, &col_match_count, &newmv_count,
@@ -1293,7 +1294,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
           refmv_count);
   }
-  if ((xd->width >> 2) >= xd->height && xd->up_available &&  xd->width > 8)
+  if ( xd->up_available )
   {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width >> 1) , ref_mv_stack,
             ref_mv_weight, &row_match_count, &newmv_count,
@@ -1304,6 +1305,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
             refmv_count);
   }
+#endif
 #else
   // Scan the first above row mode info. row_offset = -1;
   if (abs(max_row_offset) >= 1)
@@ -1534,8 +1536,10 @@ static AOM_INLINE void setup_ref_mv_list(
   }
 #endif
 
-#if COND_RE_BANK
+#if COND_RE_BANK||BF_DERIVE
+#if !BF_DERIVE
     if (!(xd->width >= 16 || xd->height >= 16)){
+#endif
 #if CONFIG_REF_MV_BANK
   if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
@@ -1568,7 +1572,9 @@ static AOM_INLINE void setup_ref_mv_list(
     }
   }
 #endif  // CONFIG_REF_MV_BANK
+#if !BF_DERIVE
   }
+#endif
 #endif //COND_RE_BANK
 
 #if CONFIG_SMVP_IMPROVEMENT
@@ -1712,6 +1718,7 @@ static AOM_INLINE void setup_ref_mv_list(
       }
     }
   }
+#if !BF_DERIVE
 #if COND_RE_BANK
     if ((xd->width >= 16 || xd->height >= 16)){
 #endif
@@ -1749,6 +1756,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_REF_MV_BANK
 #if COND_RE_BANK
   }
+#endif
 #endif
 
 #if CONFIG_BVP_IMPROVEMENT
