@@ -804,7 +804,7 @@ struct CommonModeInfoParams {
    */
   uint32_t tx_skip_buf_size[MAX_MB_PLANE];
   /*!
-   * tx_skip stridie
+   * tx_skip stride
    */
   uint32_t tx_skip_stride[MAX_MB_PLANE];
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
@@ -814,7 +814,7 @@ struct CommonModeInfoParams {
    */
   uint8_t *class_id[MAX_MB_PLANE];
   /*!
-   * class_id stridie
+   * class_id stride
    */
   uint32_t class_id_stride[MAX_MB_PLANE];
 #endif  // CONFIG_PC_WIENER
