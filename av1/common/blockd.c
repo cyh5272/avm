@@ -152,22 +152,20 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
 }
 
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params) {
+void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
   // allocate based on the MIN_TX_SIZE, which is 4x4 block
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
     int w = mi_params->mi_cols << MI_SIZE_LOG2;
     int h = mi_params->mi_rows << MI_SIZE_LOG2;
     w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
-    // TODO(oguleryuz): hack, cm is not available here.
-    const int cm_seq_params_subsampling_x = 1;
-    const int cm_seq_params_subsampling_y = 1;
-    w >>= ((plane == 0) ? 0 : cm_seq_params_subsampling_x);
-    h >>= ((plane == 0) ? 0 : cm_seq_params_subsampling_y);
+    w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+    h >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_y);
     int stride = (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
     int rows = (h + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
     mi_params->tx_skip[plane] = aom_calloc(rows * stride, sizeof(uint8_t));
     mi_params->tx_skip_buf_size[plane] = rows * stride;
+    mi_params->tx_skip_stride[plane] = stride;
   }
 }
 
@@ -316,3 +314,28 @@ uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
 }
 
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+
+#if CONFIG_PC_WIENER
+void av1_alloc_class_id_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+    int w = mi_params->mi_cols << MI_SIZE_LOG2;
+    int h = mi_params->mi_rows << MI_SIZE_LOG2;
+    w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+    h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+    w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+    h >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_y);
+    int stride = (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+    int rows = (h + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+    mi_params->class_id[plane] = aom_calloc(rows * stride, sizeof(uint8_t));
+    mi_params->class_id_stride[plane] = stride;
+  }
+}
+
+void av1_dealloc_class_id_array(CommonModeInfoParams *mi_params) {
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+    aom_free(mi_params->class_id[plane]);
+    mi_params->class_id[plane] = NULL;
+  }
+}
+
+#endif  // CONFIG_PC_WIENER

@@ -32,7 +32,10 @@ extern "C" {
 /*!\cond */
 
 #if CONFIG_PC_WIENER
-#define PC_WIENER_PROCESS_CHROMA 0
+#define PC_WIENER_FILTER_CHROMA 0
+#define PC_WIENER_CLASSIFY_CHROMA 1
+#define PC_WIENER_ONLY_CLASSIFY_CHROMA \
+  (!(PC_WIENER_FILTER_CHROMA) && (PC_WIENER_CLASSIFY_CHROMA))
 #endif  // CONFIG_PC_WIENER
 
 // Border for Loop restoration buffer
@@ -309,13 +312,21 @@ typedef struct {
    * Offset to quantizer index.
    */
   int qindex_offset;
-#endif  // CONFIG_PC_WIENER
+  /*!
+   * Pointer to class_id frame.
+   */
+  uint8_t *class_id;
+  /*!
+   * Stride for class_id frame.
+   */
+  int class_id_stride;
 #if CONFIG_COMBINE_PC_NS_WIENER
   /*!
-   * Whether pc_wiener should be added before wiener_ns.
+   * Whether classification needs to be computed.
    */
-  bool combine_with_pc_wiener;
+  int compute_classification;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
+#endif  // CONFIG_PC_WIENER
 } RestorationUnitInfo;
 
 /*!\cond */
@@ -564,6 +575,11 @@ typedef struct FilterFrameCtxt {
   const uint8_t *tskip;
   int tskip_stride;
   int qindex_offset;
+  uint8_t *class_id;
+  int class_id_stride;
+#if CONFIG_COMBINE_PC_NS_WIENER
+  int compute_classification;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER;
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_SAVE_IN_LOOP_DATA
   uint8_t *lr_mode_info;
