@@ -843,9 +843,9 @@ static int64_t calc_sgrproj_err(const RestSearchCtxt *rsc,
       width = old_limits.h_end - old_limits.h_start;
       height = old_limits.v_end - old_limits.v_start;
       flt_stride = ((width + 7) & ~7) + 8;
-      err += compute_sgrproj_err(
-          dat8, width, height, dat_stride, src8, src_stride, use_highbitdepth,
-          bit_depth, pu_width, pu_height, ep, flt0, flt1, flt_stride, exqd);
+      err += compute_sgrproj_err(dat8, width, height, dat_stride, src8,
+                                 src_stride, bit_depth, pu_width, pu_height, ep,
+                                 flt0, flt1, flt_stride, exqd);
     }
 #else   // CONFIG_RST_MERGECOEFFS
     assert(0 && "Tile limits should not be NULL.");
@@ -1033,7 +1033,7 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   memset(&rui_temp, 0, sizeof(rui_temp));
   rui_temp.restoration_type = RESTORE_SGRPROJ;
   rui_temp.sgrproj_info = search_selfguided_restoration(
-      rsc, NULL, highbd, bit_depth, procunit_width, procunit_height, tmpbuf,
+      rsc, NULL, bit_depth, procunit_width, procunit_height, tmpbuf,
       rsc->lpf_sf->enable_sgr_ep_pruning);
   // Iterate through vector to get sse and bits for each on the new filter.
   double cost_merge = 0;
