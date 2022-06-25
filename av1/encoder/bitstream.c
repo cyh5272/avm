@@ -2719,14 +2719,6 @@ static void write_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
           if (end_feat - beg_feat > 5 &&
               wienerns_info->nsfilter[end_feat - 5] == 0) {
             reduce_step[WIENERNS_REDUCE_STEPS - 5] = 1;
-            if (end_feat - beg_feat > 6 &&
-                wienerns_info->nsfilter[end_feat - 6] == 0) {
-              reduce_step[WIENERNS_REDUCE_STEPS - 6] = 1;
-              if (end_feat - beg_feat > 7 &&
-                  wienerns_info->nsfilter[end_feat - 7] == 0) {
-                reduce_step[WIENERNS_REDUCE_STEPS - 7] = 1;
-              }
-            }
           }
         }
       }
@@ -2744,40 +2736,30 @@ static void write_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
   for (int i = beg_feat; i < end_feat; ++i) {
     // printf("(%d/%d), ", wienerns_info->nsfilter[i],
     //        ref_wienerns_info->nsfilter[i]);
-    if (rodd && i == end_feat - 7 && i != beg_feat) {
+    if (rodd && i == end_feat - 5 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[0],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2);
       if (reduce_step[0]) break;
     }
-    if (!rodd && i == end_feat - 6 && i != beg_feat) {
+    if (!rodd && i == end_feat - 4 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[1],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2);
       if (reduce_step[1]) break;
     }
-    if (rodd && i == end_feat - 5 && i != beg_feat) {
+    if (rodd && i == end_feat - 3 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[2],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2);
       if (reduce_step[2]) break;
     }
-    if (!rodd && i == end_feat - 4 && i != beg_feat) {
+    if (!rodd && i == end_feat - 2 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[3],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2);
       if (reduce_step[3]) break;
     }
-    if (rodd && i == end_feat - 3 && i != beg_feat) {
+    if (rodd && i == end_feat - 1 && i != beg_feat) {
       aom_write_symbol(wb, reduce_step[4],
                        xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2);
       if (reduce_step[4]) break;
-    }
-    if (!rodd && i == end_feat - 2 && i != beg_feat) {
-      aom_write_symbol(wb, reduce_step[5],
-                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][5], 2);
-      if (reduce_step[5]) break;
-    }
-    if (rodd && i == end_feat - 1 && i != beg_feat) {
-      aom_write_symbol(wb, reduce_step[6],
-                       xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][6], 2);
-      if (reduce_step[6]) break;
     }
 #if CONFIG_LR_4PART_CODE
     aom_write_4part_wref(
