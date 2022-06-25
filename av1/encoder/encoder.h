@@ -2395,14 +2395,6 @@ typedef struct AV1_COMP {
    */
   YV12_BUFFER_CONFIG trial_frame_rst;
 
-#if CONFIG_COMBINE_PC_NS_WIENER
-  /*!
-   * Temporary frame buffer used to store the pc-wiener-output during loop
-   * restoration search.
-   */
-  YV12_BUFFER_CONFIG pc_wiener_buf;
-#endif  // #if CONFIG_COMBINE_PC_NS_WIENER
-
 #if CONFIG_CNN_RESTORATION
   /*!
    * Temprorary frame buffer used to store pre CNN filtered frame during RDO, to
