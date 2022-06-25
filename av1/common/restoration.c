@@ -1285,187 +1285,6 @@ void av1_apply_selfguided_restoration_c(const uint8_t *dat8, int width,
 
 #if CONFIG_PC_WIENER
 
-#if CONFIG_COMBINE_PC_NS_WIENER
-
-// 7 x 7 combined filters.
-#define MIN_ROW -3
-#define MAX_ROW 3
-#define MIN_COL -3
-#define MAX_COL 3
-#define MAX_NUM_TAPS ((MAX_ROW - MIN_ROW + 1) * (MAX_COL - MIN_COL + 1))
-#define IMPOSSIBLE_TAP_POSITION -1
-#define NS_TAP_POS 2
-#define PC_TAP_POS 3
-
-// Assumes Y combination only. Encapsulate x3 if chroma support is needed.
-// Format of the inner four dimensions:
-// offset-row, offset-col, filter1-tap-posn, filter2-tap-posn.
-static int combined_tap_positions[MAX_NUM_TAPS][4] = { 0 };
-
-// Number of taps in the combined filter.
-static int combined_total_taps = 0;
-static int32_t combined_filter[MAX_NUM_TAPS] = { 0 };
-static int combined_tap_config[MAX_NUM_TAPS][3] = { 0 };
-static NonsepFilterConfig combined_filter_config = {
-  0, 0, 0, combined_tap_config, NULL, 0, 0
-};
-
-// Correction factor to account for nsfilters filtering pixel differences.
-static int32_t combined_filter_correction = 0;
-
-// Useful in storing the two configs that have been combined to help skip
-// set_combined_filter_tap_positions when it is not needed.
-static int prev_ns_tap_config[MAX_NUM_TAPS][3] = { 0 };
-static int prev_pc_tap_config[MAX_NUM_TAPS][3] = { 0 };
-
-static bool is_config_same(const NonsepFilterConfig *filter_config,
-                           const int (*prev_tap_config)[3]) {
-  assert(filter_config->num_pixels <= MAX_NUM_TAPS);
-  for (int k = 0; k < filter_config->num_pixels; ++k) {
-    for (int l = 0; l < 3; ++l) {
-      if (filter_config->config[k][l] != prev_tap_config[k][l]) return false;
-    }
-  }
-  return true;
-}
-
-static void copy_to_prev_tap_config(const NonsepFilterConfig *filter_config,
-                                    int (*prev_tap_config)[3]) {
-  assert(filter_config->num_pixels <= MAX_NUM_TAPS);
-  for (int k = 0; k < filter_config->num_pixels; ++k) {
-    for (int l = 0; l < 3; ++l) {
-      prev_tap_config[k][l] = filter_config->config[k][l];
-    }
-  }
-}
-
-// Checks if (row, col) exists in the filter_config and returns the matching
-// filter-tap position.
-static int get_matching_filter_position(const NonsepFilterConfig *filter_config,
-                                        int row, int col) {
-  int pos = IMPOSSIBLE_TAP_POSITION;
-  for (int k = 0; k < filter_config->num_pixels; ++k) {
-    if ((row == filter_config->config[k][NONSEP_ROW_ID]) &&
-        (col == filter_config->config[k][NONSEP_COL_ID])) {
-      pos = filter_config->config[k][NONSEP_BUF_POS];
-      assert(pos != IMPOSSIBLE_TAP_POSITION);
-      break;
-    }
-  }
-  return pos;
-}
-
-static bool is_combined_tap_positions_change_needed(
-    const NonsepFilterConfig *nsfilter_config,
-    const NonsepFilterConfig *pcfilter_config) {
-  return !is_config_same(nsfilter_config, prev_ns_tap_config) ||
-         !is_config_same(pcfilter_config, prev_pc_tap_config);
-}
-
-// Combines the tap positions from two configs (of two filters) into
-// combined_tap_positions. Useful in deriving a config for the sum filter
-// determined by summing the two filters.
-static void set_combined_filter_tap_positions(
-    const NonsepFilterConfig *nsfilter_config,
-    const NonsepFilterConfig *pcfilter_config) {
-  // Check if we need to recalculate.
-  if (!is_combined_tap_positions_change_needed(nsfilter_config,
-                                               pcfilter_config))
-    return;
-
-  int total_taps = 0;
-  for (int r = MIN_ROW; r <= MAX_ROW; ++r) {
-    for (int c = MIN_COL; c <= MAX_COL; ++c) {
-      const int pos_ns = get_matching_filter_position(nsfilter_config, r, c);
-      const int pos_pc = get_matching_filter_position(pcfilter_config, r, c);
-      if (pos_ns == IMPOSSIBLE_TAP_POSITION &&
-          pos_pc == IMPOSSIBLE_TAP_POSITION)
-        continue;
-      combined_tap_positions[total_taps][NONSEP_ROW_ID] = r;
-      combined_tap_positions[total_taps][NONSEP_COL_ID] = c;
-      combined_tap_positions[total_taps][NS_TAP_POS] = pos_ns;
-      combined_tap_positions[total_taps][PC_TAP_POS] = pos_pc;
-      ++total_taps;
-    }
-  }
-  combined_total_taps = total_taps;
-  copy_to_prev_tap_config(nsfilter_config, prev_ns_tap_config);
-  copy_to_prev_tap_config(pcfilter_config, prev_pc_tap_config);
-}
-
-// Adds the two filters pointed to by the configs. Assumes
-// combined_tap_positions has been set.
-static void add_filters(const NonsepFilterConfig *nsfilter_config,
-                        const NonsepFilterConfig *pcfilter_config,
-                        const int16_t *nsfilter, const int32_t *pcfilter,
-                        const int32_t nsmultiplier,
-                        const int32_t pcmultiplier) {
-  // TODO(oguleryuz): Add buffers for chroma.
-  assert(PC_WIENER_PROCESS_CHROMA == 0);
-  // Leave num_pixels2, config1, config2, strict_bounds as in initializer.
-  combined_filter_config.num_pixels = combined_total_taps;
-  combined_filter_correction = 0;
-  const int mult_room = PC_WIENER_MULT_ROOM;
-
-  // The sum filter should have the higher precision. Figure out how much
-  // shift is needed for each summand.
-  int ns_prec_shift = 0;
-  int pc_prec_shift = 0;
-  if (nsfilter_config->prec_bits > pcfilter_config->prec_bits) {
-    combined_filter_config.prec_bits = nsfilter_config->prec_bits + mult_room;
-    pc_prec_shift += nsfilter_config->prec_bits - pcfilter_config->prec_bits;
-  } else {
-    combined_filter_config.prec_bits = pcfilter_config->prec_bits + mult_room;
-    ns_prec_shift += pcfilter_config->prec_bits - nsfilter_config->prec_bits;
-  }
-
-  const int32_t ns_scale = nsmultiplier << ns_prec_shift;
-  const int32_t pc_scale = pcmultiplier << pc_prec_shift;
-
-  // After the addition combined taps are at cb bits where,
-  // cb = combined_filter_config.prec_bits - mult_room + PC_WIENER_PREC_FEATURE.
-  // Right shift by cb - combined_filter_config.prec_bits, i.e.,
-  // by PC_WIENER_PREC_FEATURE - mult_room to bring them down to
-  // combined_filter_config.prec_bits precision.
-  const int mult_shift = PC_WIENER_PREC_FEATURE - mult_room;
-
-  for (int k = 0; k < combined_total_taps; ++k) {
-    int32_t tap = 0;
-    const int ns_tap_posn = combined_tap_positions[k][NS_TAP_POS];
-    const int pc_tap_posn = combined_tap_positions[k][PC_TAP_POS];
-    if (ns_tap_posn == IMPOSSIBLE_TAP_POSITION)
-      tap = ROUND_POWER_OF_TWO_SIGNED(pc_scale * pcfilter[pc_tap_posn],
-                                      mult_shift);
-    else if (pc_tap_posn == IMPOSSIBLE_TAP_POSITION) {
-      tap = ROUND_POWER_OF_TWO_SIGNED(ns_scale * nsfilter[ns_tap_posn],
-                                      mult_shift);
-      combined_filter_correction += tap;
-    } else {
-      const int ns_tap = ns_scale * nsfilter[ns_tap_posn];
-      combined_filter_correction +=
-          ROUND_POWER_OF_TWO_SIGNED(ns_tap, mult_shift);
-      tap = ROUND_POWER_OF_TWO_SIGNED(pc_scale * pcfilter[pc_tap_posn] + ns_tap,
-                                      mult_shift);
-    }
-    combined_tap_config[k][NONSEP_ROW_ID] =
-        combined_tap_positions[k][NONSEP_ROW_ID];
-    combined_tap_config[k][NONSEP_COL_ID] =
-        combined_tap_positions[k][NONSEP_COL_ID];
-    combined_tap_config[k][NONSEP_BUF_POS] = k;
-    combined_filter[k] = tap;
-  }
-}
-
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-
-static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
-  int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
-
-  int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
-  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
-  return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
-}
-
 // TODO(oguleryuz): This should remain in sync with av1_convert_qindex_to_q.
 static int get_qstep(int base_qindex, int bit_depth, int *shift) {
   int base_shift = QUANT_TABLE_BITS;
@@ -1519,14 +1338,13 @@ static void rotate_feature_line_buffers(int feature_len) {
 //    row_begin = row - PC_WIENER_FEATURE_LENGTH / 2
 //    row_end = row + PC_WIENER_FEATURE_LENGTH / 2 + 1.
 // This version of the routine assumes use_strict_bounds is false.
-static void fill_directional_feature_buffers_highbd(int row, int buffer_row,
-                                                    const uint16_t *dgd,
-                                                    int dgd_stride, int width,
-                                                    int feature_length,
-                                                    bool use_strict_bounds) {
+static void fill_directional_feature_buffers_highbd(
+    int row, int buffer_row, const uint16_t *dgd, int dgd_stride, int width,
+    int feature_lead, int feature_lag, bool use_strict_bounds) {
   assert(use_strict_bounds == false);
-  const int col_begin = -feature_length / 2;
-  const int col_end = width + feature_length / 2;
+  const int feature_length = feature_lead + feature_lag + 1;
+  const int col_begin = -feature_lead;
+  const int col_end = width + feature_lag;
 
   const int buffer_row_0 = buffer_row;
   const int buffer_row_1 = buffer_row_0 + feature_length;
@@ -1631,28 +1449,29 @@ static void clear_line_buffers() {
 }
 
 // Accumulates tskip over a window of rows centered at row. If use_strict_bounds
-// is false tskip must have valid data on this column extending for rows from
+// is false tskip must have valid data extending for rows from
 // [row_begin, row_end) where,
 //    row_begin = row - PC_WIENER_TSKIP_LENGTH / 2
 //    row_end = row + PC_WIENER_TSKIP_LENGTH / 2 + 1.
 // This version of the routine assumes use_strict_bounds is true.
 static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
                                   int tskip_stride, int width, int height,
-                                  int tskip_length, bool use_strict_bounds) {
+                                  int tskip_lead, int tskip_lag,
+                                  bool use_strict_bounds) {
   // TODO(oguleryuz): tskip needs boundary extension.
   assert(use_strict_bounds == true);
-  const int col_begin = -tskip_length / 2;
-  const int col_end = width + tskip_length / 2;
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+  const int col_begin = -tskip_lead;
+  const int col_end = width + tskip_lag;
   const int clamped_row = AOMMAX(AOMMIN(row, height - 1), 0);
 
   int buffer_col = 0;
-  int left_tskip_id =
-      (clamped_row >> MI_SIZE_LOG2) * tskip_stride + (0 >> MI_SIZE_LOG2);
+  int tskip_id_base = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
+  int left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
   for (int col = col_begin; col < 0; ++col) {
     tskip_sum_buffer[buffer_col] += tskip[left_tskip_id];
     ++buffer_col;
   }
-  int tskip_id_base = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
 #pragma GCC ivdep
   for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
     const uint8_t tskip_val = tskip[tskip_id_base + col];
@@ -1664,30 +1483,27 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
   }
 
   for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width; ++col) {
-    int tskip_id =
-        (clamped_row >> MI_SIZE_LOG2) * tskip_stride + (col >> MI_SIZE_LOG2);
+    int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
     tskip_sum_buffer[buffer_col] += tskip[tskip_id];
     ++buffer_col;
   }
-  int right_tskip_id = (clamped_row >> MI_SIZE_LOG2) * tskip_stride +
-                       ((width - 1) >> MI_SIZE_LOG2);
+  int right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
   for (int col = width; col < col_end; ++col) {
     tskip_sum_buffer[buffer_col] += tskip[right_tskip_id];
     ++buffer_col;
   }
 
   int subtract_row = row - tskip_length;
-  if (subtract_row >= -tskip_length / 2) {
+  if (subtract_row >= -tskip_lead) {
     assert(subtract_row <= height - 1);
     subtract_row = subtract_row >= 0 ? subtract_row : 0;
     buffer_col = 0;
-    left_tskip_id =
-        (subtract_row >> MI_SIZE_LOG2) * tskip_stride + (0 >> MI_SIZE_LOG2);
+    tskip_id_base = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
+    left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
     for (int col = col_begin; col < 0; ++col) {
       tskip_sum_buffer[buffer_col] -= tskip[left_tskip_id];
       ++buffer_col;
     }
-    tskip_id_base = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
 #pragma GCC ivdep
     for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
       const uint8_t tskip_val = tskip[tskip_id_base + col];
@@ -1699,13 +1515,11 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
     }
     for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width;
          ++col) {
-      int tskip_id =
-          (subtract_row >> MI_SIZE_LOG2) * tskip_stride + (col >> MI_SIZE_LOG2);
+      int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
       tskip_sum_buffer[buffer_col] -= tskip[tskip_id];
       ++buffer_col;
     }
-    right_tskip_id = (subtract_row >> MI_SIZE_LOG2) * tskip_stride +
-                     ((width - 1) >> MI_SIZE_LOG2);
+    right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
     for (int col = width; col < col_end; ++col) {
       tskip_sum_buffer[buffer_col] -= tskip[right_tskip_id];
       ++buffer_col;
@@ -1714,8 +1528,10 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
 }
 
 static void fill_directional_feature_accumulators(int col, int col_offset,
-                                                  int feature_length) {
-  const int col_base = col + col_offset + feature_length / 2;
+                                                  int feature_lead,
+                                                  int feature_lag) {
+  const int feature_length = feature_lead + feature_lag + 1;
+  const int col_base = col + col_offset + feature_lead;
   const int cl = col_base - feature_length;
   // Lose the if check.
   if (cl < 0) {
@@ -1733,8 +1549,12 @@ static void fill_directional_feature_accumulators(int col, int col_offset,
 }
 
 static void fill_tskip_feature_accumulator(int col, int col_offset,
-                                           int tskip_length) {
-  const int col_base = col + col_offset + tskip_length / 2;
+                                           int tskip_lead, int tskip_lag) {
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+
+  // Add tskip_lead to ensure buffer access is from >=0.
+  const int col_base = col + col_offset + tskip_lead;
+  assert(col_base >= 0);
   const int cl = col_base - tskip_length;
   // Lose the if check.
   if (cl < 0) {
@@ -1747,34 +1567,29 @@ static void fill_tskip_feature_accumulator(int col, int col_offset,
 }
 
 // Initializes the accumulators.
-static void initialize_feature_accumulators(int feature_length,
-                                            int tskip_length) {
+static void initialize_feature_accumulators(int feature_lead, int feature_lag,
+                                            int tskip_lead, int tskip_lag) {
   for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
     directional_feature_accumulator[k] = 0;
   }
   tskip_feature_accumulator = 0;
 
-  const int feature_half_length = feature_length / 2;
-  const int tskip_half_length = tskip_length / 2;
-
   // Initialize accumulators on the leftmost portion of the line.
-  for (int col_offset = -feature_half_length; col_offset < feature_half_length;
-       ++col_offset) {
-    fill_directional_feature_accumulators(0, col_offset, feature_length);
+  for (int col_offset = -feature_lead; col_offset < feature_lag; ++col_offset) {
+    fill_directional_feature_accumulators(0, col_offset, feature_lead,
+                                          feature_lag);
   }
-  for (int col_offset = -tskip_half_length; col_offset < tskip_half_length;
-       ++col_offset) {
-    fill_tskip_feature_accumulator(0, col_offset, tskip_length);
+  for (int col_offset = -tskip_lead; col_offset < tskip_lag; ++col_offset) {
+    fill_tskip_feature_accumulator(0, col_offset, tskip_lead, tskip_lag);
   }
 }
 
 // Updates the accumulators.
-static void update_accumulators(int col, int feature_length,
-                                int feature_half_length, int tskip_length,
-                                int tskip_half_length) {
-  fill_directional_feature_accumulators(col, feature_half_length,
-                                        feature_length);
-  fill_tskip_feature_accumulator(col, tskip_half_length, tskip_length);
+static void update_accumulators(int col, int feature_lead, int feature_lag,
+                                int tskip_lead, int tskip_lag) {
+  fill_directional_feature_accumulators(col, feature_lag, feature_lead,
+                                        feature_lag);
+  fill_tskip_feature_accumulator(col, tskip_lag, tskip_lead, tskip_lag);
 }
 
 // Calculates the features needed for get_pcwiener_index.
@@ -1843,12 +1658,11 @@ static void set_feature_normalizers(bool is_uv) {
   } else {
     for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i)
       feature_normalizers[i] = feature_normalizers_luma[i];
-    feature_normalizers[NUM_PC_WIENER_FEATURES] =
-        (int)(256 / NUM_PC_WIENER_TSKIP_TAPS_LUMA);
+    feature_normalizers[NUM_PC_WIENER_FEATURES] = tskip_normalizer;
   }
 }
 
-static int get_pcwiener_index(int bit_depth, int32_t *multiplier) {
+static uint8_t get_pcwiener_index(int bit_depth, int32_t *multiplier) {
   int32_t feature_vector[NUM_PC_WIENER_FEATURES + 1];  // 255 x actual
 
   // Fill the feature vector.
@@ -1878,7 +1692,7 @@ static int get_pcwiener_index(int bit_depth, int32_t *multiplier) {
   *multiplier = 1 << PC_WIENER_PREC_FEATURE;
   assert(lut_input == AOMMAX(AOMMIN(lut_input, PC_WIENER_LUT_SIZE - 1), 0));
 
-  const int filter_index = pc_wiener_lut_to_filter_index[lut_input];
+  const uint8_t filter_index = pc_wiener_lut_to_filter_index[lut_input];
   assert(filter_index ==
          AOMMAX(AOMMIN(filter_index, NUM_PC_WIENER_FILTERS - 1), 0));
   return filter_index;
@@ -1887,21 +1701,11 @@ static int get_pcwiener_index(int bit_depth, int32_t *multiplier) {
 void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                             int stride, uint8_t *dst8, int dst_stride,
                             const uint8_t *tskip, int tskip_stride,
-#if CONFIG_COMBINE_PC_NS_WIENER
-                            const int16_t *nsfilter,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-                            bool is_uv, int bit_depth) {
+                            uint8_t *class_id, int class_id_stride, bool is_uv,
+                            int bit_depth, bool classify_only) {
   const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
-  if (!PC_WIENER_PROCESS_CHROMA && is_uv) {
-    // Not filtering uv.
-    for (int i = 0; i < height; ++i) {
-      for (int j = 0; j < width; ++j) {
-        dst[i * dst_stride + j] = dgd[i * stride + j];
-      }
-    }
-    return;
-  }
+  const bool skip_filtering = classify_only;
 
   const int pc_filter_num_taps = is_uv
                                      ? sizeof(pcwiener_tap_config_chroma) /
@@ -1919,28 +1723,10 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                                                0 };
 
   const NonsepFilterConfig *filter_config = &pcfilter_config;
-  bool multiply_here = true;
-  int32_t correction_factor = 0;
-#if CONFIG_COMBINE_PC_NS_WIENER
-  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
-  const NonsepFilterConfig *nsfilter_config =
-      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
-  assert(nsfilter_config->strict_bounds == false);
-  if (nsfilter != NULL) {
-    multiply_here = false;
-    filter_config = &combined_filter_config;
-    set_combined_filter_tap_positions(nsfilter_config, &pcfilter_config);
-  }
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-
   const int singleton_tap_index =
       filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
-#if CONFIG_COMBINE_PC_NS_WIENER
-  const int num_sym_taps = (filter_config->num_pixels - 1) / 2;
-#else
   const int num_sym_taps = is_uv ? (2 * NUM_PC_WIENER_TAPS_CHROMA - 1) / 2
                                  : (2 * NUM_PC_WIENER_TAPS_LUMA - 1) / 2;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
   assert(num_sym_taps == (filter_config->num_pixels - 1) / 2);
   assert(num_sym_taps <= 24);
   int16_t compute_buffer[24];
@@ -1962,42 +1748,51 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   assert(filter_config->strict_bounds == false);
   const bool dir_strict = filter_config->strict_bounds;
   const bool tskip_strict = true;
-  const int feature_length =
-      is_uv ? PC_WIENER_FEATURE_LENGTH_CHROMA : PC_WIENER_FEATURE_LENGTH_LUMA;
-  const int feature_half_length = feature_length / 2;
-  const int tskip_length =
-      is_uv ? PC_WIENER_TSKIP_LENGTH_CHROMA : PC_WIENER_TSKIP_LENGTH_LUMA;
-  const int tskip_half_length = tskip_length / 2;
+  const int feature_lead =
+      is_uv ? PC_WIENER_FEATURE_LEAD_CHROMA : PC_WIENER_FEATURE_LEAD_LUMA;
+  const int feature_lag =
+      is_uv ? PC_WIENER_FEATURE_LAG_CHROMA : PC_WIENER_FEATURE_LAG_LUMA;
+  const int feature_length = feature_lead + feature_lag + 1;
+  const int tskip_lead =
+      is_uv ? PC_WIENER_TSKIP_LEAD_CHROMA : PC_WIENER_TSKIP_LEAD_LUMA;
+  const int tskip_lag =
+      is_uv ? PC_WIENER_TSKIP_LAG_CHROMA : PC_WIENER_TSKIP_LAG_LUMA;
+  const int tskip_length = tskip_lead + tskip_lag + 1;
 
+  // Class-id is allocated over blocks of size (1 << MI_SIZE_LOG2).
+  assert((1 << MI_SIZE_LOG2) == PC_WIENER_BLOCK_SIZE);
   set_feature_normalizers(is_uv);
   clear_line_buffers();
   for (int row = 0; row < feature_length - 1; ++row) {
-    fill_directional_feature_buffers_highbd(row - feature_half_length, row, dgd,
-                                            stride, width, feature_length,
-                                            dir_strict);
+    fill_directional_feature_buffers_highbd(row - feature_lead, row, dgd,
+                                            stride, width, feature_lead,
+                                            feature_lag, dir_strict);
   }
   for (int row = 0; row < tskip_length - 1; ++row) {
-    fill_tskip_sum_buffer(row - tskip_half_length, tskip, tskip_stride, width,
-                          height, tskip_length, tskip_strict);
+    fill_tskip_sum_buffer(row - tskip_lead, tskip, tskip_stride, width, height,
+                          tskip_lead, tskip_lag, tskip_strict);
   }
   for (int i = 0; i < height; ++i) {
-    fill_directional_feature_buffers_highbd(i + feature_half_length,
-                                            feature_length - 1, dgd, stride,
-                                            width, feature_length, dir_strict);
-    fill_tskip_sum_buffer(i + tskip_half_length, tskip, tskip_stride, width,
-                          height, tskip_length, tskip_strict);
+    fill_directional_feature_buffers_highbd(i + feature_lag, feature_length - 1,
+                                            dgd, stride, width, feature_lead,
+                                            feature_lag, dir_strict);
+    fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride, width, height,
+                          tskip_lead, tskip_lag, tskip_strict);
 #if PC_WIENER_BLOCK_SIZE > 1
     bool skip_row_compute =
         i % PC_WIENER_BLOCK_SIZE != PC_WIENER_BLOCK_ROW_OFFSET;
+#else
+    bool skip_row_compute = false;
 #endif  // PC_WIENER_BLOCK_SIZE > 1
     // Initialize accumulators on the leftmost portion of the line.
     if (!skip_row_compute) {
-      initialize_feature_accumulators(feature_length, tskip_length);
+      initialize_feature_accumulators(feature_lead, feature_lag, tskip_lead,
+                                      tskip_lag);
     }
     for (int j = 0; j < width; ++j) {
       if (!skip_row_compute) {
-        update_accumulators(j, feature_length, feature_half_length,
-                            tskip_length, tskip_half_length);
+        update_accumulators(j, feature_lead, feature_lag, tskip_lead,
+                            tskip_lag);
       }
 
 #if PC_WIENER_BLOCK_SIZE > 1
@@ -2007,19 +1802,19 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // PC_WIENER_BLOCK_SIZE > 1
 
       int32_t multiplier = 0;
-      const int filter_index = get_pcwiener_index(bit_depth, &multiplier);
+      const uint8_t filter_index = get_pcwiener_index(bit_depth, &multiplier);
+
+      // Store classification.
+      class_id[(i >> MI_SIZE_LOG2) * class_id_stride + (j >> MI_SIZE_LOG2)] =
+          filter_index;
+      if (skip_filtering) {
+        continue;
+      }
+
       const int16_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
                                     : pcwiener_filters_luma[filter_index];
       const int16_t singleton_tap =
           filter[singleton_tap_index] + (1 << filter_config->prec_bits);
-#if CONFIG_COMBINE_PC_NS_WIENER
-      if (nsfilter != NULL) {
-        add_filters(nsfilter_config, &pcfilter_config, nsfilter, filter,
-                    1 << PC_WIENER_PREC_FEATURE, multiplier);
-        filter = combined_filter;
-        correction_factor = combined_filter_correction;
-      }
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 #if PC_WIENER_BLOCK_SIZE > 1
       const int block_row_begin = i - PC_WIENER_BLOCK_ROW_OFFSET;
@@ -2028,6 +1823,9 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
       if (i + PC_WIENER_BLOCK_SIZE >= height) block_row_end = height;
       const int block_col_begin = j - PC_WIENER_BLOCK_COL_OFFSET;
       int block_col_end = AOMMIN(block_col_begin + PC_WIENER_BLOCK_SIZE, width);
+
+      // Extend block if the next time we will calculate classification will be
+      // out of bounds.
       if (j + PC_WIENER_BLOCK_SIZE >= width) block_col_end = width;
 #else
       const int block_row_begin = i;
@@ -2064,19 +1862,11 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
             tmp += filter[pos] * compute_buffer[k];
           }
 
-          if (multiply_here) {
-            tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
-          } else {
-            // TODO(oguleryuz): Change pc training so that both filters operate
-            // the same way and a correction is not needed.
-            tmp -= correction_factor * dgd[dgd_id];
-            tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
-          }
-
+          tmp = ROUND_POWER_OF_TWO_SIGNED(tmp, filter_config->prec_bits);
           int dst_id = r * dst_stride + c;
           dst[dst_id] = (tmp > max_pixel_value) ? max_pixel_value
-                        : (tmp < 0) ? 0
-                                    : tmp;
+                        : (tmp < 0)             ? 0
+                                                : tmp;
         }
       }
 #endif  // USE_CONVOLVE_SYM
@@ -2086,36 +1876,37 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   }
 }
 
+static void setup_qval_tskip_lut(int qindex, int bit_depth) {
+  static int prev_qindex = -1;
+  static int prev_bit_depth = -1;
+  if (qindex == prev_qindex && bit_depth == prev_bit_depth) {
+    return;
+  }
+  fill_qval_given_tskip_lut(qindex, bit_depth);
+  prev_qindex = qindex;
+  prev_bit_depth = bit_depth;
+}
+
 static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
                                     int stripe_width, int stripe_height,
                                     int procunit_width, const uint8_t *src,
                                     int src_stride, uint8_t *dst,
                                     int dst_stride, int32_t *tmpbuf,
                                     int bit_depth) {
+  if (!PC_WIENER_FILTER_CHROMA && rui->plane != AOM_PLANE_Y) {
+    return;
+  }
   (void)tmpbuf;
   (void)bit_depth;
-  assert(rui->tskip);
-  bool is_uv = (rui->plane != AOM_PLANE_Y);
-  static int prev_qindex = -1;
-  static int prev_bit_depth = -1;
-
-  if (rui->base_qindex + rui->qindex_offset != prev_qindex ||
-      bit_depth != prev_bit_depth) {
-    fill_qval_given_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
-    prev_qindex = rui->base_qindex + rui->qindex_offset;
-    prev_bit_depth = bit_depth;
-  }
-
+  setup_qval_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
 
-    apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
-                           dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
-                           rui->tskip_stride,
-#if CONFIG_COMBINE_PC_NS_WIENER
-                           NULL,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-                           is_uv, bit_depth);
+    apply_pc_wiener_highbd(
+        src + j, w, stripe_height, src_stride, dst + j, dst_stride,
+        rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+        rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
+        rui->plane != AOM_PLANE_Y, bit_depth, false);
   }
 }
 #endif  // CONFIG_PC_WIENER
@@ -2149,6 +1940,54 @@ void apply_wiener_nonsep_highbd(const uint8_t *dgd8, int width, int height,
   return;
 }
 
+const int16_t *get_filter_for_class_id(const int16_t *filter, int class_id) {
+  // Placeholder until filters are expanded.
+  (void)class_id;
+  return filter;
+}
+
+void apply_wiener_nonsep_class_id_highbd(
+    const uint8_t *dgd8, int width, int height, int stride, int base_qindex,
+    const int16_t *filter, uint8_t *dst8, int dst_stride, int plane,
+    const uint8_t *luma8, int luma_stride, int bit_depth,
+    const uint8_t *class_id, int class_id_stride) {
+  (void)luma8;
+  (void)luma_stride;
+  int is_uv = (plane != AOM_PLANE_Y);
+  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
+  const NonsepFilterConfig *nsfilter =
+      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+  const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
+  const int block_size = 4;
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  if (is_uv && nsfilter->num_pixels2 != 0) {
+    // TODO: This branch needs a classified dual filtering.
+    av1_convolve_nonsep_dual_highbd(dgd8, width, height, stride, luma8,
+                                    luma_stride, nsfilter, filter_, dst8,
+                                    dst_stride, bit_depth);
+    return;
+  }
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+  for (int r = 0; r < height; r += block_size) {
+    const int h = AOMMIN(block_size, height - r);
+    const uint8_t *dgd8_row = dgd8 + r * stride;
+    uint8_t *dst8_row = dst8 + r * dst_stride;
+    for (int c = 0; c < width; c += block_size) {
+      const int w = AOMMIN(block_size, width - c);
+
+      const int full_class_id =
+          class_id[(r >> MI_SIZE_LOG2) * class_id_stride + (c >> MI_SIZE_LOG2)];
+      const int sub_class_id = pc_wiener_sub_classify_to_four[full_class_id];
+      const int16_t *block_filter =
+          get_filter_for_class_id(filter_, sub_class_id);
+      av1_convolve_nonsep_highbd(dgd8_row + c, w, h, stride, nsfilter,
+                                 block_filter, dst8_row + c, dst_stride,
+                                 bit_depth);
+    }
+  }
+  return;
+}
+
 static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
                                           int stripe_width, int stripe_height,
                                           int procunit_width,
@@ -2158,34 +1997,45 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   (void)tmpbuf;
   (void)bit_depth;
 
-  bool ignore_pc_wiener = true;
 #if CONFIG_COMBINE_PC_NS_WIENER
-  ignore_pc_wiener = !rui->combine_with_pc_wiener;
+  if (rui->compute_classification) {
+    // Replicate pc_wiener_stripe but only perform classification, i.e., no
+    // filtering. Only needed in the decoding loop. Encoder side will buffer the
+    // class_id (follow rsc->is_buffered.)
+    setup_qval_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
+    for (int j = 0; j < stripe_width; j += procunit_width) {
+      int w = AOMMIN(procunit_width, stripe_width - j);
+      apply_pc_wiener_highbd(
+          src + j, w, stripe_height, src_stride, dst + j, dst_stride,
+          rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
+          rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
+          rui->plane != AOM_PLANE_Y, bit_depth, true);
+    }
+  }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
-    if (ignore_pc_wiener) {
-      apply_wiener_nonsep_highbd(
-          src + j, w, stripe_height, src_stride, rui->base_qindex,
-          rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-          rui->luma + j, rui->luma_stride,
-#else
-          NULL, -1,
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-          bit_depth);
-    }
 #if CONFIG_COMBINE_PC_NS_WIENER
-    if (!ignore_pc_wiener) {
-      bool is_uv = (rui->plane != AOM_PLANE_Y);
-      apply_pc_wiener_highbd(src + j, w, stripe_height, src_stride, dst + j,
-                             dst_stride, rui->tskip + (j >> MI_SIZE_LOG2),
-                             rui->tskip_stride,
-                             rui->wiener_nonsep_info.nsfilter,
-                             rui->base_qindex + rui->qindex_offset, is_uv,
-                             bit_depth, rui->bit_depth);
-    }
+    apply_wiener_nonsep_class_id_highbd(
+        src + j, w, stripe_height, src_stride, rui->base_qindex,
+        rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+        rui->luma + j, rui->luma_stride,
+#else
+        NULL, -1,
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+        bit_depth, rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride);
+#else
+    apply_wiener_nonsep_highbd(
+        src + j, w, stripe_height, src_stride, rui->base_qindex,
+        rui->wiener_nonsep_info.nsfilter, dst + j, dst_stride, rui->plane,
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+        rui->luma + j, rui->luma_stride,
+#else
+        NULL, -1,
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+        bit_depth);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
 }
@@ -2372,6 +2222,9 @@ void av1_loop_restoration_filter_unit(
   const uint8_t *tskip_in_ru =
       rui->tskip + (limits->v_start >> MI_SIZE_LOG2) * rui->tskip_stride +
       (limits->h_start >> MI_SIZE_LOG2);
+  uint8_t *class_id_in_ru =
+      rui->class_id + (limits->v_start >> MI_SIZE_LOG2) * rui->class_id_stride +
+      (limits->h_start >> MI_SIZE_LOG2);
   allocate_pcwiener_line_buffers(procunit_width);
 #endif  // CONFIG_PC_WIENER
 
@@ -2413,6 +2266,8 @@ void av1_loop_restoration_filter_unit(
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #if CONFIG_PC_WIENER
     tmp_rui->tskip = tskip_in_ru + (i >> MI_SIZE_LOG2) * rui->tskip_stride;
+    tmp_rui->class_id =
+        class_id_in_ru + (i >> MI_SIZE_LOG2) * rui->class_id_stride;
 #endif  // CONFIG_PC_WIENER
 
     stripe_filter(tmp_rui, unit_w, h, procunit_width, data8_tl + i * stride,
@@ -2459,13 +2314,14 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
 #if CONFIG_PC_WIENER
   rsi->unit_info[rest_unit_idx].tskip = ctxt->tskip;
   rsi->unit_info[rest_unit_idx].tskip_stride = ctxt->tskip_stride;
+  rsi->unit_info[rest_unit_idx].class_id = ctxt->class_id;
+  rsi->unit_info[rest_unit_idx].class_id_stride = ctxt->class_id_stride;
   rsi->unit_info[rest_unit_idx].base_qindex = ctxt->base_qindex;
   rsi->unit_info[rest_unit_idx].qindex_offset = ctxt->qindex_offset;
   rsi->unit_info[rest_unit_idx].plane = ctxt->plane;
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_COMBINE_PC_NS_WIENER
-  rsi->unit_info[rest_unit_idx].combine_with_pc_wiener =
-      ctxt->plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA;
+  rsi->unit_info[rest_unit_idx].compute_classification = 1;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   av1_loop_restoration_filter_unit(
@@ -2591,7 +2447,7 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
-    ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
+    ctxt[plane].tskip_stride = cm->mi_params.tx_skip_stride[plane];
     ctxt[plane].base_qindex = cm->quant_params.base_qindex;
     if (plane != AOM_PLANE_Y)
       ctxt[plane].qindex_offset = plane == AOM_PLANE_U
@@ -2600,6 +2456,8 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     else
       ctxt[plane].qindex_offset = cm->quant_params.y_dc_delta_q;
     ctxt[plane].plane = plane;
+    ctxt[plane].class_id = cm->mi_params.class_id[plane];
+    ctxt[plane].class_id_stride = cm->mi_params.class_id_stride[plane];
 #endif  // CONFIG_PC_WIENER
 
     av1_foreach_rest_unit_in_plane(cm, plane, lr_ctxt->on_rest_unit,

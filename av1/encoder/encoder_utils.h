@@ -96,6 +96,9 @@ static AOM_INLINE void enc_free_mi(CommonModeInfoParams *mi_params) {
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_dealloc_txk_skip_array(mi_params);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER
+  av1_dealloc_class_id_array(mi_params);
+#endif  // CONFIG_PC_WIENER
 }
 
 static AOM_INLINE void enc_set_mb_mi(CommonModeInfoParams *mi_params, int width,

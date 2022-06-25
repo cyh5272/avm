@@ -130,10 +130,6 @@ typedef struct {
 #if CONFIG_WIENER_NONSEP
   WienerNonsepInfo wiener_nonsep;
 #endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_COMBINE_PC_NS_WIENER
-  // Whether pc_wiener should be combined with wiener_ns.
-  bool combine_with_pc_wiener;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   // The sum of squared errors for this rtype.
   int64_t sse[RESTORE_SWITCHABLE_TYPES];
@@ -166,8 +162,6 @@ typedef struct {
   const uint8_t *src_buffer;
   int src_stride;
 #if CONFIG_COMBINE_PC_NS_WIENER
-  uint8_t *pc_wiener_buffer;
-  int pc_wiener_stride;
   bool is_buffered;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
@@ -377,9 +371,6 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
                                 const LOOP_FILTER_SPEED_FEATURES *lpf_sf,
                                 int plane, RestUnitSearchInfo *rusi,
                                 YV12_BUFFER_CONFIG *dst,
-#if CONFIG_COMBINE_PC_NS_WIENER
-                                YV12_BUFFER_CONFIG *pc_wiener_buf,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_RST_MERGECOEFFS
                                 Vector *unit_stack,
 #endif  // CONFIG_RST_MERGECOEFFS
@@ -394,16 +385,6 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
 
   const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
   const int is_uv = plane != AOM_PLANE_Y;
-
-#if CONFIG_COMBINE_PC_NS_WIENER
-  // Will be subtracting pc_wiener_buf from dgd during stat calc.
-  assert(pc_wiener_buf->crop_widths[is_uv] == dgd->crop_widths[is_uv]);
-  assert(pc_wiener_buf->crop_heights[is_uv] == dgd->crop_heights[is_uv]);
-
-  rsc->pc_wiener_buffer = pc_wiener_buf->buffers[plane];
-  rsc->pc_wiener_stride = pc_wiener_buf->strides[is_uv];
-  rsc->is_buffered = false;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   rsc->plane_width = src->crop_widths[is_uv];
   rsc->plane_height = src->crop_heights[is_uv];
@@ -1459,15 +1440,6 @@ static AOM_INLINE void finalize_sym_filter(int wiener_win, int32_t *f,
   // The central element has an implicit +WIENER_FILT_STEP
   fi[3] = -2 * (fi[0] + fi[1] + fi[2]);
 }
-#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
-  int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
-
-  int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
-  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
-  return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
-}
-#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 
 #if CONFIG_PC_WIENER
 
@@ -1475,36 +1447,6 @@ static int count_pc_wiener_bits() {
   // No side-information for now.
   return 0;
 }
-
-#if CONFIG_COMBINE_PC_NS_WIENER
-static void buffer_pc_wiener_output(RestSearchCtxt *rsc, int h_beg, int h_end,
-                                    int v_beg, int v_end) {
-  assert(!rsc->is_buffered);
-
-  int plane = rsc->plane;
-  const int is_uv = plane != AOM_PLANE_Y;
-  const bool use_highbd = rsc->cm->seq_params.use_highbitdepth;
-
-  const uint16_t *dst_hbd = CONVERT_TO_SHORTPTR(rsc->dst->buffers[plane]);
-  const uint8_t *dst = rsc->dst->buffers[plane];
-  const int dst_stride = rsc->dst->strides[is_uv];
-
-  uint16_t *pred_hbd = CONVERT_TO_SHORTPTR(rsc->pc_wiener_buffer);
-  uint8_t *pred = rsc->pc_wiener_buffer;
-  int pred_stride = rsc->pc_wiener_stride;
-
-  // dst contains pc_wiener output. Copy it into pc_wiener_buffer.
-  for (int i = v_beg; i < v_end; ++i) {
-    for (int j = h_beg; j < h_end; ++j) {
-      if (use_highbd) {
-        pred_hbd[i * pred_stride + j] = dst_hbd[i * dst_stride + j];
-      } else {
-        pred[i * pred_stride + j] = dst[i * dst_stride + j];
-      }
-    }
-  }
-}
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
@@ -1522,7 +1464,8 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
   const int64_t bits_none = x->mode_costs.pc_wiener_restore_cost[0];
   const int plane = rsc->plane;
 
-  bool skip_search = !PC_WIENER_PROCESS_CHROMA && plane != AOM_PLANE_Y;
+  bool skip_search = !PC_WIENER_FILTER_CHROMA && plane != AOM_PLANE_Y &&
+                     !PC_WIENER_ONLY_CLASSIFY_CHROMA;
   if (skip_search) {
     rsc->bits += bits_none;
     rsc->sse += rusi->sse[RESTORE_NONE];
@@ -1535,7 +1478,7 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
   rui.plane = plane;
   rui.restoration_type = RESTORE_PC_WIENER;
   rui.tskip = rsc->cm->mi_params.tx_skip[plane];
-  rui.tskip_stride = get_tskip_stride(rsc->cm, plane);
+  rui.tskip_stride = rsc->cm->mi_params.tx_skip_stride[plane];
   rui.base_qindex = rsc->cm->quant_params.base_qindex;
   if (plane != AOM_PLANE_Y)
     rui.qindex_offset = plane == AOM_PLANE_U
@@ -1543,12 +1486,19 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
                             : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
+  rui.class_id = rsc->cm->mi_params.class_id[plane];
+  rui.class_id_stride = rsc->cm->mi_params.class_id_stride[plane];
   rusi->sse[RESTORE_PC_WIENER] =
       try_restoration_unit(rsc, limits, tile_rect, &rui);
-#if CONFIG_COMBINE_PC_NS_WIENER
-  buffer_pc_wiener_output(rsc, limits->h_start, limits->h_end, limits->v_start,
-                          limits->v_end);
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
+
+  if (PC_WIENER_ONLY_CLASSIFY_CHROMA && plane != AOM_PLANE_Y) {
+    // Classified the data for downsteram processing.
+    rsc->bits += bits_none;
+    rsc->sse += rusi->sse[RESTORE_NONE];
+    rusi->best_rtype[RESTORE_PC_WIENER - 1] = RESTORE_NONE;
+    rusi->sse[RESTORE_PC_WIENER] = INT64_MAX;
+    return;
+  }
 
   double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
@@ -2531,17 +2481,10 @@ static int64_t finer_tile_search_wienerns(
 static int compute_quantized_wienerns_filter(
     RestSearchCtxt *rsc, const uint8_t *dgd, const uint8_t *src,
     const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
-    int dgd_stride, int src_stride, RestorationUnitInfo *rui,
-#if CONFIG_COMBINE_PC_NS_WIENER
-    const uint8_t *pred, int pred_stride,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-    int bit_depth, double *A, double *b,
-    const WienernsFilterConfigPairType *wnsf) {
+    int dgd_stride, int src_stride, RestorationUnitInfo *rui, int bit_depth,
+    double *A, double *b, const WienernsFilterConfigPairType *wnsf) {
   const uint16_t *src_hbd = CONVERT_TO_SHORTPTR(src);
   const uint16_t *dgd_hbd = CONVERT_TO_SHORTPTR(dgd);
-#if CONFIG_COMBINE_PC_NS_WIENER
-  const uint16_t *pred_hbd = CONVERT_TO_SHORTPTR(pred);
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint16_t *luma_hbd = CONVERT_TO_SHORTPTR(rui->luma);
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -2573,9 +2516,6 @@ static int compute_quantized_wienerns_filter(
     for (int j = limits->h_start; j < limits->h_end; ++j) {
       int dgd_id = i * dgd_stride + j;
       int src_id = i * src_stride + j;
-#if CONFIG_COMBINE_PC_NS_WIENER
-      int pred_id = i * pred_stride + j;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
       int luma_id = i * rui->luma_stride + j;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -2614,18 +2554,7 @@ static int compute_quantized_wienerns_filter(
         }
       }
       int16_t y;
-#if CONFIG_COMBINE_PC_NS_WIENER
-      if (rui->combine_with_pc_wiener) {
-        // Adjust stats since wiener-nonsep will add on pc-wiener output.
-        y = (use_hbd ? ((int64_t)src_hbd[src_id] - pred_hbd[pred_id])
-                     : ((int64_t)src[src_id] - pred[pred_id]));
-      } else {
-        y = (use_hbd ? ((int64_t)src_hbd[src_id] - dgd_hbd[dgd_id])
-                     : ((int64_t)src[src_id] - dgd[dgd_id]));
-      }
-#else   // CONFIG_COMBINE_PC_NS_WIENER
       y = ((int64_t)src_hbd[src_id] - dgd_hbd[dgd_id]);
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
       for (int k = 0; k < num_feat; ++k) {
         for (int l = 0; l <= k; ++l) {
           A[k * num_feat + l] += (double)buf[k] * (double)buf[l];
@@ -2723,19 +2652,23 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
   memset(&rui, 0, sizeof(rui));
   rui.restoration_type = RESTORE_WIENER_NONSEP;
 #if CONFIG_COMBINE_PC_NS_WIENER
-  if (rsc->plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA) {
-    // Ensure search_pc_wiener was done and output was buffered.
+  rui.compute_classification = 0;
+  rui.class_id = rsc->cm->mi_params.class_id[rsc->plane];
+  rui.class_id_stride = rsc->cm->mi_params.class_id_stride[rsc->plane];
+  if (rsc->plane == AOM_PLANE_Y || PC_WIENER_FILTER_CHROMA ||
+      PC_WIENER_ONLY_CLASSIFY_CHROMA) {
+    // Ensure search_pc_wiener was done and classification was computed.
     assert(rsc->is_buffered == true);
   } else {
     assert(rsc->is_buffered == false);
   }
+  // These are not needed since class_id is already computed. Add them to avoid
+  // NULLs etc. during debug and other uses.
   rui.tskip = rsc->cm->mi_params.tx_skip[rsc->plane];
-  rui.tskip_stride = get_tskip_stride(rsc->cm, rsc->plane);
-  rui.combine_with_pc_wiener =
-      rsc->plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA;
-  rusi->combine_with_pc_wiener = rui.combine_with_pc_wiener;
-  if (rui.plane != AOM_PLANE_Y)
-    rui.qindex_offset = rui.plane == AOM_PLANE_U
+  rui.tskip_stride = rsc->cm->mi_params.tx_skip_stride[rsc->plane];
+  rui.base_qindex = rsc->cm->quant_params.base_qindex;
+  if (rsc->plane != AOM_PLANE_Y)
+    rui.qindex_offset = rsc->plane == AOM_PLANE_U
                             ? rsc->cm->quant_params.u_dc_delta_q
                             : rsc->cm->quant_params.v_dc_delta_q;
   else
@@ -2754,11 +2687,8 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
   double b[WIENERNS_MAX];
   if (compute_quantized_wienerns_filter(
           rsc, rsc->dgd_buffer, rsc->src_buffer, limits, tile_rect,
-          rsc->dgd_stride, rsc->src_stride, &rui,
-#if CONFIG_COMBINE_PC_NS_WIENER
-          rsc->pc_wiener_buffer, rsc->pc_wiener_stride,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-          rsc->cm->seq_params.bit_depth, A, b, wnsf)) {
+          rsc->dgd_stride, rsc->src_stride, &rui, rsc->cm->seq_params.bit_depth,
+          A, b, wnsf)) {
     aom_clear_system_state();
 
     rusi->sse[RESTORE_WIENER_NONSEP] =
@@ -2869,17 +2799,8 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     rui_temp.luma_stride = rsc->luma_stride;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #if CONFIG_COMBINE_PC_NS_WIENER
-    rui_temp.tskip = rsc->cm->mi_params.tx_skip[rsc->plane];
-    rui_temp.tskip_stride = get_tskip_stride(rsc->cm, rsc->plane);
-    rui_temp.base_qindex = rsc->cm->quant_params.base_qindex;
-    if (rsc->plane != AOM_PLANE_Y)
-      rui_temp.qindex_offset = rsc->plane == AOM_PLANE_U
-                                   ? rsc->cm->quant_params.u_dc_delta_q
-                                   : rsc->cm->quant_params.v_dc_delta_q;
-    else
-      rui_temp.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
-    rui_temp.qindex_offset = offset;
-    rui_temp.combine_with_pc_wiener = rui.combine_with_pc_wiener;
+    assert(rui.compute_classification == 0);
+    rui_temp.compute_classification = 0;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
     int num_feat = is_uv ? wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
     if (linsolve_const(num_feat, A_AVG, num_feat, b_AVG, merge_filter_stats)) {
@@ -3374,9 +3295,6 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
 #if CONFIG_WIENER_NONSEP
   else if (rui->restoration_type == RESTORE_WIENER_NONSEP) {
     rui->wiener_nonsep_info = rusi->wiener_nonsep;
-#if CONFIG_COMBINE_PC_NS_WIENER
-    rui->combine_with_pc_wiener = rusi->combine_with_pc_wiener;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -3478,9 +3396,6 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   for (int plane = plane_start; plane <= plane_end; ++plane) {
     init_rsc(src, &cpi->common, x, &cpi->sf.lpf_sf, plane, rusi,
              &cpi->trial_frame_rst,
-#if CONFIG_COMBINE_PC_NS_WIENER
-             &cpi->pc_wiener_buf,
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_RST_MERGECOEFFS
              &unit_stack,
 #endif  // CONFIG_RST_MERGECOEFFS
@@ -3508,9 +3423,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
 
         double cost = search_rest_type(&rsc, r);
 #if CONFIG_COMBINE_PC_NS_WIENER
-        // TODO(oguleryuz): Clean this up.
+        assert(RESTORE_PC_WIENER < RESTORE_WIENER_NONSEP);
         if (r == RESTORE_PC_WIENER &&
-            (plane == AOM_PLANE_Y || PC_WIENER_PROCESS_CHROMA)) {
+            (plane == AOM_PLANE_Y || PC_WIENER_FILTER_CHROMA ||
+             PC_WIENER_ONLY_CLASSIFY_CHROMA)) {
           rsc.is_buffered = true;  // Buffer is set.
         }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
@@ -3593,10 +3509,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     // Export tskip.
     for (int plane = 0; plane < num_planes; ++plane) {
       const int upsample_factor = plane != AOM_PLANE_Y ? 2 : 1;
-      success = success &&
-                export_context_export_frame(cm->mi_params.tx_skip[plane],
-                                            get_tskip_stride(cm, plane), false,
-                                            upsample_factor << MI_SIZE_LOG2);
+      success = success && export_context_export_frame(
+                               cm->mi_params.tx_skip[plane],
+                               cm->mi_params.tx_skip_stride[plane], false,
+                               upsample_factor << MI_SIZE_LOG2);
     }
     assert(success);
 
