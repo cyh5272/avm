@@ -850,17 +850,6 @@ static int loop_restoration_row_worker(void *arg1, void *arg2) {
   return 1;
 }
 
-#if CONFIG_PC_WIENER
-// TODO(oguleryuz): Put this some place accessible and have a single version.
-static int get_tskip_stride(const AV1_COMMON *cm, int plane) {
-  int height = cm->mi_params.mi_cols << MI_SIZE_LOG2;
-
-  int w = ((height + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
-  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
-  return (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
-}
-#endif  // CONFIG_PC_WIENER
-
 static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
                                            AVxWorker *workers, int nworkers,
                                            AV1LrSync *lr_sync, AV1_COMMON *cm) {
@@ -903,7 +892,7 @@ static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
-    ctxt[plane].tskip_stride = get_tskip_stride(cm, plane);
+    ctxt[plane].tskip_stride = cm->mi_params.tx_skip_stride[plane];
     ctxt[plane].base_qindex = cm->quant_params.base_qindex;
     if (plane != AOM_PLANE_Y)
       ctxt[plane].qindex_offset = plane == AOM_PLANE_U
@@ -912,6 +901,8 @@ static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
     else
       ctxt[plane].qindex_offset = cm->quant_params.y_dc_delta_q;
     ctxt[plane].plane = plane;
+    ctxt[plane].class_id = cm->mi_params.class_id[plane];
+    ctxt[plane].class_id_stride = cm->mi_params.class_id_stride[plane];
 #endif  // CONFIG_PC_WIENER
 
     const AV1PixelRect tile_rect = ctxt[plane].tile_rect;

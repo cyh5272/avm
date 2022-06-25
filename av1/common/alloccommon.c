@@ -227,7 +227,12 @@ int av1_alloc_above_context_buffers(CommonContexts *above_contexts,
 // Allocate the dynamically allocated arrays in 'mi_params' assuming
 // 'mi_params->set_mb_mi()' was already called earlier to initialize the rest of
 // the struct members.
-static int alloc_mi(CommonModeInfoParams *mi_params) {
+static int alloc_mi(CommonModeInfoParams *mi_params
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+                    ,
+                    AV1_COMMON *cm
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+) {
   const int aligned_mi_rows = calc_mi_size(mi_params->mi_rows);
   const int mi_grid_size = mi_params->mi_stride * aligned_mi_rows;
   const int alloc_size_1d = mi_size_wide[mi_params->mi_alloc_bsize];
@@ -248,8 +253,11 @@ static int alloc_mi(CommonModeInfoParams *mi_params) {
     if (!mi_params->mi_grid_base) return 1;
     mi_params->mi_grid_size = mi_grid_size;
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
-    av1_alloc_txk_skip_array(mi_params);
+    av1_alloc_txk_skip_array(mi_params, cm);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER
+    av1_alloc_class_id_array(mi_params, cm);
+#endif  // CONFIG_PC_WIENER
 
     mi_params->tx_type_map =
         aom_calloc(mi_grid_size, sizeof(*mi_params->tx_type_map));
@@ -262,7 +270,11 @@ static int alloc_mi(CommonModeInfoParams *mi_params) {
 int av1_alloc_context_buffers(AV1_COMMON *cm, int width, int height) {
   CommonModeInfoParams *const mi_params = &cm->mi_params;
   mi_params->set_mb_mi(mi_params, width, height);
+#if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
+  if (alloc_mi(mi_params, cm)) goto fail;
+#else
   if (alloc_mi(mi_params)) goto fail;
+#endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   return 0;
 
 fail:

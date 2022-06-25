@@ -122,6 +122,9 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
     mi_params->lr_mode_info[plane] = NULL;
   }
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
+#if CONFIG_PC_WIENER
+  av1_dealloc_class_id_array(mi_params);
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
   av1_dealloc_txk_skip_array(mi_params);
 #endif  // CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
