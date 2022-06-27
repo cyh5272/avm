@@ -135,7 +135,7 @@ static INLINE void lower_mv_precision(MV *mv, MvSubpelPrecision precision) {
   int mod = (mv->row % radix);
   if (mod != 0) {
     mv->row -= mod;
-    if (ABS(mod) > radix / 2) {
+    if (ABS(mod) > (radix >> 1)) {
       if (mod > 0) {
         mv->row += radix;
       } else {
@@ -147,7 +147,7 @@ static INLINE void lower_mv_precision(MV *mv, MvSubpelPrecision precision) {
   mod = (mv->col % radix);
   if (mod != 0) {
     mv->col -= mod;
-    if (ABS(mod) > radix / 2) {
+    if (ABS(mod) > (radix >> 1)) {
       if (mod > 0) {
         mv->col += radix;
       } else {

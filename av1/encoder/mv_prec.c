@@ -301,18 +301,18 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
 #else
   const int frac_part_rate =
       use_fractional_mv ? get_symbol_cost(frac_part_cdf, frac_part) : 0;
+  if (use_fractional_mv) update_cdf(frac_part_cdf, frac_part, MV_FP_SIZE);
 #endif
 
   rates[r_idx++] = frac_part_rate;
   const int high_part_rate = (use_hp && use_fractional_mv)
                                  ? get_symbol_cost(high_part_cdf, high_part)
                                  : 0;
-  if (use_fractional_mv) {
-    update_cdf(frac_part_cdf, frac_part, MV_FP_SIZE);
-    if (use_hp) {
-      update_cdf(high_part_cdf, high_part, 2);
-    }
+
+  if (use_hp && use_fractional_mv) {
+    update_cdf(high_part_cdf, high_part, 2);
   }
+
   rates[r_idx++] = high_part_rate;
 
   mv_stats->last_bit_zero += !high_part;

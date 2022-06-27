@@ -67,7 +67,9 @@ enum {
 #define CLASS0_SIZE (1 << CLASS0_BITS)
 #define MV_OFFSET_BITS (MV_CLASSES + CLASS0_BITS - 2)
 #define MV_BITS_CONTEXTS 6
+#if !CONFIG_FLEX_MVRES
 #define MV_FP_SIZE 4
+#endif
 
 #define MV_MAX_BITS (MV_CLASSES + CLASS0_BITS + 2)
 #define MV_MAX ((1 << MV_MAX_BITS) - 1)
