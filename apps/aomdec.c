@@ -93,9 +93,10 @@ static const arg_def_t fb_arg =
     ARG_DEF(NULL, "frame-buffers", 1, "Number of frame buffers to use");
 static const arg_def_t md5arg =
     ARG_DEF(NULL, "md5", 0, "Compute the MD5 sum of the decoded frame");
-static const arg_def_t verifyarg = ARG_DEF(
-    NULL, "verify", 1,
-    "Use Decoded Frame Hash Metadata to verify integrity of decoded frames");
+static const arg_def_t verifyarg =
+    ARG_DEF(NULL, "verify", 1,
+            "Use Decoded Frame Hash Metadata to verify integrity of decoded "
+            "frames (off, fatal, warn)");
 static const arg_def_t framestatsarg =
     ARG_DEF(NULL, "framestats", 1, "Output per-frame stats (.csv format)");
 static const arg_def_t outbitdeptharg =
@@ -417,8 +418,8 @@ static void print_md5(unsigned char digest[16], const char *filename) {
   printf("  %s\n", filename);
 }
 
-static int check_decoded_frame_hash(aom_image_t *img, int frame_out,
-                                    int skip_film_gain) {
+static int check_decoded_frame_hash(aom_codec_ctx_t *decoder, aom_image_t *img,
+                                    int frame_out, int skip_film_gain) {
   size_t num_metadata = aom_img_num_metadata(img);
   int ret = 0;
   for (size_t i = 0; i < num_metadata; ++i) {
@@ -428,9 +429,21 @@ static int check_decoded_frame_hash(aom_image_t *img, int frame_out,
     int type = (metadata->payload[0] & 0xF0) >> 4;
     int per_plane = !!(metadata->payload[0] & 8);
     int has_grain = !!(metadata->payload[0] & 4);
-    if (type || (has_grain && skip_film_gain) ||
-        (!has_grain && !skip_film_gain))
-      continue;
+    if (type) continue;
+
+    int flags;
+    if (AOM_CODEC_CONTROL_TYPECHECKED(decoder, AOMD_GET_FRAME_FLAGS, &flags)) {
+      fprintf(stderr, "Failed to get frame flags: %s\n",
+              aom_codec_error(decoder));
+      return -1;
+    }
+    if (has_grain) {
+      if (skip_film_gain || !(flags & AOM_FRAME_HAS_FILM_GRAIN_PARAMS))
+        continue;
+    } else {
+      if (!skip_film_gain && (flags & AOM_FRAME_HAS_FILM_GRAIN_PARAMS))
+        continue;
+    }
 
     const int planes[] = { AOM_PLANE_Y, AOM_PLANE_U, AOM_PLANE_V };
     const char *plane_names[] = { "y", "u", "v" };
@@ -607,10 +620,10 @@ static int main_loop(int argc, const char **argv_) {
       if (!strcmp(arg.val, "warn")) {
         do_verify = 1;
         error_on_verify = 0;
-      } else if (!strcmp(arg.val, "error")) {
+      } else if (!strcmp(arg.val, "fatal")) {
         do_verify = 1;
         error_on_verify = 1;
-      } else
+      } else if (strcmp(arg.val, "off"))
         die("Error: Invalid argument for --verify (%s).\n", arg.val);
     } else if (arg_match(&arg, &framestatsarg, argi)) {
       framestats_file = fopen(arg.val, "w");
@@ -880,7 +893,8 @@ static int main_loop(int argc, const char **argv_) {
       if (progress) show_progress(frame_in, frame_out, dx_time);
 
       if (do_verify) {
-        if (check_decoded_frame_hash(img, frame_out, skip_film_grain) &&
+        if (check_decoded_frame_hash(&decoder, img, frame_out,
+                                     skip_film_grain) &&
             error_on_verify && !keep_going)
           goto fail;
       }
