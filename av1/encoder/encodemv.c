@@ -683,17 +683,27 @@ static void build_nmv_component_cost_table(int *mvcost,
 }
 #endif
 
+    void av1_encode_mv(AV1_COMP * cpi, aom_writer * w,
 #if CONFIG_FLEX_MVRES
-    void av1_encode_mv(AV1_COMP * cpi, aom_writer * w, MV mv, MV ref,
-                       nmv_context * mvctx, MvSubpelPrecision pb_mv_precision,
+                       MV mv, MV ref,
+#else
+                   const MV *mv, const MV *ref,
+#endif
+                       nmv_context * mvctx,
+#if CONFIG_FLEX_MVRES
+                       MvSubpelPrecision pb_mv_precision,
                        MvSubpelPrecision max_mv_precision) {
+#else
+                   int usehp) {
+#endif
+
+#if CONFIG_FLEX_MVRES
       lower_mv_precision(&ref, pb_mv_precision);
       const MV diff = { mv.row - ref.row, mv.col - ref.col };
 #else
-void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
-                   nmv_context *mvctx, int usehp) {
   const MV diff = { mv->row - ref->row, mv->col - ref->col };
 #endif
+
 #if CONFIG_ADAPTIVE_MVD
       const AV1_COMMON *cm = &cpi->common;
       const MACROBLOCK *const x = &cpi->td.mb;

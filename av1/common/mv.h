@@ -128,7 +128,10 @@ static AOM_INLINE void convert_fullmv_to_mv(int_mv *mv) {
 
 #if CONFIG_FLEX_MVRES
 #define ABS(x) (((x) >= 0) ? (x) : (-(x)))
-
+// Reduce the precision of the MV to the target precision
+// The parameter radix define the step size of the MV .
+// For instance, radix = 1 for 1/8th pel, 2 for 1/4-th perl, 4 for 1/2 pel, 8
+// for integer pel
 static INLINE void lower_mv_precision(MV *mv, MvSubpelPrecision precision) {
   const int radix = (1 << (MV_PRECISION_ONE_EIGHTH_PEL - precision));
   if (radix == 1) return;

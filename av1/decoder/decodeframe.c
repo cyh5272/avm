@@ -5198,28 +5198,28 @@ static int read_global_motion_params(WarpedMotionParams *params,
   }
 
   if (type >= TRANSLATION) {
-#if CONFIG_FLEX_MVRES
     const int trans_bits = (type == TRANSLATION)
+#if CONFIG_FLEX_MVRES
                                ? GM_ABS_TRANS_ONLY_BITS - precision_loss
+#else
+                               ? GM_ABS_TRANS_ONLY_BITS - !allow_hp
+#endif
                                : GM_ABS_TRANS_BITS;
     const int trans_dec_factor =
         (type == TRANSLATION)
+#if CONFIG_FLEX_MVRES
             ? GM_TRANS_ONLY_DECODE_FACTOR * (1 << precision_loss)
+#else
+            ? GM_TRANS_ONLY_DECODE_FACTOR * (1 << !allow_hp)
+#endif
             : GM_TRANS_DECODE_FACTOR;
     const int trans_prec_diff = (type == TRANSLATION)
+#if CONFIG_FLEX_MVRES
                                     ? GM_TRANS_ONLY_PREC_DIFF + precision_loss
-                                    : GM_TRANS_PREC_DIFF;
 #else
-    const int trans_bits = (type == TRANSLATION)
-                               ? GM_ABS_TRANS_ONLY_BITS - !allow_hp
-                               : GM_ABS_TRANS_BITS;
-    const int trans_dec_factor =
-        (type == TRANSLATION) ? GM_TRANS_ONLY_DECODE_FACTOR * (1 << !allow_hp)
-                              : GM_TRANS_DECODE_FACTOR;
-    const int trans_prec_diff = (type == TRANSLATION)
                                     ? GM_TRANS_ONLY_PREC_DIFF + !allow_hp
-                                    : GM_TRANS_PREC_DIFF;
 #endif
+                                    : GM_TRANS_PREC_DIFF;
 
     params->wmmat[0] = aom_rb_read_signed_primitive_refsubexpfin(
                            rb, (1 << trans_bits) + 1, SUBEXPFIN_K,

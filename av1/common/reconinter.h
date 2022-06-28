@@ -670,28 +670,52 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
                    WarpedMotionParams *final_warp_params);
 
 #if CONFIG_FLEX_MVRES
+// derive the context of the mpp_flag
 int av1_get_mpp_flag_context(const AV1_COMMON *cm, const MACROBLOCKD *xd);
+
+// derive the context of the precision signaling
 int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
                                          const MACROBLOCKD *xd);
+
+// derive the context of the mv class
 int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision);
+
+// set the precision of a block to the precision
 void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+
+// set the most probable mv precision of the block
+// Currently, the most probable MV precision is same as the maximum precision of
+// the block.
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
 
+// Set the default value fo the precision set. Currently the value is always 0.
 void set_default_precision_set(const AV1_COMMON *const cm, MB_MODE_INFO *mbmi,
                                const BLOCK_SIZE bsize);
+
+// Set the precision set of the block. Currently, the value is 0.
 void set_precision_set(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                        MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize,
                        uint8_t ref_mv_idx);
+// Get the index of the precision
+// this index is signalled when precision is not same as the most probable
+// precision
 int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi);
+
+// get the actual precision value from the signalled index
 MvSubpelPrecision av1_get_precision_from_index(MB_MODE_INFO *mbmi,
                                                int precision_idx_coded_value);
+
+// Set the maximum precision to the default value
 void set_default_max_mv_precision(MB_MODE_INFO *mbmi,
                                   MvSubpelPrecision precision);
+
+// get the maximum allowed precision value of the block
 MvSubpelPrecision av1_get_mbmi_max_mv_precision(const AV1_COMMON *const cm,
                                                 const SB_INFO *sbi,
                                                 const MB_MODE_INFO *mbmi);
 
+// check if pb_mv_precision is allowed or not
 int is_pb_mv_precision_active(const AV1_COMMON *const cm,
                               const MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
 
