@@ -662,6 +662,12 @@ typedef struct macroblockd_plane {
 
 #define BLOCK_OFFSET(i) ((i) << 4)
 
+#if CONFIG_RST_MERGECOEFFS
+#define LR_BANK_SIZE 4
+#else
+#define LR_BANK_SIZE 1
+#endif  // CONFIG_RST_MERGE_COEFFS
+
 /*!\endcond */
 
 /*!\brief Parameters related to Wiener Filter */
@@ -677,6 +683,22 @@ typedef struct {
   DECLARE_ALIGNED(16, InterpKernel, hfilter);
 } WienerInfo;
 
+/*!\brief Parameters related to Wiener Filter Bank */
+typedef struct {
+  /*!
+   * Bank of filter infos
+   */
+  WienerInfo filter[LR_BANK_SIZE];
+  /*!
+   * Size of the bank
+   */
+  int bank_size;
+  /*!
+   * Pointer to the most current filter
+   */
+  int bank_ptr;
+} WienerInfoBank;
+
 /*!\brief Parameters related to Sgrproj Filter */
 typedef struct {
   /*!
@@ -689,6 +711,22 @@ typedef struct {
    */
   int xqd[2];
 } SgrprojInfo;
+
+/*!\brief Parameters related to Sgrproj Filter Bank */
+typedef struct {
+  /*!
+   * Bank of filter infos
+   */
+  SgrprojInfo filter[LR_BANK_SIZE];
+  /*!
+   * Size of the bank
+   */
+  int bank_size;
+  /*!
+   * Pointer to the most current filter
+   */
+  int bank_ptr;
+} SgrprojInfoBank;
 
 #if CONFIG_CNN_GUIDED_QUADTREE
 
@@ -717,6 +755,23 @@ typedef struct {
    */
   DECLARE_ALIGNED(16, int16_t, nsfilter[WIENERNS_YUV_MAX]);
 } WienerNonsepInfo;
+
+/*!\brief Parameters related to Nonseparable Wiener Filter Bank */
+typedef struct {
+  /*!
+   * Bank of filter infos
+   */
+  WienerNonsepInfo filter[LR_BANK_SIZE];
+  /*!
+   * Size of the bank
+   */
+  int bank_size;
+  /*!
+   * Pointer to the most current filter
+   */
+  int bank_ptr;
+} WienerNonsepInfoBank;
+
 #endif  // CONFIG_WIENER_NONSEP
 
 /*!\cond */
@@ -1014,22 +1069,22 @@ typedef struct macroblockd {
   TXFM_CONTEXT left_txfm_context_buffer[MAX_MIB_SIZE];
 
   /**
-   * \name Default values for the two restoration filters for each plane.
-   * Default values for the two restoration filters for each plane.
-   * These values are used as reference values when writing the bitstream. That
-   * is, we transmit the delta between the actual values in
+   * \name Reference values for the restoration filters for each plane.
+   * Reference values for the restoration filters for each plane.
+   * The values here are used as reference values when writing the bitstream.
+   * That is, we transmit the delta between the actual values in
    * cm->rst_info[plane].unit_info[unit_idx] and these reference values.
    */
   /**@{*/
-  WienerInfo wiener_info[MAX_MB_PLANE];   /*!< Defaults for Wiener filter*/
-  SgrprojInfo sgrproj_info[MAX_MB_PLANE]; /*!< Defaults for SGR filter */
+  WienerInfoBank wiener_info[MAX_MB_PLANE];   /*!< Refs for Wiener filter*/
+  SgrprojInfoBank sgrproj_info[MAX_MB_PLANE]; /*!< Refs for SGR filter */
   /**@}*/
 
 #if CONFIG_WIENER_NONSEP
   /*!
    * Nonseparable Wiener filter information for all planes.
    */
-  WienerNonsepInfo wiener_nonsep_info[MAX_MB_PLANE];
+  WienerNonsepInfoBank wiener_nonsep_info[MAX_MB_PLANE];
 #endif  // CONFIG_WIENER_NONSEP
 
   /**
@@ -1782,6 +1837,39 @@ void av1_reset_entropy_context(MACROBLOCKD *xd, BLOCK_SIZE bsize,
                                const int num_planes);
 
 void av1_reset_loop_filter_delta(MACROBLOCKD *xd, int num_planes);
+
+void av1_reset_wiener_bank(WienerInfoBank *bank);
+void av1_add_to_wiener_bank(WienerInfoBank *bank, const WienerInfo *info);
+WienerInfo *av1_ref_from_wiener_bank(WienerInfoBank *bank, int ndx);
+const WienerInfo *av1_constref_from_wiener_bank(const WienerInfoBank *bank,
+                                                int ndx);
+void av1_upd_to_wiener_bank(WienerInfoBank *bank, int ndx,
+                            const WienerInfo *info);
+void av1_get_from_wiener_bank(WienerInfoBank *bank, int ndx, WienerInfo *info);
+
+void av1_reset_sgrproj_bank(SgrprojInfoBank *bank);
+void av1_add_to_sgrproj_bank(SgrprojInfoBank *bank, const SgrprojInfo *info);
+SgrprojInfo *av1_ref_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx);
+const SgrprojInfo *av1_constref_from_sgrproj_bank(const SgrprojInfoBank *bank,
+                                                  int ndx);
+void av1_upd_to_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
+                             const SgrprojInfo *info);
+void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
+                               SgrprojInfo *info);
+
+#if CONFIG_WIENER_NONSEP
+void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex);
+void av1_add_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
+                                   const WienerNonsepInfo *info);
+WienerNonsepInfo *av1_ref_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
+                                                  int ndx);
+const WienerNonsepInfo *av1_constref_from_wiener_nonsep_bank(
+    const WienerNonsepInfoBank *bank, int ndx);
+void av1_upd_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
+                                   const WienerNonsepInfo *info);
+void av1_get_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
+                                     WienerNonsepInfo *info, int qindex);
+#endif  // CONFIG_WIENER_NONSEP
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);
 
