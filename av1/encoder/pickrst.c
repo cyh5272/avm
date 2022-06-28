@@ -190,6 +190,30 @@ typedef struct {
   AV1PixelRect tile_rect;
 } RestSearchCtxt;
 
+#if CONFIG_RST_MERGECOEFFS
+typedef struct RstUnitSnapshot {
+  RestorationTileLimits limits;
+  int rest_unit_idx;  // update filter value and sse as needed
+  int64_t current_sse;
+  int64_t current_bits;
+  int64_t merge_sse;
+  int64_t merge_bits;
+  // Wiener filter info
+  int64_t M[WIENER_WIN2];
+  int64_t H[WIENER_WIN2 * WIENER_WIN2];
+  WienerInfo ref_wiener;
+#if CONFIG_WIENER_NONSEP
+  // Nonseparable Wiener filter info
+  double A[WIENERNS_MAX * WIENERNS_MAX];
+  double b[WIENERNS_MAX];
+  WienerNonsepInfo ref_wiener_nonsep;
+#endif  // CONFIG_WIENER_NONSEP
+  // Sgrproj filter info
+  SgrprojInfo unit_sgrproj;
+  SgrprojInfo ref_sgrproj;
+} RstUnitSnapshot;
+#endif  // CONFIG_RST_MERGECOEFFS
+
 static AOM_INLINE void rsc_on_tile(void *priv) {
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   set_default_sgrproj(&rsc->sgrproj);
