@@ -66,8 +66,17 @@ static INLINE int check_wiener_eq(const WienerInfo *info,
 }
 static INLINE int check_sgrproj_eq(const SgrprojInfo *info,
                                    const SgrprojInfo *ref) {
-  if (!memcmp(info, ref, sizeof(*info))) return 1;
+  if (info->ep == ref->ep && !memcmp(info->xqd, ref->xqd, sizeof(info->xqd)))
+    return 1;
   return 0;
+}
+static INLINE int wiener_info_diff(const WienerInfo *info1,
+                                   const WienerInfo *info2) {
+  int diff = 0;
+  for (int k = 0; k < WIENER_HALFWIN; ++k)
+    diff += abs(info1->vfilter[k] - info2->vfilter[k]) +
+            abs(info1->hfilter[k] - info2->hfilter[k]);
+  return diff;
 }
 
 static INLINE int check_wiener_bank_eq(const WienerInfoBank *bank,
@@ -77,7 +86,6 @@ static INLINE int check_wiener_bank_eq(const WienerInfoBank *bank,
   }
   return -1;
 }
-
 static INLINE int check_sgrproj_bank_eq(const SgrprojInfoBank *bank,
                                         const SgrprojInfo *info) {
   for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
@@ -86,6 +94,17 @@ static INLINE int check_sgrproj_bank_eq(const SgrprojInfoBank *bank,
   }
   return -1;
 }
+
+static INLINE int sgrproj_info_diff(const SgrprojInfo *info1,
+                                    const SgrprojInfo *info2) {
+  return abs(info1->xqd[0] - info2->xqd[0]) +
+         abs(info1->xqd[1] - info2->xqd[1]);
+}
+
+int get_sgrproj_best_ref(const ModeCosts *mode_costs, const SgrprojInfo *info,
+                         const SgrprojInfoBank *bank);
+int get_wiener_best_ref(int wiener_win, const ModeCosts *mode_costs,
+                        const WienerInfo *info, const WienerInfoBank *bank);
 
 #if CONFIG_WIENER_NONSEP
 static INLINE int check_wienerns_eq(int chroma, const WienerNonsepInfo *info,
@@ -114,6 +133,23 @@ static INLINE int check_wienerns_bank_eq(
   }
   return -1;
 }
+
+static INLINE int wienerns_info_diff(int chroma, const WienerNonsepInfo *info1,
+                                     const WienerNonsepInfo *info2,
+                                     const WienernsFilterConfigPairType *wnsf) {
+  int diff = 0;
+  int beg_feat = chroma ? wnsf->y->ncoeffs : 0;
+  int end_feat =
+      chroma ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
+  for (int k = beg_feat; k < end_feat; ++k)
+    diff += abs(info1->nsfilter[k] - info2->nsfilter[k]);
+  return diff;
+}
+
+int get_wienerns_best_ref(int plane, const ModeCosts *mode_costs,
+                          const WienerNonsepInfo *info,
+                          const WienerNonsepInfoBank *bank,
+                          const WienernsFilterConfigPairType *wnsf);
 #endif  // CONFIG_WIENER_NONSEP
 #endif  // CONFIG_RST_MERGECOEFFS
 
