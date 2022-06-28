@@ -201,16 +201,16 @@ typedef struct RstUnitSnapshot {
   // Wiener filter info
   int64_t M[WIENER_WIN2];
   int64_t H[WIENER_WIN2 * WIENER_WIN2];
-  WienerInfoBank ref_wiener;
+  WienerInfo ref_wiener;
 #if CONFIG_WIENER_NONSEP
   // Nonseparable Wiener filter info
   double A[WIENERNS_MAX * WIENERNS_MAX];
   double b[WIENERNS_MAX];
-  WienerNonsepInfoBank ref_wiener_nonsep;
+  WienerNonsepInfo ref_wiener_nonsep;
 #endif  // CONFIG_WIENER_NONSEP
   // Sgrproj filter info
   SgrprojInfo unit_sgrproj;
-  SgrprojInfoBank ref_sgrproj;
+  SgrprojInfo ref_sgrproj;
 } RstUnitSnapshot;
 #endif  // CONFIG_RST_MERGECOEFFS
 
