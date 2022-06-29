@@ -2045,7 +2045,13 @@ int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision) {
 void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision) {
   mbmi->pb_mv_precision = precision;
 }
-
+#if BUGFIX_AMVD_AMVR
+// set the mv precision for amvd applied mode
+void set_amvd_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision) {
+  mbmi->pb_mv_precision =
+      precision <= MV_PRECISION_QTR_PEL ? precision : MV_PRECISION_QTR_PEL;
+}
+#endif  // BUGFIX_AMVD_AMVR
 int av1_get_pb_mv_precision_index(const MB_MODE_INFO *mbmi) {
   const PRECISION_SET *precision_def =
       &av1_mv_precision_sets[mbmi->mb_precision_set];

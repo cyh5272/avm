@@ -675,6 +675,9 @@ int av1_get_pb_mv_precision_down_context(const AV1_COMMON *cm,
                                          const MACROBLOCKD *xd);
 int av1_get_mv_class_context(const MvSubpelPrecision pb_mv_precision);
 void set_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+#if BUGFIX_AMVD_AMVR
+void set_amvd_mv_precision(MB_MODE_INFO *mbmi, MvSubpelPrecision precision);
+#endif  // BUGFIX_AMVD_AMVR
 void set_most_probable_mv_precision(const AV1_COMMON *const cm,
                                     MB_MODE_INFO *mbmi, const BLOCK_SIZE bsize);
 

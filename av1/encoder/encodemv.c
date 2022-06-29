@@ -180,7 +180,10 @@ if (precision > MV_SUBPEL_LOW_PRECISION) {
 #endif  // CONFIG_ADAPTIVE_MVD
                            MvSubpelPrecision precision) {
 #if CONFIG_FLEX_MVRES
-    lower_mv_precision(&ref, precision);
+#if BUGFIX_AMVD_AMVR
+    if (!is_adaptive_mvd)
+#endif  // BUGFIX_AMVD_AMVR
+      lower_mv_precision(&ref, precision);
 #endif  // CONFIG_FLEX_MVRES
     const MV diff = { mv.row - ref.row, mv.col - ref.col };
 #else
@@ -687,8 +690,6 @@ static void build_nmv_component_cost_table(int *mvcost,
     void av1_encode_mv(AV1_COMP * cpi, aom_writer * w, MV mv, MV ref,
                        nmv_context * mvctx, MvSubpelPrecision pb_mv_precision,
                        MvSubpelPrecision max_mv_precision) {
-      lower_mv_precision(&ref, pb_mv_precision);
-      const MV diff = { mv.row - ref.row, mv.col - ref.col };
 #else
 void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
                    nmv_context *mvctx, int usehp) {
@@ -701,6 +702,13 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
       MB_MODE_INFO *mbmi = xd->mi[0];
       const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
 #endif  // CONFIG_ADAPTIVE_MVD
+#if CONFIG_FLEX_MVRES
+#if BUGFIX_AMVD_AMVR
+      if (!is_adaptive_mvd)
+#endif  // BUGFIX_AMVD_AMVR
+        lower_mv_precision(&ref, pb_mv_precision);
+      const MV diff = { mv.row - ref.row, mv.col - ref.col };
+#endif
       const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
 #if !CONFIG_FLEX_MVRES
       // If the mv_diff is zero, then we should have used near or nearest

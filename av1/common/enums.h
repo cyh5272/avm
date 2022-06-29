@@ -47,6 +47,12 @@ extern "C" {
 #define IMPROVED_AMVD 0
 #endif  // CONFIG_ADAPTIVE_MVD
 
+#if CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
+#define BUGFIX_AMVD_AMVR 1
+#else
+#define BUGFIX_AMVD_AMVR 0
+#endif  // CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
+
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
 #define MAX_SB_SIZE (1 << MAX_SB_SIZE_LOG2)

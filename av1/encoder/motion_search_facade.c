@@ -812,7 +812,11 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
 #if CONFIG_FLEX_MVRES
   assert(!is_pb_mv_precision_active(cm, mbmi, bsize));
+#if BUGFIX_AMVD_AMVR
+  set_amvd_mv_precision(mbmi, mbmi->max_mv_precision);
+#else
   assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
+#endif  // BUGFIX_AMVD_AMVR
 #endif
 
   const YV12_BUFFER_CONFIG *const scaled_ref_frame =

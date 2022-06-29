@@ -2878,7 +2878,7 @@ static INLINE int is_global_intrabc_allowed(const AV1_COMMON *const cm) {
 }
 /*!\endcond */
 
-#if CONFIG_FLEX_MVRES && CONFIG_DEBUG
+#if CONFIG_FLEX_MVRES
 static inline int is_this_mv_precision_compliant(
     const MV this_mv, MvSubpelPrecision pb_mv_precision) {
   bool check_row = this_mv.row &

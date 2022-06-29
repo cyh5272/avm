@@ -1473,7 +1473,10 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
 #endif
 
 #if CONFIG_FLEX_MVRES
-  lower_mv_precision(&ref, precision);
+#if BUGFIX_AMVD_AMVR
+  if (!is_adaptive_mvd)
+#endif  // BUGFIX_AMVD_AMVR
+    lower_mv_precision(&ref, precision);
   mv->row = ref.row + diff.row;
   mv->col = ref.col + diff.col;
 #else
@@ -2057,7 +2060,10 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
 
 #if CONFIG_FLEX_MVRES
       MV low_prec_refmv = ref_mv[jmvd_base_ref_list].as_mv;
-      lower_mv_precision(&low_prec_refmv, precision);
+#if BUGFIX_AMVD_AMVR
+      if (!is_adaptive_mvd)
+#endif  // BUGFIX_AMVD_AMVR
+        lower_mv_precision(&low_prec_refmv, precision);
       diff.row = mv[jmvd_base_ref_list].as_mv.row - low_prec_refmv.row;
       diff.col = mv[jmvd_base_ref_list].as_mv.col - low_prec_refmv.col;
 #else
@@ -2287,6 +2293,10 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
         set_most_probable_mv_precision(cm, mbmi, bsize);
         mbmi->pb_mv_precision = av1_read_pb_mv_precision(cm, xd, r);
       }
+#if BUGFIX_AMVD_AMVR
+      if (enable_adaptive_mvd_resolution(cm, mbmi))
+        set_amvd_mv_precision(mbmi, mbmi->max_mv_precision);
+#endif  // BUGFIX_AMVD_AMVR
 #endif  // CONFIG_FLEX_MVRES
     }
   }

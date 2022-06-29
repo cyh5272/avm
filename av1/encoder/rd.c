@@ -880,9 +880,15 @@ void av1_fill_mv_costs(const FRAME_CONTEXT *fc, int integer_mv,
 #if CONFIG_ADAPTIVE_MVD
   mv_costs->amvd_nmv_cost[0] = &mv_costs->amvd_nmv_cost_alloc[0][MV_MAX];
   mv_costs->amvd_nmv_cost[1] = &mv_costs->amvd_nmv_cost_alloc[1][MV_MAX];
-  av1_build_nmv_cost_table(mv_costs->amvd_nmv_joint_cost,
-                           mv_costs->amvd_nmv_cost, &fc->nmvc, fr_mv_precision,
-                           1);
+  av1_build_nmv_cost_table(
+      mv_costs->amvd_nmv_joint_cost, mv_costs->amvd_nmv_cost, &fc->nmvc,
+#if BUGFIX_AMVD_AMVR
+      (fr_mv_precision <= MV_PRECISION_QTR_PEL ? fr_mv_precision
+                                               : MV_PRECISION_QTR_PEL),
+#else
+      fr_mv_precision,
+#endif
+      1);
 #endif
 }
 #else

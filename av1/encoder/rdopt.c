@@ -1420,10 +1420,15 @@ static INLINE int clamp_and_check_mv(int_mv *out_mv, int_mv in_mv,
 #if CONFIG_FLEX_MVRES
   // This function is called only for non-NEW MV modes.
   // Therefore, PB based MV resolution  may not necessary.
-  // MB_MODE_INFO *const mbmi = xd->mi[0];
+  MB_MODE_INFO *const mbmi = xd->mi[0];
   // const MvSubpelPrecision precision = mbmi->pb_mv_precision;
   // lower_mv_precision(&out_mv->as_mv, cm->features.fr_mv_precision);
-  lower_mv_precision(&out_mv->as_mv, cm->features.fr_mv_precision);
+  lower_mv_precision(&out_mv->as_mv,
+#if BUGFIX_AMVD_AMVR
+                     mbmi->pb_mv_precision);
+#else
+                     cm->features.fr_mv_precision);
+#endif
 #else
   lower_mv_precision(&out_mv->as_mv, cm->features.allow_high_precision_mv,
                      cm->features.cur_frame_force_integer_mv);
