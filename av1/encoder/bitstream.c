@@ -1763,11 +1763,16 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         nmv_context *nmvc = &ec_ctx->nmvc;
         const int_mv ref_mv = get_ref_mv(x, ref);
 
+        av1_encode_mv(cpi, w,
 #if CONFIG_FLEX_MVRES
-        av1_encode_mv(cpi, w, mbmi->mv[ref].as_mv, ref_mv.as_mv, nmvc,
+                      mbmi->mv[ref].as_mv, ref_mv.as_mv,
+#else
+                      &mbmi->mv[ref].as_mv, &ref_mv.as_mv,
+#endif
+                      nmvc,
+#if CONFIG_FLEX_MVRES
                       pb_mv_precision);
 #else
-        av1_encode_mv(cpi, w, &mbmi->mv[ref].as_mv, &ref_mv.as_mv, nmvc,
                       allow_hp);
 #endif
       }
