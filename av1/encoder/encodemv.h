@@ -21,8 +21,7 @@ extern "C" {
 
 #if CONFIG_FLEX_MVRES
 void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, MV mv, MV ref,
-                   nmv_context *mvctx, MvSubpelPrecision pb_mv_precision,
-                   MvSubpelPrecision max_mv_precision);
+                   nmv_context *mvctx, MvSubpelPrecision pb_mv_precision);
 void av1_update_mv_stats(MV mv, MV ref, nmv_context *mvctx,
 #if CONFIG_ADAPTIVE_MVD
                          int is_adaptive_mvd,
@@ -123,26 +122,14 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   const PREDICTION_MODE this_mode = mbmi->mode;
-#if 0   // CONFIG_FLEX_MVRES
-  const MvSubpelPrecision precision = mbmi->pb_mv_precision;
-  if (is_pb_mv_precision_active(cm, mbmi, mbmi->sb_type[PLANE_TYPE_Y]))
-    return 1;  // When flex MV tool is enabled it is possible to have JOINTMV
-               // value equal to 0
-#endif  // CONFIG_FLEX_MVRES
+
 #if CONFIG_OPTFLOW_REFINEMENT
   if (this_mode == NEW_NEWMV || this_mode == NEW_NEWMV_OPTFLOW) {
 #else
   if (this_mode == NEW_NEWMV) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-#if 0   // CONFIG_FLEX_MVRES
-    int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
-    int_mv ref_mv_1 = av1_get_ref_mv(x, 1);
-    lower_mv_precision(&ref_mv_0.as_mv, precision);
-    lower_mv_precision(&ref_mv_1.as_mv, precision);
-#else
     const int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
     const int_mv ref_mv_1 = av1_get_ref_mv(x, 1);
-#endif
     if (mbmi->mv[0].as_int == ref_mv_0.as_int ||
         mbmi->mv[1].as_int == ref_mv_1.as_int) {
       return 0;
@@ -153,9 +140,7 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
   } else if (this_mode == NEAR_NEWMV) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     const int_mv ref_mv_1 = av1_get_ref_mv(x, 1);
-#if 0  // CONFIG_FLEX_MVRES
-    lower_mv_precision(&ref_mv_1.as_mv, precision);
-#endif
+
     if (mbmi->mv[1].as_int == ref_mv_1.as_int) {
       return 0;
     }
@@ -168,10 +153,6 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
 #endif  // CONFIG_JOINT_MVD
   ) {
     const int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
-#if 0   // CONFIG_FLEX_MVRES
-    lower_mv_precision(&ref_mv_0.as_mv, precision);
-#endif  // CONFIG_FLEX_MVRES
-
     if (mbmi->mv[0].as_int == ref_mv_0.as_int) {
       return 0;
     }
@@ -180,12 +161,7 @@ static INLINE int av1_check_newmv_joint_nonzero(const AV1_COMMON *cm,
              || this_mode == AMVDNEWMV
 #endif  // IMPROVED_AMVD
   ) {
-#if 0  // CONFIG_FLEX_MVRES
-    int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
-    lower_mv_precision(&ref_mv_0.as_mv, precision);
-#else
     const int_mv ref_mv_0 = av1_get_ref_mv(x, 0);
-#endif
     if (mbmi->mv[0].as_int == ref_mv_0.as_int) {
       return 0;
     }

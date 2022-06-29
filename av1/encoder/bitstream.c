@@ -1593,6 +1593,11 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
   assert(mbmi->most_probable_pb_mv_precision ==
          cm->features.most_probable_fr_mv_precision);
 
+  // One binary symbol is used to signal if the precision is same as the most
+  // probable precision.
+  // mpp_flag == 1 indicates that the precision is same as the most probable
+  // precision in current implementaion, the most probable precision is same as
+  // the maximum precision value of the block.
   const int mpp_flag_context = av1_get_mpp_flag_context(cm, xd);
   const int mpp_flag =
       (mbmi->pb_mv_precision == mbmi->most_probable_pb_mv_precision);
@@ -1602,6 +1607,9 @@ static void write_pb_mv_precision(const AV1_COMMON *const cm,
   if (!mpp_flag) {
     const PRECISION_SET *precision_def =
         &av1_mv_precision_sets[mbmi->mb_precision_set];
+
+    // instead of directly signaling the precision value, we signal index ( i.e.
+    // down) of the precision
     int down = av1_get_pb_mv_precision_index(mbmi);
     int nsymbs = precision_def->num_precisions - 1;
     assert(down >= 0 && down <= nsymbs);
@@ -1755,11 +1763,16 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         nmv_context *nmvc = &ec_ctx->nmvc;
         const int_mv ref_mv = get_ref_mv(x, ref);
 
+        av1_encode_mv(cpi, w,
 #if CONFIG_FLEX_MVRES
-        av1_encode_mv(cpi, w, mbmi->mv[ref].as_mv, ref_mv.as_mv, nmvc,
-                      pb_mv_precision, mbmi->max_mv_precision);
+                      mbmi->mv[ref].as_mv, ref_mv.as_mv,
 #else
-        av1_encode_mv(cpi, w, &mbmi->mv[ref].as_mv, &ref_mv.as_mv, nmvc,
+                      &mbmi->mv[ref].as_mv, &ref_mv.as_mv,
+#endif
+                      nmvc,
+#if CONFIG_FLEX_MVRES
+                      pb_mv_precision);
+#else
                       allow_hp);
 #endif
       }
@@ -1774,12 +1787,19 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 1);
 
+      av1_encode_mv(cpi, w,
 #if CONFIG_FLEX_MVRES
-      av1_encode_mv(cpi, w, mbmi->mv[1].as_mv, ref_mv.as_mv, nmvc,
-                    pb_mv_precision, mbmi->max_mv_precision);
+                    mbmi->mv[1].as_mv, ref_mv.as_mv,
 #else
-      av1_encode_mv(cpi, w, &mbmi->mv[1].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+                    &mbmi->mv[1].as_mv, &ref_mv.as_mv,
 #endif
+                    nmvc,
+#if CONFIG_FLEX_MVRES
+                    pb_mv_precision);
+#else
+                    allow_hp);
+#endif
+
     } else if (mode == NEW_NEARMV
 #if CONFIG_OPTFLOW_REFINEMENT
                || mode == NEW_NEARMV_OPTFLOW
@@ -1790,11 +1810,19 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     ) {
       nmv_context *nmvc = &ec_ctx->nmvc;
       const int_mv ref_mv = get_ref_mv(x, 0);
+
+      av1_encode_mv(cpi, w,
 #if CONFIG_FLEX_MVRES
-      av1_encode_mv(cpi, w, mbmi->mv[0].as_mv, ref_mv.as_mv, nmvc,
-                    pb_mv_precision, mbmi->max_mv_precision);
+                    mbmi->mv[0].as_mv, ref_mv.as_mv,
+
 #else
-      av1_encode_mv(cpi, w, &mbmi->mv[0].as_mv, &ref_mv.as_mv, nmvc, allow_hp);
+                    &mbmi->mv[0].as_mv, &ref_mv.as_mv,
+#endif
+                    nmvc,
+#if CONFIG_FLEX_MVRES
+                    pb_mv_precision);
+#else
+                    allow_hp);
 #endif
     }
 

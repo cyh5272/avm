@@ -686,14 +686,17 @@ static void build_nmv_component_cost_table(int *mvcost,
 }
 #endif
 
+    void av1_encode_mv(AV1_COMP * cpi, aom_writer * w,
 #if CONFIG_FLEX_MVRES
-    void av1_encode_mv(AV1_COMP * cpi, aom_writer * w, MV mv, MV ref,
-                       nmv_context * mvctx, MvSubpelPrecision pb_mv_precision,
-                       MvSubpelPrecision max_mv_precision) {
+                       MV mv, MV ref,
 #else
-void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
-                   nmv_context *mvctx, int usehp) {
-  const MV diff = { mv->row - ref->row, mv->col - ref->col };
+                   const MV *mv, const MV *ref,
+#endif
+                       nmv_context * mvctx,
+#if CONFIG_FLEX_MVRES
+                       MvSubpelPrecision pb_mv_precision) {
+#else
+                   int usehp) {
 #endif
 #if CONFIG_ADAPTIVE_MVD
       const AV1_COMMON *cm = &cpi->common;
@@ -708,6 +711,8 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
 #endif  // BUGFIX_AMVD_AMVR
         lower_mv_precision(&ref, pb_mv_precision);
       const MV diff = { mv.row - ref.row, mv.col - ref.col };
+#else
+  const MV diff = { mv->row - ref->row, mv->col - ref->col };
 #endif
       const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
 #if !CONFIG_FLEX_MVRES
@@ -765,9 +770,6 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
         cpi->mv_search_params.max_mv_magnitude =
             AOMMAX(maxv, cpi->mv_search_params.max_mv_magnitude);
       }
-#if CONFIG_FLEX_MVRES
-      (void)max_mv_precision;
-#endif
     }
 
     void av1_encode_dv(aom_writer * w, const MV *mv, const MV *ref,

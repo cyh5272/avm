@@ -1263,6 +1263,9 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   if (xd->tree_type != CHROMA_PART) read_filter_intra_mode_info(cm, xd, r);
 }
 #if CONFIG_FLEX_MVRES
+// Read the MVD for the lower precision
+// this function is executed when the precision is less than integer pixel
+// precision
 static int read_mv_component_low_precision(aom_reader *r, nmv_component *mvcomp,
                                            MvSubpelPrecision precision) {
   int offset, mag;
