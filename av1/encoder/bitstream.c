@@ -1765,7 +1765,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 
 #if CONFIG_FLEX_MVRES
         av1_encode_mv(cpi, w, mbmi->mv[ref].as_mv, ref_mv.as_mv, nmvc,
-                      pb_mv_precision, mbmi->max_mv_precision);
+                      pb_mv_precision);
 #else
         av1_encode_mv(cpi, w, &mbmi->mv[ref].as_mv, &ref_mv.as_mv, nmvc,
                       allow_hp);
@@ -1790,7 +1790,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif
                     nmvc,
 #if CONFIG_FLEX_MVRES
-                    pb_mv_precision, mbmi->max_mv_precision);
+                    pb_mv_precision);
 #else
                     allow_hp);
 #endif
@@ -1815,7 +1815,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif
                     nmvc,
 #if CONFIG_FLEX_MVRES
-                    pb_mv_precision, mbmi->max_mv_precision);
+                    pb_mv_precision);
 #else
                     allow_hp);
 #endif

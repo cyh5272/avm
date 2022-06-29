@@ -691,8 +691,7 @@ static void build_nmv_component_cost_table(int *mvcost,
 #endif
                        nmv_context * mvctx,
 #if CONFIG_FLEX_MVRES
-                       MvSubpelPrecision pb_mv_precision,
-                       MvSubpelPrecision max_mv_precision) {
+                       MvSubpelPrecision pb_mv_precision) {
 #else
                    int usehp) {
 #endif
@@ -767,9 +766,6 @@ static void build_nmv_component_cost_table(int *mvcost,
         cpi->mv_search_params.max_mv_magnitude =
             AOMMAX(maxv, cpi->mv_search_params.max_mv_magnitude);
       }
-#if CONFIG_FLEX_MVRES
-      (void)max_mv_precision;
-#endif
     }
 
     void av1_encode_dv(aom_writer * w, const MV *mv, const MV *ref,
