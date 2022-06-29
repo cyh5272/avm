@@ -249,9 +249,7 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
 
 #if CONFIG_FLEX_MVRES
-#if BUGFIX_AMVD_AMVR
-  assert(!(is_adaptive_mvd && (mbmi->pb_mv_precision < MV_PRECISION_QTR_PEL)));
-#else
+#if !BUGFIX_AMVD_AMVR
   assert(
       !(is_adaptive_mvd && (mbmi->pb_mv_precision != mbmi->max_mv_precision)));
 #endif  // BUGFIX_AMVD_AMVR
