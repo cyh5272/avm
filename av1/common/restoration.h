@@ -460,38 +460,6 @@ static INLINE void set_default_wiener(WienerInfo *wiener_info) {
   wiener_info->vfilter[6] = wiener_info->hfilter[6] = WIENER_FILT_TAP0_MIDV;
 }
 
-#if CONFIG_RST_MERGECOEFFS
-static INLINE int check_wiener_eq(const WienerInfo *info,
-                                  const WienerInfo *ref) {
-  return !memcmp(info->vfilter, ref->vfilter,
-                 WIENER_HALFWIN * sizeof(info->vfilter[0])) &&
-         !memcmp(info->hfilter, ref->hfilter,
-                 WIENER_HALFWIN * sizeof(info->hfilter[0]));
-}
-static INLINE int check_sgrproj_eq(const SgrprojInfo *info,
-                                   const SgrprojInfo *ref) {
-  if (!memcmp(info, ref, sizeof(*info))) return 1;
-  return 0;
-}
-
-static INLINE int check_wiener_bank_eq(const WienerInfoBank *bank,
-                                       const WienerInfo *info) {
-  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
-    if (check_wiener_eq(info, av1_constref_from_wiener_bank(bank, k))) return k;
-  }
-  return -1;
-}
-
-static INLINE int check_sgrproj_bank_eq(const SgrprojInfoBank *bank,
-                                        const SgrprojInfo *info) {
-  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
-    if (check_sgrproj_eq(info, av1_constref_from_sgrproj_bank(bank, k)))
-      return k;
-  }
-  return -1;
-}
-#endif  // CONFIG_RST_MERGECOEFFS
-
 #if CONFIG_WIENER_NONSEP
 static INLINE void set_default_wiener_nonsep(WienerNonsepInfo *wienerns_info,
                                              int qindex) {
@@ -507,35 +475,6 @@ static INLINE void set_default_wiener_nonsep(WienerNonsepInfo *wienerns_info,
         (1 << wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_BIT_ID]) / 2;
   }
 }
-
-#if CONFIG_RST_MERGECOEFFS
-static INLINE int check_wienerns_eq(int chroma, const WienerNonsepInfo *info,
-                                    const WienerNonsepInfo *ref,
-                                    const WienernsFilterConfigPairType *wnsf) {
-  if (!chroma) {
-    if (!memcmp(info->nsfilter, ref->nsfilter,
-                wnsf->y->ncoeffs * sizeof(*info->nsfilter)))
-      return 1;
-  } else {
-    if (!memcmp(&info->nsfilter[wnsf->y->ncoeffs],
-                &ref->nsfilter[wnsf->y->ncoeffs],
-                wnsf->uv->ncoeffs * sizeof(*info->nsfilter)))
-      return 1;
-  }
-  return 0;
-}
-
-static INLINE int check_wienerns_bank_eq(
-    int chroma, const WienerNonsepInfoBank *bank, const WienerNonsepInfo *info,
-    const WienernsFilterConfigPairType *wnsf) {
-  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
-    if (check_wienerns_eq(chroma, info,
-                          av1_constref_from_wiener_nonsep_bank(bank, k), wnsf))
-      return k;
-  }
-  return -1;
-}
-#endif  // CONFIG_RST_MERGECOEFFS
 
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
 uint8_t *wienerns_copy_luma(const uint8_t *dgd, int height_y, int width_y,
