@@ -796,7 +796,7 @@ static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
-#if !ADJ_ORDER
+#if !CONFIG_MVP_IMPROVEMENTS
   if (bs > mi_size_wide[BLOCK_64X64]) return 0;
 #endif
 
@@ -857,7 +857,7 @@ static int check_sb_border(const int mi_row, const int mi_col,
   return 1;
 }
 
-#if ADJ_ORDER
+#if CONFIG_MVP_IMPROVEMENTS
 static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                          int mi_row, int mi_col, int bs) {
   const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
@@ -1154,7 +1154,7 @@ static AOM_INLINE void setup_ref_mv_list(
     int mi_row, int mi_col, int16_t *mode_context) {
   const int bs = AOMMAX(xd->width, xd->height);
   const int has_tr = has_top_right(cm, xd, mi_row, mi_col, bs);
-#if ADJ_ORDER
+#if CONFIG_MVP_IMPROVEMENTS
   const int has_bl = has_bottom_left(cm, xd, mi_row, mi_col, bs);
 #endif
   MV_REFERENCE_FRAME rf[2];
@@ -1163,7 +1163,7 @@ static AOM_INLINE void setup_ref_mv_list(
   int max_row_offset = 0, max_col_offset = 0;
   const int row_adj = (xd->height < mi_size_high[BLOCK_8X8]) && (mi_row & 0x01);
   const int col_adj = (xd->width < mi_size_wide[BLOCK_8X8]) && (mi_col & 0x01);
-#if !ADJ_ORDER
+#if !CONFIG_MVP_IMPROVEMENTS
   int processed_rows = 0;
 #endif
   int processed_cols = 0;
@@ -1211,7 +1211,7 @@ static AOM_INLINE void setup_ref_mv_list(
   uint8_t derived_mv_count = 0;
 #endif  // CONFIG_SMVP_IMPROVEMENT
 
-#if ADJ_ORDER
+#if CONFIG_MVP_IMPROVEMENTS
   if (xd->left_available)
         scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height - 1), -1, ref_mv_stack,
                   ref_mv_weight, &col_match_count, &newmv_count,
@@ -1282,7 +1282,6 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   }
-#if WITH_MID_POS
   if ( xd->left_available )
   {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height >> 1), -1, ref_mv_stack,
@@ -1305,7 +1304,6 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
             refmv_count);
   }
-#endif
 #else
   // Scan the first above row mode info. row_offset = -1;
   if (abs(max_row_offset) >= 1)
@@ -1409,7 +1407,7 @@ static AOM_INLINE void setup_ref_mv_list(
 
   uint8_t dummy_newmv_count = 0;
 
-#if !ADJ_ORDER
+#if !CONFIG_MVP_IMPROVEMENTS
   // Scan the second outer area.
   scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, -1, ref_mv_stack, ref_mv_weight,
                 &row_match_count, &dummy_newmv_count, gm_mv_candidates,
@@ -1536,10 +1534,7 @@ static AOM_INLINE void setup_ref_mv_list(
   }
 #endif
 
-#if COND_RE_BANK||BF_DERIVE
-#if !BF_DERIVE
-    if (!(xd->width >= 16 || xd->height >= 16)){
-#endif
+#if CONFIG_MVP_IMPROVEMENTS
 #if CONFIG_REF_MV_BANK
   if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
@@ -1550,7 +1545,7 @@ static AOM_INLINE void setup_ref_mv_list(
       && ref_frame != INTRA_FRAME
 #endif  // CONFIG_BVP_IMPROVEMENT
   ) {
-#if SAME_SB //HG
+#if CONFIG_MVP_IMPROVEMENTS
     const REF_MV_BANK *ref_mv_bank = &xd->ref_mv_bank;
 #else
     const REF_MV_BANK *ref_mv_bank = xd->ref_mv_bank_pt;
@@ -1572,10 +1567,7 @@ static AOM_INLINE void setup_ref_mv_list(
     }
   }
 #endif  // CONFIG_REF_MV_BANK
-#if !BF_DERIVE
-  }
 #endif
-#endif //COND_RE_BANK
 
 #if CONFIG_SMVP_IMPROVEMENT
   const int max_ref_mv_count =
@@ -1718,10 +1710,7 @@ static AOM_INLINE void setup_ref_mv_list(
       }
     }
   }
-#if !BF_DERIVE
-#if COND_RE_BANK
-    if ((xd->width >= 16 || xd->height >= 16)){
-#endif
+#if !CONFIG_MVP_IMPROVEMENTS
 #if CONFIG_REF_MV_BANK
   if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
@@ -1732,7 +1721,7 @@ static AOM_INLINE void setup_ref_mv_list(
       && ref_frame != INTRA_FRAME
 #endif  // CONFIG_BVP_IMPROVEMENT
   ) {
-#if SAME_SB //HG
+#if CONFIG_MVP_IMPROVEMENTS
     const REF_MV_BANK *ref_mv_bank = &xd->ref_mv_bank;
 #else
     const REF_MV_BANK *ref_mv_bank = xd->ref_mv_bank_pt;
@@ -1754,9 +1743,6 @@ static AOM_INLINE void setup_ref_mv_list(
     }
   }
 #endif  // CONFIG_REF_MV_BANK
-#if COND_RE_BANK
-  }
-#endif
 #endif
 
 #if CONFIG_BVP_IMPROVEMENT

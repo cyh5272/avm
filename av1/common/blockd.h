@@ -1090,7 +1090,7 @@ typedef struct macroblockd {
    */
   bool is_first_horizontal_rect;
 
-#if ADJ_ORDER
+#if CONFIG_MVP_IMPROVEMENTS
   bool is_last_horizontal_rect;
   bool is_first_vertical_rect;
 #endif

@@ -29,11 +29,6 @@ extern "C" {
 
 #undef MAX_SB_SIZE
 
-#define SAME_SB 1 // CB level MV bank update
-#define COND_RE_BANK 0 // cond. relocated MV bank
-#define BF_DERIVE 1 // MV bank before derived MV
-#define ADJ_ORDER 1 //inerleaved adjacent order
-#define WITH_MID_POS 1 // with middle pos candidates
 
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
