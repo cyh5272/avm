@@ -1870,6 +1870,7 @@ const int16_t *get_filter_for_class_id(const int16_t *filter, int class_id) {
   return filter;
 }
 
+#if CONFIG_COMBINE_PC_NS_WIENER
 void apply_wiener_nonsep_class_id_highbd(
     const uint8_t *dgd8, int width, int height, int stride, int base_qindex,
     const int16_t *filter, uint8_t *dst8, int dst_stride, int plane,
@@ -1911,6 +1912,7 @@ void apply_wiener_nonsep_class_id_highbd(
   }
   return;
 }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
                                           int stripe_width, int stripe_height,

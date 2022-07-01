@@ -1469,10 +1469,10 @@ static const aom_cdf_prob default_filter_intra_cdfs[BLOCK_SIZES_ALL][CDF_SIZE(
 #if CONFIG_LR_FLEX_SYNTAX
 static const aom_cdf_prob default_switchable_flex_restore_cdf
     [MULTIQ_LR_LEVELS][MAX_LR_FLEX_SWITCHABLE_BITS][CDF_SIZE(2)] = {
-      { { AOM_CDF2(16384) },
-        { AOM_CDF2(16384) },
-        { AOM_CDF2(16384) },
-        { AOM_CDF2(16384) } },
+      { { AOM_CDF2(20384) },
+        { AOM_CDF2(20384) },
+        { AOM_CDF2(24384) },
+        { AOM_CDF2(20384) } },
 #if CONFIG_MULTIQ_LR_SIGNALING
       { { AOM_CDF2(16384) },
         { AOM_CDF2(16384) },

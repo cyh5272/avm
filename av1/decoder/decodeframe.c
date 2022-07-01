@@ -2314,18 +2314,21 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
 
 static AOM_INLINE void read_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                           WienerInfo *wiener_info,
-                                          WienerInfo *ref_wiener_info,
+                                          WienerInfoBank *bank,
                                           aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
-      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(wiener_info, ref_wiener_info, sizeof(*wiener_info));
-    return;
+  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
+    if (aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR)) {
+      memcpy(wiener_info, av1_ref_from_wiener_bank(bank, k),
+             sizeof(*wiener_info));
+      if (bank->bank_size == 0) av1_add_to_wiener_bank(bank, wiener_info);
+      return;
+    }
   }
 #else
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
+  WienerInfo *ref_wiener_info = av1_ref_from_wiener_bank(bank, 0);
   memset(wiener_info->vfilter, 0, sizeof(wiener_info->vfilter));
   memset(wiener_info->hfilter, 0, sizeof(wiener_info->hfilter));
 
@@ -2380,23 +2383,27 @@ static AOM_INLINE void read_wiener_filter(MACROBLOCKD *xd, int wiener_win,
   wiener_info->hfilter[WIENER_HALFWIN] =
       -2 * (wiener_info->hfilter[0] + wiener_info->hfilter[1] +
             wiener_info->hfilter[2]);
-  memcpy(ref_wiener_info, wiener_info, sizeof(*wiener_info));
+  // memcpy(ref_wiener_info, wiener_info, sizeof(*wiener_info));
+  av1_add_to_wiener_bank(bank, wiener_info);
 }
 
 static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
                                            SgrprojInfo *sgrproj_info,
-                                           SgrprojInfo *ref_sgrproj_info,
+                                           SgrprojInfoBank *bank,
                                            aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
-      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(sgrproj_info, ref_sgrproj_info, sizeof(*sgrproj_info));
-    return;
+  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
+    if (aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR)) {
+      memcpy(sgrproj_info, av1_ref_from_sgrproj_bank(bank, k),
+             sizeof(*sgrproj_info));
+      if (bank->bank_size == 0) av1_add_to_sgrproj_bank(bank, sgrproj_info);
+      return;
+    }
   }
 #else
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
+  SgrprojInfo *ref_sgrproj_info = av1_ref_from_sgrproj_bank(bank, 0);
   sgrproj_info->ep = aom_read_literal(rb, SGRPROJ_PARAMS_BITS, ACCT_STR);
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
 
@@ -2427,21 +2434,23 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
             ref_sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1, ACCT_STR) +
         SGRPROJ_PRJ_MIN1;
   }
-
-  memcpy(ref_sgrproj_info, sgrproj_info, sizeof(*sgrproj_info));
+  // memcpy(ref_sgrproj_info, sgrproj_info, sizeof(*sgrproj_info));
+  av1_add_to_sgrproj_bank(bank, sgrproj_info);
 }
 
 #if CONFIG_WIENER_NONSEP
 static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
                                  WienerNonsepInfo *wienerns_info,
-                                 WienerNonsepInfo *ref_wienerns_info,
-                                 aom_reader *rb) {
+                                 WienerNonsepInfoBank *bank, aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
-      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(wienerns_info, ref_wienerns_info, sizeof(*wienerns_info));
-    return;
+  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
+    if (aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR)) {
+      memcpy(wienerns_info, av1_ref_from_wiener_nonsep_bank(bank, k),
+             sizeof(*wienerns_info));
+      if (bank->bank_size == 0)
+        av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
+      return;
+    }
   }
 #else
   (void)xd;
@@ -2453,6 +2462,8 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
       is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  WienerNonsepInfo *ref_wienerns_info =
+      av1_ref_from_wiener_nonsep_bank(bank, 0);
 
   // printf("Dec %s ", is_uv ? "UV:" : "Y: ");
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
@@ -2517,7 +2528,8 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
     // ref_wienerns_info->nsfilter[i]);
   }
   // printf("\n");
-  memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
+  // memcpy(ref_wienerns_info, wienerns_info, sizeof(*wienerns_info));
+  av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
 }
 #endif  // CONFIG_WIENER_NONSEP
 
@@ -2540,11 +2552,6 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
   const int is_uv = (plane > 0);
 #endif  // CONFIG_WIENER_NONSEP
-  WienerInfo *wiener_info = xd->wiener_info + plane;
-  SgrprojInfo *sgrproj_info = xd->sgrproj_info + plane;
-#if CONFIG_WIENER_NONSEP
-  WienerNonsepInfo *wiener_nonsep_info = xd->wiener_nonsep_info + plane;
-#endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
 #if CONFIG_LR_FLEX_SYNTAX
@@ -2565,15 +2572,17 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_LR_FLEX_SYNTAX
     switch (rui->restoration_type) {
       case RESTORE_WIENER:
-        read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
+        read_wiener_filter(xd, wiener_win, &rui->wiener_info,
+                           &xd->wiener_info[plane], r);
         break;
       case RESTORE_SGRPROJ:
-        read_sgrproj_filter(xd, &rui->sgrproj_info, sgrproj_info, r);
+        read_sgrproj_filter(xd, &rui->sgrproj_info, &xd->sgrproj_info[plane],
+                            r);
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
         read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                             wiener_nonsep_info, r);
+                             &xd->wiener_nonsep_info[plane], r);
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2586,7 +2595,8 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
   } else if (rsi->frame_restoration_type == RESTORE_WIENER) {
     if (aom_read_symbol(r, xd->tile_ctx->wiener_restore_cdf[ql], 2, ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER;
-      read_wiener_filter(xd, wiener_win, &rui->wiener_info, wiener_info, r);
+      read_wiener_filter(xd, wiener_win, &rui->wiener_info,
+                         &xd->wiener_info[plane], r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
@@ -2594,7 +2604,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     if (aom_read_symbol(r, xd->tile_ctx->sgrproj_restore_cdf[ql], 2,
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_SGRPROJ;
-      read_sgrproj_filter(xd, &rui->sgrproj_info, sgrproj_info, r);
+      read_sgrproj_filter(xd, &rui->sgrproj_info, &xd->sgrproj_info[plane], r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
@@ -2604,7 +2614,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
       read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                           wiener_nonsep_info, r);
+                           &xd->wiener_nonsep_info[plane], r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
