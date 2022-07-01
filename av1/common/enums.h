@@ -29,7 +29,6 @@ extern "C" {
 
 #undef MAX_SB_SIZE
 
-
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
 #define CCSO_BLK_SIZE 7

@@ -547,6 +547,7 @@ static AOM_INLINE void add_ref_mv_candidate(
 #endif  // CONFIG_TIP
 }
 
+#if !(CONFIG_SMVP_IMPROVEMENT && CONFIG_MVP_IMPROVEMENTS)
 static AOM_INLINE void scan_row_mbmi(
     const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #if CONFIG_TIP
@@ -636,6 +637,7 @@ static AOM_INLINE void scan_row_mbmi(
     i += len;
   }
 }
+#endif
 
 static AOM_INLINE void scan_col_mbmi(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, int mi_row,
@@ -859,24 +861,24 @@ static int check_sb_border(const int mi_row, const int mi_col,
 
 #if CONFIG_MVP_IMPROVEMENTS
 static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
-                         int mi_row, int mi_col, int bs) {
+                           int mi_row, int mi_col, int bs) {
   const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
-
   // In a split partition, only top left subblock has a bottom right
   int has_bl = !((mask_row & bs) || (mask_col & bs));
 
-  if (bs > mi_size_wide[BLOCK_64X64]) has_bl=0;
+  if (bs > mi_size_wide[BLOCK_64X64]) has_bl = 0;
+
+  if (xd->height == mi_size_wide[cm->seq_params.sb_size]) has_bl = 0;
 
   // bs > 0 and bs is a power of 2
   assert(bs > 0 && !(bs & (bs - 1)));
 
   while (bs < sb_mi_size) {
     if (!(mask_col & bs)) {
-      if (2 * bs == sb_mi_size)
-        break;
+      if (2 * bs == sb_mi_size) break;
       if (!(mask_col & (2 * bs)) && !(mask_row & (2 * bs))) {
         has_bl = 1;
         break;
@@ -1213,8 +1215,8 @@ static AOM_INLINE void setup_ref_mv_list(
 
 #if CONFIG_MVP_IMPROVEMENTS
   if (xd->left_available)
-        scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height - 1), -1, ref_mv_stack,
-                  ref_mv_weight, &col_match_count, &newmv_count,
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height - 1), -1,
+                  ref_mv_stack, ref_mv_weight, &col_match_count, &newmv_count,
                   gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
                   1, single_mv, &single_mv_count, derived_mv_stack,
@@ -1222,7 +1224,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   if (xd->up_available)
-      scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width - 1), ref_mv_stack,
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width - 1), ref_mv_stack,
                   ref_mv_weight, &row_match_count, &newmv_count,
                   gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
@@ -1230,8 +1232,8 @@ static AOM_INLINE void setup_ref_mv_list(
                   derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
-  if (xd->left_available){
-      scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, 0, -1, ref_mv_stack,
+  if (xd->left_available) {
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, 0, -1, ref_mv_stack,
                   ref_mv_weight, &col_match_count, &newmv_count,
                   gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
@@ -1240,8 +1242,8 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   }
-  if (xd->up_available){
-      scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, 0, ref_mv_stack,
+  if (xd->up_available) {
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, 0, ref_mv_stack,
                   ref_mv_weight, &row_match_count, &newmv_count,
                   gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
@@ -1260,7 +1262,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   }
-  if (has_tr){
+  if (has_tr) {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, xd->width, ref_mv_stack,
                   ref_mv_weight, &row_match_count, &newmv_count,
                   gm_mv_candidates,
@@ -1268,9 +1270,9 @@ static AOM_INLINE void setup_ref_mv_list(
                   1, single_mv, &single_mv_count, derived_mv_stack,
                   derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-                  refmv_count);    
-  } 
-  if (xd->up_available && xd->left_available){
+                  refmv_count);
+  }
+  if (xd->up_available && xd->left_available) {
     uint8_t dummy_ref_match_count = 0;
     uint8_t dummy_new_mv_count = 0;
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, -1, ref_mv_stack,
@@ -1282,27 +1284,25 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
   }
-  if ( xd->left_available )
-  {
-    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height >> 1), -1, ref_mv_stack,
-          ref_mv_weight, &col_match_count, &newmv_count,
-          gm_mv_candidates,
+  if (xd->left_available) {
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height >> 1), -1,
+                  ref_mv_stack, ref_mv_weight, &col_match_count, &newmv_count,
+                  gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
-          1, single_mv, &single_mv_count, derived_mv_stack,
-          derived_mv_weight, &derived_mv_count,
+                  1, single_mv, &single_mv_count, derived_mv_stack,
+                  derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-          refmv_count);
+                  refmv_count);
   }
-  if ( xd->up_available )
-  {
-    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width >> 1) , ref_mv_stack,
-            ref_mv_weight, &row_match_count, &newmv_count,
-            gm_mv_candidates,
+  if (xd->up_available) {
+    scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width >> 1),
+                  ref_mv_stack, ref_mv_weight, &row_match_count, &newmv_count,
+                  gm_mv_candidates,
 #if CONFIG_SMVP_IMPROVEMENT
-            1, single_mv, &single_mv_count, derived_mv_stack,
-            derived_mv_weight, &derived_mv_count,
+                  1, single_mv, &single_mv_count, derived_mv_stack,
+                  derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
-            refmv_count);
+                  refmv_count);
   }
 #else
   // Scan the first above row mode info. row_offset = -1;
