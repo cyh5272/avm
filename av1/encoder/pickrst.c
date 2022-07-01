@@ -172,10 +172,10 @@ typedef struct {
 
   // sgrproj and wiener are initialised by rsc_on_tile when starting the first
   // tile in the frame.
-  SgrprojInfo sgrproj;
-  WienerInfo wiener;
+  WienerInfoBank wiener;
+  SgrprojInfoBank sgrproj;
 #if CONFIG_WIENER_NONSEP
-  WienerNonsepInfo wiener_nonsep;
+  WienerNonsepInfoBank wiener_nonsep;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint8_t *luma;
   int luma_stride;
@@ -190,13 +190,37 @@ typedef struct {
   AV1PixelRect tile_rect;
 } RestSearchCtxt;
 
+#if CONFIG_RST_MERGECOEFFS
+typedef struct RstUnitSnapshot {
+  RestorationTileLimits limits;
+  int rest_unit_idx;  // update filter value and sse as needed
+  int64_t current_sse;
+  int64_t current_bits;
+  int64_t merge_sse;
+  int64_t merge_bits;
+  // Wiener filter info
+  int64_t M[WIENER_WIN2];
+  int64_t H[WIENER_WIN2 * WIENER_WIN2];
+  WienerInfoBank ref_wiener;
+#if CONFIG_WIENER_NONSEP
+  // Nonseparable Wiener filter info
+  double A[WIENERNS_MAX * WIENERNS_MAX];
+  double b[WIENERNS_MAX];
+  WienerNonsepInfoBank ref_wiener_nonsep;
+#endif  // CONFIG_WIENER_NONSEP
+  // Sgrproj filter info
+  SgrprojInfo unit_sgrproj;
+  SgrprojInfoBank ref_sgrproj;
+} RstUnitSnapshot;
+#endif  // CONFIG_RST_MERGECOEFFS
+
 static AOM_INLINE void rsc_on_tile(void *priv) {
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
-  set_default_sgrproj(&rsc->sgrproj);
-  set_default_wiener(&rsc->wiener);
+  av1_reset_wiener_bank(&rsc->wiener);
+  av1_reset_sgrproj_bank(&rsc->sgrproj);
 #if CONFIG_WIENER_NONSEP
-  set_default_wiener_nonsep(&rsc->wiener_nonsep,
-                            rsc->cm->quant_params.base_qindex);
+  av1_reset_wiener_nonsep_bank(&rsc->wiener_nonsep,
+                               rsc->cm->quant_params.base_qindex);
 #endif  // CONFIG_WIENER_NONSEP
   rsc->tile_stripe0 = 0;
 }
@@ -907,8 +931,12 @@ static SgrprojInfo search_selfguided_restoration(
 }
 
 static int64_t count_sgrproj_bits(SgrprojInfo *sgrproj_info,
-                                  SgrprojInfo *ref_sgrproj_info) {
-  int64_t bits = SGRPROJ_PARAMS_BITS;
+                                  const ModeCosts *mode_costs,
+                                  const SgrprojInfoBank *bank) {
+  (void)mode_costs;
+  int64_t bits = 0;
+  const SgrprojInfo *ref_sgrproj_info = av1_constref_from_sgrproj_bank(bank, 0);
+  bits += SGRPROJ_PARAMS_BITS;
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
   if (params->r[0] > 0)
     bits += aom_count_primitive_refsubexpfin(
@@ -922,6 +950,25 @@ static int64_t count_sgrproj_bits(SgrprojInfo *sgrproj_info,
         sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1);
   return bits << AV1_PROB_COST_SHIFT;
 }
+
+#if CONFIG_RST_MERGECOEFFS
+static int64_t count_sgrproj_bits_all(SgrprojInfo *sgrproj_info,
+                                      const ModeCosts *mode_costs,
+                                      const SgrprojInfoBank *bank) {
+  int64_t bits = 0;
+  const int *merged_param_cost = mode_costs->merged_param_cost;
+  const int equal = check_sgrproj_bank_eq(bank, sgrproj_info);
+  if (equal != -1) {
+    for (int k = 0; k < equal; ++k) bits += merged_param_cost[0];
+    bits += merged_param_cost[1];
+    return bits;
+  } else {
+    for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k)
+      bits += merged_param_cost[0];
+  }
+  return bits + count_sgrproj_bits(sgrproj_info, mode_costs, bank);
+}
+#endif  // CONFIG_RST_MERGECOEFFS
 
 static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                       const AV1PixelRect *tile,
@@ -967,9 +1014,10 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
 
 #if CONFIG_RST_MERGECOEFFS
   Vector *current_unit_stack = rsc->unit_stack;
-  int64_t bits_nomerge = x->mode_costs.sgrproj_restore_cost[1] +
-                         x->mode_costs.merged_param_cost[0] +
-                         count_sgrproj_bits(&rusi->sgrproj, &rsc->sgrproj);
+  int64_t bits_nomerge =
+      x->mode_costs.sgrproj_restore_cost[1] +
+      // x->mode_costs.merged_param_cost[0] +
+      count_sgrproj_bits_all(&rusi->sgrproj, &x->mode_costs, &rsc->sgrproj);
   double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
   const double dual_sgr_penalty_sf_mult =
@@ -997,7 +1045,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   unit_snapshot.ref_sgrproj = rsc->sgrproj;
   // If current_unit_stack is empty, we can leave early.
   if (aom_vector_is_empty(current_unit_stack)) {
-    if (rtype == RESTORE_SGRPROJ) rsc->sgrproj = rusi->sgrproj;
+    if (rtype == RESTORE_SGRPROJ)
+      av1_add_to_sgrproj_bank(&rsc->sgrproj, &rusi->sgrproj);
+    // rsc->sgrproj = rusi->sgrproj;
     aom_vector_push_back(current_unit_stack, &unit_snapshot);
     return;
   }
@@ -1005,12 +1055,15 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   // filter for the stack - we don't want to perform another merge and
   // get a less optimal filter, but we want to continue building the stack.
   if (rtype == RESTORE_SGRPROJ &&
-      check_sgrproj_eq(&rusi->sgrproj, &rsc->sgrproj)) {
+      check_sgrproj_eq(&rusi->sgrproj,
+                       av1_ref_from_sgrproj_bank(&rsc->sgrproj, 0))) {
+    /*
     rsc->bits -= bits_nomerge;
     rsc->bits += x->mode_costs.sgrproj_restore_cost[1] +
                  x->mode_costs.merged_param_cost[1];
     unit_snapshot.current_bits = x->mode_costs.sgrproj_restore_cost[1] +
                                  x->mode_costs.merged_param_cost[1];
+                                 */
     aom_vector_push_back(current_unit_stack, &unit_snapshot);
     return;
   }
@@ -1047,8 +1100,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
     if (aom_iterator_equals(&(listed_unit), &begin)) {
       old_unit->merge_bits =
           x->mode_costs.sgrproj_restore_cost[1] +
-          x->mode_costs.merged_param_cost[0] +
-          count_sgrproj_bits(&rui_temp.sgrproj_info, &old_unit->ref_sgrproj);
+          // x->mode_costs.merged_param_cost[0] +
+          count_sgrproj_bits_all(&rui_temp.sgrproj_info, &x->mode_costs,
+                                 &old_unit->ref_sgrproj);
     } else {
       old_unit->merge_bits = x->mode_costs.sgrproj_restore_cost[1] +
                              x->mode_costs.merged_param_cost[1];
@@ -1074,7 +1128,8 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       old_unit->current_sse = old_unit->merge_sse;
       old_unit->current_bits = old_unit->merge_bits;
     }
-    rsc->sgrproj = rui_temp.sgrproj_info;
+    av1_upd_to_sgrproj_bank(&rsc->sgrproj, 0, &rui_temp.sgrproj_info);
+    // rsc->sgrproj = rui_temp.sgrproj_info;
   } else {
     // Copy current unit from the top of the stack.
     memset(&unit_snapshot, 0, sizeof(unit_snapshot));
@@ -1082,7 +1137,8 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
     // RESTORE_SGRPROJ units become start of new stack, and
     // RESTORE_NONE units are discarded.
     if (rtype == RESTORE_SGRPROJ) {
-      rsc->sgrproj = rusi->sgrproj;
+      // rsc->sgrproj = rusi->sgrproj;
+      av1_add_to_sgrproj_bank(&rsc->sgrproj, &rusi->sgrproj);
       aom_vector_clear(current_unit_stack);
       aom_vector_push_back(current_unit_stack, &unit_snapshot);
     } else {
@@ -1090,8 +1146,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
     }
   }
 #else   // CONFIG_RST_MERGECOEFFS
-  const int64_t bits_sgr = x->mode_costs.sgrproj_restore_cost[1] +
-                           count_sgrproj_bits(&rusi->sgrproj, &rsc->sgrproj);
+  const int64_t bits_sgr =
+      x->mode_costs.sgrproj_restore_cost[1] +
+      count_sgrproj_bits(&rusi->sgrproj, &x->mode_costs, &rsc->sgrproj);
   double cost_sgr = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_sgr >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
   if (rusi->sgrproj.ep < 10)
@@ -1104,7 +1161,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
 
   rsc->sse += rusi->sse[rtype];
   rsc->bits += (cost_sgr < cost_none) ? bits_sgr : bits_none;
-  if (cost_sgr < cost_none) rsc->sgrproj = rusi->sgrproj;
+  if (cost_sgr < cost_none)
+    av1_add_to_sgrproj_bank(&rsc->sgrproj, &rusi->sgrproj);
+    // rsc->sgrproj = rusi->sgrproj;
 #endif  // CONFIG_RST_MERGECOEFFS
 }
 
@@ -1520,9 +1579,12 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
 }
 #endif  // CONFIG_PC_WIENER
 
-static int64_t count_wiener_bits(int wiener_win, WienerInfo *wiener_info,
-                                 const WienerInfo *ref_wiener_info) {
+static int64_t count_wiener_bits(int wiener_win, const ModeCosts *mode_costs,
+                                 WienerInfo *wiener_info,
+                                 const WienerInfoBank *bank) {
+  (void)mode_costs;
   int64_t bits = 0;
+  const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, 0);
   if (wiener_win == WIENER_WIN)
     bits += aom_count_primitive_refsubexpfin(
         WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
@@ -1558,6 +1620,26 @@ static int64_t count_wiener_bits(int wiener_win, WienerInfo *wiener_info,
   return bits << AV1_PROB_COST_SHIFT;
 }
 
+#if CONFIG_RST_MERGECOEFFS
+static int64_t count_wiener_bits_all(int wiener_win,
+                                     const ModeCosts *mode_costs,
+                                     WienerInfo *wiener_info,
+                                     const WienerInfoBank *bank) {
+  int64_t bits = 0;
+  const int *merged_param_cost = mode_costs->merged_param_cost;
+  const int equal = check_wiener_bank_eq(bank, wiener_info);
+  if (equal != -1) {
+    for (int k = 0; k < equal; ++k) bits += merged_param_cost[0];
+    bits += merged_param_cost[1];
+    return bits;
+  } else {
+    for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k)
+      bits += merged_param_cost[0];
+  }
+  return bits + count_wiener_bits(wiener_win, mode_costs, wiener_info, bank);
+}
+#endif  // CONFIG_RST_MERGECOEFFS
+
 #if CONFIG_WIENER_NONSEP || CONFIG_RST_MERGECOEFFS
 
 // If limits != NULL, calculates error for current restoration unit.
@@ -1585,7 +1667,7 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 #endif  // CONFIG_WIENER_NONSEP
 
 #define USE_WIENER_REFINEMENT_SEARCH 1
-static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
+static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
                                         const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile,
                                         RestorationUnitInfo *rui,
@@ -1601,7 +1683,8 @@ static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
   WienerInfo *plane_wiener = &rui->wiener_info;
 
   const MACROBLOCK *const x = rsc->x;
-  int64_t bits = count_wiener_bits(wiener_win, plane_wiener, &rsc->wiener);
+  int64_t bits =
+      count_wiener_bits(wiener_win, &x->mode_costs, plane_wiener, &rsc->wiener);
   double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, err,
                                                rsc->cm->seq_params.bit_depth);
   int tap_min[] = { WIENER_FILT_TAP0_MINV, WIENER_FILT_TAP1_MINV,
@@ -1624,8 +1707,8 @@ static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
 #endif  // CONFIG_RST_MERGECOEFFS
-          int64_t bits2 =
-              count_wiener_bits(wiener_win, plane_wiener, &rsc->wiener);
+          int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
+                                            plane_wiener, &rsc->wiener);
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
           if (cost2 > cost) {
@@ -1653,8 +1736,8 @@ static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
 #endif  // CONFIG_RST_MERGECOEFFS
-          int64_t bits2 =
-              count_wiener_bits(wiener_win, plane_wiener, &rsc->wiener);
+          int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
+                                            plane_wiener, &rsc->wiener);
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
           if (cost2 > cost) {
@@ -1683,8 +1766,8 @@ static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
 #endif  // CONFIG_RST_MERGECOEFFS
-          int64_t bits2 =
-              count_wiener_bits(wiener_win, plane_wiener, &rsc->wiener);
+          int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
+                                            plane_wiener, &rsc->wiener);
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
           if (cost2 > cost) {
@@ -1712,8 +1795,8 @@ static int64_t finer_tile_search_wiener(const RestSearchCtxt *rsc,
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
 #endif  // CONFIG_RST_MERGECOEFFS
-          int64_t bits2 =
-              count_wiener_bits(wiener_win, plane_wiener, &rsc->wiener);
+          int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
+                                            plane_wiener, &rsc->wiener);
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
           if (cost2 > cost) {
@@ -1841,10 +1924,10 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       rsc->cm->seq_params.bit_depth);
 #if CONFIG_RST_MERGECOEFFS
   Vector *current_unit_stack = rsc->unit_stack;
-  int64_t bits_nomerge =
-      x->mode_costs.wiener_restore_cost[1] +
-      x->mode_costs.merged_param_cost[0] +
-      count_wiener_bits(wiener_win, &rusi->wiener, &rsc->wiener);
+  int64_t bits_nomerge = x->mode_costs.wiener_restore_cost[1] +
+                         // x->mode_costs.merged_param_cost[0] +
+                         count_wiener_bits_all(wiener_win, &x->mode_costs,
+                                               &rusi->wiener, &rsc->wiener);
   double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_WIENER],
       rsc->cm->seq_params.bit_depth);
@@ -1870,19 +1953,25 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
   unit_snapshot.ref_wiener = rsc->wiener;
   // If current_unit_stack is empty, we can leave early.
   if (aom_vector_is_empty(current_unit_stack)) {
-    if (rtype == RESTORE_WIENER) rsc->wiener = rusi->wiener;
+    if (rtype == RESTORE_WIENER)
+      av1_add_to_wiener_bank(&rsc->wiener, &rusi->wiener);
+    // rsc->wiener = rusi->wiener;
     aom_vector_push_back(current_unit_stack, &unit_snapshot);
     return;
   }
   // Handles special case where no-merge filter is equal to merged
   // filter for the stack - we don't want to perform another merge and
   // get a less optimal filter, but we want to continue building the stack.
-  if (rtype == RESTORE_WIENER && check_wiener_eq(&rusi->wiener, &rsc->wiener)) {
+  if (rtype == RESTORE_WIENER &&
+      check_wiener_eq(&rusi->wiener,
+                      av1_ref_from_wiener_bank(&rsc->wiener, 0))) {
+    /*
     rsc->bits -= bits_nomerge;
     rsc->bits += x->mode_costs.wiener_restore_cost[1] +
                  x->mode_costs.merged_param_cost[1];
     unit_snapshot.current_bits = x->mode_costs.wiener_restore_cost[1] +
                                  x->mode_costs.merged_param_cost[1];
+                 */
     aom_vector_push_back(current_unit_stack, &unit_snapshot);
     return;
   }
@@ -1942,9 +2031,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     if (aom_iterator_equals(&(listed_unit), &begin)) {
       old_unit->merge_bits =
           x->mode_costs.wiener_restore_cost[1] +
-          x->mode_costs.merged_param_cost[0] +
-          count_wiener_bits(wiener_win, &rui_temp.wiener_info,
-                            &old_unit->ref_wiener);
+          // x->mode_costs.merged_param_cost[0] +
+          count_wiener_bits_all(wiener_win, &x->mode_costs,
+                                &rui_temp.wiener_info, &old_unit->ref_wiener);
     } else {
       old_unit->merge_bits = x->mode_costs.wiener_restore_cost[1] +
                              x->mode_costs.merged_param_cost[1];
@@ -1968,7 +2057,8 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       old_unit->current_sse = old_unit->merge_sse;
       old_unit->current_bits = old_unit->merge_bits;
     }
-    rsc->wiener = rui_temp.wiener_info;
+    // rsc->wiener = rui_temp.wiener_info;
+    av1_upd_to_wiener_bank(&rsc->wiener, 0, &rui_temp.wiener_info);
   } else {
     // Copy current unit from the top of the stack.
     memset(&unit_snapshot, 0, sizeof(unit_snapshot));
@@ -1976,7 +2066,8 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     // RESTORE_WIENER units become start of new stack, and
     // RESTORE_NONE units are discarded.
     if (rtype == RESTORE_WIENER) {
-      rsc->wiener = rusi->wiener;
+      // rsc->wiener = rusi->wiener;
+      av1_add_to_wiener_bank(&rsc->wiener, &rusi->wiener);
       aom_vector_clear(current_unit_stack);
       aom_vector_push_back(current_unit_stack, &unit_snapshot);
     } else {
@@ -1985,9 +2076,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
   }
 
 #else   // CONFIG_RST_MERGECOEFFS
-  const int64_t bits_wiener =
-      x->mode_costs.wiener_restore_cost[1] +
-      count_wiener_bits(wiener_win, &rusi->wiener, &rsc->wiener);
+  const int64_t bits_wiener = x->mode_costs.wiener_restore_cost[1] +
+                              count_wiener_bits(wiener_win, &x->mode_costs,
+                                                &rusi->wiener, &rsc->wiener);
 
   double cost_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_wiener >> 4, rusi->sse[RESTORE_WIENER],
@@ -2007,7 +2098,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
 
   rsc->sse += rusi->sse[rtype];
   rsc->bits += (cost_wiener < cost_none) ? bits_wiener : bits_none;
-  if (cost_wiener < cost_none) rsc->wiener = rusi->wiener;
+  if (cost_wiener < cost_none)
+    // rsc->wiener = rusi->wiener;
+    av1_add_to_wiener_bank(&rsc->wiener, &rusi->wiener);
 #endif  // CONFIG_RST_MERGECOEFFS
 }
 
@@ -2030,21 +2123,24 @@ static AOM_INLINE void search_norestore(const RestorationTileLimits *limits,
 }
 
 #if CONFIG_WIENER_NONSEP
-static int64_t count_wienerns_bits(int plane, const int (*reduce_cost)[2],
-#if CONFIG_LR_4PART_CODE
-                                   const int (*cost_4part)[4],
-#endif  // CONFIG_LR_4PART_CODE
+static int64_t count_wienerns_bits(int plane, const ModeCosts *mode_costs,
                                    WienerNonsepInfo *wienerns_info,
-                                   const WienerNonsepInfo *ref_wienerns_info,
+                                   const WienerNonsepInfoBank *bank,
                                    const WienernsFilterConfigPairType *wnsf) {
+  (void)mode_costs;
   int is_uv = (plane != AOM_PLANE_Y);
+  int64_t bits = 0;
+  const WienerNonsepInfo *ref_wienerns_info =
+      av1_constref_from_wiener_nonsep_bank(bank, 0);
+  const int(*reduce_cost)[2] = mode_costs->wiener_nonsep_reduce_cost;
+#if CONFIG_LR_4PART_CODE
+  const int(*cost_4part)[4] = mode_costs->wiener_nonsep_4part_cost;
+#endif  // CONFIG_LR_4PART_CODE
   int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
   int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
       is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
-
-  int64_t bits = 0;
 
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
   if (end_feat - beg_feat > 1 && wienerns_info->nsfilter[end_feat - 1] == 0) {
@@ -2109,6 +2205,28 @@ static int64_t count_wienerns_bits(int plane, const int (*reduce_cost)[2],
   return bits;
 }
 
+#if CONFIG_RST_MERGECOEFFS
+static int64_t count_wienerns_bits_all(
+    int plane, const ModeCosts *mode_costs, WienerNonsepInfo *wienerns_info,
+    const WienerNonsepInfoBank *bank,
+    const WienernsFilterConfigPairType *wnsf) {
+  int is_uv = (plane != AOM_PLANE_Y);
+  int64_t bits = 0;
+  const int *merged_param_cost = mode_costs->merged_param_cost;
+  const int equal = check_wienerns_bank_eq(is_uv, bank, wienerns_info, wnsf);
+  if (equal != -1) {
+    for (int k = 0; k < equal; ++k) bits += merged_param_cost[0];
+    bits += merged_param_cost[1];
+    return bits;
+  } else {
+    for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k)
+      bits += merged_param_cost[0];
+  }
+  return bits +
+         count_wienerns_bits(plane, mode_costs, wienerns_info, bank, wnsf);
+}
+#endif  // CONFIG_RST_MERGECOEFFS
+
 static int16_t quantize(double x, int16_t minv, int16_t n, int prec_bits) {
   int scale_x = (int)round(x * (1 << prec_bits));
   scale_x = AOMMAX(scale_x, minv);
@@ -2120,7 +2238,7 @@ static int16_t quantize(double x, int16_t minv, int16_t n, int prec_bits) {
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
 static int64_t finer_tile_search_wienerns(
-    const RestSearchCtxt *rsc, const RestorationTileLimits *limits,
+    RestSearchCtxt *rsc, const RestorationTileLimits *limits,
     const AV1PixelRect *tile_rect, RestorationUnitInfo *rui,
     const WienernsFilterConfigPairType *wnsf, int ext_search) {
   assert(rsc->plane == rui->plane);
@@ -2129,12 +2247,8 @@ static int64_t finer_tile_search_wienerns(
   WienerNonsepInfo best = curr;
   int64_t best_err = calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 
-  int64_t best_bits =
-      count_wienerns_bits(rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-                          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-                          &curr, &rsc->wiener_nonsep, wnsf);
+  int64_t best_bits = count_wienerns_bits(rsc->plane, &x->mode_costs, &curr,
+                                          &rsc->wiener_nonsep, wnsf);
   double best_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, best_bits >> 4, best_err, rsc->cm->seq_params.bit_depth);
   // printf("Err  pre = %"PRId64", cost = %f\n", best_err, best_cost);
@@ -2166,12 +2280,9 @@ static int64_t finer_tile_search_wienerns(
         rui->wiener_nonsep_info.nsfilter[i] = ci;
         const int64_t err =
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-        const int64_t bits = count_wienerns_bits(
-            rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-            x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+        const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                                 &rui->wiener_nonsep_info,
+                                                 &rsc->wiener_nonsep, wnsf);
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
         if (cost < best_cost) {
@@ -2203,12 +2314,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 1] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2229,12 +2337,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 3] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2259,12 +2364,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 5] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2293,12 +2395,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 7] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2318,12 +2417,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 2] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2346,12 +2442,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 4] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2378,12 +2471,9 @@ static int64_t finer_tile_search_wienerns(
       rui->wiener_nonsep_info.nsfilter[end_feat - 6] = 0;
       const int64_t err =
           calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-      const int64_t bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+      const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                               &rui->wiener_nonsep_info,
+                                               &rsc->wiener_nonsep, wnsf);
       const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
           x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
       if (cost < best_cost) {
@@ -2430,12 +2520,9 @@ static int64_t finer_tile_search_wienerns(
         }
         const int64_t err =
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
-        const int64_t bits = count_wienerns_bits(
-            rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-            x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+        const int64_t bits = count_wienerns_bits(rsc->plane, &x->mode_costs,
+                                                 &rui->wiener_nonsep_info,
+                                                 &rsc->wiener_nonsep, wnsf);
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
         if (cost < best_cost) {
@@ -2592,12 +2679,9 @@ static int compute_quantized_wienerns_filter(
         //     finer_tile_search_wienerns(rsc, limits, tile_rect, rui, wnsf, 0);
         // for better results at the expense of higger encoder complexity.
         if (real_errq > real_sse) break;
-        int64_t bits = count_wienerns_bits(
-            rui->plane, rsc->x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-            rsc->x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-            &rui->wiener_nonsep_info, &rsc->wiener_nonsep, wnsf);
+        int64_t bits = count_wienerns_bits(rui->plane, &rsc->x->mode_costs,
+                                           &rui->wiener_nonsep_info,
+                                           &rsc->wiener_nonsep, wnsf);
         double cost =
             RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, bits >> 4, real_errq,
                                            rsc->cm->seq_params.bit_depth);
@@ -2686,14 +2770,11 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
 #if CONFIG_RST_MERGECOEFFS
     int is_uv = (rsc->plane != AOM_PLANE_Y);
     Vector *current_unit_stack = rsc->unit_stack;
-    int64_t bits_nomerge =
-        x->mode_costs.wiener_nonsep_restore_cost[1] +
-        x->mode_costs.merged_param_cost[0] +
-        count_wienerns_bits(rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-                            x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-                            &rusi->wiener_nonsep, &rsc->wiener_nonsep, wnsf);
+    int64_t bits_nomerge = x->mode_costs.wiener_nonsep_restore_cost[1] +
+                           // x->mode_costs.merged_param_cost[0] +
+                           count_wienerns_bits_all(rsc->plane, &x->mode_costs,
+                                                   &rusi->wiener_nonsep,
+                                                   &rsc->wiener_nonsep, wnsf);
     double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
         x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
         bit_depth);
@@ -2720,7 +2801,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     // If current_unit_stack is empty, we can leave early.
     if (aom_vector_is_empty(current_unit_stack)) {
       if (rtype == RESTORE_WIENER_NONSEP)
-        rsc->wiener_nonsep = rusi->wiener_nonsep;
+        // rsc->wiener_nonsep = rusi->wiener_nonsep;
+        av1_add_to_wiener_nonsep_bank(&rsc->wiener_nonsep,
+                                      &rusi->wiener_nonsep);
       aom_vector_push_back(current_unit_stack, &unit_snapshot);
       return;
     }
@@ -2728,13 +2811,16 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     // filter for the stack - we don't want to perform another merge and
     // get a less optimal filter, but we want to continue building the stack.
     if (rtype == RESTORE_WIENER_NONSEP &&
-        check_wienerns_eq(is_uv, &rusi->wiener_nonsep, &rsc->wiener_nonsep,
-                          wnsf)) {
+        check_wienerns_eq(
+            is_uv, &rusi->wiener_nonsep,
+            av1_ref_from_wiener_nonsep_bank(&rsc->wiener_nonsep, 0), wnsf)) {
+      /*
       rsc->bits -= bits_nomerge;
       rsc->bits += x->mode_costs.wiener_nonsep_restore_cost[1] +
                    x->mode_costs.merged_param_cost[1];
       unit_snapshot.current_bits = x->mode_costs.wiener_nonsep_restore_cost[1] +
                                    x->mode_costs.merged_param_cost[1];
+                                   */
       aom_vector_push_back(current_unit_stack, &unit_snapshot);
       return;
     }
@@ -2822,14 +2908,10 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
       if (aom_iterator_equals(&(listed_unit), &begin)) {
         old_unit->merge_bits =
             x->mode_costs.wiener_nonsep_restore_cost[1] +
-            x->mode_costs.merged_param_cost[0] +
-            count_wienerns_bits(rsc->plane,
-                                x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-                                x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-                                &rui_temp.wiener_nonsep_info,
-                                &old_unit->ref_wiener_nonsep, wnsf);
+            // x->mode_costs.merged_param_cost[0] +
+            count_wienerns_bits_all(rsc->plane, &x->mode_costs,
+                                    &rui_temp.wiener_nonsep_info,
+                                    &old_unit->ref_wiener_nonsep, wnsf);
       } else {
         old_unit->merge_bits = x->mode_costs.wiener_nonsep_restore_cost[1] +
                                x->mode_costs.merged_param_cost[1];
@@ -2852,7 +2934,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
         old_unit->current_sse = old_unit->merge_sse;
         old_unit->current_bits = old_unit->merge_bits;
       }
-      rsc->wiener_nonsep = rui_temp.wiener_nonsep_info;
+      // rsc->wiener_nonsep = rui_temp.wiener_nonsep_info;
+      av1_upd_to_wiener_nonsep_bank(&rsc->wiener_nonsep, 0,
+                                    &rui_temp.wiener_nonsep_info);
     } else {
       // Copy current unit from the top of the stack.
       memset(&unit_snapshot, 0, sizeof(unit_snapshot));
@@ -2860,21 +2944,20 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
       // RESTORE_WIENER_NONSEP units become start of new stack, and
       // RESTORE_NONE units are discarded.
       if (rtype == RESTORE_WIENER_NONSEP) {
-        rsc->wiener_nonsep = rusi->wiener_nonsep;
+        // rsc->wiener_nonsep = rusi->wiener_nonsep;
+        av1_add_to_wiener_nonsep_bank(&rsc->wiener_nonsep,
+                                      &rusi->wiener_nonsep);
         aom_vector_clear(current_unit_stack);
         aom_vector_push_back(current_unit_stack, &unit_snapshot);
       } else {
         aom_vector_pop_back(current_unit_stack);
       }
     }
-#else  // CONFIG_RST_MERGECOEFFS
+#else   // CONFIG_RST_MERGECOEFFS
     const int64_t bits_wienerns =
         x->mode_costs.wiener_nonsep_restore_cost[1] +
-        count_wienerns_bits(rui.plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-                            x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-                            &rusi->wiener_nonsep, &rsc->wiener_nonsep, wnsf);
+        count_wienerns_bits(rui.plane, &x->mode_costs, &rusi->wiener_nonsep,
+                            &rsc->wiener_nonsep, wnsf);
     double cost_wienerns = RDCOST_DBL_WITH_NATIVE_BD_DIST(
         x->rdmult, bits_wienerns >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
         bit_depth);
@@ -2883,7 +2966,9 @@ static void search_wiener_nonsep(const RestorationTileLimits *limits,
     rusi->best_rtype[RESTORE_WIENER_NONSEP - 1] = rtype;
     rsc->sse += rusi->sse[rtype];
     rsc->bits += (cost_wienerns < cost_none) ? bits_wienerns : bits_none;
-    if (cost_wienerns < cost_none) rsc->wiener_nonsep = rusi->wiener_nonsep;
+    if (cost_wienerns < cost_none)
+      // rsc->wiener_nonsep = rusi->wiener_nonsep;
+      av1_add_to_wiener_nonsep_bank(&rsc->wiener_nonsep, &rusi->wiener_nonsep);
       /*
       printf("[%d] none: %"PRId64"/%"PRId64"/%f; wns: %"PRId64"/%"PRId64"/%f\n",
              x->rdmult, rusi->sse[RESTORE_NONE], bits_none, cost_none,
@@ -2934,19 +3019,18 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
   switch (rest_type) {
     case RESTORE_NONE: coeff_bits = 0; break;
     case RESTORE_WIENER:
-      coeff_bits = count_wiener_bits(wiener_win, &rusi->wiener, &rsc->wiener);
+      coeff_bits = count_wiener_bits(wiener_win, &x->mode_costs, &rusi->wiener,
+                                     &rsc->wiener);
       break;
     case RESTORE_SGRPROJ:
-      coeff_bits = count_sgrproj_bits(&rusi->sgrproj, &rsc->sgrproj);
+      coeff_bits =
+          count_sgrproj_bits(&rusi->sgrproj, &x->mode_costs, &rsc->sgrproj);
       break;
 #if CONFIG_WIENER_NONSEP
     case RESTORE_WIENER_NONSEP:
-      coeff_bits = count_wienerns_bits(
-          rsc->plane, x->mode_costs.wiener_nonsep_reduce_cost,
-#if CONFIG_LR_4PART_CODE
-          x->mode_costs.wiener_nonsep_4part_cost,
-#endif  // CONFIG_LR_4PART_CODE
-          &rusi->wiener_nonsep, &rsc->wiener_nonsep, wnsf);
+      coeff_bits =
+          count_wienerns_bits(rsc->plane, &x->mode_costs, &rusi->wiener_nonsep,
+                              &rsc->wiener_nonsep, wnsf);
       break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2964,16 +3048,21 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
   int merged = 0;
   switch (rest_type) {
     case RESTORE_WIENER:
-      if (check_wiener_eq(&rusi->wiener, &rsc->wiener)) merged = 1;
+      if (check_wiener_eq(&rusi->wiener,
+                          av1_ref_from_wiener_bank(&rsc->wiener, 0)))
+        merged = 1;
       break;
     case RESTORE_SGRPROJ:
-      if (check_sgrproj_eq(&rusi->sgrproj, &rsc->sgrproj)) merged = 1;
+      if (check_sgrproj_eq(&rusi->sgrproj,
+                           av1_ref_from_sgrproj_bank(&rsc->sgrproj, 0)))
+        merged = 1;
       break;
 #if CONFIG_WIENER_NONSEP
     case RESTORE_WIENER_NONSEP: {
       int is_uv = (rsc->plane != AOM_PLANE_Y);
-      if (check_wienerns_eq(is_uv, &rusi->wiener_nonsep, &rsc->wiener_nonsep,
-                            wnsf))
+      if (check_wienerns_eq(
+              is_uv, &rusi->wiener_nonsep,
+              av1_ref_from_wiener_nonsep_bank(&rsc->wiener_nonsep, 0), wnsf))
         merged = 1;
     } break;
 #endif  // CONFIG_WIENER_NONSEP
@@ -3012,6 +3101,9 @@ RestSearchCtxt switchable_update_refs(Vector *path, const RestSearchCtxt *rsc,
   // Duplicate rsc to avoid overwriting
   RestSearchCtxt rsc_dup = *rsc;
 
+  const WienernsFilterConfigPairType *wnsf =
+      get_wienerns_filters(rsc->cm->quant_params.base_qindex);
+
   int is_uv = (rsc->plane != AOM_PLANE_Y);
   int nunits = rest_tiles_in_plane(rsc->cm, is_uv);
   int max_out = RESTORE_SWITCHABLE_TYPES;
@@ -3036,11 +3128,27 @@ RestSearchCtxt switchable_update_refs(Vector *path, const RestSearchCtxt *rsc,
     }
     switch (visited_rtype) {
       case RESTORE_NONE: break;
-      case RESTORE_WIENER: rsc_dup.wiener = visited_rusi->wiener; break;
-      case RESTORE_SGRPROJ: rsc_dup.sgrproj = visited_rusi->sgrproj; break;
+      case RESTORE_WIENER:
+        if (!check_wiener_eq(&visited_rusi->wiener,
+                             av1_ref_from_wiener_bank(&rsc_dup.wiener, 0)))
+          av1_add_to_wiener_bank(&rsc_dup.wiener, &visited_rusi->wiener);
+        // rsc_dup.wiener = visited_rusi->wiener;
+        break;
+      case RESTORE_SGRPROJ:
+        if (!check_sgrproj_eq(&visited_rusi->sgrproj,
+                              av1_ref_from_sgrproj_bank(&rsc_dup.sgrproj, 0)))
+          av1_add_to_sgrproj_bank(&rsc_dup.sgrproj, &visited_rusi->sgrproj);
+        // rsc_dup.sgrproj = visited_rusi->sgrproj;
+        break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        rsc_dup.wiener_nonsep = visited_rusi->wiener_nonsep;
+        if (!check_wienerns_eq(
+                is_uv, &visited_rusi->wiener_nonsep,
+                av1_ref_from_wiener_nonsep_bank(&rsc_dup.wiener_nonsep, 0),
+                wnsf))
+          av1_add_to_wiener_nonsep_bank(&rsc_dup.wiener_nonsep,
+                                        &visited_rusi->wiener_nonsep);
+        // rsc_dup.wiener_nonsep = visited_rusi->wiener_nonsep;
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -3256,11 +3364,16 @@ static void search_switchable(const RestorationTileLimits *limits,
 
     rsc->sse += rusi->sse[best_rtype];
     rsc->bits += best_bits;
-    if (best_rtype == RESTORE_WIENER) rsc->wiener = rusi->wiener;
-    if (best_rtype == RESTORE_SGRPROJ) rsc->sgrproj = rusi->sgrproj;
+    if (best_rtype == RESTORE_WIENER)
+      av1_add_to_wiener_bank(&rsc->wiener, &rusi->wiener);
+    // rsc->wiener = rusi->wiener;
+    if (best_rtype == RESTORE_SGRPROJ)
+      av1_add_to_sgrproj_bank(&rsc->sgrproj, &rusi->sgrproj);
+      // rsc->sgrproj = rusi->sgrproj;
 #if CONFIG_WIENER_NONSEP
     if (best_rtype == RESTORE_WIENER_NONSEP)
-      rsc->wiener_nonsep = rusi->wiener_nonsep;
+      av1_add_to_wiener_nonsep_bank(&rsc->wiener_nonsep, &rusi->wiener_nonsep);
+      // rsc->wiener_nonsep = rusi->wiener_nonsep;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
     if (best_rtype == RESTORE_PC_WIENER) {
