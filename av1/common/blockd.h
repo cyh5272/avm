@@ -681,6 +681,12 @@ typedef struct {
    * Horizontal filter kernel.
    */
   DECLARE_ALIGNED(16, InterpKernel, hfilter);
+#if CONFIG_RST_MERGECOEFFS
+  /*!
+   * Best Reference from dynamic bank
+   */
+  int bank_ref;
+#endif  // CONFIG_RST_MERGECOEFFS
 } WienerInfo;
 
 /*!\brief Parameters related to Wiener Filter Bank */
@@ -710,6 +716,12 @@ typedef struct {
    * Weights for linear combination of filtered versions
    */
   int xqd[2];
+#if CONFIG_RST_MERGECOEFFS
+  /*!
+   * Best Reference from dynamic bank
+   */
+  int bank_ref;
+#endif  // CONFIG_RST_MERGECOEFFS
 } SgrprojInfo;
 
 /*!\brief Parameters related to Sgrproj Filter Bank */
@@ -754,6 +766,12 @@ typedef struct {
    * Filter data.
    */
   DECLARE_ALIGNED(16, int16_t, nsfilter[WIENERNS_YUV_MAX]);
+#if CONFIG_RST_MERGECOEFFS
+  /*!
+   * Best Reference from dynamic bank
+   */
+  int bank_ref;
+#endif  // CONFIG_RST_MERGECOEFFS
 } WienerNonsepInfo;
 
 /*!\brief Parameters related to Nonseparable Wiener Filter Bank */
