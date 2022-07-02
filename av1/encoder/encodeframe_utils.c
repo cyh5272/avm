@@ -230,35 +230,40 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   txfm_info->skip_txfm = ctx->rd_stats.skip_txfm;
   if (xd->tree_type != CHROMA_PART) {
     xd->tx_type_map = ctx->tx_type_map;
-#if CONFIG_CROSS_CHROMA_TX
-    xd->cctx_type_map = ctx->cctx_type_map;
-#endif  // CONFIG_CROSS_CHROMA_TX
     xd->tx_type_map_stride = mi_size_wide[bsize];
     // If not dry_run, copy the transform type data into the frame level buffer.
     // Encoder will fetch tx types when writing bitstream.
     if (!dry_run) {
       const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
       TX_TYPE *const tx_type_map = mi_params->tx_type_map + grid_idx;
-#if CONFIG_CROSS_CHROMA_TX
-      CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
-#endif  // CONFIG_CROSS_CHROMA_TX
       const int mi_stride = mi_params->mi_stride;
       for (int blk_row = 0; blk_row < bh; ++blk_row) {
         av1_copy_array(tx_type_map + blk_row * mi_stride,
                        xd->tx_type_map + blk_row * xd->tx_type_map_stride, bw);
-#if CONFIG_CROSS_CHROMA_TX
-        av1_copy_array(cctx_type_map + blk_row * mi_stride,
-                       xd->cctx_type_map + blk_row * xd->tx_type_map_stride,
-                       bw);
-#endif  // CONFIG_CROSS_CHROMA_TX
       }
       xd->tx_type_map = tx_type_map;
-#if CONFIG_CROSS_CHROMA_TX
-      xd->cctx_type_map = cctx_type_map;
-#endif  // CONFIG_CROSS_CHROMA_TX
       xd->tx_type_map_stride = mi_stride;
     }
   }
+
+#if CONFIG_CROSS_CHROMA_TX
+  if (xd->tree_type != LUMA_PART) {
+    xd->cctx_type_map = ctx->cctx_type_map;
+    xd->tx_type_map_stride = mi_size_wide[bsize];
+    if (!dry_run) {
+      const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
+      CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
+      const int mi_stride = mi_params->mi_stride;
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        av1_copy_array(cctx_type_map + blk_row * mi_stride,
+                       xd->cctx_type_map + blk_row * xd->tx_type_map_stride,
+                       bw);
+      }
+      xd->cctx_type_map = cctx_type_map;
+      xd->tx_type_map_stride = mi_stride;
+    }
+  }
+#endif
 
   // If segmentation in use
   if (seg->enabled) {
