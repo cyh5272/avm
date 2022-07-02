@@ -2157,21 +2157,16 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
 
 #if CONFIG_CROSS_CHROMA_TX
   // TODO(kslu): figure out these conditions
-  if (plane == AOM_PLANE_V && is_inter &&
-      get_ext_tx_types(tx_size, is_inter, reduced_tx_set_used) > 1 &&
-      cm->quant_params.base_qindex > 0 &&
+  if (plane == AOM_PLANE_V && is_inter && cm->quant_params.base_qindex > 0 &&
       !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
-    const int eset = get_ext_tx_set(tx_size, is_inter, reduced_tx_set_used);
-    if (eset > 0) {
-      const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
-      if (allow_update_cdf)
-        update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
-                   CCTX_TYPES);
+    const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    if (allow_update_cdf)
+      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
+                 CCTX_TYPES);
 #if CONFIG_ENTROPY_STATS
-      ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
+    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
 #endif  // CONFIG_ENTROPY_STATS
-    }
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

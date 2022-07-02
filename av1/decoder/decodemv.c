@@ -887,16 +887,10 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const int qindex = xd->qindex[mbmi->segment_id];
   if (qindex == 0) return;
 
-  const int inter_block = is_inter_block(mbmi, xd->tree_type);
-  // TODO(kslu): remove this once cctx is allowed for intra
-  assert(inter_block);
-  if (get_ext_tx_types(tx_size, inter_block, cm->features.reduced_tx_set_used) >
-      1) {
-    FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
-    const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    *cctx_type = aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size],
-                                 CCTX_TYPES, ACCT_STR);
-  }
+  FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+  const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+  *cctx_type = aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size],
+                               CCTX_TYPES, ACCT_STR);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
