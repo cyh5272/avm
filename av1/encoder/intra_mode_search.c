@@ -563,6 +563,9 @@ int get_uv_mode_cost(MB_MODE_INFO *mbmi, const ModeCosts mode_costs,
 int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                     int *rate, int *rate_tokenonly,
                                     int64_t *distortion, int *skippable,
+#if CONFIG_CROSS_CHROMA_TX
+                                    const PICK_MODE_CONTEXT *ctx,
+#endif  // CONFIG_CROSS_CHROMA_TX
                                     BLOCK_SIZE bsize, TX_SIZE max_tx_size) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
@@ -594,6 +597,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       // this function everytime we search through uv modes. There is some
       // potential speed up here if we cache the result to avoid redundant
       // computation.
+#if CONFIG_CROSS_CHROMA_TX
+      // TODO(kslu) fix CFL and apply the pipeline change
+#endif  // CONFIG_CROSS_CHROMA_TX
       av1_encode_intra_block_plane(cpi, x, mbmi->sb_type[PLANE_TYPE_Y],
                                    AOM_PLANE_Y, DRY_RUN_NORMAL,
                                    cpi->optimize_seg_arr[mbmi->segment_id]);
@@ -678,6 +684,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     if (this_rd < best_rd) {
       best_mbmi = *mbmi;
+#if CONFIG_CROSS_CHROMA_TX
+      av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
       best_rd = this_rd;
       *rate = this_rate;
       *rate_tokenonly = tokenonly_rd_stats.rate;
@@ -710,6 +719,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   }
 
   *mbmi = best_mbmi;
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy_array(xd->cctx_type_map, ctx->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
   // Make sure we actually chose a mode
   assert(best_rd < INT64_MAX);
   return best_rd;
@@ -780,7 +792,11 @@ int av1_search_palette_mode(IntraModeSearchState *intra_search_state,
       av1_rd_pick_intra_sbuv_mode(cpi, x, &intra_search_state->rate_uv_intra,
                                   &intra_search_state->rate_uv_tokenonly,
                                   &intra_search_state->dist_uvs,
-                                  &intra_search_state->skip_uvs, bsize, uv_tx);
+                                  &intra_search_state->skip_uvs,
+#if CONFIG_CROSS_CHROMA_TX
+                                  ctx,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                                  bsize, uv_tx);
       intra_search_state->mode_uv = mbmi->uv_mode;
       intra_search_state->pmi_uv = *pmi;
       intra_search_state->uv_angle_delta = mbmi->angle_delta[PLANE_TYPE_UV];
@@ -1091,7 +1107,11 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
       av1_rd_pick_intra_sbuv_mode(cpi, x, &intra_search_state->rate_uv_intra,
                                   &intra_search_state->rate_uv_tokenonly,
                                   &intra_search_state->dist_uvs,
-                                  &intra_search_state->skip_uvs, bsize, uv_tx);
+                                  &intra_search_state->skip_uvs,
+#if CONFIG_CROSS_CHROMA_TX
+                                  ctx,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                                  bsize, uv_tx);
       intra_search_state->mode_uv = mbmi->uv_mode;
       if (try_palette) intra_search_state->pmi_uv = *pmi;
       intra_search_state->uv_angle_delta = mbmi->angle_delta[PLANE_TYPE_UV];

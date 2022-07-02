@@ -1115,6 +1115,9 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   if (!is_inter && best_eob &&
       (blk_row + tx_size_high_unit[tx_size] < mi_size_high[plane_bsize] ||
        blk_col + tx_size_wide_unit[tx_size] < mi_size_wide[plane_bsize])) {
+#if CONFIG_CROSS_CHROMA_TX
+    CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#endif  // CONFIG_CROSS_CHROMA_TX
     // if the quantized coefficients are stored in the dqcoeff buffer, we don't
     // need to do transform and quantization again.
     if (do_quant) {
@@ -1126,7 +1129,7 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
                       tx_size, best_tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                      CCTX_NONE,
+                      cctx_type,
 #endif  // CONFIG_CROSS_CHROMA_TX
                       &txfm_param_intra);
       av1_setup_quant(tx_size, !skip_trellis,
@@ -1146,16 +1149,38 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       if (quant_param_intra.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, best_tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                       CCTX_NONE,
+                       cctx_type,
 #endif  // CONFIG_CROSS_CHROMA_TX
                        txb_ctx, rate_cost);
       }
     }
 
-    // TODO(kslu) apply inv cctx for u plane once it is needed for intra
-    inverse_transform_block_facade(x, plane, block, blk_row, blk_col,
-                                   x->plane[plane].eobs[block],
-                                   cm->features.reduced_tx_set_used);
+#if CONFIG_CROSS_CHROMA_TX
+    // In CONFIG_CROSS_CHROMA_TX, reconstruction for U plane relies on dqcoeffs
+    // of V plane, so the below operators for U are performed together with V
+    // once dqcoeffs of V are obtained.
+    if (plane == AOM_PLANE_V) {
+      tran_low_t *dqcoeff_u =
+          x->plane[AOM_PLANE_U].dqcoeff + BLOCK_OFFSET(block);
+      tran_low_t *dqcoeff_v =
+          x->plane[AOM_PLANE_V].dqcoeff + BLOCK_OFFSET(block);
+      const int max_uv_eob = AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
+                                    x->plane[AOM_PLANE_V].eobs[block]);
+      av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
+      inverse_transform_block_facade(x, AOM_PLANE_U, block, blk_row, blk_col,
+                                     max_uv_eob,
+                                     cm->features.reduced_tx_set_used);
+      inverse_transform_block_facade(x, AOM_PLANE_V, block, blk_row, blk_col,
+                                     max_uv_eob,
+                                     cm->features.reduced_tx_set_used);
+    } else if (plane == AOM_PLANE_Y) {
+#endif  // CONFIG_CROSS_CHROMA_TX
+      inverse_transform_block_facade(x, plane, block, blk_row, blk_col,
+                                     x->plane[plane].eobs[block],
+                                     cm->features.reduced_tx_set_used);
+#if CONFIG_CROSS_CHROMA_TX
+    }
+#endif  // CONFIG_CROSS_CHROMA_TX
 
     // This may happen because of hash collision. The eob stored in the hash
     // table is non-zero, but the real eob is zero. We need to make sure tx_type
@@ -1486,7 +1511,7 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
                   tx_size, DCT_DCT,
 #if CONFIG_CROSS_CHROMA_TX
-                  CCTX_NONE,  // TODO(kslu): check
+                  CCTX_NONE,
 #endif                        // CONFIG_CROSS_CHROMA_TX
                   &txfm_param);
   av1_setup_quant(tx_size, 1, AV1_XFORM_QUANT_B, cpi->oxcf.q_cfg.quant_b_adapt,
@@ -1648,7 +1673,7 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
                   tx_size, DCT_DCT,
 #if CONFIG_CROSS_CHROMA_TX
-                  CCTX_NONE,  // TODO(kslu): check
+                  CCTX_NONE,
 #endif                        // CONFIG_CROSS_CHROMA_TX
                   &txfm_param);
   av1_setup_quant(tx_size, 1, AV1_XFORM_QUANT_B, cpi->oxcf.q_cfg.quant_b_adapt,
@@ -2217,6 +2242,13 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
     }
     assert(num_allowed > 0);
 
+#if CONFIG_DEBUG && CONFIG_CROSS_CHROMA_TX
+    if (plane) {
+      const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+      assert(cctx_type == CCTX_NONE);
+    }
+#endif  // CONFIG_DEBUG && CONFIG_CROSS_CHROMA_TX
+
     if (num_allowed > 2 && cpi->sf.tx_sf.tx_type_search.prune_tx_type_est_rd) {
       int pf = prune_factors[txfm_params->prune_2d_txfm_mode];
       int mf = mul_factors[txfm_params->prune_2d_txfm_mode];
@@ -2619,8 +2651,8 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
                   tx_size, DCT_DCT,
 #if CONFIG_CROSS_CHROMA_TX
-                  CCTX_NONE,  // TODO(kslu): check
-#endif                        // CONFIG_CROSS_CHROMA_TX
+                  CCTX_NONE,
+#endif  // CONFIG_CROSS_CHROMA_TX
                   &txfm_param);
 
 #if CONFIG_FORWARDSKIP
@@ -3003,6 +3035,9 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   uint8_t best_txb_ctx_u = 0;
   uint8_t best_txb_ctx_v = 0;
 
+  // TODO(kslu) intra hash?
+  // const int is_inter = is_inter_block(mbmi, xd->tree_type);
+
   TxfmParam txfm_param;
   av1_setup_xform(cm, x,
 #if CONFIG_IST
@@ -3156,8 +3191,22 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   p_u->eobs[block] = best_eob_u;
   p_v->eobs[block] = best_eob_v;
 
+  // Point dqcoeff to the quantized coefficients corresponding to the best
+  // transform type, then we can skip transform and quantization, e.g. in the
+  // final pixel domain distortion calculation and recon_intra().
+  p_u->dqcoeff = best_dqcoeff_u;
+  p_v->dqcoeff = best_dqcoeff_v;
+
   // TODO(kslu) double check the removal of calc_pixel_domain_distortion_final
 
+  // Intra mode needs decoded pixels such that the next transform block can use
+  // them for prediction.
+  recon_intra(cpi, x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+              tx_size, &txb_ctx_uv[0], skip_trellis, tx_type, 0, &rate_cost[0],
+              AOMMAX(best_eob_u, best_eob_v));
+  recon_intra(cpi, x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+              tx_size, &txb_ctx_uv[1], skip_trellis, tx_type, 0, &rate_cost[1],
+              AOMMAX(best_eob_u, best_eob_v));
   p_u->dqcoeff = orig_dqcoeff_u;
   p_v->dqcoeff = orig_dqcoeff_v;
 }
@@ -4234,8 +4283,10 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
   struct rdcost_block_args *args = arg;
   MACROBLOCK *const x = args->x;
   MACROBLOCKD *const xd = &x->e_mbd;
+  const int is_inter = is_inter_block(xd->mi[0], xd->tree_type);
 
   const AV1_COMP *cpi = args->cpi;
+  const AV1_COMMON *cm = &cpi->common;
   RD_STATS rd_stats_joint_uv;
   av1_init_rd_stats(&rd_stats_joint_uv);
 
@@ -4250,6 +4301,11 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
 
     // TODO(kslu): maybe remove this feature
     if (args->exit_early) args->incomplete_exit = 1;
+
+    if (!is_inter) {
+      av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
+      av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size);
+    }
 
     const struct macroblockd_plane *const pd = &xd->plane[plane];
     av1_get_entropy_contexts(plane_bsize, pd, args->t_above, args->t_left);
@@ -4284,13 +4340,18 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
     TxfmSearchInfo *txfm_info = &x->txfm_search_info;
     set_blk_skip(txfm_info->blk_skip, plane, blk_idx, 0);
 
-    // TODO(kslu): introduce intra
     int64_t rd;
-    const int64_t no_skip_txfm_rd =
-        RDCOST(x->rdmult, this_rd_stats->rate, this_rd_stats->dist);
-    const int64_t skip_txfm_rd = RDCOST(x->rdmult, 0, this_rd_stats->sse);
-    rd = AOMMIN(no_skip_txfm_rd, skip_txfm_rd);
-    this_rd_stats->skip_txfm &= !x->plane[plane].eobs[block];
+    if (is_inter) {
+      const int64_t no_skip_txfm_rd =
+          RDCOST(x->rdmult, this_rd_stats->rate, this_rd_stats->dist);
+      const int64_t skip_txfm_rd = RDCOST(x->rdmult, 0, this_rd_stats->sse);
+      rd = AOMMIN(no_skip_txfm_rd, skip_txfm_rd);
+      this_rd_stats->skip_txfm &= !x->plane[plane].eobs[block];
+    } else {
+      // Signal non-skip_txfm for Intra blocks
+      rd = RDCOST(x->rdmult, this_rd_stats->rate, this_rd_stats->dist);
+      this_rd_stats->skip_txfm = 0;
+    }
 
     args->current_rd += rd;
     av1_merge_rd_stats(&rd_stats_joint_uv, this_rd_stats);
@@ -4300,7 +4361,6 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
     search_cctx_type(cpi, x, block, blk_row, blk_col, plane_bsize, tx_size,
                      txb_ctx_uv, args->skip_trellis, &rd_stats_joint_uv);
   }
-
   av1_merge_rd_stats(&args->rd_stats, &rd_stats_joint_uv);
 }
 
@@ -4654,50 +4714,46 @@ int av1_txfm_uvrd(const AV1_COMP *const cpi, MACROBLOCK *x, RD_STATS *rd_stats,
   int is_cost_valid = 1;
 #if CONFIG_CROSS_CHROMA_TX
   // TODO(kslu): apply the early exit mechanism?
-  if (is_inter) {
+  RD_STATS this_rd_stats;
+  int64_t chroma_ref_best_rd = ref_best_rd;
+  if (cpi->sf.inter_sf.perform_best_rd_based_gating_for_chroma && is_inter &&
+      chroma_ref_best_rd != INT64_MAX)
+    chroma_ref_best_rd = ref_best_rd - AOMMIN(this_rd, skip_txfm_rd);
+  av1_txfm_rd_joint_uv(x, cpi, &this_rd_stats, chroma_ref_best_rd, 0,
+                       plane_bsize, uv_tx_size, FTXS_NONE, skip_trellis);
+  if (this_rd_stats.rate == INT_MAX) {
+    is_cost_valid = 0;
+  } else {
+    av1_merge_rd_stats(rd_stats, &this_rd_stats);
+    this_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
+    skip_txfm_rd = RDCOST(x->rdmult, 0, rd_stats->sse);
+    if (AOMMIN(this_rd, skip_txfm_rd) > ref_best_rd) is_cost_valid = 0;
+  }
+#else
+  for (int plane = 1; plane < MAX_MB_PLANE; ++plane) {
     RD_STATS this_rd_stats;
     int64_t chroma_ref_best_rd = ref_best_rd;
+    // For inter blocks, refined ref_best_rd is used for early exit
+    // For intra blocks, even though current rd crosses ref_best_rd, early
+    // exit is not recommended as current rd is used for gating subsequent
+    // modes as well (say, for angular modes)
+    // TODO(any): Extend the early exit mechanism for intra modes as well
     if (cpi->sf.inter_sf.perform_best_rd_based_gating_for_chroma && is_inter &&
         chroma_ref_best_rd != INT64_MAX)
       chroma_ref_best_rd = ref_best_rd - AOMMIN(this_rd, skip_txfm_rd);
-    av1_txfm_rd_joint_uv(x, cpi, &this_rd_stats, chroma_ref_best_rd, 0,
+    av1_txfm_rd_in_plane(x, cpi, &this_rd_stats, chroma_ref_best_rd, 0, plane,
                          plane_bsize, uv_tx_size, FTXS_NONE, skip_trellis);
     if (this_rd_stats.rate == INT_MAX) {
       is_cost_valid = 0;
-    } else {
-      av1_merge_rd_stats(rd_stats, &this_rd_stats);
-      this_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
-      skip_txfm_rd = RDCOST(x->rdmult, 0, rd_stats->sse);
-      if (AOMMIN(this_rd, skip_txfm_rd) > ref_best_rd) is_cost_valid = 0;
+      break;
     }
-  } else {
-#endif  // CONFIG_CROSS_CHROMA_TX
-    for (int plane = 1; plane < MAX_MB_PLANE; ++plane) {
-      RD_STATS this_rd_stats;
-      int64_t chroma_ref_best_rd = ref_best_rd;
-      // For inter blocks, refined ref_best_rd is used for early exit
-      // For intra blocks, even though current rd crosses ref_best_rd, early
-      // exit is not recommended as current rd is used for gating subsequent
-      // modes as well (say, for angular modes)
-      // TODO(any): Extend the early exit mechanism for intra modes as well
-      if (cpi->sf.inter_sf.perform_best_rd_based_gating_for_chroma &&
-          is_inter && chroma_ref_best_rd != INT64_MAX)
-        chroma_ref_best_rd = ref_best_rd - AOMMIN(this_rd, skip_txfm_rd);
-      av1_txfm_rd_in_plane(x, cpi, &this_rd_stats, chroma_ref_best_rd, 0, plane,
-                           plane_bsize, uv_tx_size, FTXS_NONE, skip_trellis);
-      if (this_rd_stats.rate == INT_MAX) {
-        is_cost_valid = 0;
-        break;
-      }
-      av1_merge_rd_stats(rd_stats, &this_rd_stats);
-      this_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
-      skip_txfm_rd = RDCOST(x->rdmult, 0, rd_stats->sse);
-      if (AOMMIN(this_rd, skip_txfm_rd) > ref_best_rd) {
-        is_cost_valid = 0;
-        break;
-      }
+    av1_merge_rd_stats(rd_stats, &this_rd_stats);
+    this_rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
+    skip_txfm_rd = RDCOST(x->rdmult, 0, rd_stats->sse);
+    if (AOMMIN(this_rd, skip_txfm_rd) > ref_best_rd) {
+      is_cost_valid = 0;
+      break;
     }
-#if CONFIG_CROSS_CHROMA_TX
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

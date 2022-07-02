@@ -313,10 +313,6 @@ typedef struct {
   uint16_t eob;
   //! Transform type used on the current block.
   TX_TYPE tx_type;
-#if CONFIG_CROSS_CHROMA_TX
-  //! CCTX type used on the current block.
-  CctxType cctx_type;
-#endif  // CONFIG_CROSS_CHROMA_TX
   //! Unknown usage
   uint16_t entropy_context;
   //! Context used to code the coefficients.

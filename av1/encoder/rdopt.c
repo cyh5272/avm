@@ -3937,14 +3937,15 @@ void av1_rd_pick_intra_mode_sb(const struct AV1_COMP *cpi, struct macroblock *x,
         memcpy(txfm_info->blk_skip, ctx->blk_skip,
                sizeof(txfm_info->blk_skip[0]) * ctx->num_4x4_blk);
         av1_copy_array(xd->tx_type_map, ctx->tx_type_map, ctx->num_4x4_blk);
-#if CONFIG_CROSS_CHROMA_TX
-        av1_copy_array(xd->cctx_type_map, ctx->cctx_type_map, ctx->num_4x4_blk);
-#endif  // CONFIG_CROSS_CHROMA_TX
       }
       const TX_SIZE max_uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
       av1_rd_pick_intra_sbuv_mode(cpi, x, &rate_uv, &rate_uv_tokenonly,
-                                  &dist_uv, &uv_skip_txfm, bsize,
-                                  max_uv_tx_size);
+                                  &dist_uv, &uv_skip_txfm,
+
+#if CONFIG_CROSS_CHROMA_TX
+                                  ctx,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                                  bsize, max_uv_tx_size);
     }
 
     // Intra block is always coded as non-skip
@@ -3974,9 +3975,6 @@ void av1_rd_pick_intra_mode_sb(const struct AV1_COMP *cpi, struct macroblock *x,
         &ctx->mbmi_ext_best, x->mbmi_ext,
         av1_ref_frame_type(xd->mi[0]->ref_frame));
   av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
-#if CONFIG_CROSS_CHROMA_TX
-  av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
-#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 static AOM_INLINE void calc_target_weighted_pred(
