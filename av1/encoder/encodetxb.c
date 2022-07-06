@@ -452,7 +452,9 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #if CONFIG_CROSS_CHROMA_TX
   // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
   // plane if either of eob_u and eob_v is > 0.
-  if (plane == AOM_PLANE_V) {
+  if (plane == AOM_PLANE_V &&
+      ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
+       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA))) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
     if (eob > 0 || eob_u > 0) {
@@ -581,7 +583,9 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
   // CCTX type is transmitted with V plane
-  if (plane == AOM_PLANE_V) {
+  if (plane == AOM_PLANE_V &&
+      ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
+       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA))) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
     if (eob > 0 || eob_u > 0) {
@@ -867,7 +871,9 @@ static int get_tx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd,
   const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (plane == AOM_PLANE_V)
+  if (plane == AOM_PLANE_V &&
+      ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
+       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA)))
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_type];
 #endif  // CONFIG_CROSS_CHROMA_TX
   if (plane > 0) return 0;
@@ -2157,7 +2163,9 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
 
 #if CONFIG_CROSS_CHROMA_TX
   // TODO(kslu): figure out these conditions
-  if (plane == AOM_PLANE_V && cm->quant_params.base_qindex > 0 &&
+  if (plane == AOM_PLANE_V &&
+      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) &&
+      cm->quant_params.base_qindex > 0 &&
       !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);

@@ -281,7 +281,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                    BLOCK_SIZE bsize, int64_t best_rd,
                                    PICK_MODE_CONTEXT *ctx);
 
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 /*!\brief Perform intra-mode search on chroma channels.
  *
  * \ingroup intra_mode_search
@@ -343,13 +343,13 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
  * \return Returns the rd_cost of the best uv mode found. This also updates the
  * mbmi, the rate and distortion, distortion.
  */
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                     int *rate, int *rate_tokenonly,
                                     int64_t *distortion, int *skippable,
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
                                     const PICK_MODE_CONTEXT *ctx,
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
                                     BLOCK_SIZE bsize, TX_SIZE max_tx_size);
 
 /*! \brief Return the number of colors in src. Used by palette mode.

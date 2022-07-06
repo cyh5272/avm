@@ -280,40 +280,45 @@ void av1_xform_quant(
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_CROSS_CHROMA_TX
-  switch (plane) {
-    case AOM_PLANE_Y:
+  if ((is_inter_block(mbmi, xd->tree_type) && CCTX_INTER) ||
+      (!is_inter_block(mbmi, xd->tree_type) && CCTX_INTRA)) {
+    switch (plane) {
+      case AOM_PLANE_Y:
 #if CONFIG_IST
-      av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
-                txfm_param, 0);
+        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
 #else
-      av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
-                txfm_param);
+        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
 #endif
-      break;
-    case AOM_PLANE_U:
+        break;
+      case AOM_PLANE_U:
 #if CONFIG_IST
-      av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
-                txfm_param, 0);
-      av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
-                txfm_param, 0);
+        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
+        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                  txfm_param, 0);
 #else
-      av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
-                txfm_param);
-      av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
-                txfm_param);
+        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
+        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                  txfm_param);
 #endif
-      forward_cross_chroma_transform(x, block, txfm_param->tx_size,
-                                     txfm_param->cctx_type);
-      // TODO(kslu): maybe skip av1_setup_xform for V
-      break;
-    case AOM_PLANE_V: break;
-  }
-#else
+        forward_cross_chroma_transform(x, block, txfm_param->tx_size,
+                                       txfm_param->cctx_type);
+        // TODO(kslu): maybe skip av1_setup_xform for V
+        break;
+      case AOM_PLANE_V: break;
+    }
+  } else {
+#endif  // CONFIG_CROSS_CHROMA_TX
 #if CONFIG_IST
-  av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param, 0);
+    av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param, 0);
 #else
   av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param);
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  }
 #endif  // CONFIG_CROSS_CHROMA_TX
 #if CONFIG_FORWARDSKIP
   const uint8_t fsc_mode =
@@ -539,7 +544,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   MB_MODE_INFO *mbmi = xd->mi[0];
   struct macroblock_plane *const p = &x->plane[plane];
   struct macroblockd_plane *const pd = &xd->plane[plane];
-#if CONFIG_IST || CONFIG_CROSS_CHROMA_TX
+#if CONFIG_IST || (CONFIG_CROSS_CHROMA_TX && CCTX_INTER)
   tran_low_t *dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
 #else
   tran_low_t *const dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
@@ -642,7 +647,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 
   av1_set_txb_context(x, plane, block, tx_size, a, l);
 
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
   // In CONFIG_CROSS_CHROMA_TX, reconstruction for U plane relies on dqcoeffs of
   // V plane, so the below operations for U are performed together with V once
   // dqcoeffs of V are obtained.
@@ -671,7 +676,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     *(args->skip) = 0;
     av1_inverse_transform_block(
         xd, dqcoeff, plane, tx_type, tx_size, dst, pd->dst.stride,
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
         (plane == 0) ? p->eobs[block]
                      : AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
                               x->plane[AOM_PLANE_V].eobs[block]),
@@ -710,7 +715,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     int blk_h = block_size_high[bsize];
     mi_to_pixel_loc(&pixel_c, &pixel_r, xd->mi_col, xd->mi_row, blk_col,
                     blk_row, pd->subsampling_x, pd->subsampling_y);
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
     if (plane == AOM_PLANE_V) {
       struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
       uint8_t *dst_u =
@@ -922,7 +927,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     cpi,  x,    &ctx,    &mbmi->skip_txfm[xd->tree_type == CHROMA_PART],
     NULL, NULL, dry_run, cpi->optimize_seg_arr[mbmi->segment_id]
   };
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
   // Subtract first, so both U and V residues will be available when U component
   // is being transformed and quantized.
   for (int plane = plane_start; plane < plane_end; ++plane) {
@@ -951,7 +956,7 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
     const int step =
         tx_size_wide_unit[max_tx_size] * tx_size_high_unit[max_tx_size];
     av1_get_entropy_contexts(plane_bsize, pd, ctx.ta[plane], ctx.tl[plane]);
-#if !CONFIG_CROSS_CHROMA_TX
+#if !(CONFIG_CROSS_CHROMA_TX && CCTX_INTER)
     av1_subtract_plane(x, plane_bsize, plane);
 #endif  // !CONFIG_CROSS_CHROMA_TX
 
@@ -1023,7 +1028,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   uint8_t *dst = &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
   int dummy_rate_cost = 0;
 
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
   // In CONFIG_CROSS_CHROMA_TX, prediction and subtraction for U and V are done
   // together in U plane because the quantized U coefficients depend on V
   // coefficients
@@ -1034,7 +1039,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                                    tx_size);
 #else
   av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 
   TX_TYPE tx_type = DCT_DCT;
 #if CONFIG_CROSS_CHROMA_TX
@@ -1061,14 +1066,14 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     }
 #endif
   } else {
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
     if (plane != AOM_PLANE_V)
       av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size);
     if (plane == AOM_PLANE_U)
       av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);
 #else
     av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size);
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 
     const ENTROPY_CONTEXT *a = &args->ta[blk_col];
     const ENTROPY_CONTEXT *l = &args->tl[blk_row];
@@ -1161,7 +1166,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     }
   }
 
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
   // In CONFIG_CROSS_CHROMA_TX, reconstruction for U plane relies on dqcoeffs of
   // V plane, so the below operations for U are performed together with V once
   // dqcoeffs of V are obtained.
@@ -1185,16 +1190,16 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                          x->plane[AOM_PLANE_V].eobs[block]))) {
 #else
   if (*eob) {
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
     av1_inverse_transform_block(
         xd, dqcoeff, plane, tx_type, tx_size, dst, dst_stride,
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
         (plane == 0) ? *eob
                      : AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
                               x->plane[AOM_PLANE_V].eobs[block]),
 #else
         *eob,
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
         cm->features.reduced_tx_set_used);
   }
 

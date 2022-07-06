@@ -248,7 +248,7 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
   av1_predict_intra_block_facade(cm, xd, plane, col, row, tx_size);
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
     eob_info *eob_data_v =
@@ -333,7 +333,7 @@ static AOM_INLINE void decode_reconstruct_tx(
     AV1_COMMON *cm, ThreadData *const td, aom_reader *r,
     MB_MODE_INFO *const mbmi, int plane, BLOCK_SIZE plane_bsize, int blk_row,
     int blk_col, int block, TX_SIZE tx_size, int *eob_total) {
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
   if (plane == AOM_PLANE_U) return;
 #endif  // CONFIG_CROSS_CHROMA_TX
   DecoderCodingBlock *const dcb = &td->dcb;
@@ -353,7 +353,7 @@ static AOM_INLINE void decode_reconstruct_tx(
   if (blk_row >= max_blocks_high || blk_col >= max_blocks_wide) return;
 
   if (tx_size == plane_tx_size || plane) {
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
     switch (plane) {
       case AOM_PLANE_Y:
         td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row,
@@ -1266,7 +1266,7 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
     for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
       for (int plane = plane_start; plane < plane_end; ++plane) {
         if (plane && !xd->is_chroma_ref) break;
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
         if (!is_inter && plane == AOM_PLANE_U) continue;
 #endif  // CONFIG_CROSS_CHROMA_TX
         const struct macroblockd_plane *const pd = &xd->plane[plane];
@@ -1292,7 +1292,7 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
           for (int blk_col = col >> ss_x; blk_col < unit_width;
                blk_col += stepc) {
             if (!is_inter) {
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
               switch (plane) {
                 case AOM_PLANE_Y:
                   td->read_coeffs_tx_intra_block_visit(

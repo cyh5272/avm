@@ -3942,9 +3942,9 @@ void av1_rd_pick_intra_mode_sb(const struct AV1_COMP *cpi, struct macroblock *x,
       av1_rd_pick_intra_sbuv_mode(cpi, x, &rate_uv, &rate_uv_tokenonly,
                                   &dist_uv, &uv_skip_txfm,
 
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
                                   ctx,
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
                                   bsize, max_uv_tx_size);
     }
 
