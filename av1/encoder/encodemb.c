@@ -1028,23 +1028,9 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   uint8_t *dst = &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
   int dummy_rate_cost = 0;
 
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-  // In CONFIG_CROSS_CHROMA_TX, prediction and subtraction for U and V are done
-  // together in U plane because the quantized U coefficients depend on V
-  // coefficients
-  if (plane != AOM_PLANE_V)
-    av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
-  if (plane == AOM_PLANE_U)
-    av1_predict_intra_block_facade(cm, xd, AOM_PLANE_V, blk_col, blk_row,
-                                   tx_size);
-#else
   av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 
   TX_TYPE tx_type = DCT_DCT;
-#if CONFIG_CROSS_CHROMA_TX
-  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
-#endif  // CONFIG_CROSS_CHROMA_TX
 
   const int bw = mi_size_wide[plane_bsize];
 #if DEBUG_EXTQUANT
@@ -1066,14 +1052,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     }
 #endif
   } else {
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-    if (plane != AOM_PLANE_V)
-      av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size);
-    if (plane == AOM_PLANE_U)
-      av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);
-#else
     av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
 
     const ENTROPY_CONTEXT *a = &args->ta[blk_col];
     const ENTROPY_CONTEXT *l = &args->tl[blk_row];
@@ -1105,7 +1084,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 #endif
                     tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                    cctx_type,
+                    CCTX_NONE,
 #endif  // CONFIG_CROSS_CHROMA_TX
                     &txfm_param);
     av1_setup_quant(tx_size, use_trellis, quant_idx,
@@ -1152,7 +1131,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                     cctx_type,
+                     CCTX_NONE,
 #endif  // CONFIG_CROSS_CHROMA_TX
                      &txb_ctx, &dummy_rate_cost);
     }
@@ -1166,41 +1145,10 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
     }
   }
 
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-  // In CONFIG_CROSS_CHROMA_TX, reconstruction for U plane relies on dqcoeffs of
-  // V plane, so the below operations for U are performed together with V once
-  // dqcoeffs of V are obtained.
-  if (plane == AOM_PLANE_U) {
-    *(args->skip) = 0;
-    return;
-  } else if (plane == AOM_PLANE_V) {
-    struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-    tran_low_t *dqcoeff_u = x->plane[AOM_PLANE_U].dqcoeff + BLOCK_OFFSET(block);
-    struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
-    uint8_t *dst_u =
-        &pd_u->dst.buf[(blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2];
-    av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff, tx_size, cctx_type);
-    av1_inverse_transform_block(
-        xd, dqcoeff_u, AOM_PLANE_U, tx_type, tx_size, dst_u, pd_u->dst.stride,
-        AOMMAX(p_u->eobs[block], *eob), cm->features.reduced_tx_set_used);
-  }
-
-  // TODO(kslu) keep track of transform domain eobs for U and V
-  if (*eob || (plane && (x->plane[AOM_PLANE_U].eobs[block] ||
-                         x->plane[AOM_PLANE_V].eobs[block]))) {
-#else
   if (*eob) {
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-    av1_inverse_transform_block(
-        xd, dqcoeff, plane, tx_type, tx_size, dst, dst_stride,
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-        (plane == 0) ? *eob
-                     : AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
-                              x->plane[AOM_PLANE_V].eobs[block]),
-#else
-        *eob,
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-        cm->features.reduced_tx_set_used);
+    av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, dst,
+                                dst_stride, *eob,
+                                cm->features.reduced_tx_set_used);
   }
 
   // TODO(jingning): Temporarily disable txk_type check for eob=0 case.
