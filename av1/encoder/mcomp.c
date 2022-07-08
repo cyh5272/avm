@@ -490,22 +490,6 @@ static INLINE int get_mv_cost_with_precision(
   const MV diff = { mv.row - low_prec_ref_mv.row,
                     mv.col - low_prec_ref_mv.col };
 
-#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
-  const int round = MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision;
-  int col_reduced = (abs(diff.col) >> round) << round;
-  int row_reduced = (abs(diff.row) >> round) << round;
-  if (row_reduced != abs(diff.row) || col_reduced != abs(diff.col)) {
-    printf(" row_reduced = %d col_reduced = %d\n", row_reduced, col_reduced);
-    printf(" row = %d col = %d\n", abs(diff.row), abs(diff.col));
-    printf(" pb_mv_precision = %d \n", pb_mv_precision);
-    printf(" is_adaptive_mvd = %d \n", is_adaptive_mvd);
-    printf(" is_ibc_cost = %d \n", is_ibc_cost);
-  }
-
-  CHECK_FLEX_MV(row_reduced != abs(diff.row), "Error in diff row");
-  CHECK_FLEX_MV(col_reduced != abs(diff.col), "Error in diff column");
-#endif  // CONFIG_DEBUG
-
   if (mvcost) {
     return (int)ROUND_POWER_OF_TWO_64(
         (int64_t)mv_cost(&diff, mvjcost, mvcost) * weight, round_bits);
@@ -700,22 +684,6 @@ static INLINE int mvsad_err_cost(const FULLPEL_MV *mv, const FULLPEL_MV *ref_mv,
   const MV diff = { GET_MV_SUBPEL(mv->row - ref_mv->row),
                     GET_MV_SUBPEL(mv->col - ref_mv->col) };
 #endif
-
-#if CONFIG_FLEX_MVRES && DEBUG_FLEX_MV
-  int round = MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision;
-  int col_reduced = (abs(diff.col) >> round) << round;
-  int row_reduced = (abs(diff.row) >> round) << round;
-
-  if (row_reduced != abs(diff.row) || col_reduced != abs(diff.col)) {
-    printf(" row_reduced = %d col_reduced = %d\n", row_reduced, col_reduced);
-    printf(" row = %d col = %d\n", abs(diff.row), abs(diff.col));
-    printf(" pb_mv_precision = %d \n", pb_mv_precision);
-    printf(" is_adaptive_mvd = %d \n", mv_cost_params->is_adaptive_mvd);
-    printf(" is_ibc_cost = %d \n", mv_cost_params->is_ibc_cost);
-  }
-  CHECK_FLEX_MV(row_reduced != abs(diff.row), "Error in diff row");
-  CHECK_FLEX_MV(col_reduced != abs(diff.col), "Error in diff column");
-#endif  // CONFIG_DEBUG
 
   switch (mv_cost_type) {
     case MV_COST_ENTROPY:
@@ -1178,11 +1146,6 @@ static AOM_FORCE_INLINE void calc_int_cost_list(
 #if CONFIG_FLEX_MVRES
   // costlist is not supported for the 2/4 MV precision
   assert(ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL);
-#if DEBUG_FLEX_MV
-  CHECK_FLEX_MV(
-      ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL,
-      "precision is not supported for costlist");
-#endif
 #endif
 
   cost_list[0] = get_mvpred_var_cost(ms_params, &best_mv);
@@ -1234,11 +1197,6 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
 #if CONFIG_FLEX_MVRES
   // costlist is not supported for the 2/4 MV precision
   assert(ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL);
-#if DEBUG_FLEX_MV
-  CHECK_FLEX_MV(
-      ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL,
-      "precision is not supported for costlist");
-#endif
 #endif
 
   // Refresh the costlist it does not contain valid sad

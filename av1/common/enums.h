@@ -917,17 +917,6 @@ enum {
 #define IBP_WEIGHT_MAX 255
 #endif
 
-#if CONFIG_FLEX_MVRES
-#define DEBUG_FLEX_MV 1
-#if DEBUG_FLEX_MV
-#define CHECK_FLEX_MV(c, err)                                            \
-  if (c) {                                                               \
-    printf("The assertion failed on line %d, in file %s %s\n", __LINE__, \
-           __FILE__, err);                                               \
-  }
-#endif
-#endif  // CONFIG_DEBUG
-
 /*!\endcond */
 
 #ifdef __cplusplus
