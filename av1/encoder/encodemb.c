@@ -1250,3 +1250,169 @@ void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
   av1_foreach_transformed_block_in_plane(
       xd, plane_bsize, plane, encode_block_intra_and_set_context, &arg);
 }
+
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
+                                     BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
+                                     void *arg) {
+  struct encode_b_args *const args = arg;
+  const AV1_COMP *const cpi = args->cpi;
+  const AV1_COMMON *const cm = &cpi->common;
+  MACROBLOCK *const x = args->x;
+  MACROBLOCKD *const xd = &x->e_mbd;
+  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
+  struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
+  struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
+  struct macroblockd_plane *const pd_v = &xd->plane[AOM_PLANE_V];
+  tran_low_t *dqcoeff_u = p_u->dqcoeff + BLOCK_OFFSET(block);
+  tran_low_t *dqcoeff_v = p_v->dqcoeff + BLOCK_OFFSET(block);
+  uint16_t *eob_u = &p_u->eobs[block];
+  uint16_t *eob_v = &p_v->eobs[block];
+  const int dst_stride = pd_u->dst.stride;
+  uint8_t *dst_u =
+      &pd_u->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+  uint8_t *dst_v =
+      &pd_v->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+  int dummy_rate_cost = 0;
+
+  av1_predict_intra_block_facade(cm, xd, AOM_PLANE_U, blk_col, blk_row,
+                                 tx_size);
+  av1_predict_intra_block_facade(cm, xd, AOM_PLANE_V, blk_col, blk_row,
+                                 tx_size);
+
+  TX_TYPE tx_type = DCT_DCT;
+  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+
+  av1_subtract_txb(x, AOM_PLANE_U, plane_bsize, blk_col, blk_row, tx_size);
+  av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);
+
+  tx_type = av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
+                            cm->features.reduced_tx_set_used);
+  TxfmParam txfm_param;
+  QUANT_PARAM quant_param;
+  const int use_trellis =
+      is_trellis_used(args->enable_optimize_b, args->dry_run);
+  int quant_idx;
+  if (use_trellis)
+    quant_idx = AV1_XFORM_QUANT_FP;
+  else
+    quant_idx = USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B : AV1_XFORM_QUANT_FP;
+
+  av1_setup_xform(cm, x,
+#if CONFIG_IST
+                  AOM_PLANE_U,
+#endif
+                  tx_size, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+                  cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                  &txfm_param);
+  av1_setup_quant(tx_size, use_trellis, quant_idx,
+                  cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
+  // Whether trellis or dropout optimization is required for key frames and
+  // intra frames.
+  const bool do_trellis = (frame_is_intra_only(cm) &&
+                           (KEY_BLOCK_OPT_TYPE == TRELLIS_OPT ||
+                            KEY_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT)) ||
+                          (!frame_is_intra_only(cm) &&
+                           (INTRA_BLOCK_OPT_TYPE == TRELLIS_OPT ||
+                            INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
+  const bool do_dropout = (frame_is_intra_only(cm) &&
+                           (KEY_BLOCK_OPT_TYPE == DROPOUT_OPT ||
+                            KEY_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT)) ||
+                          (!frame_is_intra_only(cm) &&
+                           (INTRA_BLOCK_OPT_TYPE == DROPOUT_OPT ||
+                            INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
+
+  for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+    av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
+                      &quant_param);
+    av1_xform_quant(
+#if CONFIG_FORWARDSKIP
+        cm,
+#endif  // CONFIG_FORWARDSKIP
+        x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
+        &quant_param);
+    if (quant_param.use_optimize_b && do_trellis) {
+      const ENTROPY_CONTEXT *a =
+          &args->ta[blk_col + (plane - AOM_PLANE_U) * MAX_MIB_SIZE];
+      const ENTROPY_CONTEXT *l =
+          &args->tl[blk_row + (plane - AOM_PLANE_U) * MAX_MIB_SIZE];
+      TXB_CTX txb_ctx;
+      get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx
+#if CONFIG_FORWARDSKIP
+                  ,
+                  xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART]
+#endif  // CONFIG_FORWARDSKIP
+      );
+      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, cctx_type,
+                     &txb_ctx, &dummy_rate_cost);
+    }
+    if (do_dropout) {
+      av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,
+                         cm->quant_params.base_qindex);
+    }
+  }
+
+  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
+  if (*eob_u || *eob_v) {
+    // TODO(kslu) keep track of transform domain eobs for U and V
+    av1_inverse_transform_block(xd, dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
+                                dst_u, dst_stride, AOMMAX(*eob_u, *eob_v),
+                                cm->features.reduced_tx_set_used);
+    av1_inverse_transform_block(xd, dqcoeff_v, AOM_PLANE_V, tx_type, tx_size,
+                                dst_v, dst_stride, AOMMAX(*eob_u, *eob_v),
+                                cm->features.reduced_tx_set_used);
+  }
+
+  // For intra mode, skipped blocks are so rare that transmitting skip=1 is
+  // very expensive.
+  *(args->skip) = 0;
+}
+
+static void encode_block_intra_and_set_context_joint_uv(
+    int plane, int block, int blk_row, int blk_col, BLOCK_SIZE plane_bsize,
+    TX_SIZE tx_size, void *arg) {
+  (void)plane;
+  av1_encode_block_intra_joint_uv(block, blk_row, blk_col, plane_bsize, tx_size,
+                                  arg);
+
+  struct encode_b_args *const args = arg;
+  MACROBLOCK *x = args->x;
+  ENTROPY_CONTEXT *au = &args->ta[blk_col];
+  ENTROPY_CONTEXT *lu = &args->tl[blk_row];
+  ENTROPY_CONTEXT *av = &args->ta[MAX_MIB_SIZE + blk_col];
+  ENTROPY_CONTEXT *lv = &args->tl[MAX_MIB_SIZE + blk_row];
+  av1_set_txb_context(x, AOM_PLANE_U, block, tx_size, au, lu);
+  av1_set_txb_context(x, AOM_PLANE_V, block, tx_size, av, lv);
+}
+
+void av1_encode_intra_block_joint_uv(const struct AV1_COMP *cpi, MACROBLOCK *x,
+                                     BLOCK_SIZE bsize, RUN_TYPE dry_run,
+                                     TRELLIS_OPT_TYPE enable_optimize_b) {
+  assert(bsize < BLOCK_SIZES_ALL);
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  if (!xd->is_chroma_ref) return;
+
+  const struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
+  const struct macroblockd_plane *const pd_v = &xd->plane[AOM_PLANE_V];
+  const int ss_x = pd_u->subsampling_x;
+  const int ss_y = pd_u->subsampling_y;
+  assert(ss_x == pd_v->subsampling_x && ss_y == pd_v->subsampling_y);
+  ENTROPY_CONTEXT ta[MAX_MIB_SIZE * 2] = { 0 };
+  ENTROPY_CONTEXT tl[MAX_MIB_SIZE * 2] = { 0 };
+  struct encode_b_args arg = {
+    cpi, x,  NULL,    &(xd->mi[0]->skip_txfm[xd->tree_type == CHROMA_PART]),
+    ta,  tl, dry_run, enable_optimize_b
+  };
+  const BLOCK_SIZE plane_bsize = get_plane_block_size(bsize, ss_x, ss_y);
+  if (enable_optimize_b) {
+    av1_get_entropy_contexts(plane_bsize, pd_u, ta, tl);
+    av1_get_entropy_contexts(plane_bsize, pd_v, &ta[MAX_MIB_SIZE],
+                             &tl[MAX_MIB_SIZE]);
+  }
+  av1_foreach_transformed_block_in_plane(
+      xd, plane_bsize, AOM_PLANE_U, encode_block_intra_and_set_context_joint_uv,
+      &arg);
+}
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA

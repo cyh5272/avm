@@ -178,7 +178,11 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
                                   BLOCK_SIZE bsize, int plane, RUN_TYPE dry_run,
                                   TRELLIS_OPT_TYPE enable_optimize_b);
-
+#if CONFIG_CROSS_CHROMA_TX
+void av1_encode_intra_block_joint_uv(const struct AV1_COMP *cpi, MACROBLOCK *x,
+                                     BLOCK_SIZE bsize, RUN_TYPE dry_run,
+                                     TRELLIS_OPT_TYPE enable_optimize_b);
+#endif  // CONFIG_CROSS_CHROMA_TX
 static INLINE int is_trellis_used(TRELLIS_OPT_TYPE optimize_b,
                                   RUN_TYPE dry_run) {
   if (optimize_b == NO_TRELLIS_OPT) return false;
