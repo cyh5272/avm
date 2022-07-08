@@ -163,9 +163,8 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 #endif
 
 #if CONFIG_IMPROVED_CFL_DC
-static void subtract_average_neighbor_c(const uint16_t *src,
-                                               int16_t *dst, int width,
-                                               int height, int avg) {
+static void subtract_average_neighbor_c(const uint16_t *src, int16_t *dst,
+                                        int width, int height, int avg) {
   for (int j = 0; j < height; j++) {
     for (int i = 0; i < width; i++) {
       dst[i] = src[i] - avg;
@@ -174,14 +173,13 @@ static void subtract_average_neighbor_c(const uint16_t *src,
     dst += CFL_BUF_LINE;
   }
 }
-static void cfl_compute_parameters_alt(MACROBLOCKD *const xd,
-                                          TX_SIZE tx_size) {
+static void cfl_compute_parameters_alt(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   cfl_pad(cfl, tx_size_wide[tx_size], tx_size_high[tx_size]);
 
   subtract_average_neighbor_c(cfl->recon_buf_q3, cfl->ac_buf_q3,
-                                     tx_size_wide[tx_size],
-                                     tx_size_high[tx_size], cfl->avg_l);
+                              tx_size_wide[tx_size], tx_size_high[tx_size],
+                              cfl->avg_l);
   cfl->are_parameters_computed = 1;
 }
 
@@ -459,11 +457,11 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   int alpha_q3;
   if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
     alpha_q3 = mbmi->cfl_implicit_alpha[plane - 1];
-  else
+  else {
     alpha_q3 =
-        cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1)
-        << CFL_ADD_BITS_ALPHA;
-
+        cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
+    alpha_q3 <<= CFL_ADD_BITS_ALPHA;
+  }
 #elif CONFIG_IMPROVED_CFL_DC
   cfl_compute_parameters_alt(xd, tx_size);
   const int alpha_q3 =
@@ -496,9 +494,9 @@ static void cfl_luma_subsampling_420_hbd_c(const uint16_t *input,
 }
 
 #if CONFIG_CFL_DS_1_2_1
-void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input,
-                                        int input_stride, uint16_t *output_q3,
-                                        int width, int height) {
+void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
+                                        uint16_t *output_q3, int width,
+                                        int height) {
   for (int j = 0; j < height; j += 2) {
     for (int i = 0; i < width; i += 2) {
       const int bot = i + input_stride;
@@ -595,9 +593,8 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
 #if CONFIG_CFL_DS_1_2_1
   if (sub_x && sub_y)
-    cfl_luma_subsampling_420_hbd_121_c(CONVERT_TO_SHORTPTR(input),
-                                       input_stride, recon_buf_q3,
-                                       width, height);
+    cfl_luma_subsampling_420_hbd_121_c(CONVERT_TO_SHORTPTR(input), input_stride,
+                                       recon_buf_q3, width, height);
   else
 #endif
     cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
