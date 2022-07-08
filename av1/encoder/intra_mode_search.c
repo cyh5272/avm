@@ -530,7 +530,7 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
     ind = (u << CFL_ALPHABET_SIZE_LOG2) + v;
     best_rate_overhead = mode_costs->cfl_cost[best_joint_sign][CFL_PRED_U][u] +
                          mode_costs->cfl_cost[best_joint_sign][CFL_PRED_V][v];
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
     xd->cfl.rate =
 #if CONFIG_AIMC
         mode_costs->intra_uv_mode_cost[CFL_ALLOWED][uv_context][UV_CFL_PRED] +
@@ -539,7 +539,7 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
 #endif
         best_rate_overhead + best_rate_uv[best_joint_sign][CFL_PRED_U] +
         best_rate_uv[best_joint_sign][CFL_PRED_V];
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
   } else {
     best_joint_sign = 0;
   }
@@ -675,10 +675,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                 intra_mode_info_cost_uv(cpi, x, mbmi, bsize, mode_cost);
     if (mode == UV_CFL_PRED) {
       assert(is_cfl_allowed(xd) && intra_mode_cfg->enable_cfl_intra);
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
       if (!xd->lossless[mbmi->segment_id])
         assert(xd->cfl.rate == tokenonly_rd_stats.rate + mode_cost);
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
     }
     this_rd = RDCOST(x->rdmult, this_rate, tokenonly_rd_stats.dist);
 
