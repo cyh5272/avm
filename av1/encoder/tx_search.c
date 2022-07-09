@@ -1309,9 +1309,9 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   const uint8_t *dst_u = &pd_u->dst.buf[dst_idx_u];
   const uint8_t *dst_v = &pd_v->dst.buf[dst_idx_v];
   // p_u->dqcoeff and p_v->dqcoeff must remain unchanged here because the best
-  // dqcoeff in the CCTX domain may be used in the search later
-  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_u[MAX_SB_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_v[MAX_SB_SQUARE]);
+  // dqcoeff in the CCTX domain may be used in the search later.
+  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_u[MAX_TX_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_v[MAX_TX_SQUARE]);
   memcpy(tmp_dqcoeff_u, p_u->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
   memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
@@ -3024,9 +3024,9 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   int rate_cost[2] = { 0, 0 };
 
   // The buffer used to swap dqcoeff in macroblockd_plane so we can keep dqcoeff
-  // of the best tx_type
-  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_u[MAX_SB_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_v[MAX_SB_SQUARE]);
+  // of the best tx_type.
+  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_u[MAX_TX_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_v[MAX_TX_SQUARE]);
   tran_low_t *orig_dqcoeff_u = p_u->dqcoeff;
   tran_low_t *orig_dqcoeff_v = p_v->dqcoeff;
   tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
@@ -3051,8 +3051,8 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   // CCTX is performed in-place, so these buffers are needed to store original
   // transform coefficients.
   const int max_eob = av1_get_max_eob(tx_size);
-  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_u[MAX_SB_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_v[MAX_SB_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_u[MAX_TX_SQUARE]);
+  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_v[MAX_TX_SQUARE]);
   memcpy(orig_coeff_u, p_u->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
   memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),
@@ -3174,7 +3174,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       p_v->dqcoeff = tmp_dqcoeff_v;
     }
 
-    // TODO(kslu): can we do it without memcpy?
     // Recover the original transform coefficients
     if (cctx_type < CCTX_TYPES - 1) {
       memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
