@@ -3032,14 +3032,10 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
   tran_low_t *best_dqcoeff_v = this_dqcoeff_v;
 
-  // TODO(kslu): predict_dc_block feature
   const uint16_t *eobs_ptr_u = x->plane[AOM_PLANE_U].eobs;
   const uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
   uint8_t best_txb_ctx_u = 0;
   uint8_t best_txb_ctx_v = 0;
-
-  // TODO(kslu) intra hash?
-  // const int is_inter = is_inter_block(mbmi, xd->tree_type);
 
   TxfmParam txfm_param;
   av1_setup_xform(cm, x,
@@ -3102,7 +3098,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
     if (RDCOST(x->rdmult, rate_cost[0] + rate_cost[1], 0) > best_rd) continue;
 
     // Calculate distortion.
-    // TODO(kslu): adding back the dc_only_block feature
     if (eobs_ptr_u[block] == 0 && eobs_ptr_v[block] == 0) {
       // When eob is 0, pixel domain distortion is more efficient and accurate.
       this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
@@ -3185,7 +3180,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
 
   assert(best_rd != INT64_MAX);
 
-  // TODO(kslu): best_rd_stats->skip_txfm = (best_eob_u << 1) + best_eob_v;
   best_rd_stats->skip_txfm = (best_eob_u == 0 && best_eob_v == 0);
   update_cctx_array(xd, blk_row, blk_col, tx_size, best_cctx_type);
   p_u->txb_entropy_ctx[block] = best_txb_ctx_u;
