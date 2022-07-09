@@ -216,8 +216,7 @@ set_aom_config_var(CONFIG_CFL_DS_1_2_1 1
   "Use alternative downsampling filter for luma samples in CfL mode: method 2")
 set_aom_config_var(CONFIG_IMPLICIT_CFL_DERIVED_ALPHA 1
   "Enable implicit CfL mode with derived scaling factor and luma DC from
-  neighboring samples: method 4"
-)
+  neighboring samples: method 4")
 
 #
 # Variables in this section control optional features of the build system.
