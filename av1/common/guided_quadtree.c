@@ -163,15 +163,17 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
   return index;
 }
 
-int qp235_quadtree_model_quantSet[] = { 1024, -9, -4 };
-int qp210_quadtree_model_quantSet[] = { 1024, -5, -3 };
-int qp185_quadtree_model_quantSet[] = { 1024, -13, -3 };
-int qp160_quadtree_model_quantSet[] = { 2048, -16, -16 };
-int qp135_quadtree_model_quantSet[] = { 2048, 0, -4 };
-int qp110_quadtree_model_quantSet[] = { 2048, -13, -4 };
-int qp85_quadtree_model_quantSet[] = { 2048, -14, -2 };
+double qp235_quadtree_model_quantSet[] = { 1024, -9, -4 };
+double qp210_quadtree_model_quantSet[] = { 1024, -5, -3 };
+double qp185_quadtree_model_quantSet[] = { 1024, -13, -3 };
+//double qp160_quadtree_model_quantSet[] = { 2048, -16, -16 };
+//Unet model a0_min a1_mind
+double qp160_quadtree_model_quantSet[] = { 1/2, 16, -32 };
+double qp135_quadtree_model_quantSet[] = { 2048, 0, -4 };
+double qp110_quadtree_model_quantSet[] = { 2048, -13, -4 };
+double qp85_quadtree_model_quantSet[] = { 2048, -14, -2 };
 
-int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,
+double *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,
                               int cnn_index) {
   if (superres_denom == SCALE_NUMERATOR) {  // quadtree
     if (is_luma) {
