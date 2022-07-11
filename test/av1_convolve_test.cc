@@ -957,13 +957,25 @@ class AV1ConvolveNonSep2DHighbdTest
 
     const uint16_t *input = FirstRandomInput16(GetParam());
     DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
+    DECLARE_ALIGNED(32, uint16_t, reference[MAX_SB_SQUARE]);
 
     ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
         << "Not enough padding for 7x7 filters";
     const uint16_t *centered_input =
         input + kMaxTapOffset * width + kMaxTapOffset;
 
+    // Calculate time taken for C function
     aom_usec_timer timer;
+    aom_usec_timer_start(&timer);
+    for (int i = 0; i < kSpeedIterations; ++i) {
+      av1_convolve_symmetric_highbd_c(centered_input, width, filter_config,
+                                      filter, reference, kOutputStride,
+                                      bit_depth, 0, height, 0, width);
+    }
+    aom_usec_timer_mark(&timer);
+    auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+
+    // Calculate time taken for optimized/intrinsic function
     aom_usec_timer_start(&timer);
     for (int i = 0; i < kSpeedIterations; ++i) {
       GetParam().TestFunction()(centered_input, width, filter_config, filter,
@@ -971,11 +983,18 @@ class AV1ConvolveNonSep2DHighbdTest
                                 width);
     }
     aom_usec_timer_mark(&timer);
+    auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
 
-    auto elapsed_time = aom_usec_timer_elapsed(&timer);
-    printf("\tconvolve symmetric: %2d bit,  %3dx%-3d: %10.5f ns per-pixel.\n",
-           bit_depth, width, height,
-           1000.0 * elapsed_time / (kSpeedIterations * width * height));
+    float c_time_per_pixel =
+        (float)1000.0 * elapsed_time_c / (kSpeedIterations * width * height);
+    float opt_time_per_pixel =
+        (float)1000.0 * elapsed_time_opt / (kSpeedIterations * width * height);
+    float scaling = c_time_per_pixel / opt_time_per_pixel;
+    printf(
+        "\tconvolve symmetric: %2d bit,  %3dx%-3d: c_time_per_pixel=%10.5f, "
+        "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+        bit_depth, width, height, c_time_per_pixel, opt_time_per_pixel,
+        scaling);
   }
 
   // Generates NonsepFilterConfig compliant origin symmetric filter tap values.
@@ -1005,22 +1024,21 @@ class AV1ConvolveNonSep2DHighbdTest
   }
 
   libaom_test::ACMRandom rnd_;
-  static constexpr int kMaxPrecisionBeforeOverflow = 14;
-  static constexpr int kNumSymmetricTaps = 16;
+  static constexpr int kMaxPrecisionBeforeOverflow = 12;
+  static constexpr int kNumSymmetricTaps = 12;
   static constexpr int kMaxTapOffset = 3;  // Filters are 7x7.
   static constexpr int kSpeedIterations = 10000;
 
-  // Configuration for nonseparable 7x7 filters. Format is offset (i) row and
-  // (ii) column from center pixel and the (iii) filter-tap index that
-  // multiplies the pixel at the respective offset.
-  const int NonsepConfig_[33][3] = {
-    { -3, -3, 0 }, { 3, 3, 0 },   { -3, 0, 1 },  { 3, 0, 1 },   { -3, 3, 2 },
-    { 3, -3, 2 },  { -2, -2, 3 }, { 2, 2, 3 },   { -2, -1, 4 }, { 2, 1, 4 },
-    { -2, 0, 5 },  { 2, 0, 5 },   { -2, 1, 6 },  { 2, -1, 6 },  { -2, 2, 7 },
-    { 2, -2, 7 },  { -1, -2, 8 }, { 1, 2, 8 },   { -1, -1, 9 }, { 1, 1, 9 },
-    { -1, 0, 10 }, { 1, 0, 10 },  { -1, 1, 11 }, { 1, -1, 11 }, { -1, 2, 12 },
-    { 1, -2, 12 }, { 0, -3, 13 }, { 0, 3, 13 },  { 0, -2, 14 }, { 0, 2, 14 },
-    { 0, -1, 15 }, { 0, 1, 15 },  { 0, 0, 16 },
+  // Configuration for nonseparable 7x7 filters for DIAMOND shape.
+  // Format is offset (i) row and (ii) column from center pixel
+  // and the (iii) filter-tap index that multiplies the pixel at
+  // the respective offset.
+  const int NonsepConfig_[25][3] = {
+    { -3, 0, 0 },  { 3, 0, 0 },  { -2, -1, 1 }, { 2, 1, 1 },   { -2, 0, 2 },
+    { 2, 0, 2 },   { -2, 1, 3 }, { 2, -1, 3 },  { -1, -2, 4 }, { 1, 2, 4 },
+    { -1, -1, 5 }, { 1, 1, 5 },  { -1, 0, 6 },  { 1, 0, 6 },   { -1, 1, 7 },
+    { 1, -1, 7 },  { -1, 2, 8 }, { 1, -2, 8 },  { 0, -3, 9 },  { 0, 3, 9 },
+    { 0, -2, 10 }, { 0, 2, 10 }, { 0, -1, 11 }, { 0, 1, 11 },  { 0, 0, 12 },
   };
 
   // Filters use only the first (2 * kNumSymmetricTaps) taps. Center tap is
@@ -1051,9 +1069,11 @@ TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
 
 TEST_P(AV1ConvolveNonSep2DHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
 
-// TODO(rachelbarker@): Test with appropriate fast routine.
-INSTANTIATE_TEST_SUITE_P(C, AV1ConvolveNonSep2DHighbdTest,
-                         BuildHighbdParams(av1_convolve_symmetric_highbd_c));
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(AVX2, AV1ConvolveNonSep2DHighbdTest,
+                         BuildHighbdParams(av1_convolve_symmetric_highbd_avx2));
+#endif
+
 #endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 
 }  // namespace
