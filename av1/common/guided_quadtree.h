@@ -30,10 +30,8 @@ int computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
 
 double min_tflite(double a, double b, double c, double d);
 
-
 void replace_tflite_hbd(int startx, int starty, int width, int height,
                         uint16_t *rec, uint16_t *buf, int stride);
-
 
 double computePSNR_buf_tflite_hbd(uint16_t *buf_all, uint16_t *dgd,
                                   uint16_t *src, int startx, int starty,
@@ -49,7 +47,7 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
                           int starty, int startx, int quadtree_max_size);
 
 double *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,
-                              int cnn_index);
+                                 int cnn_index);
 
 int64_t count_guided_quad_bits(struct AV1Common *cm);
 #if CONFIG_CNN_GUIDED_QUADTREE
