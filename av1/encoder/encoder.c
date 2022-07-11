@@ -94,7 +94,7 @@
 FRAME_COUNTS aggregate_fc;
 #endif  // CONFIG_ENTROPY_STATS
 
-#define OUTPUT_YUV_REC
+// #define OUTPUT_YUV_REC
 #ifdef OUTPUT_YUV_REC
 FILE *yuv_rec_file;
 #define FILE_NAME_LEN 100
