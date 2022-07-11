@@ -166,15 +166,15 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
 double qp235_quadtree_model_quantSet[] = { 1024, -9, -4 };
 double qp210_quadtree_model_quantSet[] = { 1024, -5, -3 };
 double qp185_quadtree_model_quantSet[] = { 1024, -13, -3 };
-//double qp160_quadtree_model_quantSet[] = { 2048, -16, -16 };
-//Unet model a0_min a1_mind
-double qp160_quadtree_model_quantSet[] = { 1/2, 16, -32 };
+// double qp160_quadtree_model_quantSet[] = { 2048, -16, -16 };
+// Unet model a0_min a1_mind
+double qp160_quadtree_model_quantSet[] = { 1 / 2, 16, -32 };
 double qp135_quadtree_model_quantSet[] = { 2048, 0, -4 };
 double qp110_quadtree_model_quantSet[] = { 2048, -13, -4 };
 double qp85_quadtree_model_quantSet[] = { 2048, -14, -2 };
 
 double *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,
-                              int cnn_index) {
+                                 int cnn_index) {
   if (superres_denom == SCALE_NUMERATOR) {  // quadtree
     if (is_luma) {
       if (qindex <= 85) {

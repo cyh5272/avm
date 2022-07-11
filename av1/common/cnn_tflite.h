@@ -118,8 +118,6 @@ void av1_restore_cnn_tflite(const struct AV1Common *cm, int num_threads,
 
 #if CONFIG_CNN_GUIDED_QUADTREE
 
-
-
 int av1_restore_cnn_quadtree_img_tflite_highbd(YV12_BUFFER_CONFIG *source_frame,
                                                AV1_COMMON *cm,
                                                int superres_denom, int RDMULT,
