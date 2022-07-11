@@ -1759,7 +1759,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // PC_WIENER_BLOCK_SIZE > 1
 
 #if USE_CONVOLVE_SYM
-      av1_convolve_symmetric_highbd_c(
+      av1_convolve_symmetric_highbd(
           dgd, stride, filter_config, filter, dst, dst_stride, bit_depth,
           block_row_begin, block_row_end, block_col_begin, block_col_end);
 #else
