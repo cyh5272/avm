@@ -936,8 +936,14 @@ static int64_t count_sgrproj_bits(const ModeCosts *mode_costs,
   (void)mode_costs;
   int64_t bits = 0;
 #if CONFIG_RST_MERGECOEFFS
+  const int ref = sgrproj_info->bank_ref;
   const SgrprojInfo *ref_sgrproj_info =
-      av1_constref_from_sgrproj_bank(bank, sgrproj_info->bank_ref);
+      av1_constref_from_sgrproj_bank(bank, ref);
+  for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
+    const int match = (k == ref);
+    bits++;
+    if (match) break;
+  }
 #else
   const SgrprojInfo *ref_sgrproj_info = av1_constref_from_sgrproj_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
@@ -1604,8 +1610,13 @@ static int64_t count_wiener_bits(int wiener_win, const ModeCosts *mode_costs,
   (void)mode_costs;
   int64_t bits = 0;
 #if CONFIG_RST_MERGECOEFFS
-  const WienerInfo *ref_wiener_info =
-      av1_constref_from_wiener_bank(bank, wiener_info->bank_ref);
+  const int ref = wiener_info->bank_ref;
+  const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, ref);
+  for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
+    const int match = (k == ref);
+    bits++;
+    if (match) break;
+  }
 #else
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
@@ -2187,8 +2198,14 @@ static int64_t count_wienerns_bits(int plane, const ModeCosts *mode_costs,
   int is_uv = (plane != AOM_PLANE_Y);
   int64_t bits = 0;
 #if CONFIG_RST_MERGECOEFFS
+  const int ref = wienerns_info->bank_ref;
   const WienerNonsepInfo *ref_wienerns_info =
-      av1_constref_from_wiener_nonsep_bank(bank, wienerns_info->bank_ref);
+      av1_constref_from_wiener_nonsep_bank(bank, ref);
+  for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
+    const int match = (k == ref);
+    bits += (1 << AV1_PROB_COST_SHIFT);
+    if (match) break;
+  }
 #else
   const WienerNonsepInfo *ref_wienerns_info =
       av1_constref_from_wiener_nonsep_bank(bank, 0);
