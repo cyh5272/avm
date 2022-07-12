@@ -80,6 +80,7 @@
 #if CONFIG_CNN_RESTORATION
 
 #define USE_XNNPACK 0
+#define USE_QUAT 1
 
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_intra_model_from_qindex(int qindex,
@@ -694,7 +695,7 @@ extern "C" int TFlite_Predict_quadtree_hbd(
   }
 
   int scale, A0_min, A1_min;
-  double *quadtset;
+  int *quadtset;
   quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
   scale = quadtset[0];
   A0_min = quadtset[1];
@@ -852,7 +853,7 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           }
         }
       }
-
+#if USE_QUAT
       double A0 = 0;
       double A1 = 0;
       for (int i = 0; i < lenth; i++) {
@@ -861,7 +862,6 @@ extern "C" int TFlite_Predict_quadtree_hbd(
       }
       A0 = A0 * scale;
       A1 = A1 * scale;
-
       A0 = int(round(A0));
       A1 = int(round(A1));
       if (A0 < A0_min) {
@@ -889,6 +889,26 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
         }
       }
+#else
+      double A0 = 0;
+      double A1 = 0;
+
+      for (int i = 0; i < lenth; i++) {
+        A0 += mid[0][i] * sub_r_flatten[i];
+        A1 += mid[1][i] * sub_r_flatten[i];
+      }
+
+      printf("A0:%lf  A1:%lf\n", A0, A1);
+      for (int i = start_clow; i < end_clow; i++) {
+        for (int j = start_row; j < end_row; j++) {
+          repic[i][j] = int(round(sub_dgr[i][j] + A0 * r0[i][j] +
+                                  A1 * r1[i][j]));
+          // repic[i][j] = int(round(sub_dgr[i][j]));
+          repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
+        }
+      }
+#endif USE_QUAT  
+      
 
       for (int i = 0; i < lenth; i++) {
         delete[] R[i];
@@ -1059,7 +1079,7 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
     }
   }
   int scale, A0_min, A1_min;
-  double *quadtset;
+  int *quadtset;
   quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
   scale = quadtset[0];
   A0_min = quadtset[1];
@@ -1371,7 +1391,7 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
     }
   }
   int scale, A0_min, A1_min;
-  double *quadtset;
+  int *quadtset;
   quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
   scale = quadtset[0];
   A0_min = quadtset[1];
@@ -1860,6 +1880,7 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
   // save unfilter frame psnr
   double dgdpsnr = computePSNR_tflite_hbd(dgr, src, height, width, dgr_stride,
                                           src_stride, bit_depth);
+
   int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
   int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
   int block_num_level_0 = (int)ceil(((float)width) / quadtree_max_size) *
@@ -1897,7 +1918,7 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
                               is_intra_only, is_luma, cnn_index);
   double psnr_level_0 = computePSNR_tflite_hbd(buf_level_0, src, height, width,
                                                width, src_stride, bit_depth);
-
+  //29.99811
   // for (int i = 0; i < 512; i++)
   //  for (int j = 0; j < 512; j++) buf[i][j] = buf_level_0[i * width + j];
   // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
