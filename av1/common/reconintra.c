@@ -16,7 +16,6 @@
 #include "config/aom_dsp_rtcd.h"
 #include "config/av1_rtcd.h"
 
-#include "aom_dsp/intrapred_common.h"
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/aom_once.h"
@@ -1857,7 +1856,6 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       cfl_store_tx(xd, blk_row, blk_col, luma_tx_size,
                    mbmi->sb_type[PLANE_TYPE_UV]);
     }
-
 #if CONFIG_IMPROVED_CFL
     CFL_CTX *const cfl = &xd->cfl;
     CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);

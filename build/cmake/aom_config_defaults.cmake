@@ -203,7 +203,6 @@ set_aom_config_var(CONFIG_FLEX_MVRES 1
                    "AV2 flexible mv precision experiment flag")
 
 # This is an encode-only change.
-
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 0
                    "Enable a sufficient MV search range.")
 				   

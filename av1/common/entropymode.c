@@ -1892,11 +1892,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif  // CONFIG_AIMC
   av1_copy(fc->uv_mode_cdf, default_uv_mode_cdf);
   av1_copy(fc->mrl_index_cdf, default_mrl_index_cdf);
-
 #if CONFIG_FORWARDSKIP
   av1_copy(fc->fsc_mode_cdf, default_fsc_mode_cdf);
 #endif  // CONFIG_FORWARDSKIP
-
 #if CONFIG_IMPROVED_CFL
   av1_copy(fc->cfl_index_cdf, default_cfl_index_cdf);
 #endif

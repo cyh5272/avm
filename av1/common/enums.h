@@ -47,14 +47,11 @@ extern "C" {
 #define IMPROVED_AMVD 0
 #endif  // CONFIG_ADAPTIVE_MVD
 
-
 #if CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
 #define BUGFIX_AMVD_AMVR 1
 #else
 #define BUGFIX_AMVD_AMVR 0
 #endif  // CONFIG_ADAPTIVE_MVD && CONFIG_FLEX_MVRES
-
-#define CFL_IDX_NUMBER 2
 
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
@@ -611,6 +608,7 @@ enum {
 } UENUM1BYTE(UV_PREDICTION_MODE);
 
 #if CONFIG_IMPROVED_CFL
+#define CFL_IDX_NUMBER 2
 enum {
   CFL_EXPLICIT,       // av1 cfl
   CFL_DERIVED_ALPHA,  // implicit CfL mode with derived scaling factor

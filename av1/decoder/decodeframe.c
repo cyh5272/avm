@@ -1080,7 +1080,6 @@ static AOM_INLINE void dec_build_obmc_inter_predictors_sb(
 static AOM_INLINE void cfl_store_inter_block(AV1_COMMON *const cm,
                                              MACROBLOCKD *const xd) {
   MB_MODE_INFO *mbmi = xd->mi[0];
-
   if (store_cfl_required(cm, xd) && xd->tree_type == SHARED_PART) {
     cfl_store_block(xd, mbmi->sb_type[PLANE_TYPE_Y], mbmi->tx_size);
   }

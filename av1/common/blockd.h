@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
@@ -41,6 +40,7 @@ extern "C" {
 #define MAX_DIFFWTD_MASK_BITS 1
 
 #define INTERINTRA_WEDGE_SIGN 0
+
 /*!\cond */
 
 // DIFFWTD_MASK_TYPES should not surpass 1 << MAX_DIFFWTD_MASK_BITS

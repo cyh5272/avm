@@ -26,7 +26,6 @@ void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params) {
 
   memset(&cfl->recon_buf_q3, 0, sizeof(cfl->recon_buf_q3));
   memset(&cfl->ac_buf_q3, 0, sizeof(cfl->ac_buf_q3));
-
   cfl->subsampling_x = seq_params->subsampling_x;
   cfl->subsampling_y = seq_params->subsampling_y;
   cfl->are_parameters_computed = 0;
@@ -461,6 +460,7 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   }
 #else
   if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
+
   const int alpha_q3 =
       cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
 #endif
@@ -577,6 +577,7 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
     if (xd->mb_to_bottom_edge < 0)
       cfl->buf_height += xd->mb_to_bottom_edge >> (3 + pd->subsampling_y);
   }
+
   // Check that we will remain inside the pixel buffer.
   assert(store_row + store_height <= CFL_BUF_LINE);
   assert(store_col + store_width <= CFL_BUF_LINE);

@@ -1185,7 +1185,7 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
                                      bsize, mbmi->tx_size);
   }
   if (num_planes > 1 && xd->is_chroma_ref) {
-    int uv_mode_cost =
+    const int uv_mode_cost =
 #if CONFIG_AIMC
         get_uv_mode_cost(mbmi, x->mode_costs, is_cfl_allowed(xd),
                          mbmi->uv_mode_idx);
