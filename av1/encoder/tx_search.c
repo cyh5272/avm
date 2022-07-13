@@ -1173,10 +1173,8 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       inverse_transform_block_facade(x, AOM_PLANE_U, block, blk_row, blk_col,
                                      max_uv_eob,
                                      cm->features.reduced_tx_set_used);
-      inverse_transform_block_facade(x, AOM_PLANE_V, block, blk_row, blk_col,
-                                     max_uv_eob,
-                                     cm->features.reduced_tx_set_used);
-    } else if (plane == AOM_PLANE_Y) {
+    }
+    if (plane != AOM_PLANE_U) {
 #endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
       inverse_transform_block_facade(x, plane, block, blk_row, blk_col,
                                      x->plane[plane].eobs[block],

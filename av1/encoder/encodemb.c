@@ -286,33 +286,27 @@ void av1_xform_quant(
 #if CONFIG_CROSS_CHROMA_TX
   if ((is_inter_block(mbmi, xd->tree_type) && CCTX_INTER) ||
       (!is_inter_block(mbmi, xd->tree_type) && CCTX_INTRA)) {
-    switch (plane) {
-      case AOM_PLANE_Y:
+    // In the pipeline of cross-chroma transform, the forward transform for
+    // plane V is done earlier in plane U, followed by forward cross chroma
+    // transform, in order to obtain the quantized coefficients of the second
+    // channel.
+    if (plane != AOM_PLANE_V) {
 #if CONFIG_IST
-        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
-                  txfm_param, 0);
+      av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param, 0);
 #else
-        av1_xform(x, AOM_PLANE_Y, block, blk_row, blk_col, plane_bsize,
-                  txfm_param);
+      av1_xform(x, plane, block, blk_row, blk_col, plane_bsize, txfm_param);
 #endif
-        break;
-      case AOM_PLANE_U:
+    }
+    if (plane == AOM_PLANE_U) {
 #if CONFIG_IST
-        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
-                  txfm_param, 0);
-        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
-                  txfm_param, 0);
+      av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                txfm_param, 0);
 #else
-        av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
-                  txfm_param);
-        av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
-                  txfm_param);
+      av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+                txfm_param);
 #endif
-        forward_cross_chroma_transform(x, block, txfm_param->tx_size,
-                                       txfm_param->cctx_type);
-        // TODO(kslu): maybe skip av1_setup_xform for V
-        break;
-      case AOM_PLANE_V: break;
+      forward_cross_chroma_transform(x, block, txfm_param->tx_size,
+                                     txfm_param->cctx_type);
     }
   } else {
 #endif  // CONFIG_CROSS_CHROMA_TX
