@@ -859,7 +859,7 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
 static int get_tx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd,
                             int plane, TX_SIZE tx_size, TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                            CctxType cctx_type,
+                            CctxType cctx_type, int block,
 #endif  // CONFIG_CROSS_CHROMA_TX
                             int reduced_tx_set_used
 #if CONFIG_IST
@@ -873,8 +873,11 @@ static int get_tx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd,
 #if CONFIG_CROSS_CHROMA_TX
   if (plane == AOM_PLANE_V &&
       ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
-       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA)))
+       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA)) &&
+      (x->plane[AOM_PLANE_U].eobs[block] ||
+       x->plane[AOM_PLANE_V].eobs[block])) {
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_type];
+  }
 #endif  // CONFIG_CROSS_CHROMA_TX
   if (plane > 0) return 0;
 
@@ -1014,7 +1017,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
   av1_txb_init_levels_signs(qcoeff, width, height, levels_buf, signs_buf);
   cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                           cctx_type,
+                           cctx_type, block,
 #endif  // CONFIG_CROSS_CHROMA_TX
                            reduced_tx_set_used
 #if CONFIG_IST
@@ -1100,7 +1103,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
 
   cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                           cctx_type,
+                           cctx_type, block,
 #endif  // CONFIG_CROSS_CHROMA_TX
                            reduced_tx_set_used
 #if CONFIG_IST
@@ -1254,7 +1257,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_laplacian(
 
   cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                           cctx_type,
+                           cctx_type, block,
 #endif  // CONFIG_CROSS_CHROMA_TX
                            reduced_tx_set_used
 #if CONFIG_IST
@@ -2104,7 +2107,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 
   const int tx_type_cost = get_tx_type_cost(x, xd, plane, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                                            cctx_type,
+                                            cctx_type, block,
 #endif  // CONFIG_CROSS_CHROMA_TX
                                             cm->features.reduced_tx_set_used
 #if CONFIG_IST
@@ -2144,6 +2147,32 @@ uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
   return (uint8_t)cul_level;
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
+                                   int blk_row, int blk_col, TX_SIZE tx_size,
+                                   FRAME_COUNTS *counts,
+                                   uint8_t allow_update_cdf) {
+  const MB_MODE_INFO *mbmi = xd->mi[0];
+  const int is_inter = is_inter_block(mbmi, xd->tree_type);
+  FRAME_CONTEXT *fc = xd->tile_ctx;
+#if !CONFIG_ENTROPY_STATS
+  (void)counts;
+#endif  // !CONFIG_ENTROPY_STATS
+  if (((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) &&
+      cm->quant_params.base_qindex > 0 &&
+      !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
+      !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
+    const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    if (allow_update_cdf)
+      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
+                 CCTX_TYPES);
+#if CONFIG_ENTROPY_STATS
+    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
+#endif  // CONFIG_ENTROPY_STATS
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
                                  MACROBLOCKD *xd, int blk_row, int blk_col,
                                  int plane, TX_SIZE tx_size,
@@ -2160,23 +2189,6 @@ static void update_tx_type_count(const AV1_COMP *cpi, const AV1_COMMON *cm,
 #if !CONFIG_ENTROPY_STATS
   (void)counts;
 #endif  // !CONFIG_ENTROPY_STATS
-
-#if CONFIG_CROSS_CHROMA_TX
-  // TODO(kslu): figure out these conditions
-  if (plane == AOM_PLANE_V &&
-      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) &&
-      cm->quant_params.base_qindex > 0 &&
-      !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
-      !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
-    const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
-    if (allow_update_cdf)
-      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
-                 CCTX_TYPES);
-#if CONFIG_ENTROPY_STATS
-    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
-#endif  // CONFIG_ENTROPY_STATS
-  }
-#endif  // CONFIG_CROSS_CHROMA_TX
 
   // Only y plane's tx_type is updated
   if (plane > 0) return;
@@ -2581,6 +2593,13 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
     entropy_ctx[block] = txb_ctx.txb_skip_ctx;
     eob_txb[block] = eob;
 
+#if CONFIG_CROSS_CHROMA_TX
+    if (plane == AOM_PLANE_V &&
+        (eob > 0 || x->plane[AOM_PLANE_U].eobs[block] > 0)) {
+      update_cctx_type_count(cm, xd, blk_row, blk_col, tx_size, td->counts,
+                             allow_update_cdf);
+    }
+#endif  // CONFIG_CROSS_CHROMA_TX
     if (eob == 0) {
       av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, 0, blk_col,
                                blk_row);

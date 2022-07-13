@@ -576,7 +576,23 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 CB_COEFF_BUFFER *av1_get_cb_coeff_buffer(const struct AV1_COMP *cpi, int mi_row,
                                          int mi_col);
 
-#if CONFIG_CONTEXT_DERIVATION
+#if CONFIG_CROSS_CHROMA_TX
+/*!\brief Returns the entropy cost associated with skipping the current
+ * transform block.
+ *
+ * \ingroup coefficient_coding
+ *
+ * \param[in]    coeff_costs    Table of entropy cost for coefficient coding.
+ * \param[in]    txb_ctx        Context info for entropy coding transform block
+ * skip flag (tx_skip) and the sign of DC coefficient (dc_sign).
+ * \param[in]    plane          The index of the current plane
+ * \param[in]    cctx_type      The cross-chroma transform type
+ * \param[in]    tx_size        The transform size
+ * \param[in]    x              Pointer to structure holding the data for the
+                                current encoding macroblock
+ * \param[in]    block          The index of the current transform block
+ */
+#elif CONFIG_CONTEXT_DERIVATION
 /*!\brief Returns the entropy cost associated with skipping the current
  * transform block.
  *
@@ -603,14 +619,17 @@ CB_COEFF_BUFFER *av1_get_cb_coeff_buffer(const struct AV1_COMP *cpi, int mi_row,
  * \param[in]    plane          The index of the current plane
  * \param[in]    tx_size        The transform size
  */
-#endif  // CONFIG_CONTEXT_DERIVATION
+#endif  // CONFIG_CROSS_CHROMA_TX
 static INLINE int av1_cost_skip_txb(const CoeffCosts *coeff_costs,
                                     const TXB_CTX *const txb_ctx, int plane,
+#if CONFIG_CROSS_CHROMA_TX
+                                    CctxType cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
                                     TX_SIZE tx_size
-#if CONFIG_CONTEXT_DERIVATION
+#if CONFIG_CONTEXT_DERIVATION || CONFIG_CROSS_CHROMA_TX
                                     ,
                                     MACROBLOCK *x, int block
-#endif  // CONFIG_CONTEXT_DERIVATION
+#endif  // CONFIG_CONTEXT_DERIVATION || CONFIG_CROSS_CHROMA_TX
 ) {
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   const PLANE_TYPE plane_type = get_plane_type(plane);
@@ -623,7 +642,15 @@ static INLINE int av1_cost_skip_txb(const CoeffCosts *coeff_costs,
   } else {
     txb_skip_ctx +=
         (x->plane[AOM_PLANE_U].eobs[block] ? V_TXB_SKIP_CONTEXT_OFFSET : 0);
+#if CONFIG_CROSS_CHROMA_TX
+    if (x->plane[AOM_PLANE_U].eobs[block] || x->plane[AOM_PLANE_V].eobs[block])
+      return coeff_costs_->v_txb_skip_cost[txb_skip_ctx][1] +
+             x->mode_costs.cctx_type_cost[txsize_sqr_map[tx_size]][cctx_type];
+    else
+      return coeff_costs_->v_txb_skip_cost[txb_skip_ctx][1];
+#else
     return coeff_costs_->v_txb_skip_cost[txb_skip_ctx][1];
+#endif  // CONFIG_CROSS_CHROMA_TX
   }
 #else
   return coeff_costs_->txb_skip_cost[txb_ctx->txb_skip_ctx][1];

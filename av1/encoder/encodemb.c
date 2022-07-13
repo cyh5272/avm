@@ -88,11 +88,15 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 
   if (eob == 0 || !cpi->optimize_seg_arr[segment_id] ||
       xd->lossless[segment_id]) {
-    *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane, tx_size
-#if CONFIG_CONTEXT_DERIVATION
+    *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane,
+#if CONFIG_CROSS_CHROMA_TX
+                                   cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+                                   tx_size
+#if CONFIG_CONTEXT_DERIVATION || CONFIG_CROSS_CHROMA_TX
                                    ,
                                    x, block
-#endif  // CONFIG_CONTEXT_DERIVATION
+#endif  // CONFIG_CONTEXT_DERIVATION || CONFIG_CROSS_CHROMA_TX
     );
     return eob;
   }
