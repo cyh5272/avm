@@ -90,16 +90,17 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height);
 // Get neighbor luma reconstruction pixels
-void cfl_implicit_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
-                                   int row, int col, TX_SIZE tx_size);
+void cfl_implicit_fetch_neighbor_luma(const AV1_COMMON *cm,
+                                      MACROBLOCKD *const xd, int row, int col,
+                                      TX_SIZE tx_size);
 
 // Calculate luma DC
 void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size);
 
 // Get neighbor chroma reconstruction pixels
-void cfl_implicit_fetch_neigh_chroma(const AV1_COMMON *cm,
-                                     MACROBLOCKD *const xd, int plane, int row,
-                                     int col, TX_SIZE tx_size);
+void cfl_implicit_fetch_neighbor_chroma(const AV1_COMMON *cm,
+                                        MACROBLOCKD *const xd, int plane,
+                                        int row, int col, TX_SIZE tx_size);
 
 // Derive the implicit scaling factor
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,

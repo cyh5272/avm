@@ -184,8 +184,9 @@ static void cfl_compute_parameters_alt(CFL_CTX *const cfl, TX_SIZE tx_size) {
   cfl->are_parameters_computed = 1;
 }
 
-void cfl_implicit_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
-                                   int row, int col, TX_SIZE tx_size) {
+void cfl_implicit_fetch_neighbor_luma(const AV1_COMMON *cm,
+                                      MACROBLOCKD *const xd, int row, int col,
+                                      TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
   int input_stride = pd->dst.stride;
@@ -319,9 +320,9 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
   }
 }
 
-void cfl_implicit_fetch_neigh_chroma(const AV1_COMMON *cm,
-                                     MACROBLOCKD *const xd, int plane, int row,
-                                     int col, TX_SIZE tx_size) {
+void cfl_implicit_fetch_neighbor_chroma(const AV1_COMMON *cm,
+                                        MACROBLOCKD *const xd, int plane,
+                                        int row, int col, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[plane];
   int input_stride = pd->dst.stride;
