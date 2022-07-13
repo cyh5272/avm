@@ -450,6 +450,12 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_C1_NONZERO
+  if (plane == AOM_PLANE_U) {
+    CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+  }
+#else
   // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
   // plane if either of eob_u and eob_v is > 0.
   if (plane == AOM_PLANE_V) {
@@ -460,6 +466,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
       av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
     }
   }
+#endif  // CCTX_C1_NONZERO
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (eob == 0) return 0;
@@ -580,6 +587,12 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_C1_NONZERO
+  if (plane == AOM_PLANE_U) {
+    CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+  }
+#else
   // CCTX type is transmitted with V plane
   if (plane == AOM_PLANE_V) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
@@ -589,6 +602,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
       av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
     }
   }
+#endif  // CCTX_C1_NONZERO
 #endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
 
@@ -856,9 +870,15 @@ int get_cctx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd, int plane,
                        TX_SIZE tx_size, int block, CctxType cctx_type) {
   const int is_inter = is_inter_block(xd->mi[0], xd->tree_type);
   const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+#if CCTX_C1_NONZERO
+  (void)block;
+  if (plane == AOM_PLANE_U &&
+#else
   if (plane == AOM_PLANE_V &&
-      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) &&
-      (x->plane[AOM_PLANE_U].eobs[block] || x->plane[AOM_PLANE_V].eobs[block]))
+      (x->plane[AOM_PLANE_U].eobs[block] ||
+       x->plane[AOM_PLANE_V].eobs[block]) &&
+#endif  // CCTX_C1_NONZERO
+      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)))
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_type];
   else
     return 0;
@@ -2600,11 +2620,17 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
     eob_txb[block] = eob;
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_C1_NONZERO
+    if (plane == AOM_PLANE_U)
+      update_cctx_type_count(cm, xd, blk_row, blk_col, tx_size, td->counts,
+                             allow_update_cdf);
+#else
     if (plane == AOM_PLANE_V &&
         (eob > 0 || x->plane[AOM_PLANE_U].eobs[block] > 0)) {
       update_cctx_type_count(cm, xd, blk_row, blk_col, tx_size, td->counts,
                              allow_update_cdf);
     }
+#endif  // CCTX_C1_NONZERO
 #endif  // CONFIG_CROSS_CHROMA_TX
     if (eob == 0) {
       av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, 0, blk_col,

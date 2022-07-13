@@ -404,7 +404,10 @@ enum {
 } UENUM1BYTE(TX_TYPE);
 
 #if CONFIG_CROSS_CHROMA_TX
-#define CCTX_NEG_ANGLES 0
+#define CCTX_NEG_ANGLES 1
+// Always signal C1 coefficients for some cctx (i.e., both C1 and C2 nonzero
+// or C1 nonzero and C2 zero). This requires CCTX_NEG_ANGLES to be on.
+#define CCTX_C1_NONZERO 1
 enum {
   CCTX_NONE,  // No cross chroma transform
   CCTX_45,    // 45 degrees rotation (Haar transform)
