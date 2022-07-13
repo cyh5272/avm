@@ -615,12 +615,15 @@ extern "C" int TFlite_Predict_quadtree_hbd(
     int dgd_stride, int src_stride, int QP, int unit_width, int unit_height,
     uint16_t *rePic, int rec_stride, int superres_denom, int num_threads,
     int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
+  // makesure can downscale 3 times
+  int padding_width = ceil(width * 1.0 / 8) * 8;
+  int padding_height = ceil(height * 1.0 / 8) * 8;
 #if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
 #endif  // USE_XNNPACK
   std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, superres_denom, width, height, num_threads,
-                             is_intra_only, is_luma, cnn_index
+      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
 #if USE_XNNPACK
                              ,
                              xnnpack_delegate
@@ -629,14 +632,26 @@ extern "C" int TFlite_Predict_quadtree_hbd(
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = width;
+  const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
+  // for (int r = 0; r < height; ++r) {
+  //  for (int c = 0; c < width; ++c) {
+  //    input[r * in_stride + c] =
+  //        static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+  //    assert(input[r * in_stride + c] >= 0.0f);
+  //    assert(input[r * in_stride + c] <= 1.0f);
+  //  }
+  //}
+  for (int r = 0; r < padding_height; ++r) {
+    for (int c = 0; c < padding_width; ++c) {
+      if (r < height && c < width) {
+        input[r * in_stride + c] =
+            static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+        assert(input[r * in_stride + c] >= 0.0f);
+        assert(input[r * in_stride + c] <= 1.0f);
+      } else {
+        input[r * in_stride + c] = 0;
+      }
     }
   }
 
@@ -649,7 +664,7 @@ extern "C" int TFlite_Predict_quadtree_hbd(
   }
   // Use the output to restore 'dgd' and store in 'rst'.
   const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = width;
+  const int out_stride = padding_width;
 
   uint16_t **sub_dgr = new uint16_t *[height];
   for (int i = 0; i < height; i++) {
@@ -901,14 +916,13 @@ extern "C" int TFlite_Predict_quadtree_hbd(
       printf("A0:%lf  A1:%lf\n", A0, A1);
       for (int i = start_clow; i < end_clow; i++) {
         for (int j = start_row; j < end_row; j++) {
-          repic[i][j] = int(round(sub_dgr[i][j] + A0 * r0[i][j] +
-                                  A1 * r1[i][j]));
+          repic[i][j] =
+              int(round(sub_dgr[i][j] + A0 * r0[i][j] + A1 * r1[i][j]));
           // repic[i][j] = int(round(sub_dgr[i][j]));
           repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
         }
       }
-#endif USE_QUAT  
-      
+#endif USE_QUAT
 
       for (int i = 0; i < lenth; i++) {
         delete[] R[i];
@@ -1325,11 +1339,14 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
     uint16_t *rePic, int rec_stride, int QP, int *A, int *regular_A, int *Split,
     int block_size, int superres_denom, int num_threads, int bit_depth,
     int is_intra_only, int is_luma, int cnn_index) {
+  // makesure can downscale 3 times
+  int padding_width = ceil(img_width * 1.0 / 8) * 8;
+  int padding_height = ceil(img_height * 1.0 / 8) * 8;
 #if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
 #endif  // USE_XNNPACK
   std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, superres_denom, img_width, img_height,
+      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
                              num_threads, is_intra_only, is_luma, cnn_index
 #if USE_XNNPACK
                              ,
@@ -1339,17 +1356,28 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = img_width;
+  const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
+  // for (int r = 0; r < img_height; ++r) {
+  //  for (int c = 0; c < img_width; ++c) {
+  //    input[r * in_stride + c] =
+  //        static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+  //    assert(input[r * in_stride + c] >= 0.0f);
+  //    assert(input[r * in_stride + c] <= 1.0f);
+  //  }
+  //}
+  for (int r = 0; r < padding_height; ++r) {
+    for (int c = 0; c < padding_width; ++c) {
+      if (r < img_height && c < img_width) {
+        input[r * in_stride + c] =
+            static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+        assert(input[r * in_stride + c] >= 0.0f);
+        assert(input[r * in_stride + c] <= 1.0f);
+      } else {
+        input[r * in_stride + c] = 0;
+      }
     }
   }
-
   // Invoke TFlite inference.
   tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
   auto status = interpreter->Invoke();
@@ -1360,7 +1388,7 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
 
   // Use the output to restore 'dgd' and store in 'rst'.
   const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = img_width;
+  const int out_stride = padding_width;
 
   uint16_t **sub_dgr = new uint16_t *[img_height];
   for (int i = 0; i < img_height; i++) {
@@ -1918,7 +1946,7 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
                               is_intra_only, is_luma, cnn_index);
   double psnr_level_0 = computePSNR_tflite_hbd(buf_level_0, src, height, width,
                                                width, src_stride, bit_depth);
-  //29.99811
+  // 29.99811
   // for (int i = 0; i < 512; i++)
   //  for (int j = 0; j < 512; j++) buf[i][j] = buf_level_0[i * width + j];
   // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
