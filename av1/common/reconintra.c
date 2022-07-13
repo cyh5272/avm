@@ -1827,7 +1827,7 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       assert(block_size_high[plane_bsize] == tx_size_high[tx_size]);
     }
 #endif
-#if !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if !CONFIG_IMPROVED_CFL
     CFL_CTX *const cfl = &xd->cfl;
     CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
     if (cfl->dc_pred_is_cached[pred_plane] == 0) {
@@ -1842,7 +1842,7 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
     } else {
       cfl_load_dc_pred(xd, dst, dst_stride, tx_size, pred_plane);
     }
-#if CONFIG_IMPROVED_CFL_DC
+#if CONFIG_IMPROVED_CFL
     const int luma_tx_size_fetch =
         av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
     implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
@@ -1858,7 +1858,7 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
                    mbmi->sb_type[PLANE_TYPE_UV]);
     }
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
     CFL_CTX *const cfl = &xd->cfl;
     CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
     if (cfl->dc_pred_is_cached[pred_plane] == 0) {

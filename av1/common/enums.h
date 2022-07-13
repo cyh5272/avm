@@ -610,7 +610,7 @@ enum {
   UV_MODE_INVALID,  // For uv_mode in inter blocks
 } UENUM1BYTE(UV_PREDICTION_MODE);
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 enum {
   CFL_EXPLICIT,       // av1 cfl
   CFL_DERIVED_ALPHA,  // implicit CfL mode with derived scaling factor

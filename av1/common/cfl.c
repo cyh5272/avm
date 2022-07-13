@@ -16,7 +16,7 @@
 
 #include "config/av1_rtcd.h"
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 #include "av1/common/warped_motion.h"
 #endif
 
@@ -149,7 +149,7 @@ void cfl_predict_hbd_c(const int16_t *ac_buf_q3, uint16_t *dst, int dst_stride,
 
 CFL_PREDICT_FN(c, hbd)
 
-#if !CONFIG_IMPROVED_CFL_DC && !CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if !CONFIG_IMPROVED_CFL
 static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   // Do not call cfl_compute_parameters multiple time on the same values.
@@ -162,7 +162,7 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 }
 #endif
 
-#if CONFIG_IMPROVED_CFL_DC || CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 static void subtract_average_neighbor_c(const uint16_t *src, int16_t *dst,
                                         int width, int height, int avg) {
   for (int j = 0; j < height; j++) {
@@ -209,7 +209,7 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2 * input_stride;
       for (int i = 0; i < width; i += 2) {
         const int bot = i + input_stride;
-#if CONFIG_CFL_DS_1_2_1
+#if CONFIG_IMPROVED_CFL
         output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
                             input[i + 1] + input[bot + AOMMAX(-1, -i)] +
                             2 * input[bot] + input[bot + 1];
@@ -246,7 +246,7 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2;
       for (int j = 0; j < height; j += 2) {
         const int bot = input_stride;
-#if CONFIG_CFL_DS_1_2_1
+#if CONFIG_IMPROVED_CFL
         output_q3[j >> 1] = input[-1] + 2 * input[0] + input[1] +
                             input[bot - 1] + 2 * input[bot] + input[bot + 1];
 #else
@@ -318,7 +318,7 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
   }
 }
 #endif
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size) {
@@ -449,7 +449,7 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   MB_MODE_INFO *mbmi = xd->mi[0];
   assert(is_cfl_allowed(xd));
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
   cfl_compute_parameters_alt(xd, tx_size);
   int alpha_q3;
   if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
@@ -459,10 +459,6 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
         cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
     alpha_q3 *= (1 << CFL_ADD_BITS_ALPHA);
   }
-#elif CONFIG_IMPROVED_CFL_DC
-  cfl_compute_parameters_alt(xd, tx_size);
-  const int alpha_q3 =
-      cfl_idx_to_alpha(mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, plane - 1);
 #else
   if (!cfl->are_parameters_computed) cfl_compute_parameters(xd, tx_size);
   const int alpha_q3 =
@@ -490,7 +486,7 @@ static void cfl_luma_subsampling_420_hbd_c(const uint16_t *input,
   }
 }
 
-#if CONFIG_CFL_DS_1_2_1
+#if CONFIG_IMPROVED_CFL
 void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height) {
@@ -588,7 +584,7 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
   // Store the input into the CfL pixel buffer
   uint16_t *recon_buf_q3 =
       cfl->recon_buf_q3 + (store_row * CFL_BUF_LINE + store_col);
-#if CONFIG_CFL_DS_1_2_1
+#if CONFIG_IMPROVED_CFL
   if (sub_x && sub_y)
     cfl_luma_subsampling_420_hbd_121_c(CONVERT_TO_SHORTPTR(input), input_stride,
                                        recon_buf_q3, width, height);

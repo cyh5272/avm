@@ -218,7 +218,7 @@ static uint8_t read_fsc_mode(aom_reader *r, aom_cdf_prob *fsc_cdf) {
 }
 #endif  // CONFIG_FORWARDSKIP
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 static uint8_t read_cfl_index(FRAME_CONTEXT *ec_ctx, aom_reader *r) {
   uint8_t cfl_index =
       aom_read_symbol(r, ec_ctx->cfl_index_cdf, CFL_IDX_NUMBER, ACCT_STR);
@@ -1259,7 +1259,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
       }
 #endif  // CONFIG_AIMC
       if (mbmi->uv_mode == UV_CFL_PRED) {
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
         { mbmi->cfl_idx = read_cfl_index(ec_ctx, r); }
         if (mbmi->cfl_idx == 0)
 #endif
@@ -1826,7 +1826,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
     }
 #endif  // CONFIG_AIMC
     if (mbmi->uv_mode == UV_CFL_PRED) {
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
       { mbmi->cfl_idx = read_cfl_index(ec_ctx, r); }
       if (mbmi->cfl_idx == 0)
 #endif

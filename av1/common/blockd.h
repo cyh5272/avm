@@ -420,7 +420,7 @@ typedef struct MB_MODE_INFO {
   int8_t cfl_alpha_signs;
   /*! \brief Chroma from Luma: Index of the alpha Cb and alpha Cr combination */
   uint8_t cfl_alpha_idx;
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
   /*! \brief Chroma from Luma: Index of the CfL mode */
   uint8_t cfl_idx;
   /*! \brief The implicitly derived scaling factors*/
@@ -756,7 +756,7 @@ typedef struct cfl_ctx {
   uint16_t recon_buf_q3[CFL_BUF_SQUARE];
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
-#if CONFIG_IMPROVED_CFL_DC || CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
   uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
   uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
   uint16_t avg_l;

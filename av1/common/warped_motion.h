@@ -76,7 +76,7 @@ static INLINE int16_t resolve_divisor_32(uint32_t D, int16_t *shift) {
   return div_lut[f];
 }
 
-#if CONFIG_IMPLICIT_CFL_DERIVED_ALPHA
+#if CONFIG_IMPROVED_CFL
 static INLINE int16_t resolve_divisor_32_CfL(int32_t N, int32_t D,
                                              int16_t shift) {
   int32_t f_n, f_d;
