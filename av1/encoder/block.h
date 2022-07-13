@@ -640,7 +640,7 @@ typedef struct {
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_IMPROVED_CFL
   //! Cost of signaling the cfl mode
-  int cfl_index_cost[CFL_IDX_NUMBER];
+  int cfl_index_cost[CFL_TYPE_COUNT];
 #endif
 #if CONFIG_AIMC
   //! y primary flag cost

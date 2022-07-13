@@ -216,7 +216,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_IMPROVED_CFL
-  RESET_CDF_COUNTER(fc->cfl_index_cdf, CFL_IDX_NUMBER);
+  RESET_CDF_COUNTER(fc->cfl_index_cdf, CFL_TYPE_COUNT);
 #endif
   RESET_CDF_COUNTER(fc->filter_intra_cdfs, 2);
   RESET_CDF_COUNTER(fc->filter_intra_mode_cdf, FILTER_INTRA_MODES);

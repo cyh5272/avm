@@ -221,7 +221,7 @@ static uint8_t read_fsc_mode(aom_reader *r, aom_cdf_prob *fsc_cdf) {
 #if CONFIG_IMPROVED_CFL
 static uint8_t read_cfl_index(FRAME_CONTEXT *ec_ctx, aom_reader *r) {
   uint8_t cfl_index =
-      aom_read_symbol(r, ec_ctx->cfl_index_cdf, CFL_IDX_NUMBER, ACCT_STR);
+      aom_read_symbol(r, ec_ctx->cfl_index_cdf, CFL_TYPE_COUNT, ACCT_STR);
   return cfl_index;
 }
 #endif

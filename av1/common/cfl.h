@@ -68,11 +68,7 @@ static INLINE CFL_ALLOWED_TYPE store_cfl_required(const AV1_COMMON *cm,
 
 static INLINE int get_scaled_luma_q0(int alpha_q3, int16_t pred_buf_q3) {
   int scaled_luma_q6 = alpha_q3 * pred_buf_q3;
-#if CFL_ADD_BITS_ALPHA
   return ROUND_POWER_OF_TWO_SIGNED(scaled_luma_q6, (6 + CFL_ADD_BITS_ALPHA));
-#else
-  return ROUND_POWER_OF_TWO_SIGNED(scaled_luma_q6, 6);
-#endif
 }
 
 static INLINE CFL_PRED_TYPE get_cfl_pred_type(PLANE_TYPE plane) {
@@ -87,19 +83,29 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size);
 
 void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
                   BLOCK_SIZE bsize);
+
 #if CONFIG_IMPROVED_CFL
+// 121 subsample filter
 void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height);
-void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
+// Get neighbor luma reconstruction pixels
+void cfl_implicit_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
                                    int row, int col, TX_SIZE tx_size);
+
+// Calculate luma DC
 void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size);
-void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
+
+// Get neighbor chroma reconstruction pixels
+void cfl_implicit_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size);
+
+// Derive the implicit scaling factor
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
                                         int row, int col, TX_SIZE tx_size);
 #endif
+
 void cfl_store_dc_pred(MACROBLOCKD *const xd, const uint8_t *input,
                        CFL_PRED_TYPE pred_plane, int width);
 

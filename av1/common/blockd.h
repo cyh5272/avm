@@ -757,8 +757,11 @@ typedef struct cfl_ctx {
   // Q3 AC contributions (reconstructed luma pixels - tx block avg)
   int16_t ac_buf_q3[CFL_BUF_SQUARE];
 #if CONFIG_IMPROVED_CFL
-  uint16_t recon_yuv_buf_above[3][CFL_BUF_LINE];
-  uint16_t recon_yuv_buf_left[3][CFL_BUF_LINE];
+  // above luma reconstruction buffer
+  uint16_t recon_yuv_buf_above[MAX_MB_PLANE][CFL_BUF_LINE];
+  // left luma reconstruction buffer
+  uint16_t recon_yuv_buf_left[MAX_MB_PLANE][CFL_BUF_LINE];
+  // luma neighboring pixel average
   uint16_t avg_l;
 #endif
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed

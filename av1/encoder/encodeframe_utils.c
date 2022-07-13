@@ -565,9 +565,9 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_IMPROVED_CFL
     if (mbmi->uv_mode == UV_CFL_PRED) {
 #if CONFIG_ENTROPY_STATS
-      ++counts->cfl_index[mbmi->cfl_index];
+      ++counts->cfl_index[mbmi->cfl_idx];
 #endif
-      update_cdf(fc->cfl_index_cdf, mbmi->cfl_idx > 0, CFL_IDX_NUMBER);
+      update_cdf(fc->cfl_index_cdf, mbmi->cfl_idx > 0, CFL_TYPE_COUNT);
     }
 #endif
 #else
@@ -1267,7 +1267,7 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->mrl_index_cdf, ctx_tr->mrl_index_cdf, MRL_LINE_NUMBER);
 
 #if CONFIG_IMPROVED_CFL
-  AVERAGE_CDF(ctx_left->cfl_index_cdf, ctx_tr->cfl_index_cdf, CFL_IDX_NUMBER);
+  AVERAGE_CDF(ctx_left->cfl_index_cdf, ctx_tr->cfl_index_cdf, CFL_TYPE_COUNT);
 #endif
 #if CONFIG_AIMC
   AVERAGE_CDF(ctx_left->y_mode_set_cdf, ctx_tr->y_mode_set_cdf,

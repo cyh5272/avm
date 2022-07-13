@@ -105,7 +105,7 @@ static const aom_cdf_prob
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_IMPROVED_CFL
-static const aom_cdf_prob default_cfl_index_cdf[CDF_SIZE(CFL_IDX_NUMBER)] = {
+static const aom_cdf_prob default_cfl_index_cdf[CDF_SIZE(CFL_TYPE_COUNT)] = {
   AOM_CDF2(16384)
 };
 #endif

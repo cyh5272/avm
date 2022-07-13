@@ -608,10 +608,10 @@ enum {
 } UENUM1BYTE(UV_PREDICTION_MODE);
 
 #if CONFIG_IMPROVED_CFL
-#define CFL_IDX_NUMBER 2
 enum {
   CFL_EXPLICIT,       // av1 cfl
   CFL_DERIVED_ALPHA,  // implicit CfL mode with derived scaling factor
+  CFL_TYPE_COUNT,     // CfL mode type count
 } UENUM1BYTE(CFL_TYPE);
 #endif
 

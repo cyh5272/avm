@@ -162,27 +162,29 @@ static void cfl_compute_parameters(MACROBLOCKD *const xd, TX_SIZE tx_size) {
 #endif
 
 #if CONFIG_IMPROVED_CFL
-static void subtract_average_neighbor_c(const uint16_t *src, int16_t *dst,
-                                        int width, int height, int avg) {
-  for (int j = 0; j < height; j++) {
-    for (int i = 0; i < width; i++) {
+// Subtract the average from neighoring pixels
+static void subtract_average_neighbor(const uint16_t *src, int16_t *dst,
+                                      int width, int height, int avg) {
+  for (int j = 0; j < height; ++j) {
+    for (int i = 0; i < width; ++i) {
       dst[i] = src[i] - avg;
     }
     src += CFL_BUF_LINE;
     dst += CFL_BUF_LINE;
   }
 }
-static void cfl_compute_parameters_alt(MACROBLOCKD *const xd, TX_SIZE tx_size) {
-  CFL_CTX *const cfl = &xd->cfl;
+
+// Calculate luma AC values with neighbor DC
+static void cfl_compute_parameters_alt(CFL_CTX *const cfl, TX_SIZE tx_size) {
   cfl_pad(cfl, tx_size_wide[tx_size], tx_size_high[tx_size]);
 
-  subtract_average_neighbor_c(cfl->recon_buf_q3, cfl->ac_buf_q3,
-                              tx_size_wide[tx_size], tx_size_high[tx_size],
-                              cfl->avg_l);
+  subtract_average_neighbor(cfl->recon_buf_q3, cfl->ac_buf_q3,
+                            tx_size_wide[tx_size], tx_size_high[tx_size],
+                            cfl->avg_l);
   cfl->are_parameters_computed = 1;
 }
 
-void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
+void cfl_implicit_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
                                    int row, int col, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
@@ -219,20 +221,20 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       }
     } else if (sub_y) {
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2 * input_stride;
-      for (int i = 0; i < width; i++) {
+      for (int i = 0; i < width; ++i) {
         const int bot = i + input_stride;
         output_q3[i] = (input[i] + input[bot]) << 2;
       }
     } else {
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - input_stride;
-      for (int i = 0; i < width; i++) output_q3[i] = input[i] << 3;
+      for (int i = 0; i < width; ++i) output_q3[i] = input[i] << 3;
     }
 
     if ((((xd->mi_col + col) << MI_SIZE_LOG2) + width) > cm->width) {
       int temp =
           width - ((((xd->mi_col + col) << MI_SIZE_LOG2) + width) - cm->width);
       assert(temp > 0 && temp < width);
-      for (int i = temp >> sub_x; i < width >> sub_x; i++) {
+      for (int i = temp >> sub_x; i < width >> sub_x; ++i) {
         output_q3[i] = output_q3[i - 1];
       }
     }
@@ -256,13 +258,13 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       }
     } else if (sub_y) {
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
-      for (int j = 0; j < height; j++) {
+      for (int j = 0; j < height; ++j) {
         output_q3[j] = (input[0] + input[input_stride]) << 2;
         input += input_stride * 2;
       }
     } else {
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
-      for (int j = 0; j < height; j++)
+      for (int j = 0; j < height; ++j)
         output_q3[j] = input[j * input_stride] << 3;
     }
 
@@ -270,7 +272,7 @@ void implicit_cfl_fetch_neigh_luma(const AV1_COMMON *cm, MACROBLOCKD *const xd,
       int temp = height -
                  ((((xd->mi_row + row) << MI_SIZE_LOG2) + height) - cm->height);
       assert(temp > 0 && temp < height);
-      for (int j = temp >> sub_y; j < height >> sub_y; j++) {
+      for (int j = temp >> sub_y; j < height >> sub_y; ++j) {
         output_q3[j] = output_q3[j - 1];
       }
     }
@@ -296,7 +298,7 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
   uint16_t *l;
   if (have_top) {
     l = cfl->recon_yuv_buf_above[0];
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < width; ++i) {
       sum_x += l[i];
     }
     count += width;
@@ -304,7 +306,7 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
 
   if (have_left) {
     l = cfl->recon_yuv_buf_left[0];
-    for (int i = 0; i < height; i++) {
+    for (int i = 0; i < height; ++i) {
       sum_x += l[i];
     }
     count += height;
@@ -316,9 +318,8 @@ void cfl_calc_luma_dc(MACROBLOCKD *const xd, int row, int col,
     cfl->avg_l = 8 << (xd->bd - 1);
   }
 }
-#endif
-#if CONFIG_IMPROVED_CFL
-void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
+
+void cfl_implicit_fetch_neigh_chroma(const AV1_COMMON *cm,
                                      MACROBLOCKD *const xd, int plane, int row,
                                      int col, TX_SIZE tx_size) {
   CFL_CTX *const cfl = &xd->cfl;
@@ -348,7 +349,7 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
   uint16_t *output_q3 = cfl->recon_yuv_buf_above[plane];
   if (have_top) {
     uint16_t *input = CONVERT_TO_SHORTPTR(dst) - input_stride;
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < width; ++i) {
       output_q3[i] = input[i];
     }
     if (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) >
@@ -357,7 +358,7 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           width - (((((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2) + width) -
                    pic_width_c);
       assert(temp > 0 && temp < width);
-      for (int i = temp; i < width; i++) {
+      for (int i = temp; i < width; ++i) {
         output_q3[i] = output_q3[i - 1];
       }
     }
@@ -367,7 +368,7 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
   output_q3 = cfl->recon_yuv_buf_left[plane];
   if (have_left) {
     uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 1;
-    for (int j = 0; j < height; j++) {
+    for (int j = 0; j < height; ++j) {
       output_q3[j] = input[0];
       input += input_stride;
     }
@@ -378,7 +379,7 @@ void implicit_cfl_fetch_neigh_chroma(const AV1_COMMON *cm,
           height - (((((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2) + height) -
                     pic_height_c);
       assert(temp > 0 && temp < height);
-      for (int j = temp; j < height; j++) {
+      for (int j = temp; j < height; ++j) {
         output_q3[j] = output_q3[j - 1];
       }
     }
@@ -407,7 +408,7 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     l = cfl->recon_yuv_buf_above[0];
     c = cfl->recon_yuv_buf_above[plane];
 
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < width; ++i) {
       sum_x += l[i] >> 3;
       sum_y += c[i];
       sum_xy += (l[i] >> 3) * c[i];
@@ -420,7 +421,7 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
     l = cfl->recon_yuv_buf_left[0];
     c = cfl->recon_yuv_buf_left[plane];
 
-    for (int i = 0; i < height; i++) {
+    for (int i = 0; i < height; ++i) {
       sum_x += l[i] >> 3;
       sum_y += c[i];
       sum_xy += (l[i] >> 3) * c[i];
@@ -449,7 +450,7 @@ void cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   assert(is_cfl_allowed(xd));
 
 #if CONFIG_IMPROVED_CFL
-  cfl_compute_parameters_alt(xd, tx_size);
+  cfl_compute_parameters_alt(cfl, tx_size);
   int alpha_q3;
   if (mbmi->cfl_idx == CFL_DERIVED_ALPHA)
     alpha_q3 = mbmi->cfl_implicit_alpha[plane - 1];

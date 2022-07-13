@@ -1874,12 +1874,12 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
     const int luma_tx_size =
         av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
-    implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
+    cfl_implicit_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
                                   blk_col << cfl->subsampling_x, luma_tx_size);
     cfl_calc_luma_dc(xd, blk_row, blk_col, tx_size);
 
     if (mbmi->cfl_idx == CFL_DERIVED_ALPHA) {
-      implicit_cfl_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col, tx_size);
+      cfl_implicit_fetch_neigh_chroma(cm, xd, plane, blk_row, blk_col, tx_size);
       cfl_derive_implicit_scaling_factor(xd, plane, blk_row, blk_col, tx_size);
     }
 #endif
