@@ -719,7 +719,7 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
     const int is_inter = is_inter_block(&ctx->mic, xd->tree_type);
 #if CONFIG_IBC_SR_EXT && !CONFIG_BVP_IMPROVEMENT
     if (cm->seq_params.enable_refmvbank && is_inter &&
-          !is_intrabc_block(&ctx->mic, xd->tree_type))
+        !is_intrabc_block(&ctx->mic, xd->tree_type))
 #else
     if (cm->seq_params.enable_refmvbank && is_inter)
 #endif
@@ -816,7 +816,7 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
 #if CONFIG_IBC_SR_EXT && !CONFIG_BVP_IMPROVEMENT
   if (cm->seq_params.enable_refmvbank && is_inter &&
-        !is_intrabc_block(mbmi, xd->tree_type))
+      !is_intrabc_block(mbmi, xd->tree_type))
 #else
   if (cm->seq_params.enable_refmvbank && is_inter)
 #endif
@@ -2121,10 +2121,11 @@ static bool rd_test_partition3(AV1_COMP *const cpi, ThreadData *td,
                                const BLOCK_SIZE ab_subsize[SUB_PARTITIONS_AB],
                                const int ab_mi_pos[SUB_PARTITIONS_AB][2]
 #if CONFIG_MVP_IMPROVEMENTS
-                              ,REF_MV_BANK *best_level_bank
+                               ,
+                               REF_MV_BANK *best_level_bank
 #endif
 
-                               ) {
+) {
   const MACROBLOCK *const x = &td->mb;
   const MACROBLOCKD *const xd = &x->e_mbd;
   const int pl = partition_plane_context(xd, mi_row, mi_col, bsize);
@@ -2379,10 +2380,10 @@ static void rectangular_partition_search(
     PartitionSearchState *part_search_state, RD_STATS *best_rdc,
     RD_RECT_PART_WIN_INFO *rect_part_win_info
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
-    ,REF_MV_BANK *curr_level_bank
+    ,
+    REF_MV_BANK *best_level_bank, REF_MV_BANK *curr_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   RD_STATS *sum_rdc = &part_search_state->sum_rdc;
@@ -2524,9 +2525,10 @@ static void rd_pick_ab_part(
     const BLOCK_SIZE ab_subsize[SUB_PARTITIONS_AB],
     const int ab_mi_pos[SUB_PARTITIONS_AB][2], const PARTITION_TYPE part_type
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
+    ,
+    REF_MV_BANK *best_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   const int mi_row = blk_params.mi_row;
@@ -2549,11 +2551,12 @@ static void rd_pick_ab_part(
 #endif
 
   // Test this partition and update the best partition.
-  part_search_state->found_best_partition |= rd_test_partition3(
-      cpi, td, tile_data, tp, pc_tree, best_rdc, dst_ctxs, mi_row, mi_col,
-      bsize, part_type, ab_subsize, ab_mi_pos
+  part_search_state->found_best_partition |=
+      rd_test_partition3(cpi, td, tile_data, tp, pc_tree, best_rdc, dst_ctxs,
+                         mi_row, mi_col, bsize, part_type, ab_subsize, ab_mi_pos
 #if CONFIG_MVP_IMPROVEMENTS
-      ,best_level_bank
+                         ,
+                         best_level_bank
 #endif
       );
 
@@ -2605,10 +2608,10 @@ static void ab_partitions_search(
     RD_STATS *best_rdc, RD_RECT_PART_WIN_INFO *rect_part_win_info,
     int pb_source_variance, int ext_partition_allowed
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
-    ,REF_MV_BANK *curr_level_bank
+    ,
+    REF_MV_BANK *best_level_bank, REF_MV_BANK *curr_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   const int mi_row = blk_params.mi_row;
@@ -2712,12 +2715,12 @@ static void ab_partitions_search(
     // Evaluation of AB partition type.
     rd_pick_ab_part(cpi, td, tile_data, tp, x, x_ctx, pc_tree,
                     cur_part_ctxs[ab_part_type], part_search_state, best_rdc,
-                    ab_subsize[ab_part_type], ab_mi_pos[ab_part_type],
-                    part_type
+                    ab_subsize[ab_part_type], ab_mi_pos[ab_part_type], part_type
 #if CONFIG_MVP_IMPROVEMENTS
-                    ,best_level_bank
+                    ,
+                    best_level_bank
 #endif
-                    );
+    );
 #if CONFIG_MVP_IMPROVEMENTS
     x->e_mbd.ref_mv_bank = *curr_level_bank;
 #endif
@@ -2761,10 +2764,10 @@ static void rd_pick_4partition(
     PartitionSearchState *part_search_state, RD_STATS *best_rdc,
     const int inc_step[NUM_PART4_TYPES], PARTITION_TYPE partition_type
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
-    ,REF_MV_BANK *curr_level_bank
+    ,
+    REF_MV_BANK *best_level_bank, REF_MV_BANK *curr_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   // mi positions needed for HORZ4 and VERT4 partition types.
@@ -3085,9 +3088,10 @@ static void none_partition_search(
     PartitionSearchState *part_search_state, RD_STATS *best_rdc,
     unsigned int *pb_source_variance, int64_t *none_rd, int64_t *part_none_rd
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
+    ,
+    REF_MV_BANK *best_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   RD_STATS *this_rdc = &part_search_state->this_rdc;
@@ -3174,9 +3178,10 @@ static void split_partition_search(
     PartitionSearchState *part_search_state, RD_STATS *best_rdc,
     SB_MULTI_PASS_MODE multi_pass_mode, int64_t *part_split_rd
 #if CONFIG_MVP_IMPROVEMENTS
-    ,REF_MV_BANK *best_level_bank
+    ,
+    REF_MV_BANK *best_level_bank
 #endif
-    ) {
+) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
@@ -3481,9 +3486,10 @@ BEGIN_PARTITION_SEARCH:
                         &part_search_state, &best_rdc, &pb_source_variance,
                         none_rd, &part_none_rd
 #if CONFIG_MVP_IMPROVEMENTS
-                        ,&best_level_bank
+                        ,
+                        &best_level_bank
 #endif
-                        );
+  );
 #if CONFIG_MVP_IMPROVEMENTS
   x->e_mbd.ref_mv_bank = curr_level_bank;
 #endif
@@ -3494,9 +3500,10 @@ BEGIN_PARTITION_SEARCH:
                          &part_search_state, &best_rdc, multi_pass_mode,
                          &part_split_rd
 #if CONFIG_MVP_IMPROVEMENTS
-                        ,&best_level_bank
+                         ,
+                         &best_level_bank
 #endif
-                         );
+  );
 #if CONFIG_MVP_IMPROVEMENTS
   x->e_mbd.ref_mv_bank = curr_level_bank;
 #endif
@@ -3515,13 +3522,12 @@ BEGIN_PARTITION_SEARCH:
 
   // Rectangular partitions search stage.
   rectangular_partition_search(cpi, td, tile_data, tp, x, pc_tree, &x_ctx,
-                               &part_search_state, &best_rdc,
-                               rect_part_win_info
+                               &part_search_state, &best_rdc, rect_part_win_info
 #if CONFIG_MVP_IMPROVEMENTS
-                              ,&best_level_bank
-                              ,&curr_level_bank
+                               ,
+                               &best_level_bank, &curr_level_bank
 #endif
-                               );
+  );
 
   if (pb_source_variance == UINT_MAX) {
     av1_setup_src_planes(x, cpi->source, mi_row, mi_col, num_planes, bsize);
@@ -3542,10 +3548,10 @@ BEGIN_PARTITION_SEARCH:
                        &part_search_state, &best_rdc, rect_part_win_info,
                        pb_source_variance, ext_partition_allowed
 #if CONFIG_MVP_IMPROVEMENTS
-                      ,&best_level_bank
-                      ,&curr_level_bank
+                       ,
+                       &best_level_bank, &curr_level_bank
 #endif
-                       );
+  );
 
   // 4-way partitions search stage.
   int part4_search_allowed[NUM_PART4_TYPES] = { 1, 1 };
@@ -3578,10 +3584,10 @@ BEGIN_PARTITION_SEARCH:
                        pc_tree->horizontal4, &part_search_state, &best_rdc,
                        inc_step, PARTITION_HORZ_4
 #if CONFIG_MVP_IMPROVEMENTS
-                      ,&best_level_bank
-                      ,&curr_level_bank
+                       ,
+                       &best_level_bank, &curr_level_bank
 #endif
-                       );
+    );
   }
 
   // PARTITION_VERT_4
@@ -3598,10 +3604,10 @@ BEGIN_PARTITION_SEARCH:
                        pc_tree->vertical4, &part_search_state, &best_rdc,
                        inc_step, PARTITION_VERT_4
 #if CONFIG_MVP_IMPROVEMENTS
-                      ,&best_level_bank
-                      ,&curr_level_bank
+                       ,
+                       &best_level_bank, &curr_level_bank
 #endif
-                       );
+    );
   }
 
   if (bsize == cm->seq_params.sb_size &&
@@ -3620,7 +3626,6 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENTS
   x->e_mbd.ref_mv_bank = best_level_bank;
 #endif
-
 
   // Also record the best partition in simple motion data tree because it is
   // necessary for the related speed features.

@@ -871,7 +871,7 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
   if (bs > mi_size_wide[BLOCK_64X64]) has_bl = 0;
 
-  if (xd->height == mi_size_wide[cm->seq_params.sb_size]) has_bl = 0;
+  if (bs == mi_size_wide[cm->seq_params.sb_size]) has_bl = 0;
 
   // bs > 0 and bs is a power of 2
   assert(bs > 0 && !(bs & (bs - 1)));
