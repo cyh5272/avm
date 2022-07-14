@@ -198,7 +198,7 @@ const int16_t
 
 #if CONFIG_CROSS_CHROMA_TX
 // Given a rotation angle t, the CCTX transform matrix is defined as
-// [cos(t), sin(t); sin(t), -cos(t)] * 1<<CCTX_PREC_BITS). The array below only
+// [cos(t), sin(t); -sin(t), cos(t)] * 1<<CCTX_PREC_BITS). The array below only
 // stores two values: cos(t) and sin(t) for each rotation angle.
 const int32_t cctx_mtx[CCTX_TYPES - 1][2] = {
   { 181, 181 },  // t = 45 degrees
