@@ -2584,11 +2584,10 @@ static AOM_INLINE void encode_restoration_mode(
   }
 }
 
-static AOM_INLINE void write_wiener_filter(MACROBLOCK *x, int wiener_win,
+static AOM_INLINE void write_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                            const WienerInfo *wiener_info,
                                            WienerInfoBank *bank,
                                            aom_writer *wb) {
-  MACROBLOCKD *xd = &x->e_mbd;
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
       check_wiener_eq(wiener_info, av1_constref_from_wiener_bank(bank, 0));
@@ -2597,8 +2596,7 @@ static AOM_INLINE void write_wiener_filter(MACROBLOCK *x, int wiener_win,
     if (bank->bank_size == 0) av1_add_to_wiener_bank(bank, wiener_info);
     return;
   }
-  const int ref =
-      get_wiener_best_ref(wiener_win, &x->mode_costs, wiener_info, bank);
+  const int ref = wiener_info->bank_ref;
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2654,11 +2652,10 @@ static AOM_INLINE void write_wiener_filter(MACROBLOCK *x, int wiener_win,
   return;
 }
 
-static AOM_INLINE void write_sgrproj_filter(MACROBLOCK *x,
+static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
                                             const SgrprojInfo *sgrproj_info,
                                             SgrprojInfoBank *bank,
                                             aom_writer *wb) {
-  MACROBLOCKD *xd = &x->e_mbd;
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
       check_sgrproj_eq(sgrproj_info, av1_constref_from_sgrproj_bank(bank, 0));
@@ -2667,7 +2664,7 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCK *x,
     if (bank->bank_size == 0) av1_add_to_sgrproj_bank(bank, sgrproj_info);
     return;
   }
-  const int ref = get_sgrproj_best_ref(&x->mode_costs, sgrproj_info, bank);
+  const int ref = sgrproj_info->bank_ref;
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2711,14 +2708,13 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCK *x,
 
 #if CONFIG_WIENER_NONSEP
 static AOM_INLINE void write_wienerns_filter(
-    MACROBLOCK *x, int is_uv, int ql, const WienerNonsepInfo *wienerns_info,
+    MACROBLOCKD *xd, int plane, int ql, const WienerNonsepInfo *wienerns_info,
     WienerNonsepInfoBank *bank, aom_writer *wb) {
-  MACROBLOCKD *xd = &x->e_mbd;
   const WienernsFilterConfigPairType *wnsf =
       get_wienerns_filters(xd->base_qindex);
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
-      check_wienerns_eq(is_uv, wienerns_info,
+      check_wienerns_eq(plane, wienerns_info,
                         av1_constref_from_wiener_nonsep_bank(bank, 0), wnsf);
   aom_write_symbol(wb, equal, xd->tile_ctx->merged_param_cdf, 2);
   if (equal) {
@@ -2726,8 +2722,7 @@ static AOM_INLINE void write_wienerns_filter(
       av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
     return;
   }
-  const int ref =
-      get_wienerns_best_ref(is_uv, &x->mode_costs, wienerns_info, bank, wnsf);
+  const int ref = wienerns_info->bank_ref;
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2742,13 +2737,13 @@ static AOM_INLINE void write_wienerns_filter(
 #endif  // CONFIG_RST_MERGECOEFFS
   WienerNonsepInfo *ref_wienerns_info =
       av1_ref_from_wiener_nonsep_bank(bank, ref);
-  int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
+  int beg_feat = plane ? wnsf->y->ncoeffs : 0;
   int end_feat =
-      is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
+      plane ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
-      is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+      plane ? wnsf->uv->coeffs : wnsf->y->coeffs;
 
-  // printf("Enc %s ", is_uv ? "UV:" : "Y: ");
+  // printf("Enc %s ", plane ? "UV:" : "Y: ");
   // Check how many trailing coefficients are 0.
   // TODO(debargha): simplify the logic
   int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
@@ -2778,7 +2773,7 @@ static AOM_INLINE void write_wienerns_filter(
   // #total_taps - 1, #total_taps - 3, #total_taps - 5.
   // If #taps is even, the exit points for signaling are:
   // #total_taps - 2, #total_taps - 4, #total_taps - 6.
-  const int rodd = is_uv ? 0 : (end_feat & 1);
+  const int rodd = plane ? 0 : (end_feat & 1);
   for (int i = beg_feat; i < end_feat; ++i) {
     // printf("(%d/%d), ", wienerns_info->nsfilter[i],
     //        ref_wienerns_info->nsfilter[i]);
@@ -2845,9 +2840,6 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
   MACROBLOCKD *const xd = &x->e_mbd;
 
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
-#if CONFIG_WIENER_NONSEP
-  const int is_uv = (plane > 0);
-#endif  // CONFIG_WIENER_NONSEP
 
   RestorationType unit_rtype = rui->restoration_type;
 #if CONFIG_LR_FLEX_SYNTAX
@@ -2882,16 +2874,16 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 
     switch (unit_rtype) {
       case RESTORE_WIENER:
-        write_wiener_filter(x, wiener_win, &rui->wiener_info,
+        write_wiener_filter(xd, wiener_win, &rui->wiener_info,
                             &xd->wiener_info[plane], w);
         break;
       case RESTORE_SGRPROJ:
-        write_sgrproj_filter(x, &rui->sgrproj_info, &xd->sgrproj_info[plane],
+        write_sgrproj_filter(xd, &rui->sgrproj_info, &xd->sgrproj_info[plane],
                              w);
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        write_wienerns_filter(x, is_uv, ql, &rui->wiener_nonsep_info,
+        write_wienerns_filter(xd, plane, ql, &rui->wiener_nonsep_info,
                               &xd->wiener_nonsep_info[plane], w);
         break;
 #endif  // CONFIG_WIENER_NONSEP
@@ -2909,7 +2901,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->wiener_restore[unit_rtype != RESTORE_NONE];
 #endif
     if (unit_rtype != RESTORE_NONE) {
-      write_wiener_filter(x, wiener_win, &rui->wiener_info,
+      write_wiener_filter(xd, wiener_win, &rui->wiener_info,
                           &xd->wiener_info[plane], w);
     }
   } else if (frame_rtype == RESTORE_SGRPROJ) {
@@ -2919,7 +2911,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->sgrproj_restore[unit_rtype != RESTORE_NONE];
 #endif
     if (unit_rtype != RESTORE_NONE) {
-      write_sgrproj_filter(x, &rui->sgrproj_info, &xd->sgrproj_info[plane], w);
+      write_sgrproj_filter(xd, &rui->sgrproj_info, &xd->sgrproj_info[plane], w);
     }
 #if CONFIG_WIENER_NONSEP
   } else if (frame_rtype == RESTORE_WIENER_NONSEP) {
@@ -2929,7 +2921,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->wiener_nonsep_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS
     if (unit_rtype != RESTORE_NONE) {
-      write_wienerns_filter(x, is_uv, ql, &rui->wiener_nonsep_info,
+      write_wienerns_filter(xd, plane, ql, &rui->wiener_nonsep_info,
                             &xd->wiener_nonsep_info[plane], w);
     }
 #endif  // CONFIG_WIENER_NONSEP

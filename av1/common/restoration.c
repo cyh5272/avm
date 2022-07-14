@@ -1647,12 +1647,13 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                                                0 };
 
   const NonsepFilterConfig *filter_config = &pcfilter_config;
-  const int singleton_tap_index =
-      filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
   const int num_sym_taps = is_uv ? (2 * NUM_PC_WIENER_TAPS_CHROMA - 1) / 2
                                  : (2 * NUM_PC_WIENER_TAPS_LUMA - 1) / 2;
   assert(num_sym_taps == (filter_config->num_pixels - 1) / 2);
   assert(num_sym_taps <= 24);
+#if !USE_CONVOLVE_SYM
+  const int singleton_tap_index =
+      filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
   int16_t compute_buffer[24];
   int pixel_offset_diffs[24];
   int filter_pos[24];
@@ -1668,6 +1669,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
     case 10: max_pixel_value = 1023; break;
     case 12: max_pixel_value = 4095; break;
   }
+#endif  // !USE_CONVOLVE_SYM
 
   assert(filter_config->strict_bounds == false);
   const bool dir_strict = filter_config->strict_bounds;
@@ -1737,9 +1739,6 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 
       const int16_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
                                     : pcwiener_filters_luma[filter_index];
-      const int16_t singleton_tap =
-          filter[singleton_tap_index] + (1 << filter_config->prec_bits);
-
 #if PC_WIENER_BLOCK_SIZE > 1
       const int block_row_begin = i - PC_WIENER_BLOCK_ROW_OFFSET;
       int block_row_end =
@@ -1763,6 +1762,9 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
           dgd, stride, filter_config, filter, dst, dst_stride, bit_depth,
           block_row_begin, block_row_end, block_col_begin, block_col_end);
 #else
+      const int16_t singleton_tap =
+          filter[singleton_tap_index] + (1 << filter_config->prec_bits);
+
       for (int r = block_row_begin; r < block_row_end; ++r) {
         for (int c = block_col_begin; c < block_col_end; ++c) {
           int dgd_id = r * stride + c;
