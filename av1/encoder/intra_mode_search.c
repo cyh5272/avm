@@ -346,9 +346,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
 #endif
   int64_t best_rd_uv[CFL_JOINT_SIGNS][CFL_PRED_PLANES];
   int best_c[CFL_JOINT_SIGNS][CFL_PRED_PLANES];
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
   int best_rate_uv[CFL_JOINT_SIGNS][CFL_PRED_PLANES];
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
 
 #if CONFIG_CONTEXT_DERIVATION
   const int skip_trellis = 0;
@@ -375,9 +375,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
     const int alpha_rate = mode_costs->cfl_cost[joint_sign][CFL_PRED_U][0];
     best_rd_uv[joint_sign][CFL_PRED_U] =
         RDCOST(x->rdmult, rd_stats.rate + alpha_rate, rd_stats.dist);
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
     best_rate_uv[joint_sign][CFL_PRED_U] = rd_stats.rate;
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
   }
   // Collect RD stats for alpha values other than zero in CFL_PRED_U.
   for (int pn_sign = CFL_SIGN_NEG; pn_sign < CFL_SIGNS; pn_sign++) {
@@ -400,9 +400,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
         if (this_rd >= best_rd_uv[joint_sign][CFL_PRED_U]) continue;
         best_rd_uv[joint_sign][CFL_PRED_U] = this_rd;
         best_c[joint_sign][CFL_PRED_U] = c;
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
         best_rate_uv[joint_sign][CFL_PRED_U] = rd_stats.rate;
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
         flag = 2;
         if (best_rd_uv[joint_sign][CFL_PRED_V] == INT64_MAX) continue;
         this_rd += mode_rd + best_rd_uv[joint_sign][CFL_PRED_V];
@@ -439,9 +439,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
       if (this_rd >= best_rd_uv[joint_sign][CFL_PRED_V]) continue;
       best_rd_uv[joint_sign][CFL_PRED_V] = this_rd;
       best_c[joint_sign][CFL_PRED_V] = c;
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
       best_rate_uv[joint_sign][CFL_PRED_V] = rd_stats.rate;
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
       flag = 2;
       if (best_rd_uv[joint_sign][CFL_PRED_U] == INT64_MAX) continue;
       this_rd += mode_rd + best_rd_uv[joint_sign][CFL_PRED_U];
@@ -475,9 +475,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
       const int alpha_rate = mode_costs->cfl_cost[joint_sign][plane][0];
       best_rd_uv[joint_sign][plane] =
           RDCOST(x->rdmult, rd_stats.rate + alpha_rate, rd_stats.dist);
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
       best_rate_uv[joint_sign][plane] = rd_stats.rate;
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
     }
   }
 
@@ -506,9 +506,9 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
           if (this_rd >= best_rd_uv[joint_sign][plane]) continue;
           best_rd_uv[joint_sign][plane] = this_rd;
           best_c[joint_sign][plane] = c;
-#if CONFIG_DEBUG
+#if CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
           best_rate_uv[joint_sign][plane] = rd_stats.rate;
-#endif  // CONFIG_DEBUG
+#endif  // CONFIG_DEBUG && !(CONFIG_CROSS_CHROMA_TX && CCTX_INTRA)
           flag = 2;
           if (best_rd_uv[joint_sign][!plane] == INT64_MAX) continue;
           this_rd += mode_rd + best_rd_uv[joint_sign][!plane];
