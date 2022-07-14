@@ -1669,7 +1669,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
     case 10: max_pixel_value = 1023; break;
     case 12: max_pixel_value = 4095; break;
   }
-#endif
+#endif  // !USE_CONVOLVE_SYM
 
   assert(filter_config->strict_bounds == false);
   const bool dir_strict = filter_config->strict_bounds;
@@ -1765,6 +1765,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #else
       const int16_t singleton_tap =
           filter[singleton_tap_index] + (1 << filter_config->prec_bits);
+
       for (int r = block_row_begin; r < block_row_end; ++r) {
         for (int c = block_col_begin; c < block_col_end; ++c) {
           int dgd_id = r * stride + c;
