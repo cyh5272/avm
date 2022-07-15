@@ -2319,18 +2319,18 @@ static AOM_INLINE void read_wiener_filter(MACROBLOCKD *xd, int wiener_win,
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(wiener_info, av1_constref_from_wiener_bank(bank, 0),
-           sizeof(*wiener_info));
-    wiener_info->bank_ref = 0;
-    if (bank->bank_size == 0) av1_add_to_wiener_bank(bank, wiener_info);
-    return;
-  }
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
+  if (equal) {
+    memcpy(wiener_info, av1_constref_from_wiener_bank(bank, ref),
+           sizeof(*wiener_info));
+    wiener_info->bank_ref = ref;
+    if (bank->bank_size == 0) av1_add_to_wiener_bank(bank, wiener_info);
+    return;
+  }
 #else
   const int ref = 0;
   (void)xd;
@@ -2401,18 +2401,18 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(sgrproj_info, av1_constref_from_sgrproj_bank(bank, 0),
-           sizeof(*sgrproj_info));
-    sgrproj_info->bank_ref = 0;
-    if (bank->bank_size == 0) av1_add_to_sgrproj_bank(bank, sgrproj_info);
-    return;
-  }
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
+  if (equal) {
+    memcpy(sgrproj_info, av1_constref_from_sgrproj_bank(bank, ref),
+           sizeof(*sgrproj_info));
+    sgrproj_info->bank_ref = ref;
+    if (bank->bank_size == 0) av1_add_to_sgrproj_bank(bank, sgrproj_info);
+    return;
+  }
 #else
   const int ref = 0;
   (void)xd;
@@ -2459,19 +2459,19 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
 #if CONFIG_RST_MERGECOEFFS
   const int equal =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  if (equal) {
-    memcpy(wienerns_info, av1_constref_from_wiener_nonsep_bank(bank, 0),
-           sizeof(*wienerns_info));
-    wienerns_info->bank_ref = 0;
-    if (bank->bank_size == 0)
-      av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
-    return;
-  }
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
+  if (equal) {
+    memcpy(wienerns_info, av1_constref_from_wiener_nonsep_bank(bank, ref),
+           sizeof(*wienerns_info));
+    wienerns_info->bank_ref = ref;
+    if (bank->bank_size == 0)
+      av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
+    return;
+  }
 #else
   const int ref = 0;
   (void)xd;

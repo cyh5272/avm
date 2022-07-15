@@ -951,27 +951,32 @@ static int64_t count_sgrproj_bits(const ModeCosts *mode_costs,
   const int ref = sgrproj_info->bank_ref;
   const SgrprojInfo *ref_sgrproj_info =
       av1_constref_from_sgrproj_bank(bank, ref);
+  const int equal = check_sgrproj_eq(sgrproj_info, ref_sgrproj_info);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
-    bits++;
+    bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
+  bits += mode_costs->merged_param_cost[equal];
+  if (equal) return bits;
 #else
   const SgrprojInfo *ref_sgrproj_info = av1_constref_from_sgrproj_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
-  bits += SGRPROJ_PARAMS_BITS;
+  bits += SGRPROJ_PARAMS_BITS << AV1_PROB_COST_SHIFT;
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
   if (params->r[0] > 0)
     bits += aom_count_primitive_refsubexpfin(
-        SGRPROJ_PRJ_MAX0 - SGRPROJ_PRJ_MIN0 + 1, SGRPROJ_PRJ_SUBEXP_K,
-        ref_sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0,
-        sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0);
+                SGRPROJ_PRJ_MAX0 - SGRPROJ_PRJ_MIN0 + 1, SGRPROJ_PRJ_SUBEXP_K,
+                ref_sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0,
+                sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0)
+            << AV1_PROB_COST_SHIFT;
   if (params->r[1] > 0)
     bits += aom_count_primitive_refsubexpfin(
-        SGRPROJ_PRJ_MAX1 - SGRPROJ_PRJ_MIN1 + 1, SGRPROJ_PRJ_SUBEXP_K,
-        ref_sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1,
-        sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1);
-  return bits << AV1_PROB_COST_SHIFT;
+                SGRPROJ_PRJ_MAX1 - SGRPROJ_PRJ_MIN1 + 1, SGRPROJ_PRJ_SUBEXP_K,
+                ref_sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1,
+                sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1)
+            << AV1_PROB_COST_SHIFT;
+  return bits;
 }
 
 #if CONFIG_RST_MERGECOEFFS
@@ -1055,7 +1060,6 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   Vector *current_unit_stack = rsc->unit_stack;
   int64_t bits_nomerge =
       x->mode_costs.sgrproj_restore_cost[1] +
-      x->mode_costs.merged_param_cost[0] +
       count_sgrproj_bits_set(&x->mode_costs, &rusi->sgrproj, &rsc->sgrproj);
   double cost_nomerge = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_nomerge >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
@@ -1137,7 +1141,6 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
     if (aom_iterator_equals(&(listed_unit), &begin)) {
       old_unit->merge_bits =
           x->mode_costs.sgrproj_restore_cost[1] +
-          x->mode_costs.merged_param_cost[0] +
           count_sgrproj_bits_set(&x->mode_costs, &rui_temp.sgrproj_info,
                                  &old_unit->ref_sgrproj);
     } else {
@@ -1624,47 +1627,56 @@ static int64_t count_wiener_bits(int wiener_win, const ModeCosts *mode_costs,
 #if CONFIG_RST_MERGECOEFFS
   const int ref = wiener_info->bank_ref;
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, ref);
+  const int equal = check_wiener_eq(wiener_info, ref_wiener_info);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
-    bits++;
+    bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
+  bits += mode_costs->merged_param_cost[equal];
+  if (equal) return bits;
 #else
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
   if (wiener_win == WIENER_WIN)
     bits += aom_count_primitive_refsubexpfin(
-        WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
-        WIENER_FILT_TAP0_SUBEXP_K,
-        ref_wiener_info->vfilter[0] - WIENER_FILT_TAP0_MINV,
-        wiener_info->vfilter[0] - WIENER_FILT_TAP0_MINV);
+                WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
+                WIENER_FILT_TAP0_SUBEXP_K,
+                ref_wiener_info->vfilter[0] - WIENER_FILT_TAP0_MINV,
+                wiener_info->vfilter[0] - WIENER_FILT_TAP0_MINV)
+            << AV1_PROB_COST_SHIFT;
   bits += aom_count_primitive_refsubexpfin(
-      WIENER_FILT_TAP1_MAXV - WIENER_FILT_TAP1_MINV + 1,
-      WIENER_FILT_TAP1_SUBEXP_K,
-      ref_wiener_info->vfilter[1] - WIENER_FILT_TAP1_MINV,
-      wiener_info->vfilter[1] - WIENER_FILT_TAP1_MINV);
+              WIENER_FILT_TAP1_MAXV - WIENER_FILT_TAP1_MINV + 1,
+              WIENER_FILT_TAP1_SUBEXP_K,
+              ref_wiener_info->vfilter[1] - WIENER_FILT_TAP1_MINV,
+              wiener_info->vfilter[1] - WIENER_FILT_TAP1_MINV)
+          << AV1_PROB_COST_SHIFT;
   bits += aom_count_primitive_refsubexpfin(
-      WIENER_FILT_TAP2_MAXV - WIENER_FILT_TAP2_MINV + 1,
-      WIENER_FILT_TAP2_SUBEXP_K,
-      ref_wiener_info->vfilter[2] - WIENER_FILT_TAP2_MINV,
-      wiener_info->vfilter[2] - WIENER_FILT_TAP2_MINV);
+              WIENER_FILT_TAP2_MAXV - WIENER_FILT_TAP2_MINV + 1,
+              WIENER_FILT_TAP2_SUBEXP_K,
+              ref_wiener_info->vfilter[2] - WIENER_FILT_TAP2_MINV,
+              wiener_info->vfilter[2] - WIENER_FILT_TAP2_MINV)
+          << AV1_PROB_COST_SHIFT;
   if (wiener_win == WIENER_WIN)
     bits += aom_count_primitive_refsubexpfin(
-        WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
-        WIENER_FILT_TAP0_SUBEXP_K,
-        ref_wiener_info->hfilter[0] - WIENER_FILT_TAP0_MINV,
-        wiener_info->hfilter[0] - WIENER_FILT_TAP0_MINV);
+                WIENER_FILT_TAP0_MAXV - WIENER_FILT_TAP0_MINV + 1,
+                WIENER_FILT_TAP0_SUBEXP_K,
+                ref_wiener_info->hfilter[0] - WIENER_FILT_TAP0_MINV,
+                wiener_info->hfilter[0] - WIENER_FILT_TAP0_MINV)
+            << AV1_PROB_COST_SHIFT;
   bits += aom_count_primitive_refsubexpfin(
-      WIENER_FILT_TAP1_MAXV - WIENER_FILT_TAP1_MINV + 1,
-      WIENER_FILT_TAP1_SUBEXP_K,
-      ref_wiener_info->hfilter[1] - WIENER_FILT_TAP1_MINV,
-      wiener_info->hfilter[1] - WIENER_FILT_TAP1_MINV);
+              WIENER_FILT_TAP1_MAXV - WIENER_FILT_TAP1_MINV + 1,
+              WIENER_FILT_TAP1_SUBEXP_K,
+              ref_wiener_info->hfilter[1] - WIENER_FILT_TAP1_MINV,
+              wiener_info->hfilter[1] - WIENER_FILT_TAP1_MINV)
+          << AV1_PROB_COST_SHIFT;
   bits += aom_count_primitive_refsubexpfin(
-      WIENER_FILT_TAP2_MAXV - WIENER_FILT_TAP2_MINV + 1,
-      WIENER_FILT_TAP2_SUBEXP_K,
-      ref_wiener_info->hfilter[2] - WIENER_FILT_TAP2_MINV,
-      wiener_info->hfilter[2] - WIENER_FILT_TAP2_MINV);
-  return bits << AV1_PROB_COST_SHIFT;
+              WIENER_FILT_TAP2_MAXV - WIENER_FILT_TAP2_MINV + 1,
+              WIENER_FILT_TAP2_SUBEXP_K,
+              ref_wiener_info->hfilter[2] - WIENER_FILT_TAP2_MINV,
+              wiener_info->hfilter[2] - WIENER_FILT_TAP2_MINV)
+          << AV1_PROB_COST_SHIFT;
+  return bits;
 }
 
 #if CONFIG_RST_MERGECOEFFS
@@ -2213,11 +2225,15 @@ static int64_t count_wienerns_bits(int plane, const ModeCosts *mode_costs,
   const int ref = wienerns_info->bank_ref;
   const WienerNonsepInfo *ref_wienerns_info =
       av1_constref_from_wiener_nonsep_bank(bank, ref);
+  const int equal =
+      check_wienerns_eq(plane, wienerns_info, ref_wienerns_info, wnsf);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
     bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
+  bits += mode_costs->merged_param_cost[equal];
+  if (equal) return bits;
 #else
   const WienerNonsepInfo *ref_wienerns_info =
       av1_constref_from_wiener_nonsep_bank(bank, 0);
@@ -3721,10 +3737,9 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
 #if CONFIG_RST_MERGECOEFFS
     const int wiener_win =
         (rsc->plane == AOM_PLANE_Y) ? WIENER_WIN : WIENER_WIN_CHROMA;
-    const int equal = check_wiener_eq(
-        &rui->wiener_info, av1_constref_from_wiener_bank(&rsc->wiener, 0));
-    if (equal) {
-      rui->wiener_info.bank_ref = 0;
+    const int equal = check_wiener_bank_eq(&rsc->wiener, &rui->wiener_info);
+    if (equal >= 0) {
+      rui->wiener_info.bank_ref = equal;
       if (rsc->wiener.bank_size == 0)
         av1_add_to_wiener_bank(&rsc->wiener, &rui->wiener_info);
     } else {
@@ -3739,11 +3754,10 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
 #if CONFIG_RST_MERGECOEFFS
     const WienernsFilterConfigPairType *wnsf =
         get_wienerns_filters(rsc->cm->quant_params.base_qindex);
-    const int equal = check_wienerns_eq(
-        rsc->plane > AOM_PLANE_Y, &rui->wiener_nonsep_info,
-        av1_constref_from_wiener_nonsep_bank(&rsc->wiener_nonsep, 0), wnsf);
-    if (equal) {
-      rui->wiener_nonsep_info.bank_ref = 0;
+    const int equal = check_wienerns_bank_eq(rsc->plane, &rsc->wiener_nonsep,
+                                             &rui->wiener_nonsep_info, wnsf);
+    if (equal >= 0) {
+      rui->wiener_nonsep_info.bank_ref = equal;
       if (rsc->wiener_nonsep.bank_size == 0)
         av1_add_to_wiener_nonsep_bank(&rsc->wiener_nonsep,
                                       &rui->wiener_nonsep_info);
@@ -3762,10 +3776,9 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   } else if (rui->restoration_type == RESTORE_SGRPROJ) {
     rui->sgrproj_info = rusi->sgrproj;
 #if CONFIG_RST_MERGECOEFFS
-    const int equal = check_sgrproj_eq(
-        &rui->sgrproj_info, av1_constref_from_sgrproj_bank(&rsc->sgrproj, 0));
-    if (equal) {
-      rui->sgrproj_info.bank_ref = 0;
+    const int equal = check_sgrproj_bank_eq(&rsc->sgrproj, &rui->sgrproj_info);
+    if (equal >= 0) {
+      rui->sgrproj_info.bank_ref = equal;
       if (rsc->sgrproj.bank_size == 0)
         av1_add_to_sgrproj_bank(&rsc->sgrproj, &rui->sgrproj_info);
     } else {
