@@ -1841,14 +1841,6 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
     } else {
       cfl_load_dc_pred(xd, dst, dst_stride, tx_size, pred_plane);
     }
-#if CONFIG_IMPROVED_CFL
-    const int luma_tx_size_fetch =
-        av1_get_max_uv_txsize(mbmi->sb_type[PLANE_TYPE_UV], 0, 0);
-    implicit_cfl_fetch_neigh_luma(cm, xd, blk_row << cfl->subsampling_y,
-                                  blk_col << cfl->subsampling_x,
-                                  luma_tx_size_fetch);
-    cfl_calc_luma_dc(xd, blk_row, blk_col, tx_size);
-#endif
 #endif
     if (xd->tree_type == CHROMA_PART) {
       const int luma_tx_size =

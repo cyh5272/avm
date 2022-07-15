@@ -1522,7 +1522,7 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 #endif  // CONFIG_AIMC
     if (uv_mode == UV_CFL_PRED) {
 #if CONFIG_IMPROVED_CFL
-      { write_cfl_index(ec_ctx, mbmi->cfl_idx, w); }
+      write_cfl_index(ec_ctx, mbmi->cfl_idx, w);
       if (mbmi->cfl_idx == 0)
 #endif
         write_cfl_alphas(ec_ctx, mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, w);

@@ -493,11 +493,12 @@ void cfl_luma_subsampling_420_hbd_121_c(const uint16_t *input, int input_stride,
                                         uint16_t *output_q3, int width,
                                         int height) {
   for (int j = 0; j < height; j += 2) {
-    for (int i = 0; i < width; i += 2) {
+    output_q3[0] = 3 * input[0] + input[1] + 3 * input[input_stride] +
+                   input[input_stride + 1];
+    for (int i = 2; i < width; i += 2) {
       const int bot = i + input_stride;
-      output_q3[i >> 1] = input[AOMMAX(0, i - 1)] + 2 * input[i] +
-                          input[i + 1] + input[bot + AOMMAX(-1, -i)] +
-                          2 * input[bot] + input[bot + 1];
+      output_q3[i >> 1] = input[i - 1] + 2 * input[i] + input[i + 1] +
+                          input[bot - 1] + 2 * input[bot] + input[bot + 1];
     }
     input += input_stride << 1;
     output_q3 += CFL_BUF_LINE;
