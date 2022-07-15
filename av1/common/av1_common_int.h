@@ -642,6 +642,9 @@ typedef struct {
    * TIP mode.
    */
   TIP_FRAME_MODE tip_frame_mode;
+#if CONFIG_OPTFLOW_ON_TIP
+  int use_optflow_tip;
+#endif
   /*!
    * Enables/disables hole fill for TIP
    */
@@ -1569,6 +1572,17 @@ typedef struct AV1Common {
    * TIP reference frame
    */
   TIP tip_ref;
+
+#if CONFIG_OPTFLOW_ON_TIP
+  uint8_t *dst0_tip;
+  uint8_t *dst1_tip;
+  uint8_t *dst0_16_tip;
+  uint8_t *dst1_16_tip;
+  int16_t *gx0;
+  int16_t *gy0;
+  int16_t *gx1;
+  int16_t *gy1;
+#endif
 #endif  // CONFIG_TIP
 } AV1_COMMON;
 
