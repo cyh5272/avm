@@ -130,8 +130,15 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
   for (int p = 0; p < num_planes; ++p) {
     av1_reset_wiener_bank(&xd->wiener_info[p]);
     av1_reset_sgrproj_bank(&xd->sgrproj_info[p]);
+#if CONFIG_COMBINE_PC_NS_WIENER
+    // TODO: Adjust every frame.
+    const int num_classes_per_frame = p == AOM_PLANE_Y ? 2 : 1;
+#else
+    const int num_classes_per_frame = 1;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_WIENER_NONSEP
-    av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info[p], xd->base_qindex);
+    av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info_bank[p],
+                                 xd->base_qindex, num_classes_per_frame);
 #endif  // CONFIG_WIENER_NONSEP
   }
 }
@@ -250,8 +257,9 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 }
 
 #if CONFIG_WIENER_NONSEP
-void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex) {
-  set_default_wiener_nonsep(&bank->filter[0], qindex);
+void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex,
+                                  int num_classes) {
+  set_default_wiener_nonsep(&bank->filter[0], qindex, num_classes);
   bank->bank_size = 0;
   bank->bank_ptr = 0;
 }
@@ -298,10 +306,11 @@ void av1_upd_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
 }
 
 void av1_get_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                     WienerNonsepInfo *info, int qindex) {
+                                     WienerNonsepInfo *info, int qindex,
+                                     int num_classes) {
   (void)ndx;
   if (bank->bank_size == 0) {
-    set_default_wiener_nonsep(info, qindex);
+    set_default_wiener_nonsep(info, qindex, num_classes);
   } else {
     assert(ndx < bank->bank_size);
     const int ptr =
@@ -325,6 +334,37 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
     xd->plane[i].subsampling_y = 1;
   }
 }
+
+#if CONFIG_WIENER_NONSEP
+int16_t *nsfilter_taps(WienerNonsepInfo *nsinfo, int class_id) {
+  assert(class_id >= 0 && class_id < nsinfo->num_classes);
+  return nsinfo->allfiltertaps + class_id * WIENERNS_YUV_MAX;
+}
+
+const int16_t *const_nsfilter_taps(const WienerNonsepInfo *nsinfo,
+                                   int class_id) {
+  assert(class_id >= 0 && class_id < nsinfo->num_classes);
+  return nsinfo->allfiltertaps + class_id * WIENERNS_YUV_MAX;
+}
+
+void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
+                                  WienerNonsepInfo *from_info, int class_id) {
+  // TODO: Should one do to_info->bank_ref = from_info->bank_ref?
+  assert(class_id >= 0 && class_id < to_info->num_classes);
+  assert(class_id >= 0 && class_id < from_info->num_classes);
+  const int offset = class_id * WIENERNS_YUV_MAX;
+  memcpy(to_info->allfiltertaps + offset, from_info->allfiltertaps + offset,
+         WIENERNS_YUV_MAX * sizeof(*to_info->allfiltertaps));
+}
+
+void copy_nsfilter_taps(WienerNonsepInfo *to_info,
+                        WienerNonsepInfo *from_info) {
+  // TODO: Should one do to_info->bank_ref = from_info->bank_ref?
+  assert(to_info->num_classes == from_info->num_classes);
+  memcpy(to_info->allfiltertaps, from_info->allfiltertaps,
+         sizeof(to_info->allfiltertaps));
+}
+#endif
 
 #if CONFIG_PC_WIENER || CONFIG_SAVE_IN_LOOP_DATA
 void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
