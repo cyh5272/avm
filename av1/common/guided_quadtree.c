@@ -163,14 +163,12 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
   return index;
 }
 
-int qp235_quadtree_model_quantSet[] = { 1024, -9, -4 };
-int qp210_quadtree_model_quantSet[] = { 1024, -5, -3 };
-int qp185_quadtree_model_quantSet[] = { 1024, -13, -3 };
-// double qp160_quadtree_model_quantSet[] = { 2048, -16, -16 };
-// Unet model a0_min a1_mind
-int qp160_quadtree_model_quantSet[] = { 128, 14, -32 };
-int qp135_quadtree_model_quantSet[] = { 2048, 0, -4 };
-int qp110_quadtree_model_quantSet[] = { 2048, -13, -4 };
+int qp235_quadtree_model_quantSet[] = { 64, 0, -16 };     // unet
+int qp210_quadtree_model_quantSet[] = { 64, 0, -16 };     // unet
+int qp185_quadtree_model_quantSet[] = { 64, 0, -30 };     // unet
+int qp160_quadtree_model_quantSet[] = { 128, 14, -32 };   // unet
+int qp135_quadtree_model_quantSet[] = { 256, 32, -48 };   // unet
+int qp110_quadtree_model_quantSet[] = { 2048, 20, -36 };  // unet
 int qp85_quadtree_model_quantSet[] = { 2048, -14, -2 };
 
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,

@@ -80,7 +80,6 @@
 #if CONFIG_CNN_RESTORATION
 
 #define USE_XNNPACK 0
-#define USE_QUAT 1
 
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_intra_model_from_qindex(int qindex,
@@ -868,7 +867,7 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           }
         }
       }
-#if USE_QUAT
+
       double A0 = 0;
       double A1 = 0;
       for (int i = 0; i < lenth; i++) {
@@ -904,25 +903,6 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
         }
       }
-#else
-      double A0 = 0;
-      double A1 = 0;
-
-      for (int i = 0; i < lenth; i++) {
-        A0 += mid[0][i] * sub_r_flatten[i];
-        A1 += mid[1][i] * sub_r_flatten[i];
-      }
-
-      printf("A0:%lf  A1:%lf\n", A0, A1);
-      for (int i = start_clow; i < end_clow; i++) {
-        for (int j = start_row; j < end_row; j++) {
-          repic[i][j] =
-              int(round(sub_dgr[i][j] + A0 * r0[i][j] + A1 * r1[i][j]));
-          // repic[i][j] = int(round(sub_dgr[i][j]));
-          repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-        }
-      }
-#endif USE_QUAT
 
       for (int i = 0; i < lenth; i++) {
         delete[] R[i];
@@ -1358,14 +1338,6 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
   const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  // for (int r = 0; r < img_height; ++r) {
-  //  for (int c = 0; c < img_width; ++c) {
-  //    input[r * in_stride + c] =
-  //        static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-  //    assert(input[r * in_stride + c] >= 0.0f);
-  //    assert(input[r * in_stride + c] <= 1.0f);
-  //  }
-  //}
   for (int r = 0; r < padding_height; ++r) {
     for (int c = 0; c < padding_width; ++c) {
       if (r < img_height && c < img_width) {
