@@ -46,13 +46,15 @@ void av1_encode_tile(struct AV1_COMP *cpi, struct ThreadData *td, int tile_row,
 void av1_encode_sb_row(struct AV1_COMP *cpi, struct ThreadData *td,
                        int tile_row, int tile_col, int mi_row);
 void av1_tip_enc_calc_subpel_params(const MV *const src_mv,
-                                InterPredParams *const inter_pred_params,
-                                MACROBLOCKD *xd, int mi_x, int mi_y, int ref,
+                                    InterPredParams *const inter_pred_params,
+                                    MACROBLOCKD *xd, int mi_x, int mi_y,
+                                    int ref,
 #if CONFIG_OPTFLOW_REFINEMENT
-                                int use_optflow_refinement,
+                                    int use_optflow_refinement,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-                                uint8_t **mc_buf, uint8_t **pre,
-                                SubpelParams *subpel_params, int *src_stride);
+                                    uint8_t **mc_buf, uint8_t **pre,
+                                    SubpelParams *subpel_params,
+                                    int *src_stride);
 #ifdef __cplusplus
 }  // extern "C"
 #endif

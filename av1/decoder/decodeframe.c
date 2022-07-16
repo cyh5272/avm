@@ -695,10 +695,10 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
     int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
 #if CONFIG_OPTFLOW_REFINEMENT
     if (use_optflow_refinement) {
-        orig_pos_y += ROUND_POWER_OF_TWO_SIGNED(
-            src_mv->row * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + ssy);
-        orig_pos_x += ROUND_POWER_OF_TWO_SIGNED(
-            src_mv->col * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + ssx);
+      orig_pos_y += ROUND_POWER_OF_TWO_SIGNED(src_mv->row * (1 << SUBPEL_BITS),
+                                              MV_REFINE_PREC_BITS + ssy);
+      orig_pos_x += ROUND_POWER_OF_TWO_SIGNED(src_mv->col * (1 << SUBPEL_BITS),
+                                              MV_REFINE_PREC_BITS + ssx);
     } else {
       orig_pos_y += src_mv->row * (1 << (1 - ssy));
       orig_pos_x += src_mv->col * (1 << (1 - ssx));
@@ -802,11 +802,11 @@ static void tip_dec_calc_subpel_params_and_extend(
                              use_optflow_refinement,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                              &scaled_mv, &subpel_x_mv, &subpel_y_mv);
-  extend_mc_border(
-      inter_pred_params->scale_factors, &inter_pred_params->ref_frame_buf,
-      scaled_mv, block, subpel_x_mv, subpel_y_mv,
-      inter_pred_params->mode == WARP_PRED, inter_pred_params->is_intrabc,
-      mc_buf[ref], pre, src_stride);
+  extend_mc_border(inter_pred_params->scale_factors,
+                   &inter_pred_params->ref_frame_buf, scaled_mv, block,
+                   subpel_x_mv, subpel_y_mv,
+                   inter_pred_params->mode == WARP_PRED,
+                   inter_pred_params->is_intrabc, mc_buf[ref], pre, src_stride);
 }
 
 static void av1_dec_setup_tip_frame(AV1_COMMON *cm, MACROBLOCKD *xd,
