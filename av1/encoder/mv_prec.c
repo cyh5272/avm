@@ -342,12 +342,6 @@ static AOM_INLINE void keep_one_mv_stat(
   nmv_context *nmvc = &ec_ctx->nmvc;
 #if CONFIG_ADAPTIVE_MVD
   const AV1_COMMON *cm = &cpi->common;
-#if !CONFIG_FLEX_MVRES
-  MB_MODE_INFO *mbmi = xd->mi[0];
-#endif
-#endif
-
-#if CONFIG_ADAPTIVE_MVD
   const int is_adaptive_mvd = enable_adaptive_mvd_resolution(cm, mbmi);
   aom_cdf_prob *joint_cdf =
       is_adaptive_mvd ? nmvc->amvd_joints_cdf : nmvc->joints_cdf;
