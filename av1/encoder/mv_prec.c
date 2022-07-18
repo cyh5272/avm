@@ -487,8 +487,8 @@ static AOM_INLINE void collect_mv_stats_b(MV_STATS *mv_stats,
     return;
   }
 
-  // While collecting the mv stats after encoding a frame, mbmi should be drived
-  // from mi_grid_base instead of using xd->mi[0].
+  // While collecting the mv stats after encoding a frame, mbmi should be
+  // derived from mi_grid_base instead of using xd->mi[0].
   const MB_MODE_INFO *mbmi =
       mi_params->mi_grid_base[mi_row * mi_params->mi_stride + mi_col];
   const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame =
