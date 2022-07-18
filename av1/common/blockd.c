@@ -130,13 +130,13 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
   for (int p = 0; p < num_planes; ++p) {
     av1_reset_wiener_bank(&xd->wiener_info[p]);
     av1_reset_sgrproj_bank(&xd->sgrproj_info[p]);
+#if CONFIG_WIENER_NONSEP
 #if CONFIG_COMBINE_PC_NS_WIENER
     // TODO: Adjust every frame.
     const int num_classes_per_frame = p == AOM_PLANE_Y ? 2 : 1;
 #else
     const int num_classes_per_frame = 1;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-#if CONFIG_WIENER_NONSEP
     av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info_bank[p],
                                  xd->base_qindex, num_classes_per_frame);
 #endif  // CONFIG_WIENER_NONSEP
