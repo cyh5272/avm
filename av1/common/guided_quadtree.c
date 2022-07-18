@@ -169,7 +169,7 @@ int qp185_quadtree_model_quantSet[] = { 64, 0, -30 };     // unet
 int qp160_quadtree_model_quantSet[] = { 128, 14, -32 };   // unet
 int qp135_quadtree_model_quantSet[] = { 256, 32, -48 };   // unet
 int qp110_quadtree_model_quantSet[] = { 2048, 20, -36 };  // unet
-int qp85_quadtree_model_quantSet[] = { 2048, -14, -2 };
+int qp85_quadtree_model_quantSet[] = { 2048, 7, -22 };    // unet
 
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_luma,
                               int cnn_index) {
