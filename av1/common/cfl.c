@@ -432,6 +432,10 @@ void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
   }
 
   if (count > 0) {
+    sum_x >>= xd->bd - 8;
+    sum_y >>= xd->bd - 8;
+    sum_xy >>= (xd->bd - 8) * 2;
+    sum_xx >>= (xd->bd - 8) * 2;
     int der = sum_xx - sum_x * sum_x / count;
     int nor = sum_xy - sum_x * sum_y / count;
     int shift = 3 + CFL_ADD_BITS_ALPHA;
