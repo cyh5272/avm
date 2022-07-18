@@ -2002,7 +2002,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
   if (xd->width > xd->height)
     if (!(mi_row & (xd->width - 1))) xd->is_first_horizontal_rect = 1;
 
-#if CONFIG_MVP_IMPROVEMENTS
+#if COFNIG_C043_MVP_IMPROVEMENTS
   xd->is_last_horizontal_rect = 0;
   if (xd->width > xd->height) {
     if (!((mi_row + xd->height) & (xd->width - 1))) {
@@ -2013,7 +2013,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
   xd->is_first_vertical_rect = 0;
   if (xd->width < xd->height)
     if (!(mi_col & (xd->height - 1))) xd->is_first_vertical_rect = 1;
-#endif
+#endif  // COFNIG_C043_MVP_IMPROVEMENTS
 }
 
 #if CONFIG_FORWARDSKIP
