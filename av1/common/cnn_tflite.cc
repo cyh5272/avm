@@ -1918,7 +1918,6 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
                               is_intra_only, is_luma, cnn_index);
   double psnr_level_0 = computePSNR_tflite_hbd(buf_level_0, src, height, width,
                                                width, src_stride, bit_depth);
-  // 29.99811
   // for (int i = 0; i < 512; i++)
   //  for (int j = 0; j < 512; j++) buf[i][j] = buf_level_0[i * width + j];
   // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
