@@ -132,7 +132,7 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
     av1_reset_sgrproj_bank(&xd->sgrproj_info[p]);
 #if CONFIG_WIENER_NONSEP
 #if CONFIG_COMBINE_PC_NS_WIENER
-    // TODO: Adjust every frame.
+    // TODO(oguleryuz): Adjust every frame.
     const int num_classes_per_frame = p == AOM_PLANE_Y ? 2 : 1;
 #else
     const int num_classes_per_frame = 1;
@@ -349,7 +349,7 @@ const int16_t *const_nsfilter_taps(const WienerNonsepInfo *nsinfo,
 
 void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
                                   WienerNonsepInfo *from_info, int class_id) {
-  // TODO: Should one do to_info->bank_ref = from_info->bank_ref?
+  // TODO(oguleryuz): Should one do to_info->bank_ref = from_info->bank_ref?
   assert(class_id >= 0 && class_id < to_info->num_classes);
   assert(class_id >= 0 && class_id < from_info->num_classes);
   const int offset = class_id * WIENERNS_YUV_MAX;
@@ -359,7 +359,7 @@ void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
 
 void copy_nsfilter_taps(WienerNonsepInfo *to_info,
                         WienerNonsepInfo *from_info) {
-  // TODO: Should one do to_info->bank_ref = from_info->bank_ref?
+  // TODO(oguleryuz): Should one do to_info->bank_ref = from_info->bank_ref?
   assert(to_info->num_classes == from_info->num_classes);
   memcpy(to_info->allfiltertaps, from_info->allfiltertaps,
          sizeof(to_info->allfiltertaps));
