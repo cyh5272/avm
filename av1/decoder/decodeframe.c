@@ -2478,77 +2478,85 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
 #endif  // CONFIG_RST_MERGECOEFFS
   const WienernsFilterConfigPairType *wnsf =
       get_wienerns_filters(xd->base_qindex);
-  int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
-  int end_feat =
+  const int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
+  const int end_feat =
       is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
       is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
   WienerNonsepInfo *ref_wienerns_info =
       av1_ref_from_wiener_nonsep_bank(bank, ref);
 
-  // printf("Dec %s ", is_uv ? "UV:" : "Y: ");
-  int reduce_step[WIENERNS_REDUCE_STEPS] = { 0 };
-  memset(wienerns_info->nsfilter + beg_feat, 0,
-         (end_feat - beg_feat) * sizeof(wienerns_info->nsfilter[0]));
-  // Whether the number of taps is odd or even. For luma
-  // the #taps can be either odd or even. If odd, the last
-  // tap corresponds to dc offset. For chroma, the #taps is
-  // assumed to be always even.
-  // if #taps is odd, the exit points for signaling are:
-  // #total_taps - 1, #total_taps - 3, #total_taps - 5.
-  // If #taps is even, the exit points for signaling are:
-  // #total_taps - 2, #total_taps - 4, #total_taps - 6.
-  const int rodd = is_uv ? 0 : (end_feat & 1);
-  for (int i = beg_feat; i < end_feat; ++i) {
-    if (rodd && i == end_feat - 5 && i != beg_feat) {
-      reduce_step[0] = aom_read_symbol(
-          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2, ACCT_STR);
-      if (reduce_step[0]) break;
-    }
-    if (!rodd && i == end_feat - 4 && i != beg_feat) {
-      reduce_step[1] = aom_read_symbol(
-          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR);
-      if (reduce_step[1]) break;
-    }
-    if (rodd && i == end_feat - 3 && i != beg_feat) {
-      reduce_step[2] = aom_read_symbol(
-          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2, ACCT_STR);
-      if (reduce_step[2]) break;
-    }
-    if (!rodd && i == end_feat - 2 && i != beg_feat) {
-      reduce_step[3] = aom_read_symbol(
-          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR);
-      if (reduce_step[3]) break;
-    }
-    if (rodd && i == end_feat - 1 && i != beg_feat) {
-      reduce_step[4] = aom_read_symbol(
-          rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2, ACCT_STR);
-      if (reduce_step[4]) break;
-    }
+  assert(wienerns_info->num_classes == ref_wienerns_info->num_classes);
+  int reduce_step[WIENERNS_REDUCE_STEPS];
+  for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    int16_t *wienerns_info_nsfilter = nsfilter_taps(wienerns_info, c_id);
+    int16_t *ref_wienerns_info_nsfilter =
+        nsfilter_taps(ref_wienerns_info, c_id);
+
+    // printf("Dec %s ", is_uv ? "UV:" : "Y: ");
+    memset(reduce_step, 0, sizeof(reduce_step));
+    memset(wienerns_info_nsfilter + beg_feat, 0,
+           (end_feat - beg_feat) * sizeof(wienerns_info_nsfilter[0]));
+    // Whether the number of taps is odd or even. For luma
+    // the #taps can be either odd or even. If odd, the last
+    // tap corresponds to dc offset. For chroma, the #taps is
+    // assumed to be always even.
+    // if #taps is odd, the exit points for signaling are:
+    // #total_taps - 1, #total_taps - 3, #total_taps - 5.
+    // If #taps is even, the exit points for signaling are:
+    // #total_taps - 2, #total_taps - 4, #total_taps - 6.
+    const int rodd = is_uv ? 0 : (end_feat & 1);
+    for (int i = beg_feat; i < end_feat; ++i) {
+      if (rodd && i == end_feat - 5 && i != beg_feat) {
+        reduce_step[0] = aom_read_symbol(
+            rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2, ACCT_STR);
+        if (reduce_step[0]) break;
+      }
+      if (!rodd && i == end_feat - 4 && i != beg_feat) {
+        reduce_step[1] = aom_read_symbol(
+            rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2, ACCT_STR);
+        if (reduce_step[1]) break;
+      }
+      if (rodd && i == end_feat - 3 && i != beg_feat) {
+        reduce_step[2] = aom_read_symbol(
+            rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2, ACCT_STR);
+        if (reduce_step[2]) break;
+      }
+      if (!rodd && i == end_feat - 2 && i != beg_feat) {
+        reduce_step[3] = aom_read_symbol(
+            rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2, ACCT_STR);
+        if (reduce_step[3]) break;
+      }
+      if (rodd && i == end_feat - 1 && i != beg_feat) {
+        reduce_step[4] = aom_read_symbol(
+            rb, xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2, ACCT_STR);
+        if (reduce_step[4]) break;
+      }
 #if CONFIG_LR_4PART_CODE
-    wienerns_info->nsfilter[i] =
-        aom_read_4part_wref(
-            rb,
-            ref_wienerns_info->nsfilter[i] -
-                wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-            xd->tile_ctx->wiener_nonsep_4part_cdf
-                [wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID]],
-            wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID], ACCT_STR) +
-        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
+      wienerns_info_nsfilter[i] =
+          aom_read_4part_wref(
+              rb,
+              ref_wienerns_info_nsfilter[i] -
+                  wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+              xd->tile_ctx->wiener_nonsep_4part_cdf
+                  [wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID]],
+              wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID], ACCT_STR) +
+          wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
 #else
-    wienerns_info->nsfilter[i] =
-        aom_read_primitive_refsubexpfin(
-            rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
-            wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID],
-            ref_wienerns_info->nsfilter[i] -
-                wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-            ACCT_STR) +
-        wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
+      wienerns_info_nsfilter[i] =
+          aom_read_primitive_refsubexpfin(
+              rb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
+              wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID],
+              ref_wienerns_info_nsfilter[i] -
+                  wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+              ACCT_STR) +
+          wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
 #endif  // CONFIG_LR_4PART_CODE
-    // printf("(%d/%d), ", wienerns_info->nsfilter[i],
-    // ref_wienerns_info->nsfilter[i]);
+      // printf("(%d/%d), ", wienerns_info->nsfilter[i],
+      // ref_wienerns_info->nsfilter[i]);
+    }
+    // printf("\n");
   }
-  // printf("\n");
   av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
 }
 #endif  // CONFIG_WIENER_NONSEP
@@ -2571,6 +2579,10 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
 #if CONFIG_WIENER_NONSEP
   const int is_uv = (plane > 0);
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_WIENER_NONSEP
+  rui->wiener_nonsep_info.num_classes =
+      xd->wiener_nonsep_info_bank[plane].filter[0].num_classes;
 #endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
@@ -2602,7 +2614,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
         read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                             &xd->wiener_nonsep_info[plane], r);
+                             &xd->wiener_nonsep_info_bank[plane], r);
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2634,7 +2646,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
       read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                           &xd->wiener_nonsep_info[plane], r);
+                           &xd->wiener_nonsep_info_bank[plane], r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }

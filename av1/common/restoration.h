@@ -232,6 +232,10 @@ static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
 static INLINE int get_multiq_lr_level(int qindex) { return qindex > 200; }
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
 
+#if CONFIG_COMBINE_PC_NS_WIENER
+const uint8_t *get_pc_wiener_sub_classifier(int num_classes);
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+
 // Max of SGRPROJ_TMPBUF_SIZE, DOMAINTXFMRF_TMPBUF_SIZE, WIENER_TMPBUF_SIZE
 #define RESTORATION_TMPBUF_SIZE (SGRPROJ_TMPBUF_SIZE)
 
@@ -320,6 +324,10 @@ typedef struct {
    * Stride for class_id frame.
    */
   int class_id_stride;
+  /*!
+   * The class-id that classifcation relared processing should be restricted to.
+   */
+  int class_id_restrict;
 #if CONFIG_COMBINE_PC_NS_WIENER
   /*!
    * Whether classification needs to be computed.
@@ -462,17 +470,22 @@ static INLINE void set_default_wiener(WienerInfo *wiener_info) {
 
 #if CONFIG_WIENER_NONSEP
 static INLINE void set_default_wiener_nonsep(WienerNonsepInfo *wienerns_info,
-                                             int qindex) {
+                                             int qindex, int num_classes) {
   const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(qindex);
-  for (int i = 0; i < wnsf->y->ncoeffs; ++i) {
-    wienerns_info->nsfilter[i] = wnsf->y->coeffs[i][WIENERNS_MIN_ID] +
-                                 (1 << wnsf->y->coeffs[i][WIENERNS_BIT_ID]) / 2;
-  }
-  for (int i = wnsf->y->ncoeffs; i < wnsf->y->ncoeffs + wnsf->uv->ncoeffs;
-       ++i) {
-    wienerns_info->nsfilter[i] =
-        wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_MIN_ID] +
-        (1 << wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_BIT_ID]) / 2;
+  wienerns_info->num_classes = num_classes;
+  for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    int16_t *wienerns_info_nsfilter = nsfilter_taps(wienerns_info, c_id);
+    for (int i = 0; i < wnsf->y->ncoeffs; ++i) {
+      wienerns_info_nsfilter[i] =
+          wnsf->y->coeffs[i][WIENERNS_MIN_ID] +
+          (1 << wnsf->y->coeffs[i][WIENERNS_BIT_ID]) / 2;
+    }
+    for (int i = wnsf->y->ncoeffs; i < wnsf->y->ncoeffs + wnsf->uv->ncoeffs;
+         ++i) {
+      wienerns_info_nsfilter[i] =
+          wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_MIN_ID] +
+          (1 << wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_BIT_ID]) / 2;
+    }
   }
 }
 
@@ -520,9 +533,6 @@ typedef struct FilterFrameCtxt {
   int qindex_offset;
   uint8_t *class_id;
   int class_id_stride;
-#if CONFIG_COMBINE_PC_NS_WIENER
-  int compute_classification;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER;
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_SAVE_IN_LOOP_DATA
   uint8_t *lr_mode_info;
