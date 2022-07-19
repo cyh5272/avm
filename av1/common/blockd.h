@@ -757,6 +757,11 @@ typedef struct {
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #if CONFIG_WIENER_NONSEP
+#if CONFIG_COMBINE_PC_NS_WIENER
+#define WIENERNS_MAX_CLASSES 4
+#else
+#define WIENERNS_MAX_CLASSES 1
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 #define WIENERNS_YUV_MAX 32
 /*!
  * Nonseparable Wiener filter parameters.
@@ -765,7 +770,10 @@ typedef struct {
   /*!
    * Filter data.
    */
-  DECLARE_ALIGNED(16, int16_t, nsfilter[WIENERNS_YUV_MAX]);
+  int num_classes;
+  DECLARE_ALIGNED(16, int16_t,
+                  allfiltertaps[WIENERNS_MAX_CLASSES * WIENERNS_YUV_MAX]);
+
 #if CONFIG_RST_MERGECOEFFS
   /*!
    * Best Reference from dynamic bank
@@ -790,6 +798,14 @@ typedef struct {
   int bank_ptr;
 } WienerNonsepInfoBank;
 
+int16_t *nsfilter_taps(WienerNonsepInfo *nsinfo, int class_id);
+
+const int16_t *const_nsfilter_taps(const WienerNonsepInfo *nsinfo,
+                                   int class_id);
+
+void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
+                                  WienerNonsepInfo *from_info, int class_id);
+void copy_nsfilter_taps(WienerNonsepInfo *to_info, WienerNonsepInfo *from_info);
 #endif  // CONFIG_WIENER_NONSEP
 
 /*!\cond */
@@ -1102,7 +1118,7 @@ typedef struct macroblockd {
   /*!
    * Nonseparable Wiener filter information for all planes.
    */
-  WienerNonsepInfoBank wiener_nonsep_info[MAX_MB_PLANE];
+  WienerNonsepInfoBank wiener_nonsep_info_bank[MAX_MB_PLANE];
 #endif  // CONFIG_WIENER_NONSEP
 
   /**
@@ -1876,7 +1892,8 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
                                SgrprojInfo *info);
 
 #if CONFIG_WIENER_NONSEP
-void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex);
+void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex,
+                                  int num_classes);
 void av1_add_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
                                    const WienerNonsepInfo *info);
 WienerNonsepInfo *av1_ref_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
@@ -1886,7 +1903,8 @@ const WienerNonsepInfo *av1_constref_from_wiener_nonsep_bank(
 void av1_upd_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
                                    const WienerNonsepInfo *info);
 void av1_get_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                     WienerNonsepInfo *info, int qindex);
+                                     WienerNonsepInfo *info, int qindex,
+                                     int num_classes);
 #endif  // CONFIG_WIENER_NONSEP
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);
