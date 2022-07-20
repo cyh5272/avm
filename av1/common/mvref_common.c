@@ -1721,8 +1721,7 @@ static AOM_INLINE void setup_ref_mv_list(
       }
     }
   }
-#if !CONFIG_C043_MVP_IMPROVEMENTS
-#if CONFIG_REF_MV_BANK
+#if CONFIG_REF_MV_BANK && !CONFIG_C043_MVP_IMPROVEMENTS
   if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
       AOMMIN(cm->features.max_drl_bits + 1, MAX_REF_MV_STACK_SIZE);
@@ -1749,8 +1748,7 @@ static AOM_INLINE void setup_ref_mv_list(
                      cm->width, cm->height);
     }
   }
-#endif  // CONFIG_REF_MV_BANK
-#endif  // !CONFIG_C043_MVP_IMPROVEMENTS
+#endif  // CONFIG_REF_MV_BANK && !CONFIG_C043_MVP_IMPROVEMENTS
 
 #if CONFIG_BVP_IMPROVEMENT
   // If there are open slots in reference BV candidate list
