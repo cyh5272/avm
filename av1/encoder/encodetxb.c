@@ -452,9 +452,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #if CONFIG_CROSS_CHROMA_TX
   // tx_type is signaled with Y plane if eob > 0. cctx_type is signaled with V
   // plane if either of eob_u and eob_v is > 0.
-  if (plane == AOM_PLANE_V &&
-      ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
-       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA))) {
+  if (plane == AOM_PLANE_V) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
     if (eob > 0 || eob_u > 0) {
@@ -583,9 +581,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
   // CCTX type is transmitted with V plane
-  if (plane == AOM_PLANE_V &&
-      ((is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTER) ||
-       (!is_inter_block(xd->mi[0], xd->tree_type) && CCTX_INTRA))) {
+  if (plane == AOM_PLANE_V) {
     const uint16_t *eob_txb_u = cb_coef_buff->eobs[AOM_PLANE_U] + txb_offset;
     const uint16_t eob_u = eob_txb_u[block];
     if (eob > 0 || eob_u > 0) {
