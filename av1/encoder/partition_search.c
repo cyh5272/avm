@@ -722,7 +722,7 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
         !is_intrabc_block(&ctx->mic, xd->tree_type))
 #else
     if (cm->seq_params.enable_refmvbank && is_inter)
-#endif
+#endif  // CONFIG_IBC_SR_EXT && !CONFIG_BVP_IMPROVEMENT
       av1_update_ref_mv_bank(cm, xd, &ctx->mic);
 #endif  // CONFIG_C043_MVP_IMPROVEMENTS
     return;
@@ -819,7 +819,7 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
       !is_intrabc_block(mbmi, xd->tree_type))
 #else
   if (cm->seq_params.enable_refmvbank && is_inter)
-#endif
+#endif  // CONFIG_IBC_SR_EXT && !CONFIG_BVP_IMPROVEMENT
     av1_update_ref_mv_bank(cm, xd, mbmi);
 #endif  // CONFIG_C043_MVP_IMPROVEMENTS
 

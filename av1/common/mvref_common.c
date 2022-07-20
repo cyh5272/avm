@@ -1229,7 +1229,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_SMVP_IMPROVEMENT
 
 #if CONFIG_C043_MVP_IMPROVEMENTS
-  if (xd->left_available)
+  if (xd->left_available) {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, (xd->height - 1), -1,
                   ref_mv_stack, ref_mv_weight, &col_match_count, &newmv_count,
                   gm_mv_candidates,
@@ -1238,7 +1238,8 @@ static AOM_INLINE void setup_ref_mv_list(
                   derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
-  if (xd->up_available)
+  }
+  if (xd->up_available) {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, -1, (xd->width - 1), ref_mv_stack,
                   ref_mv_weight, &row_match_count, &newmv_count,
                   gm_mv_candidates,
@@ -1247,6 +1248,7 @@ static AOM_INLINE void setup_ref_mv_list(
                   derived_mv_weight, &derived_mv_count,
 #endif  // CONFIG_SMVP_IMPROVEMENT
                   refmv_count);
+  }
   if (xd->left_available) {
     scan_blk_mbmi(cm, xd, mi_row, mi_col, rf, 0, -1, ref_mv_stack,
                   ref_mv_weight, &col_match_count, &newmv_count,
@@ -1549,8 +1551,7 @@ static AOM_INLINE void setup_ref_mv_list(
   }
 #endif
 
-#if CONFIG_C043_MVP_IMPROVEMENTS
-#if CONFIG_REF_MV_BANK
+#if (CONFIG_REF_MV_BANK && CONFIG_C043_MVP_IMPROVEMENTS)
   if (!cm->seq_params.enable_refmvbank) return;
   const int ref_mv_limit =
       AOMMIN(cm->features.max_drl_bits + 1, MAX_REF_MV_STACK_SIZE);
@@ -1577,8 +1578,7 @@ static AOM_INLINE void setup_ref_mv_list(
                      cm->width, cm->height);
     }
   }
-#endif  // CONFIG_REF_MV_BANK
-#endif  // CONFIG_C043_MVP_IMPROVEMENTS
+#endif  // (CONFIG_REF_MV_BANK && CONFIG_C043_MVP_IMPROVEMENTS)
 
 #if CONFIG_SMVP_IMPROVEMENT
   const int max_ref_mv_count =
