@@ -1845,12 +1845,12 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     if (ref_frame < REF_FRAMES) {
 #endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_FLEX_MVRES
-      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[ref_frame],
-                                      fr_mv_precision, bsize, mi_col, mi_row);
+      gm_mv[0] = get_warp_motion_vector(&cm->global_motion[ref_frame],
+                                        fr_mv_precision, bsize, mi_col, mi_row);
 #else
-      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[ref_frame],
-                                      allow_high_precision_mv, bsize, mi_col,
-                                      mi_row, force_integer_mv);
+      gm_mv[0] = get_warp_motion_vector(&cm->global_motion[ref_frame],
+                                        allow_high_precision_mv, bsize, mi_col,
+                                        mi_row, force_integer_mv);
 #endif
 
       gm_mv[1].as_int = 0;
@@ -1859,17 +1859,17 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
       MV_REFERENCE_FRAME rf[2];
       av1_set_ref_frame(rf, ref_frame);
 #if CONFIG_FLEX_MVRES
-      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[rf[0]],
-                                      fr_mv_precision, bsize, mi_col, mi_row);
-      gm_mv[1] = gm_get_motion_vector(&cm->global_motion[rf[1]],
-                                      fr_mv_precision, bsize, mi_col, mi_row);
+      gm_mv[0] = get_warp_motion_vector(&cm->global_motion[rf[0]],
+                                        fr_mv_precision, bsize, mi_col, mi_row);
+      gm_mv[1] = get_warp_motion_vector(&cm->global_motion[rf[1]],
+                                        fr_mv_precision, bsize, mi_col, mi_row);
 #else
-      gm_mv[0] = gm_get_motion_vector(&cm->global_motion[rf[0]],
-                                      allow_high_precision_mv, bsize, mi_col,
-                                      mi_row, force_integer_mv);
-      gm_mv[1] = gm_get_motion_vector(&cm->global_motion[rf[1]],
-                                      allow_high_precision_mv, bsize, mi_col,
-                                      mi_row, force_integer_mv);
+      gm_mv[0] = get_warp_motion_vector(&cm->global_motion[rf[0]],
+                                        allow_high_precision_mv, bsize, mi_col,
+                                        mi_row, force_integer_mv);
+      gm_mv[1] = get_warp_motion_vector(&cm->global_motion[rf[1]],
+                                        allow_high_precision_mv, bsize, mi_col,
+                                        mi_row, force_integer_mv);
 #endif
     }
   }

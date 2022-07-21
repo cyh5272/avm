@@ -1249,11 +1249,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
       }
 
-      const MOTION_MODE motion_allowed =
-          cm->features.switchable_motion_mode
-              ? motion_mode_allowed(xd->global_motion, xd, mbmi,
-                                    cm->features.allow_warped_motion)
-              : SIMPLE_TRANSLATION;
+      const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);
       if (mbmi->ref_frame[1] != INTRA_FRAME) {
         if (motion_allowed == WARPED_CAUSAL) {
 #if CONFIG_ENTROPY_STATS
@@ -1601,11 +1597,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
           segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_REF_FRAME);
 #endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
-        const MOTION_MODE motion_allowed =
-            cm->features.switchable_motion_mode
-                ? motion_mode_allowed(xd->global_motion, xd, mbmi,
-                                      cm->features.allow_warped_motion)
-                : SIMPLE_TRANSLATION;
+        const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);
 
         if (mbmi->ref_frame[1] != INTRA_FRAME) {
           if (motion_allowed >= OBMC_CAUSAL) {

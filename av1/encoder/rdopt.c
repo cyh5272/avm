@@ -2052,13 +2052,7 @@ static int64_t motion_mode_rd(
   av1_invalid_rd_stats(&best_rd_stats);
   aom_clear_system_state();
   mbmi->num_proj_ref = 1;  // assume num_proj_ref >=1
-  MOTION_MODE last_motion_mode_allowed = SIMPLE_TRANSLATION;
-  if (features->switchable_motion_mode) {
-    // Determine which motion modes to search if more than SIMPLE_TRANSLATION
-    // is allowed.
-    last_motion_mode_allowed = motion_mode_allowed(
-        xd->global_motion, xd, mbmi, features->allow_warped_motion);
-  }
+  MOTION_MODE last_motion_mode_allowed = motion_mode_allowed(cm, xd, mbmi);
 
   if (last_motion_mode_allowed == WARPED_CAUSAL) {
     // Collect projection samples used in least squares approximation of
@@ -2147,7 +2141,6 @@ static int64_t motion_mode_rd(
           args->left_pred_buf, args->left_pred_stride);
     } else if (mbmi->motion_mode == WARPED_CAUSAL) {
       int pts[SAMPLES_ARRAY_SIZE], pts_inref[SAMPLES_ARRAY_SIZE];
-      mbmi->motion_mode = WARPED_CAUSAL;
       mbmi->wm_params.wmtype = DEFAULT_WMTYPE;
       mbmi->interp_fltr = av1_unswitchable_filter(interp_filter);
 
@@ -2162,8 +2155,8 @@ static int64_t motion_mode_rd(
       // Compute the warped motion parameters with a least squares fit
       //  using the collected samples
       if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                               mbmi->mv[0].as_mv.row, mbmi->mv[0].as_mv.col,
-                               &mbmi->wm_params, mi_row, mi_col)) {
+                               mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
+                               mi_col)) {
         assert(!is_comp_pred);
         if (this_mode == NEWMV
 #if CONFIG_FLEX_MVRES
@@ -2172,8 +2165,6 @@ static int64_t motion_mode_rd(
         ) {
           // Refine MV for NEWMV mode
           const int_mv mv0 = mbmi->mv[0];
-          const WarpedMotionParams wm_params0 = mbmi->wm_params;
-          const int num_proj_ref0 = mbmi->num_proj_ref;
 
           const int_mv ref_mv = av1_get_ref_mv(x, 0);
 #if CONFIG_FLEX_MVRES
@@ -2208,11 +2199,6 @@ static int64_t motion_mode_rd(
                 x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
 #endif
             tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
-          } else {
-            // Restore the old MV and WM parameters.
-            mbmi->mv[0] = mv0;
-            mbmi->wm_params = wm_params0;
-            mbmi->num_proj_ref = num_proj_ref0;
           }
         }
 
@@ -8088,12 +8074,12 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
 #endif  // CONFIG_TIP
     mbmi->mv[0].as_int =
 #if CONFIG_FLEX_MVRES
-        gm_get_motion_vector(&cm->global_motion[mbmi->ref_frame[0]],
-                             features->fr_mv_precision, bsize, mi_col, mi_row)
+        get_warp_motion_vector(&cm->global_motion[mbmi->ref_frame[0]],
+                               features->fr_mv_precision, bsize, mi_col, mi_row)
 #else
-      gm_get_motion_vector(&cm->global_motion[mbmi->ref_frame[0]],
-                           features->allow_high_precision_mv, bsize, mi_col,
-                           mi_row, features->cur_frame_force_integer_mv)
+      get_warp_motion_vector(&cm->global_motion[mbmi->ref_frame[0]],
+                             features->allow_high_precision_mv, bsize, mi_col,
+                             mi_row, features->cur_frame_force_integer_mv)
 #endif
             .as_int;
 #if CONFIG_TIP

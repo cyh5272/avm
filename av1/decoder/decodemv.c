@@ -294,14 +294,13 @@ static void read_drl_idx(int max_drl_bits, const int16_t mode_ctx,
 
 static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
                                     MB_MODE_INFO *mbmi, aom_reader *r) {
-  if (cm->features.switchable_motion_mode == 0) return SIMPLE_TRANSLATION;
   if (mbmi->skip_mode) return SIMPLE_TRANSLATION;
 #if CONFIG_TIP
   if (is_tip_ref_frame(mbmi->ref_frame[0])) return SIMPLE_TRANSLATION;
 #endif  // CONFIG_TIP
 
-  const MOTION_MODE last_motion_mode_allowed = motion_mode_allowed(
-      xd->global_motion, xd, mbmi, cm->features.allow_warped_motion);
+  const MOTION_MODE last_motion_mode_allowed =
+      motion_mode_allowed(cm, xd, mbmi);
   int motion_mode;
 
   if (last_motion_mode_allowed == SIMPLE_TRANSLATION) return SIMPLE_TRANSLATION;
@@ -1937,14 +1936,14 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
     case GLOBALMV: {
 #if CONFIG_FLEX_MVRES
-      mv[0].as_int = gm_get_motion_vector(&cm->global_motion[ref_frame[0]],
-                                          features->fr_mv_precision, bsize,
-                                          xd->mi_col, xd->mi_row)
+      mv[0].as_int = get_warp_motion_vector(&cm->global_motion[ref_frame[0]],
+                                            features->fr_mv_precision, bsize,
+                                            xd->mi_col, xd->mi_row)
 #else
-      mv[0].as_int = gm_get_motion_vector(&cm->global_motion[ref_frame[0]],
-                                          features->allow_high_precision_mv,
-                                          bsize, xd->mi_col, xd->mi_row,
-                                          features->cur_frame_force_integer_mv)
+      mv[0].as_int = get_warp_motion_vector(
+                         &cm->global_motion[ref_frame[0]],
+                         features->allow_high_precision_mv, bsize, xd->mi_col,
+                         xd->mi_row, features->cur_frame_force_integer_mv)
 #endif
                          .as_int;
       break;
@@ -2038,31 +2037,31 @@ static INLINE int assign_mv(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
     case GLOBAL_GLOBALMV: {
       assert(is_compound);
-      mv[0].as_int = gm_get_motion_vector(&cm->global_motion[ref_frame[0]],
+      mv[0].as_int = get_warp_motion_vector(&cm->global_motion[ref_frame[0]],
 #if CONFIG_FLEX_MVRES
-                                          features->fr_mv_precision,
+                                            features->fr_mv_precision,
 #else
-                                          features->allow_high_precision_mv,
+                                            features->allow_high_precision_mv,
 #endif
-                                          bsize, xd->mi_col, xd->mi_row
+                                            bsize, xd->mi_col, xd->mi_row
 #if !CONFIG_FLEX_MVRES
-                                          ,
-                                          features->cur_frame_force_integer_mv
+                                            ,
+                                            features->cur_frame_force_integer_mv
 #endif
-                                          )
+                                            )
                          .as_int;
-      mv[1].as_int = gm_get_motion_vector(&cm->global_motion[ref_frame[1]],
+      mv[1].as_int = get_warp_motion_vector(&cm->global_motion[ref_frame[1]],
 #if CONFIG_FLEX_MVRES
-                                          features->fr_mv_precision,
+                                            features->fr_mv_precision,
 #else
-                                          features->allow_high_precision_mv,
+                                            features->allow_high_precision_mv,
 #endif
-                                          bsize, xd->mi_col, xd->mi_row
+                                            bsize, xd->mi_col, xd->mi_row
 #if !CONFIG_FLEX_MVRES
-                                          ,
-                                          features->cur_frame_force_integer_mv
+                                            ,
+                                            features->cur_frame_force_integer_mv
 #endif
-                                          )
+                                            )
                          .as_int;
       break;
     }
@@ -2489,8 +2488,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     }
 
     if (av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                            mbmi->mv[0].as_mv.row, mbmi->mv[0].as_mv.col,
-                            &mbmi->wm_params, mi_row, mi_col)) {
+                            mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
+                            mi_col)) {
 #if WARPED_MOTION_DEBUG
       printf("Warning: unexpected warped model from aomenc\n");
 #endif

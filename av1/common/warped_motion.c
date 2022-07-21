@@ -193,6 +193,26 @@ const int16_t av1_warped_filter[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8] = {
 
 /* clang-format on */
 
+// Recompute the translational part of a warp model, so that the center
+// of the current block (determined by `mi_row`, `mi_col`, `bsize`)
+// has an induced motion vector of `mv`
+void av1_set_warp_translation(int mi_row, int mi_col, BLOCK_SIZE bsize, MV mv,
+                              WarpedMotionParams *wm) {
+  const int center_x = mi_col * MI_SIZE + block_size_wide[bsize] / 2 - 1;
+  const int center_y = mi_row * MI_SIZE + block_size_high[bsize] / 2 - 1;
+
+  // Note(rachelbarker): We subtract 1 from the diagonal part of the model here.
+  // This is because the warp model M maps (current frame) pixel coordinates to
+  // (ref frame) pixel coordinates. So, in order to calculate the induced
+  // motion vector, we have to subtract the identity matrix.
+  wm->wmmat[0] = mv.col * (1 << (WARPEDMODEL_PREC_BITS - 3)) -
+                 (center_x * (wm->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) +
+                  center_y * wm->wmmat[3]);
+  wm->wmmat[1] = mv.row * (1 << (WARPEDMODEL_PREC_BITS - 3)) -
+                 (center_x * wm->wmmat[4] +
+                  center_y * (wm->wmmat[5] - (1 << WARPEDMODEL_PREC_BITS)));
+}
+
 const uint16_t div_lut[DIV_LUT_NUM + 1] = {
   16384, 16320, 16257, 16194, 16132, 16070, 16009, 15948, 15888, 15828, 15768,
   15709, 15650, 15592, 15534, 15477, 15420, 15364, 15308, 15252, 15197, 15142,
@@ -688,8 +708,8 @@ static int32_t get_mult_shift_diag(int64_t Px, int16_t iDet, int shift) {
 #endif  // USE_LIMITED_PREC_MULT
 
 static int find_affine_int(int np, const int *pts1, const int *pts2,
-                           BLOCK_SIZE bsize, int mvy, int mvx,
-                           WarpedMotionParams *wm, int mi_row, int mi_col) {
+                           BLOCK_SIZE bsize, MV mv, WarpedMotionParams *wm,
+                           int mi_row, int mi_col) {
   int32_t A[2][2] = { { 0, 0 }, { 0, 0 } };
   int32_t Bx[2] = { 0, 0 };
   int32_t By[2] = { 0, 0 };
@@ -700,8 +720,8 @@ static int find_affine_int(int np, const int *pts1, const int *pts2,
   const int rsux = bw / 2 - 1;
   const int suy = rsuy * 8;
   const int sux = rsux * 8;
-  const int duy = suy + mvy;
-  const int dux = sux + mvx;
+  const int duy = suy + mv.row;
+  const int dux = sux + mv.col;
 
   // Assume the center pixel of the block has exactly the same motion vector
   // as transmitted for the block. First shift the origin of the source
@@ -778,34 +798,22 @@ static int find_affine_int(int np, const int *pts1, const int *pts2,
   wm->wmmat[4] = get_mult_shift_ndiag(Py[0], iDet, shift);
   wm->wmmat[5] = get_mult_shift_diag(Py[1], iDet, shift);
 
-  const int isuy = (mi_row * MI_SIZE + rsuy);
-  const int isux = (mi_col * MI_SIZE + rsux);
-  // Note: In the vx, vy expressions below, the max value of each of the
-  // 2nd and 3rd terms are (2^16 - 1) * (2^13 - 1). That leaves enough room
-  // for the first term so that the overall sum in the worst case fits
-  // within 32 bits overall.
-  const int32_t vx = mvx * (1 << (WARPEDMODEL_PREC_BITS - 3)) -
-                     (isux * (wm->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) +
-                      isuy * wm->wmmat[3]);
-  const int32_t vy = mvy * (1 << (WARPEDMODEL_PREC_BITS - 3)) -
-                     (isux * wm->wmmat[4] +
-                      isuy * (wm->wmmat[5] - (1 << WARPEDMODEL_PREC_BITS)));
-  wm->wmmat[0] =
-      clamp(vx, -WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1);
-  wm->wmmat[1] =
-      clamp(vy, -WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1);
+  av1_set_warp_translation(mi_row, mi_col, bsize, mv, wm);
+  wm->wmmat[0] = clamp(wm->wmmat[0], -WARPEDMODEL_TRANS_CLAMP,
+                       WARPEDMODEL_TRANS_CLAMP - 1);
+  wm->wmmat[1] = clamp(wm->wmmat[1], -WARPEDMODEL_TRANS_CLAMP,
+                       WARPEDMODEL_TRANS_CLAMP - 1);
 
   wm->wmmat[6] = wm->wmmat[7] = 0;
   return 0;
 }
 
 int av1_find_projection(int np, const int *pts1, const int *pts2,
-                        BLOCK_SIZE bsize, int mvy, int mvx,
-                        WarpedMotionParams *wm_params, int mi_row, int mi_col) {
+                        BLOCK_SIZE bsize, MV mv, WarpedMotionParams *wm_params,
+                        int mi_row, int mi_col) {
   assert(wm_params->wmtype == AFFINE);
 
-  if (find_affine_int(np, pts1, pts2, bsize, mvy, mvx, wm_params, mi_row,
-                      mi_col))
+  if (find_affine_int(np, pts1, pts2, bsize, mv, wm_params, mi_row, mi_col))
     return 1;
 
   // check compatibility with the fast warp filter
