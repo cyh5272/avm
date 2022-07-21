@@ -4671,6 +4671,11 @@ void av1_pick_uniform_tx_size_type_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
     return;
   }
 
+#if CONFIG_CROSS_CHROMA_TX
+  const int n4 = bsize_to_num_blk(bs);
+  memset(xd->cctx_type_map, CCTX_NONE, sizeof(xd->cctx_type_map[0]) * n4);
+#endif  // CONFIG_CROSS_CHROMA_TX
+
   if (xd->lossless[mbmi->segment_id]) {
     // Lossless mode can only pick the smallest (4x4) transform size.
     choose_smallest_tx_size(cpi, x, rd_stats, ref_best_rd, bs);
