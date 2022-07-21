@@ -1371,22 +1371,27 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const LV_MAP_COEFF_COST *const coeff_costs =
       &x->coeff_costs.coeff_costs[txs_ctx][plane_type];
+  const MACROBLOCKD *const xd = &x->e_mbd;
   if (eob == 0) {
 #if CONFIG_CONTEXT_DERIVATION
     int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+    int skip_cost = 0;
     if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
-      return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+      skip_cost += coeff_costs->txb_skip_cost[txb_skip_ctx][1];
     } else {
       txb_skip_ctx +=
           (x->plane[AOM_PLANE_U].eobs[block] ? V_TXB_SKIP_CONTEXT_OFFSET : 0);
-      return coeff_costs->v_txb_skip_cost[txb_skip_ctx][1];
+      skip_cost += coeff_costs->v_txb_skip_cost[txb_skip_ctx][1];
     }
 #else
-    return coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
+    skip_cost += coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif  // CONFIG_CONTEXT_DERIVATION
+#if CONFIG_CROSS_CHROMA_TX
+    skip_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+#endif  // CONFIG_CROSS_CHROMA_TX
+    return skip_cost;
   }
 
-  const MACROBLOCKD *const xd = &x->e_mbd;
 #if CONFIG_IST
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
 #else
@@ -1455,22 +1460,27 @@ int av1_cost_coeffs_txb_laplacian(
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const LV_MAP_COEFF_COST *const coeff_costs =
       &x->coeff_costs.coeff_costs[txs_ctx][plane_type];
+  const MACROBLOCKD *const xd = &x->e_mbd;
   if (eob == 0) {
 #if CONFIG_CONTEXT_DERIVATION
     int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+    int skip_cost = 0;
     if (plane == AOM_PLANE_Y || plane == AOM_PLANE_U) {
-      return coeff_costs->txb_skip_cost[txb_skip_ctx][1];
+      skip_cost += coeff_costs->txb_skip_cost[txb_skip_ctx][1];
     } else {
       txb_skip_ctx +=
           (x->plane[AOM_PLANE_U].eobs[block] ? V_TXB_SKIP_CONTEXT_OFFSET : 0);
-      return coeff_costs->v_txb_skip_cost[txb_skip_ctx][1];
+      skip_cost += coeff_costs->v_txb_skip_cost[txb_skip_ctx][1];
     }
 #else
-    return coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
+    skip_cost += coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif  // CONFIG_CONTEXT_DERIVATION
+#if CONFIG_CROSS_CHROMA_TX
+    skip_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+#endif  // CONFIG_CROSS_CHROMA_TX
+    return skip_cost;
   }
 
-  const MACROBLOCKD *const xd = &x->e_mbd;
 #if CONFIG_IST
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
 #else
