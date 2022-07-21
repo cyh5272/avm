@@ -239,6 +239,10 @@ class AV1ConvolveTest : public ::testing::TestWithParam<TestParam<T>> {
     return RandomInput16(input16_2_, param);
   }
 
+  const uint16_t *FirstRandomInput16Extreme(const TestParam<T> &param) {
+    return RandomInput16Extreme(input16_1_, param);
+  }
+
  private:
   const uint8_t *RandomInput8(uint8_t *p, const TestParam<T> &param) {
     EXPECT_EQ(8, param.BitDepth());
@@ -271,6 +275,31 @@ class AV1ConvolveTest : public ::testing::TestWithParam<TestParam<T>> {
     for (int i = 0; i < size; ++i) {
       p[i] = rnd_.Rand16() & ((1 << bit_depth) - 1);
     }
+  }
+
+  const uint16_t *RandomInput16Extreme(uint16_t *p, const TestParam<T> &param) {
+    // Check that this is only called with high bit-depths.
+    EXPECT_TRUE(param.BitDepth() == 10 || param.BitDepth() == 12);
+    EXPECT_GE(MAX_SB_SIZE, param.Block().Width());
+    EXPECT_GE(MAX_SB_SIZE, param.Block().Height());
+    const int padded_width = param.Block().Width() + kInputPadding;
+    const int padded_height = param.Block().Height() + kInputPadding;
+    RandomizeExtreme(p, padded_width * padded_height, param.BitDepth());
+    return p + (kInputPadding / 2) * padded_width + kInputPadding / 2;
+  }
+
+  void RandomizeExtreme(uint16_t *p, int size, int max_bit_range) {
+    EXPECT_GE(12, max_bit_range);
+    const int max_val = (1 << max_bit_range) - 1;
+    for (int i = 0; i < size; ++i) {
+      p[i] = static_cast<uint16_t>(RandBool() ? max_val : 0);
+    }
+  }
+
+  int RandBool() {
+    const uint32_t value = rnd_.Rand8();
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 7) & 0x1;
   }
 
   static constexpr int kInputStride = MAX_SB_SIZE + kInputPadding;
@@ -926,6 +955,20 @@ class AV1ConvolveNonSep2DHighbdTest
   };
 
  private:
+  void BitMatchTest(const uint16_t *input, int input_stride, int width,
+                    int height, const NonsepFilterConfig *filter_config,
+                    const int16_t *filter, uint16_t *reference, uint16_t *test,
+                    int dst_stride, int bit_depth, int block_row_begin,
+                    int block_row_end, int block_col_begin, int block_col_end) {
+    av1_convolve_symmetric_highbd_c(input, input_stride, filter_config, filter,
+                                    reference, dst_stride, bit_depth,
+                                    block_row_begin, block_row_end,
+                                    block_col_begin, block_col_end);
+    GetParam().TestFunction()(input, input_stride, filter_config, filter, test,
+                              dst_stride, bit_depth, block_row_begin,
+                              block_row_end, block_col_begin, block_col_end);
+    AssertOutputBufferEq(reference, test, width, height);
+  }
   void TestConvolve(const NonsepFilterConfig *filter_config,
                     const int16_t *filter) {
     const int width = GetParam().Block().Width();
@@ -934,19 +977,28 @@ class AV1ConvolveNonSep2DHighbdTest
 
     const uint16_t *input = FirstRandomInput16(GetParam());
     DECLARE_ALIGNED(32, uint16_t, reference[MAX_SB_SQUARE]);
+    DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
 
     ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
         << "Not enough padding for 7x7 filters";
     const uint16_t *centered_input =
         input + kMaxTapOffset * width + kMaxTapOffset;
-    av1_convolve_symmetric_highbd_c(centered_input, width, filter_config,
-                                    filter, reference, kOutputStride, bit_depth,
-                                    0, height, 0, width);
-    DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
-    GetParam().TestFunction()(centered_input, width, filter_config, filter,
-                              test, kOutputStride, bit_depth, 0, height, 0,
-                              width);
-    AssertOutputBufferEq(reference, test, width, height);
+    const int input_stride = width;
+
+    BitMatchTest(centered_input, input_stride, width, height, filter_config,
+                 filter, reference, test, kOutputStride, bit_depth, 0, height,
+                 0, width);
+
+    // Extreme value test
+    const uint16_t *extreme_input = FirstRandomInput16Extreme(GetParam());
+    const uint16_t *centered_extreme_input =
+        extreme_input + kMaxTapOffset * width + kMaxTapOffset;
+    int16_t Extream_Tap_[kNumSymmetricTaps + 1];
+    RandomizeExtreamFilterTap(Extream_Tap_, kNumSymmetricTaps + 1,
+                              kMaxPrecisionBeforeOverflow);
+    BitMatchTest(centered_extreme_input, input_stride, width, height,
+                 filter_config, Extream_Tap_, reference, test, kOutputStride,
+                 bit_depth, 0, height, 0, width);
   }
 
   void SpeedTestConvolve(const NonsepFilterConfig *filter_config,
@@ -1003,16 +1055,7 @@ class AV1ConvolveNonSep2DHighbdTest
   // added tap at (2 * kNumSymmetricTaps) is unconstrained and intended for
   // CONFIG_PC_WIENER use case.
   void SetFilterTaps() {
-    Randomize(UniqueTaps_, kNumSymmetricTaps + 1, kMaxPrecisionBeforeOverflow);
-
-    // Add origin-symmetric taps for CONFIG_WIENER_NONSEP and CONFIG_PC_WIENER.
-    for (int i = 0; i < kNumSymmetricTaps; ++i) {
-      FilterTaps_[2 * i] = UniqueTaps_[i];
-      FilterTaps_[2 * i + 1] = UniqueTaps_[i];
-    }
-
-    // Add unconstrained center tap as used by CONFIG_PC_WIENER.
-    FilterTaps_[2 * kNumSymmetricTaps] = UniqueTaps_[kNumSymmetricTaps];
+    Randomize(FilterTaps_, kNumSymmetricTaps + 1, kMaxPrecisionBeforeOverflow);
   }
 
   // Fills the array p with signed integers.
@@ -1021,6 +1064,22 @@ class AV1ConvolveNonSep2DHighbdTest
     for (int i = 0; i < size; ++i) {
       p[i] = rnd_.Rand15Signed() & ((1 << max_bit_range) - 1);
     }
+  }
+
+  // Fills the array p with maximum and minimum possible integers.
+  void RandomizeExtreamFilterTap(int16_t *p, int size, int max_bit_range) {
+    ASSERT_TRUE(max_bit_range < 16) << "max_bit_range has to be less than 16";
+    const int sign_max_val = (1 << (max_bit_range - 1)) - 1;
+    for (int i = 0; i < size; ++i) {
+      p[i] = static_cast<uint16_t>(RandBool() ? sign_max_val
+                                              : -(sign_max_val + 1));
+    }
+  }
+
+  int RandBool() {
+    const uint32_t value = rnd_.Rand8();
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 7) & 0x1;
   }
 
   libaom_test::ACMRandom rnd_;
@@ -1061,8 +1120,7 @@ class AV1ConvolveNonSep2DHighbdTest
     0,
     0
   };
-  int16_t UniqueTaps_[kNumSymmetricTaps + 1];
-  int16_t FilterTaps_[2 * kNumSymmetricTaps + 1];
+  int16_t FilterTaps_[kNumSymmetricTaps + 1];
 };
 
 TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
