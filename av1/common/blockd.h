@@ -1118,7 +1118,7 @@ typedef struct macroblockd {
   /*!
    * Nonseparable Wiener filter information for all planes.
    */
-  WienerNonsepInfoBank wiener_nonsep_info[MAX_MB_PLANE];
+  WienerNonsepInfoBank wienerns_info[MAX_MB_PLANE];
 #endif  // CONFIG_WIENER_NONSEP
 
   /**
@@ -1892,19 +1892,19 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
                                SgrprojInfo *info);
 
 #if CONFIG_WIENER_NONSEP
-void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex,
-                                  int num_classes);
-void av1_add_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
-                                   const WienerNonsepInfo *info);
-WienerNonsepInfo *av1_ref_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
-                                                  int ndx);
-const WienerNonsepInfo *av1_constref_from_wiener_nonsep_bank(
+void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
+                             int num_classes);
+void av1_add_to_wienerns_bank(WienerNonsepInfoBank *bank,
+                              const WienerNonsepInfo *info);
+WienerNonsepInfo *av1_ref_from_wienerns_bank(WienerNonsepInfoBank *bank,
+                                             int ndx);
+const WienerNonsepInfo *av1_constref_from_wienerns_bank(
     const WienerNonsepInfoBank *bank, int ndx);
-void av1_upd_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                   const WienerNonsepInfo *info);
-void av1_get_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                     WienerNonsepInfo *info, int qindex,
-                                     int num_classes);
+void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
+                              const WienerNonsepInfo *info);
+void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
+                                WienerNonsepInfo *info, int qindex,
+                                int num_classes);
 #endif  // CONFIG_WIENER_NONSEP
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);

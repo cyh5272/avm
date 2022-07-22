@@ -281,7 +281,7 @@ typedef struct {
   /*!
    * Nonseparable Wiener filter information.
    */
-  WienerNonsepInfo wiener_nonsep_info;
+  WienerNonsepInfo wienerns_info;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   /*!
    * Pointer to luma frame.
@@ -470,8 +470,8 @@ static INLINE void set_default_wiener(WienerInfo *wiener_info) {
 }
 
 #if CONFIG_WIENER_NONSEP
-static INLINE void set_default_wiener_nonsep(WienerNonsepInfo *wienerns_info,
-                                             int qindex, int num_classes) {
+static INLINE void set_default_wienerns(WienerNonsepInfo *wienerns_info,
+                                        int qindex, int num_classes) {
   const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(qindex);
   wienerns_info->num_classes = num_classes;
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {

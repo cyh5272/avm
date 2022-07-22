@@ -2726,16 +2726,14 @@ static AOM_INLINE void write_wienerns_filter(
   }
   assert(IMPLIES(!match, ref == AOMMAX(0, bank->bank_size - 1)));
   if (equal >= 0) {
-    if (bank->bank_size == 0)
-      av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
+    if (bank->bank_size == 0) av1_add_to_wienerns_bank(bank, wienerns_info);
     return;
   }
 #else
   const int ref = 0;
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
-  WienerNonsepInfo *ref_wienerns_info =
-      av1_ref_from_wiener_nonsep_bank(bank, ref);
+  WienerNonsepInfo *ref_wienerns_info = av1_ref_from_wienerns_bank(bank, ref);
   int beg_feat = plane ? wnsf->y->ncoeffs : 0;
   int end_feat =
       plane ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
@@ -2785,38 +2783,39 @@ static AOM_INLINE void write_wienerns_filter(
       //        ref_wienerns_info->nsfilter[i]);
       if (rodd && i == end_feat - 5 && i != beg_feat) {
         aom_write_symbol(wb, reduce_step[0],
-                         xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][0], 2);
+                         xd->tile_ctx->wienerns_reduce_cdf[ql][0], 2);
         if (reduce_step[0]) break;
       }
       if (!rodd && i == end_feat - 4 && i != beg_feat) {
         aom_write_symbol(wb, reduce_step[1],
-                         xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][1], 2);
+                         xd->tile_ctx->wienerns_reduce_cdf[ql][1], 2);
         if (reduce_step[1]) break;
       }
       if (rodd && i == end_feat - 3 && i != beg_feat) {
         aom_write_symbol(wb, reduce_step[2],
-                         xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][2], 2);
+                         xd->tile_ctx->wienerns_reduce_cdf[ql][2], 2);
         if (reduce_step[2]) break;
       }
       if (!rodd && i == end_feat - 2 && i != beg_feat) {
         aom_write_symbol(wb, reduce_step[3],
-                         xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][3], 2);
+                         xd->tile_ctx->wienerns_reduce_cdf[ql][3], 2);
         if (reduce_step[3]) break;
       }
       if (rodd && i == end_feat - 1 && i != beg_feat) {
         aom_write_symbol(wb, reduce_step[4],
-                         xd->tile_ctx->wiener_nonsep_reduce_cdf[ql][4], 2);
+                         xd->tile_ctx->wienerns_reduce_cdf[ql][4], 2);
         if (reduce_step[4]) break;
       }
 #if CONFIG_LR_4PART_CODE
-      aom_write_4part_wref(wb,
-                           ref_wienerns_info_nsfilter[i] -
-                               wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-                           wienerns_info_nsfilter[i] -
-                               wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
-                           xd->tile_ctx->wiener_nonsep_4part_cdf
-                               [wienerns_coeffs[i - beg_feat][WIENERNS_PAR_ID]],
-                           wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]);
+      aom_write_4part_wref(
+          wb,
+          ref_wienerns_info_nsfilter[i] -
+              wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+          wienerns_info_nsfilter[i] -
+              wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID],
+          xd->tile_ctx->wienerns_4part_cdf[wienerns_coeffs[i - beg_feat]
+                                                          [WIENERNS_PAR_ID]],
+          wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]);
 #else
       aom_write_primitive_refsubexpfin(
           wb, (1 << wienerns_coeffs[i - beg_feat][WIENERNS_BIT_ID]),
@@ -2829,7 +2828,7 @@ static AOM_INLINE void write_wienerns_filter(
     }
   }
   // printf("\n");
-  av1_add_to_wiener_nonsep_bank(bank, wienerns_info);
+  av1_add_to_wienerns_bank(bank, wienerns_info);
   return;
 }
 #endif  // CONFIG_WIENER_NONSEP
@@ -2889,8 +2888,8 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        write_wienerns_filter(xd, plane, ql, &rui->wiener_nonsep_info,
-                              &xd->wiener_nonsep_info[plane], w);
+        write_wienerns_filter(xd, plane, ql, &rui->wienerns_info,
+                              &xd->wienerns_info[plane], w);
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2922,13 +2921,13 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
   } else if (frame_rtype == RESTORE_WIENER_NONSEP) {
     aom_write_symbol(w, unit_rtype != RESTORE_NONE,
-                     xd->tile_ctx->wiener_nonsep_restore_cdf[ql], 2);
+                     xd->tile_ctx->wienerns_restore_cdf[ql], 2);
 #if CONFIG_ENTROPY_STATS
-    ++counts->wiener_nonsep_restore[unit_rtype != RESTORE_NONE];
+    ++counts->wienerns_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS
     if (unit_rtype != RESTORE_NONE) {
-      write_wienerns_filter(xd, plane, ql, &rui->wiener_nonsep_info,
-                            &xd->wiener_nonsep_info[plane], w);
+      write_wienerns_filter(xd, plane, ql, &rui->wienerns_info,
+                            &xd->wienerns_info[plane], w);
     }
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER

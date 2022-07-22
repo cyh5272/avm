@@ -1540,38 +1540,38 @@ static const aom_cdf_prob default_sgrproj_restore_cdf[MULTIQ_LR_LEVELS]
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
                                                      };
 #if CONFIG_WIENER_NONSEP
-static const aom_cdf_prob
-    default_wiener_nonsep_reduce_cdf[MULTIQ_LR_LEVELS][WIENERNS_REDUCE_STEPS]
-                                    [CDF_SIZE(2)] = {
-                                      { { AOM_CDF2(25000) },
-                                        { AOM_CDF2(22500) },
-                                        { AOM_CDF2(20000) },
-                                        { AOM_CDF2(17500) },
-                                        { AOM_CDF2(15000) } },
+static const aom_cdf_prob default_wienerns_reduce_cdf[MULTIQ_LR_LEVELS]
+                                                     [WIENERNS_REDUCE_STEPS]
+                                                     [CDF_SIZE(2)] = {
+                                                       { { AOM_CDF2(25000) },
+                                                         { AOM_CDF2(22500) },
+                                                         { AOM_CDF2(20000) },
+                                                         { AOM_CDF2(17500) },
+                                                         { AOM_CDF2(15000) } },
 #if CONFIG_MULTIQ_LR_SIGNALING
-                                      { { AOM_CDF2(20000) },
-                                        { AOM_CDF2(17500) },
-                                        { AOM_CDF2(15000) },
-                                        { AOM_CDF2(12500) },
-                                        { AOM_CDF2(10000) } },
+                                                       { { AOM_CDF2(20000) },
+                                                         { AOM_CDF2(17500) },
+                                                         { AOM_CDF2(15000) },
+                                                         { AOM_CDF2(12500) },
+                                                         { AOM_CDF2(10000) } },
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
-                                    };
+                                                     };
 #if CONFIG_LR_4PART_CODE
 static const aom_cdf_prob
-    default_wiener_nonsep_4part_cdf[WIENERNS_4PART_CTX_MAX][CDF_SIZE(4)] = {
+    default_wienerns_4part_cdf[WIENERNS_4PART_CTX_MAX][CDF_SIZE(4)] = {
       { AOM_CDF4(16384, 24576, 28672) },
       { AOM_CDF4(16384, 24576, 28672) },
       { AOM_CDF4(12288, 24576, 28672) },
       { AOM_CDF4(8192, 16384, 24576) },
     };
 #endif  // CONFIG_LR_4PART_CODE
-static const aom_cdf_prob
-    default_wiener_nonsep_restore_cdf[MULTIQ_LR_LEVELS][CDF_SIZE(2)] = {
-      { AOM_CDF2(12000) },
+static const aom_cdf_prob default_wienerns_restore_cdf[MULTIQ_LR_LEVELS]
+                                                      [CDF_SIZE(2)] = {
+                                                        { AOM_CDF2(12000) },
 #if CONFIG_MULTIQ_LR_SIGNALING
-      { AOM_CDF2(12000) },
+                                                        { AOM_CDF2(12000) },
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
-    };
+                                                      };
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
 static const aom_cdf_prob default_pc_wiener_restore_cdf[MULTIQ_LR_LEVELS]
@@ -1975,10 +1975,10 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif
   av1_copy(fc->sgrproj_restore_cdf, default_sgrproj_restore_cdf);
 #if CONFIG_WIENER_NONSEP
-  av1_copy(fc->wiener_nonsep_restore_cdf, default_wiener_nonsep_restore_cdf);
-  av1_copy(fc->wiener_nonsep_reduce_cdf, default_wiener_nonsep_reduce_cdf);
+  av1_copy(fc->wienerns_restore_cdf, default_wienerns_restore_cdf);
+  av1_copy(fc->wienerns_reduce_cdf, default_wienerns_reduce_cdf);
 #if CONFIG_LR_4PART_CODE
-  av1_copy(fc->wiener_nonsep_4part_cdf, default_wiener_nonsep_4part_cdf);
+  av1_copy(fc->wienerns_4part_cdf, default_wienerns_4part_cdf);
 #endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_RST_MERGECOEFFS

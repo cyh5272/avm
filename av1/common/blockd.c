@@ -137,8 +137,8 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
 #else
     const int num_classes_per_frame = 1;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-    av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info[p], xd->base_qindex,
-                                 num_classes_per_frame);
+    av1_reset_wienerns_bank(&xd->wienerns_info[p], xd->base_qindex,
+                            num_classes_per_frame);
 #endif  // CONFIG_WIENER_NONSEP
   }
 }
@@ -257,15 +257,15 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 }
 
 #if CONFIG_WIENER_NONSEP
-void av1_reset_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int qindex,
-                                  int num_classes) {
-  set_default_wiener_nonsep(&bank->filter[0], qindex, num_classes);
+void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
+                             int num_classes) {
+  set_default_wienerns(&bank->filter[0], qindex, num_classes);
   bank->bank_size = 0;
   bank->bank_ptr = 0;
 }
 
-void av1_add_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
-                                   const WienerNonsepInfo *info) {
+void av1_add_to_wienerns_bank(WienerNonsepInfoBank *bank,
+                              const WienerNonsepInfo *info) {
   if (bank->bank_size < LR_BANK_SIZE) {
     bank->bank_ptr = bank->bank_size;
     memcpy(&bank->filter[bank->bank_ptr], info, sizeof(*info));
@@ -276,8 +276,8 @@ void av1_add_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
   }
 }
 
-WienerNonsepInfo *av1_ref_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
-                                                  int ndx) {
+WienerNonsepInfo *av1_ref_from_wienerns_bank(WienerNonsepInfoBank *bank,
+                                             int ndx) {
   if (bank->bank_size == 0) {
     return &bank->filter[0];
   } else {
@@ -288,7 +288,7 @@ WienerNonsepInfo *av1_ref_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank,
   }
 }
 
-const WienerNonsepInfo *av1_constref_from_wiener_nonsep_bank(
+const WienerNonsepInfo *av1_constref_from_wienerns_bank(
     const WienerNonsepInfoBank *bank, int ndx) {
   if (bank->bank_size == 0) {
     return &bank->filter[0];
@@ -300,17 +300,17 @@ const WienerNonsepInfo *av1_constref_from_wiener_nonsep_bank(
   }
 }
 
-void av1_upd_to_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                   const WienerNonsepInfo *info) {
-  memcpy(av1_ref_from_wiener_nonsep_bank(bank, ndx), info, sizeof(*info));
+void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
+                              const WienerNonsepInfo *info) {
+  memcpy(av1_ref_from_wienerns_bank(bank, ndx), info, sizeof(*info));
 }
 
-void av1_get_from_wiener_nonsep_bank(WienerNonsepInfoBank *bank, int ndx,
-                                     WienerNonsepInfo *info, int qindex,
-                                     int num_classes) {
+void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
+                                WienerNonsepInfo *info, int qindex,
+                                int num_classes) {
   (void)ndx;
   if (bank->bank_size == 0) {
-    set_default_wiener_nonsep(info, qindex, num_classes);
+    set_default_wienerns(info, qindex, num_classes);
   } else {
     assert(ndx < bank->bank_size);
     const int ptr =

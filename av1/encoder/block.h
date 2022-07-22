@@ -858,18 +858,18 @@ typedef struct {
   int sgrproj_restore_cost[2];
 #if CONFIG_WIENER_NONSEP
   /*!
-   * wiener_nonsep_restore_cost
+   * wienerns_restore_cost
    */
-  int wiener_nonsep_restore_cost[2];
+  int wienerns_restore_cost[2];
   /*!
-   * wiener_nonsep_reduce_cost
+   * wienerns_reduce_cost
    */
-  int wiener_nonsep_reduce_cost[WIENERNS_REDUCE_STEPS][2];
+  int wienerns_reduce_cost[WIENERNS_REDUCE_STEPS][2];
 #if CONFIG_LR_4PART_CODE
   /*!
-   * wiener_nonsep_4part_cost
+   * wienerns_4part_cost
    */
-  int wiener_nonsep_4part_cost[WIENERNS_4PART_CTX_MAX][4];
+  int wienerns_4part_cost[WIENERNS_4PART_CTX_MAX][4];
 #endif  // CONFIG_LR_4PART_CODE
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
