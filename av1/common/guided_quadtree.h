@@ -23,10 +23,6 @@
 extern "C" {
 #endif
 
-int computeSSE_buf_tflite(uint8_t *buf_all, uint8_t *src, int startx,
-                          int starty, int buf_width, int buf_height, int height,
-                          int width, int buf_stride, int src_stride);
-
 int computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
                               int starty, int buf_width, int buf_height,
                               int height, int width, int buf_stride,
@@ -34,25 +30,14 @@ int computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
 
 double min_tflite(double a, double b, double c, double d);
 
-void replace_tflite(int startx, int starty, int width, int height, uint8_t *rec,
-                    uint8_t *buf, int stride);
-
 void replace_tflite_hbd(int startx, int starty, int width, int height,
                         uint16_t *rec, uint16_t *buf, int stride);
-
-double computePSNR_buf_tflite(uint8_t *buf_all, uint8_t *dgd, uint8_t *src,
-                              int startx, int starty, int buf_width,
-                              int buf_height, int height, int width,
-                              int buf_stride, int dgd_stride, int src_stride);
 
 double computePSNR_buf_tflite_hbd(uint16_t *buf_all, uint16_t *dgd,
                                   uint16_t *src, int startx, int starty,
                                   int buf_width, int buf_height, int height,
                                   int width, int buf_stride, int dgd_stride,
                                   int src_stride, int bit_depth);
-
-double computePSNR_tflite(uint8_t *dgd, uint8_t *src, int height, int width,
-                          int dgd_stride, int src_stride);
 
 double computePSNR_tflite_hbd(uint16_t *dgd, uint16_t *src, int height,
                               int width, int dgd_stride, int src_stride,
