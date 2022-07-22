@@ -117,17 +117,6 @@ void av1_restore_cnn_tflite(const struct AV1Common *cm, int num_threads,
                             const int cnn_indices[MAX_MB_PLANE]);
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-int av1_restore_cnn_quadtree_img_tflite(YV12_BUFFER_CONFIG *source_frame,
-                                        AV1_COMMON *cm, int superres_denom,
-                                        int RDMULT, int num_threads,
-                                        int is_intra_only, int is_luma,
-                                        int cnn_index);
-
-int av1_restore_cnn_quadtree_decode_img_tflite(AV1_COMMON *cm,
-                                               int superres_denom,
-                                               int num_threads,
-                                               int is_intra_only, int is_luma,
-                                               int cnn_index);
 
 int av1_restore_cnn_quadtree_img_tflite_highbd(YV12_BUFFER_CONFIG *source_frame,
                                                AV1_COMMON *cm,
