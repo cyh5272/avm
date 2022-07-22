@@ -302,6 +302,10 @@ typedef struct {
    * Quantizer index.
    */
   int base_qindex;
+  /*!
+   * The class-id that classifcation related processing should be restricted to.
+   */
+  int class_id_restrict;
 #endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
 #if CONFIG_PC_WIENER
   /*!
@@ -324,10 +328,6 @@ typedef struct {
    * Stride for class_id frame.
    */
   int class_id_stride;
-  /*!
-   * The class-id that classifcation relared processing should be restricted to.
-   */
-  int class_id_restrict;
 #if CONFIG_COMBINE_PC_NS_WIENER
   /*!
    * Whether classification needs to be computed.
