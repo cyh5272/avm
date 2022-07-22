@@ -563,6 +563,10 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
                    blk_row * bw + blk_col) &&
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
+      (cctx_type == CCTX_NONE || plane < AOM_PLANE_V ||
+       x->plane[AOM_PLANE_U].eobs[block]) &&
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
 #if CONFIG_SKIP_MODE_ENHANCEMENT
       !(mbmi->skip_mode == 1)) {
 #else
@@ -1260,6 +1264,12 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                             INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
 
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+#if CCTX_C1_NONZERO
+    if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
+      *eob_v = 0;
+      break;
+    }
+#endif
     av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
                       &quant_param);
     av1_xform_quant(

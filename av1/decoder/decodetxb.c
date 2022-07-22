@@ -186,7 +186,10 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
   if (plane == AOM_PLANE_U) {
-    av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    if (!all_zero)
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    else
+      xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
   }
 #else
   if (plane == AOM_PLANE_V) {
@@ -347,7 +350,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U) {
+  if (plane == AOM_PLANE_U && !all_zero) {
     av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
   }
 #else

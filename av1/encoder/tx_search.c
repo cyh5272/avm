@@ -1315,6 +1315,9 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
 
+#if CCTX_C1_NONZERO
+  assert(p_u->eobs[block] > 0);
+#endif
   assert(cpi != NULL);
   assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
 
@@ -3090,6 +3093,25 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
             &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
       }
     }
+#if CCTX_C1_NONZERO
+    // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
+    // dqcoeffs
+    uint64_t sse_dqcoeff_u =
+        aom_sum_squares_i16((int16_t *)p_u->dqcoeff, (uint32_t)max_eob);
+    uint64_t sse_dqcoeff_v =
+        aom_sum_squares_i16((int16_t *)p_v->dqcoeff, (uint32_t)max_eob);
+    // Disallow the case where C1 eob is zero in cctx
+    if (eobs_ptr_u[block] == 0 || sse_dqcoeff_v > sse_dqcoeff_u) {
+      // Recover the original transform coefficients
+      if (cctx_type < CCTX_TYPES - 1) {
+        memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
+               sizeof(tran_low_t) * max_eob);
+        memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
+               sizeof(tran_low_t) * max_eob);
+      }
+      continue;
+    }
+#endif
 
     // If rd cost based on coeff rate alone is already more than best_rd,
     // terminate early.
@@ -3184,6 +3206,10 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   p_v->txb_entropy_ctx[block] = best_txb_ctx_v;
   p_u->eobs[block] = best_eob_u;
   p_v->eobs[block] = best_eob_v;
+
+#if CCTX_C1_NONZERO
+  assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
+#endif
 
 #if CCTX_INTRA
   // Point dqcoeff to the quantized coefficients corresponding to the best
@@ -4285,6 +4311,7 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
   const AV1_COMMON *cm = &cpi->common;
   RD_STATS rd_stats_joint_uv;
   av1_init_rd_stats(&rd_stats_joint_uv);
+  update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
 
   // Obtain RD cost for CCTX_NONE
   RD_STATS rd_stats_uv[2];

@@ -451,7 +451,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U) {
+  if (plane == AOM_PLANE_U && eob > 0) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
   }
@@ -588,7 +588,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U) {
+  if (plane == AOM_PLANE_U && eob > 0) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
   }
@@ -872,7 +872,7 @@ int get_cctx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd, int plane,
   const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
 #if CCTX_C1_NONZERO
   (void)block;
-  if (plane == AOM_PLANE_U &&
+  if (plane == AOM_PLANE_U && x->plane[plane].eobs[block] &&
 #else
   if (plane == AOM_PLANE_V &&
       (x->plane[AOM_PLANE_U].eobs[block] ||
@@ -2621,7 +2621,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-    if (plane == AOM_PLANE_U)
+    if (plane == AOM_PLANE_U && eob > 0)
       update_cctx_type_count(cm, xd, blk_row, blk_col, tx_size, td->counts,
                              allow_update_cdf);
 #else
