@@ -2582,7 +2582,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP
   rui->wiener_nonsep_info.num_classes =
-      xd->wiener_nonsep_info_bank[plane].filter[0].num_classes;
+      xd->wiener_nonsep_info[plane].filter[0].num_classes;
 #endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
@@ -2614,7 +2614,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
         read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                             &xd->wiener_nonsep_info_bank[plane], r);
+                             &xd->wiener_nonsep_info[plane], r);
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2646,7 +2646,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
                         ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
       read_wienerns_filter(xd, is_uv, ql, &rui->wiener_nonsep_info,
-                           &xd->wiener_nonsep_info_bank[plane], r);
+                           &xd->wiener_nonsep_info[plane], r);
     } else {
       rui->restoration_type = RESTORE_NONE;
     }

@@ -137,8 +137,8 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
 #else
     const int num_classes_per_frame = 1;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
-    av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info_bank[p],
-                                 xd->base_qindex, num_classes_per_frame);
+    av1_reset_wiener_nonsep_bank(&xd->wiener_nonsep_info[p], xd->base_qindex,
+                                 num_classes_per_frame);
 #endif  // CONFIG_WIENER_NONSEP
   }
 }

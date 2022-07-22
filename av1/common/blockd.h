@@ -1118,7 +1118,7 @@ typedef struct macroblockd {
   /*!
    * Nonseparable Wiener filter information for all planes.
    */
-  WienerNonsepInfoBank wiener_nonsep_info_bank[MAX_MB_PLANE];
+  WienerNonsepInfoBank wiener_nonsep_info[MAX_MB_PLANE];
 #endif  // CONFIG_WIENER_NONSEP
 
   /**
