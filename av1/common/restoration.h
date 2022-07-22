@@ -452,6 +452,7 @@ typedef struct {
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 static INLINE void set_default_sgrproj(SgrprojInfo *sgrproj_info) {
+  sgrproj_info->ep = 0;
   sgrproj_info->xqd[0] = (SGRPROJ_PRJ_MIN0 + SGRPROJ_PRJ_MAX0) / 2;
   sgrproj_info->xqd[1] = (SGRPROJ_PRJ_MIN1 + SGRPROJ_PRJ_MAX1) / 2;
 }
