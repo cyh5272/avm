@@ -78,6 +78,9 @@
 #include "common/tf_lite_includes.h"
 
 #if CONFIG_CNN_RESTORATION
+
+#define USE_XNNPACK 0
+
 // Returns the TF-lite model based on the qindex.
 static const unsigned char *get_intra_model_from_qindex(int qindex,
                                                         int superres_denom,
@@ -365,18 +368,24 @@ static const unsigned char *get_inter_model_from_qindex(int qindex,
   return nullptr;
 }
 
+#if USE_XNNPACK
 static TfLiteDelegate *get_tflite_xnnpack_delegate(int num_threads) {
   TfLiteXNNPackDelegateOptions xnnpack_options =
       TfLiteXNNPackDelegateOptionsDefault();
   xnnpack_options.num_threads = AOMMAX(num_threads, 1);
   return TfLiteXNNPackDelegateCreate(&xnnpack_options);
 }
+#endif  // USE_XNNPACK
 
 // Builds and returns the TFlite interpreter.
 static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
     int qindex, int superres_denom, int width, int height, int num_threads,
-    int is_intra_only, int is_luma, int cnn_index,
-    TfLiteDelegate *xnnpack_delegate) {
+    int is_intra_only, int is_luma, int cnn_index
+#if USE_XNNPACK
+    ,
+    TfLiteDelegate *xnnpack_delegate
+#endif  // USE_XNNPACK
+) {
   const unsigned char *const model_tflite_data =
       is_intra_only ? get_intra_model_from_qindex(qindex, superres_denom,
                                                   is_luma, cnn_index)
@@ -410,10 +419,12 @@ static std::unique_ptr<tflite::Interpreter> get_tflite_interpreter(
     return nullptr;
   }
 
+#if USE_XNNPACK
   if (interpreter->ModifyGraphWithDelegate(xnnpack_delegate) != kTfLiteOk) {
     reporter->Report("Failed at modifying graph with XNNPack delegate");
     return nullptr;
   }
+#endif  // USE_XNNPACK
 
   return interpreter;
 }
@@ -422,10 +433,17 @@ extern "C" int av1_restore_cnn_img_tflite_highbd(
     int qindex, int superres_denom, const uint16_t *dgd, int width, int height,
     int dgd_stride, uint16_t *rst, int rst_stride, int num_threads,
     int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      qindex, superres_denom, width, height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(qindex, superres_denom, width, height, num_threads,
+                             is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -460,9 +478,12 @@ extern "C" int av1_restore_cnn_img_tflite_highbd(
     }
   }
 
-  // IMPORTANT: release the interpreter before destroying the delegate.
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -588,326 +609,48 @@ void deTree_tflite(QUADInfo *quad_info, int *Aindex, int *A, int *Sindex,
   }
 }
 
-extern "C" int TFlite_Predict_quadtree(
-    uint8_t *dgd, uint8_t *src, int *A, int A_size, int height, int width,
-    int dgd_stride, int src_stride, int QP, int unit_width, int unit_height,
-    uint8_t *rePic, int rec_stride, int superres_denom, int num_threads,
-    int is_intra_only, int is_luma, int cnn_index) {
-  TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, SCALE_NUMERATOR, width, height, num_threads,
-                             is_intra_only, is_luma, -1, xnnpack_delegate);
-
-  // Prepare input.
-  const float max_val = 255.0f;
-  const int in_stride = width;
-  auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
-    }
-  }
-
-  // Invoke TFlite inference.
-  tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
-  auto status = interpreter->Invoke();
-  if (status != kTfLiteOk) {
-    reporter->Report("Failed at interpreter invocation");
-    return 0;
-  }
-  // Use the output to restore 'dgd' and store in 'rst'.
-  const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = width;
-
-  uint8_t **sub_dgr = new uint8_t *[height];
-  for (int i = 0; i < height; i++) {
-    sub_dgr[i] = new uint8_t[width];
-  }
-  uint8_t **sub_src = new uint8_t *[height];
-  for (int i = 0; i < height; i++) {
-    sub_src[i] = new uint8_t[width];
-  }
-  int **sub_r = new int *[height];
-  for (int i = 0; i < height; i++) {
-    sub_r[i] = new int[width];
-  }
-  // channel 0
-  double **r0 = new double *[height];
-  for (int i = 0; i < height; i++) {
-    r0[i] = new double[width];
-  }
-  // channel 1
-  double **r1 = new double *[height];
-  for (int i = 0; i < height; i++) {
-    r1[i] = new double[width];
-  }
-
-  uint8_t **repic = new uint8_t *[height];
-  for (int i = 0; i < height; i++) {
-    repic[i] = new uint8_t[width];
-  }
-
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      // reconstruct image
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      // src img
-      sub_src[r][c] = src[r * src_stride + c];
-      // src img-reconstruct image
-      sub_r[r][c] = sub_src[r][c] - sub_dgr[r][c];
-      // from tflite get channel 0
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      // from tflite get channel 1
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
-    }
-  }
-
-  int scale, A0_min, A1_min;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
-  scale = quadtset[0];
-  A0_min = quadtset[1];
-  A1_min = quadtset[2];
-
-  int cols = int(ceil(double(height) / unit_height));
-  int rows = int(ceil(double(width) / unit_width));
-  int number_crlc = cols * rows;
-  int index_A = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-  int testnum = 10;
-  for (int i = 0; i < cols; i++) {
-    for (int j = 0; j < rows; j++) {
-      if (i == cols - 1) {
-        start_clow = i * unit_height;
-        end_clow = height;
-      } else {
-        start_clow = i * unit_height;
-        end_clow = (i + 1) * unit_height;
-      }
-      if (j == rows - 1) {
-        start_row = j * unit_width;
-        end_row = width;
-      } else {
-        start_row = j * unit_width;
-        end_row = (j + 1) * unit_width;
-      }
-      if (width < unit_width) {
-        start_row = 0;
-        end_row = width;
-      }
-      if (height < unit_height) {
-        start_clow = 0;
-        end_clow = height;
-      }
-      int lenth_clows = end_clow - start_clow;
-      int lenth_rows = end_row - start_row;
-
-      int lenth = lenth_clows * lenth_rows;
-      int *sub_r_flatten = new int[lenth];
-      int k = 0;
-      for (int i = start_clow; i < end_clow; i++) {
-        for (int j = start_row; j < end_row; j++) {
-          sub_r_flatten[k] = sub_r[i][j];
-          k = k + 1;
-        }
-      }
-
-      double *sub_r0 = new double[lenth];
-
-      int k_r0 = 0;
-      for (int i = start_clow; i < end_clow; i++) {
-        for (int j = start_row; j < end_row; j++) {
-          sub_r0[k_r0] = r0[i][j];
-          k_r0++;
-        }
-      }
-
-      double *sub_r1 = new double[lenth];
-      int k_r1 = 0;
-      for (int i = start_clow; i < end_clow; i++) {
-        for (int j = start_row; j < end_row; j++) {
-          sub_r1[k_r1] = r1[i][j];
-          k_r1++;
-        }
-      }
-
-      double **R = new double *[lenth];
-      for (int i = 0; i < lenth; i++) {
-        R[i] = new double[2];
-      }
-
-      for (int i = 0; i < lenth; i++) {
-        for (int j = 0; j < 2; j++) {
-          if (j == 0) {
-            R[i][j] = sub_r0[i];
-          }
-          if (j == 1) {
-            R[i][j] = sub_r1[i];
-          }
-        }
-      }
-
-      double **R_T = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_T[i] = new double[lenth];
-      }
-
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < lenth; j++) {
-          if (i == 0) {
-            R_T[i][j] = sub_r0[j];
-          }
-          if (i == 1) {
-            R_T[i][j] = sub_r1[j];
-          }
-        }
-      }
-
-      double **R_TDotR = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_TDotR[i] = new double[2];
-      }
-
-      R_TDotR[0][0] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[0][0] += R_T[0][i] * R[i][0];
-      }
-      R_TDotR[0][1] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[0][1] += R_T[0][i] * R[i][1];
-      }
-      R_TDotR[1][0] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[1][0] += R_T[1][i] * R[i][0];
-      }
-      R_TDotR[1][1] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[1][1] += R_T[1][i] * R[i][1];
-      }
-
-      double value_R_TDotR =
-          R_TDotR[0][0] * R_TDotR[1][1] - R_TDotR[0][1] * R_TDotR[1][0];
-      double a00 = R_TDotR[1][1] / value_R_TDotR;
-      double a01 = -1 * R_TDotR[0][1] / value_R_TDotR;
-      double a10 = -1 * R_TDotR[1][0] / value_R_TDotR;
-      double a11 = R_TDotR[0][0] / value_R_TDotR;
-
-      double **R_TDotR_inver = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_TDotR_inver[i] = new double[2];
-      }
-      R_TDotR_inver[0][0] = a00;
-      R_TDotR_inver[0][1] = a01;
-      R_TDotR_inver[1][0] = a10;
-      R_TDotR_inver[1][1] = a11;
-
-      double **mid = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        mid[i] = new double[lenth];
-      }
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < lenth; j++) {
-          if (i == 0) {
-            mid[i][j] = R_TDotR_inver[0][0] * R_T[0][j] +
-                        R_TDotR_inver[0][1] * R_T[1][j];
-          }
-          if (i == 1) {
-            mid[i][j] = R_TDotR_inver[1][0] * R_T[0][j] +
-                        R_TDotR_inver[1][1] * R_T[1][j];
-          }
-        }
-      }
-
-      double A0 = 0;
-      double A1 = 0;
-      for (int i = 0; i < lenth; i++) {
-        A0 += mid[0][i] * sub_r_flatten[i];
-        A1 += mid[1][i] * sub_r_flatten[i];
-      }
-      A0 = A0 * scale;
-      A1 = A1 * scale;
-
-      A0 = int(round(A0));
-      A1 = int(round(A1));
-      if (A0 < A0_min) {
-        A0 = A0_min;
-      }
-      if (A0 > A0_min + 15) {
-        A0 = A0_min + 15;
-      }
-      A[index_A] = int(A0);
-      index_A = index_A + 1;
-      if (A1 < A1_min) {
-        A1 = A1_min;
-      }
-      if (A1 > A1_min + 15) {
-        A1 = A1_min + 15;
-      }
-      A[index_A] = int(A1);
-      index_A = index_A + 1;
-      for (int i = start_clow; i < end_clow; i++) {
-        for (int j = start_row; j < end_row; j++) {
-          repic[i][j] = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale +
-                                  A1 * r1[i][j] / scale));
-          // repic[i][j] = int(round(sub_dgr[i][j]));
-          repic[i][j] = clip_pixel(repic[i][j]);
-        }
-      }
-    }
-  }
-
-  assert(A_size == index_A);
-
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      rePic[r * rec_stride + c] = clip_pixel(repic[r][c]);
-    }
-  }
-  // cv::Mat image;
-  // uint8_t cc[480][832];
-  // for (int r = 0; r < height; ++r) {
-  //  for (int c = 0; c < width; ++c) {
-  //    cc[r][c] = rePic[r * rec_stride + c];
-  //  }
-  //}
-  // image = cv::Mat(480, 832, CV_8UC1, (void *)cc);
-  // cv::imshow("dgr", image);
-  // cv::waitKey();
-  // cv::imwrite("../../res/pre_Image.jpg", image);
-
-  // IMPORTANT: release the interpreter before destroying the delegate.
-  interpreter.reset();
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-
-  return 1;
-}
-
 extern "C" int TFlite_Predict_quadtree_hbd(
     uint16_t *dgd, uint16_t *src, int *A, int A_size, int height, int width,
     int dgd_stride, int src_stride, int QP, int unit_width, int unit_height,
     uint16_t *rePic, int rec_stride, int superres_denom, int num_threads,
     int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
+  // makesure can downscale 3 times
+  int padding_width = ceil(width * 1.0 / 8) * 8;
+  int padding_height = ceil(height * 1.0 / 8) * 8;
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, width, height, num_threads, is_intra_only, is_luma,
-      cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = width;
+  const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
+  // for (int r = 0; r < height; ++r) {
+  //  for (int c = 0; c < width; ++c) {
+  //    input[r * in_stride + c] =
+  //        static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+  //    assert(input[r * in_stride + c] >= 0.0f);
+  //    assert(input[r * in_stride + c] <= 1.0f);
+  //  }
+  //}
+  for (int r = 0; r < padding_height; ++r) {
+    for (int c = 0; c < padding_width; ++c) {
+      if (r < height && c < width) {
+        input[r * in_stride + c] =
+            static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+        assert(input[r * in_stride + c] >= 0.0f);
+        assert(input[r * in_stride + c] <= 1.0f);
+      } else {
+        input[r * in_stride + c] = 0;
+      }
     }
   }
 
@@ -920,7 +663,7 @@ extern "C" int TFlite_Predict_quadtree_hbd(
   }
   // Use the output to restore 'dgd' and store in 'rst'.
   const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = width;
+  const int out_stride = padding_width;
 
   uint16_t **sub_dgr = new uint16_t *[height];
   for (int i = 0; i < height; i++) {
@@ -1133,7 +876,6 @@ extern "C" int TFlite_Predict_quadtree_hbd(
       }
       A0 = A0 * scale;
       A1 = A1 * scale;
-
       A0 = int(round(A0));
       A1 = int(round(A1));
       if (A0 < A0_min) {
@@ -1251,9 +993,12 @@ extern "C" int TFlite_Predict_quadtree_hbd(
   // cv::waitKey();
   // cv::imwrite("../../res/pre_Image.jpg", image);
 
-  // IMPORTANT: release the interpreter before destroying the delegate.
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -1263,10 +1008,17 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
     uint16_t *rePic, int rec_stride, int QP, int *A, int *Split, int block_size,
     int superres_denom, int num_threads, int bit_depth, int is_intra_only,
     int is_luma, int cnn_index) {
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, img_width, img_height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, img_width, img_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
@@ -1551,8 +1303,13 @@ extern "C" int TFlite_recon_quadtree_regular_hbd(
   }
   delete[] repic;
   repic = NULL;
+
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
 }
@@ -1562,24 +1319,37 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
     uint16_t *rePic, int rec_stride, int QP, int *A, int *regular_A, int *Split,
     int block_size, int superres_denom, int num_threads, int bit_depth,
     int is_intra_only, int is_luma, int cnn_index) {
+  // makesure can downscale 3 times
+  int padding_width = ceil(img_width * 1.0 / 8) * 8;
+  int padding_height = ceil(img_height * 1.0 / 8) * 8;
+#if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, superres_denom, img_width, img_height, num_threads, is_intra_only,
-      is_luma, cnn_index, xnnpack_delegate);
+#endif  // USE_XNNPACK
+  std::unique_ptr<tflite::Interpreter> interpreter =
+      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
+                             num_threads, is_intra_only, is_luma, cnn_index
+#if USE_XNNPACK
+                             ,
+                             xnnpack_delegate
+#endif  // USE_XNNPACK
+      );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = img_width;
+  const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
+  for (int r = 0; r < padding_height; ++r) {
+    for (int c = 0; c < padding_width; ++c) {
+      if (r < img_height && c < img_width) {
+        input[r * in_stride + c] =
+            static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
+        assert(input[r * in_stride + c] >= 0.0f);
+        assert(input[r * in_stride + c] <= 1.0f);
+      } else {
+        input[r * in_stride + c] = 0;
+      }
     }
   }
-
   // Invoke TFlite inference.
   tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
   auto status = interpreter->Invoke();
@@ -1590,7 +1360,7 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
 
   // Use the output to restore 'dgd' and store in 'rst'.
   const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = img_width;
+  const int out_stride = padding_width;
 
   uint16_t **sub_dgr = new uint16_t *[img_height];
   for (int i = 0; i < img_height; i++) {
@@ -1805,793 +1575,13 @@ extern "C" int TFlite_recon_quadtree_unregular_hbd(
   }
 
   interpreter.reset();
+
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
   TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
 
   return 1;
-}
-
-extern "C" int TFlite_recon_quadtree_regular(uint8_t *dgd, int dgd_stride,
-                                             int img_height, int img_width,
-                                             uint8_t *rePic, int rec_stride,
-                                             int QP, int *A, int *Split,
-                                             int block_size, int superres_denom,
-                                             int num_threads, int is_intra_only,
-                                             int is_luma, int cnn_index) {
-  TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, SCALE_NUMERATOR, img_width, img_height, num_threads, is_intra_only,
-      is_luma, -1, xnnpack_delegate);
-
-  // Prepare input.
-  const auto max_val = 255.0f;
-  const int in_stride = img_width;
-  auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
-    }
-  }
-
-  // Invoke TFlite inference.
-  tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
-  auto status = interpreter->Invoke();
-  if (status != kTfLiteOk) {
-    reporter->Report("Failed at interpreter invocation");
-    return 0;
-  }
-
-  // Use the output to restore 'dgd' and store in 'rst'.
-  const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = img_width;
-
-  uint8_t **sub_dgr = new uint8_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    sub_dgr[i] = new uint8_t[img_width];
-  }
-
-  double **r0 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r0[i] = new double[img_width];
-  }
-
-  double **r1 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r1[i] = new double[img_width];
-  }
-
-  uint8_t **repic = new uint8_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    repic[i] = new uint8_t[img_width];
-  }
-
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      // sub_dgr[r][c] = dgd[r * in_stride + c];
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
-    }
-  }
-  int scale, A0_min, A1_min;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
-  scale = quadtset[0];
-  A0_min = quadtset[1];
-  A1_min = quadtset[2];
-
-  int index_A = 0;
-  int index_split = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-  int num_block = 0;
-
-  for (int i = 0; i < img_height; i += block_size) {
-    for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height || j + block_size > img_width) {
-        continue;
-      } else {
-        int starty = i;
-        int startx = j;
-        int buf_height;
-        int buf_width;
-        if (Split[index_split] == 0) {
-          buf_height = block_size;
-          buf_width = block_size;
-          start_row = starty;
-          end_row = starty + buf_height;
-          start_clow = startx;
-          end_clow = startx + buf_width;
-
-          int lenth_clows = end_clow - start_clow;
-          int lenth_rows = end_row - start_row;
-
-          int lenth = lenth_clows * lenth_rows;
-          int *sub_r_flatten = new int[lenth];
-
-          int a0 = A[index_A++];
-          int a1 = A[index_A++];
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                      a1 * r1[i][j] / scale));
-              repic[i][j] = clip_pixel(repic[i][j]);
-            }
-          }
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-            }
-          }
-
-        } else if (Split[index_split] == 1) {
-          buf_height = block_size / 2;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 4; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-              case 2:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 3:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                        a1 * r1[i][j] / scale));
-                repic[i][j] = clip_pixel(repic[i][j]);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-              }
-            }
-          }
-        } else if (Split[index_split] == 2) {  // vert
-
-          buf_height = block_size;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                        a1 * r1[i][j] / scale));
-                repic[i][j] = clip_pixel(repic[i][j]);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-              }
-            }
-          }
-        } else if (Split[index_split] == 3) {  // horz
-
-          buf_height = block_size / 2;
-          buf_width = block_size;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                        a1 * r1[i][j] / scale));
-                repic[i][j] = clip_pixel(repic[i][j]);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-              }
-            }
-          }
-        }
-        index_split++;
-      }
-    }
-  }
-
-  interpreter.reset();
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-
-  return 1;
-}
-
-extern "C" int TFlite_recon_quadtree_unregular(
-    uint8_t *dgd, int dgd_stride, int img_height, int img_width, uint8_t *rePic,
-    int rec_stride, int QP, int *A, int *regular_A, int *Split, int block_size,
-    int superres_denom, int num_threads, int is_intra_only, int is_luma,
-    int cnn_index) {
-  TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
-      QP, SCALE_NUMERATOR, img_width, img_height, num_threads, is_intra_only,
-      is_luma, -1, xnnpack_delegate);
-
-  // Prepare input.
-  const auto max_val = 255.0f;
-  const int in_stride = img_width;
-  auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
-    }
-  }
-
-  // Invoke TFlite inference.
-  tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
-  auto status = interpreter->Invoke();
-  if (status != kTfLiteOk) {
-    reporter->Report("Failed at interpreter invocation");
-    return 0;
-  }
-
-  // Use the output to restore 'dgd' and store in 'rst'.
-  const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = img_width;
-
-  uint8_t **sub_dgr = new uint8_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    sub_dgr[i] = new uint8_t[img_width];
-  }
-
-  double **r0 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r0[i] = new double[img_width];
-  }
-
-  double **r1 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r1[i] = new double[img_width];
-  }
-
-  uint8_t **repic = new uint8_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    repic[i] = new uint8_t[img_width];
-  }
-
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      // sub_dgr[r][c] = dgd[r * in_stride + c];
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
-    }
-  }
-  int scale, A0_min, A1_min;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_luma, cnn_index);
-  scale = quadtset[0];
-  A0_min = quadtset[1];
-  A1_min = quadtset[2];
-
-  int index_A = 0;
-  int index_regular_A = 0;
-  int index_split = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-  int num_block = 0;
-
-  for (int i = 0; i < img_height; i += block_size) {
-    for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height || j + block_size > img_width) {
-        start_row = i;
-        end_row = img_height;
-        start_clow = j;
-        end_clow = img_width;
-
-        int lenth_clows = end_clow - start_clow;
-        int lenth_rows = end_row - start_row;
-
-        int lenth = lenth_clows * lenth_rows;
-        int *sub_r_flatten = new int[lenth];
-
-        int a0 = A[index_A++];
-        int a1 = A[index_A++];
-
-        for (int i = start_row; i < end_row; i++) {
-          for (int j = start_clow; j < end_clow; j++) {
-            repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                    a1 * r1[i][j] / scale));
-            repic[i][j] = clip_pixel(repic[i][j]);
-          }
-        }
-        for (int i = start_row; i < end_row; i++) {
-          for (int j = start_clow; j < end_clow; j++) {
-            rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-          }
-        }
-      } else {
-        int starty = i;
-        int startx = j;
-        int buf_height;
-        int buf_width;
-        if (Split[index_split] == 0) {
-          buf_height = block_size;
-          buf_width = block_size;
-          start_row = starty;
-          end_row = starty + buf_height;
-          start_clow = startx;
-          end_clow = startx + buf_width;
-
-          int lenth_clows = end_clow - start_clow;
-          int lenth_rows = end_row - start_row;
-
-          int lenth = lenth_clows * lenth_rows;
-          int *sub_r_flatten = new int[lenth];
-
-          int a0 = regular_A[index_regular_A++];
-          int a1 = regular_A[index_regular_A++];
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale +
-                                      a1 * r1[i][j] / scale));
-              repic[i][j] = clip_pixel(repic[i][j]);
-            }
-          }
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              rePic[i * rec_stride + j] = clip_pixel(repic[i][j]);
-            }
-          }
-
-        } else if (Split[index_split] == 1) {
-          buf_height = block_size / 2;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 4; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-              case 2:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 3:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = regular_A[index_regular_A++];
-            int a1 = regular_A[index_regular_A++];
-          }
-        } else if (Split[index_split] == 2) {  // vert
-
-          buf_height = block_size;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = regular_A[index_regular_A++];
-            int a1 = regular_A[index_regular_A++];
-          }
-        } else if (Split[index_split] == 3) {  // horz
-
-          buf_height = block_size / 2;
-          buf_width = block_size;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = regular_A[index_regular_A++];
-            int a1 = regular_A[index_regular_A++];
-          }
-        }
-        index_split++;
-      }
-    }
-  }
-
-  interpreter.reset();
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-
-  return 1;
-}
-
-void Tree_tflite(uint8_t *rec, uint8_t *buf_256, uint8_t *buf_128,
-                 uint8_t *buf_128_horz, uint8_t *buf_128_vert, uint8_t *dgd,
-                 uint8_t *src, int dgd_stride, int src_stride, int *A_256,
-                 int *A_128, int *A_128_horz, int *A_128_vert, int height,
-                 int width, double dgd_psnr, double delta_128,
-                 double delta_128_horz, double delta_128_vert, int depth,
-                 int block_length, int starty, int startx,
-                 std::vector<int> *Split, std::vector<std::pair<int, int>> *A,
-                 int RDMULT) {
-  int index;
-  int quadtree_max_size = block_length;
-
-#if CONFIG_CNN_GUIDED_QUADTREE_RDCOST
-  int split_sse =
-      computeSSE_buf_tflite(buf_128, src, startx, starty, block_length,
-                            block_length, height, width, width, src_stride);
-
-  int vert_sse =
-      computeSSE_buf_tflite(buf_128_vert, src, startx, starty, block_length,
-                            block_length, height, width, width, src_stride);
-
-  int horz_sse =
-      computeSSE_buf_tflite(buf_128_horz, src, startx, starty, block_length,
-                            block_length, height, width, width, src_stride);
-
-  int all_sse =
-      computeSSE_buf_tflite(buf_256, src, startx, starty, block_length,
-                            block_length, height, width, width, src_stride);
-
-  double cost_split = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      RDMULT, (4 * 2 * 4 + 1) << 5, split_sse, 8);
-
-  double cost_vert =
-      RDCOST_DBL_WITH_NATIVE_BD_DIST(RDMULT, (4 * 2 * 2 + 1) << 5, vert_sse, 8);
-
-  double cost_horz =
-      RDCOST_DBL_WITH_NATIVE_BD_DIST(RDMULT, (4 * 2 * 2 + 1) << 5, horz_sse, 8);
-
-  double cost_all =
-      RDCOST_DBL_WITH_NATIVE_BD_DIST(RDMULT, (4 * 2 + 1) << 5, all_sse, 8);
-
-  double best_cost = min_tflite(cost_split, cost_vert, cost_horz, cost_all);
-
-  if (cost_split == best_cost) {
-    replace_tflite(startx, starty, block_length, block_length, rec, buf_128,
-                   width);
-    Split[0].push_back(0);
-    Split[0].push_back(1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty, startx, quadtree_max_size);
-    int a0 = A_128[index * 2];
-    int a1 = A_128[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index =
-        CalculateIndex_tflite(width, block_length / 2, block_length / 2, starty,
-                              startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (cost_horz == best_cost) {
-    replace_tflite(startx, starty, block_length, block_length, rec,
-                   buf_128_horz, width);
-    Split[0].push_back(1);
-    Split[0].push_back(1);
-
-    int index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_horz[index * 2];
-    int a1 = A_128_horz[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128_horz[index * 2];
-    a1 = A_128_horz[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (cost_vert == best_cost) {
-    replace_tflite(startx, starty, block_length, block_length, rec,
-                   buf_128_vert, width);
-    Split[0].push_back(1);
-    Split[0].push_back(0);
-
-    int index = CalculateIndex_tflite(width, block_length, block_length / 2,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_vert[index * 2];
-    int a1 = A_128_vert[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128_vert[index * 2];
-    a1 = A_128_vert[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else {
-    // qui->isSplit = 0;
-
-    replace_tflite(startx, starty, block_length, block_length, rec, buf_256,
-                   width);
-    Split[0].push_back(0);
-    Split[0].push_back(0);
-    index = CalculateIndex_tflite(width, block_length, block_length, starty,
-                                  startx, quadtree_max_size);
-    int a0 = A_256[index * 2];
-    int a1 = A_256[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-  }
-
-#else
-  double split_psnr = computePSNR_buf_tflite(
-      buf_128, dgd, src, startx, starty, block_length, block_length, height,
-      width, width, dgd_stride, src_stride);
-
-  double split_psnr_horz = computePSNR_buf_tflite(
-      buf_128_horz, dgd, src, startx, starty, block_length, block_length,
-      height, width, width, dgd_stride, src_stride);
-
-  double split_psnr_vert = computePSNR_buf_tflite(
-      buf_128_vert, dgd, src, startx, starty, block_length, block_length,
-      height, width, width, dgd_stride, src_stride);
-
-  // int64_t split_rate = 4 * 2 * 3 + 4;
-  // int64_t split_rate =4;
-  double split_delta = (split_psnr - dgd_psnr) * 1000 / 4;
-  double split_delta_horz = (split_psnr_horz - dgd_psnr) * 1000 / 2;
-  double split_delta_vert = (split_psnr_vert - dgd_psnr) * 1000 / 2;
-
-  double best_delta =
-      AOMMAX(AOMMAX(split_delta, split_delta_horz), split_delta_vert);
-
-  if (split_delta > delta_128 && best_delta == split_delta) {
-    replace_tflite(startx, starty, block_length, block_length, rec, buf_128,
-                   width);
-    Split[0].push_back(0);
-    Split[0].push_back(1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty, startx, quadtree_max_size);
-    int a0 = A_128[index * 2];
-    int a1 = A_128[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index =
-        CalculateIndex_tflite(width, block_length / 2, block_length / 2, starty,
-                              startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (split_delta_horz > delta_128_horz &&
-             best_delta == split_delta_horz) {
-    replace_tflite(startx, starty, block_length, block_length, rec,
-                   buf_128_horz, width);
-    Split[0].push_back(1);
-    Split[0].push_back(1);
-
-    int index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_horz[index * 2];
-    int a1 = A_128_horz[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128_horz[index * 2];
-    a1 = A_128_horz[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (split_delta_vert > delta_128_vert &&
-             best_delta == split_delta_vert) {
-    replace_tflite(startx, starty, block_length, block_length, rec,
-                   buf_128_vert, width);
-    Split[0].push_back(1);
-    Split[0].push_back(0);
-
-    int index = CalculateIndex_tflite(width, block_length, block_length / 2,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_vert[index * 2];
-    int a1 = A_128_vert[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128_vert[index * 2];
-    a1 = A_128_vert[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else {
-    replace_tflite(startx, starty, block_length, block_length, rec, buf_256,
-                   width);
-    Split[0].push_back(0);
-    Split[0].push_back(0);
-    index = CalculateIndex_tflite(width, block_length, block_length, starty,
-                                  startx, quadtree_max_size);
-    int a0 = A_256[index * 2];
-    int a1 = A_256[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-  }
-
-#endif  // CONFIG_CNN_GUIDED_QUADTREE_RDCOST
 }
 
 void Tree_tflite_hbd(uint16_t *rec, uint16_t *buf_256, uint16_t *buf_128,
@@ -2890,6 +1880,7 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
   // save unfilter frame psnr
   double dgdpsnr = computePSNR_tflite_hbd(dgr, src, height, width, dgr_stride,
                                           src_stride, bit_depth);
+
   int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
   int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
   int block_num_level_0 = (int)ceil(((float)width) / quadtree_max_size) *
@@ -2927,7 +1918,6 @@ extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
                               is_intra_only, is_luma, cnn_index);
   double psnr_level_0 = computePSNR_tflite_hbd(buf_level_0, src, height, width,
                                                width, src_stride, bit_depth);
-
   // for (int i = 0; i < 512; i++)
   //  for (int j = 0; j < 512; j++) buf[i][j] = buf_level_0[i * width + j];
   // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
