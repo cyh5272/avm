@@ -1253,12 +1253,17 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rusi->sgrproj_info);
       // aom_vector_clear(current_unit_stack);
       // aom_vector_push_back(current_unit_stack, &unit_snapshot);
-    } else if (rusi->sse[RESTORE_SGRPROJ] > rusi->sse[RESTORE_NONE]) {
+    } else /*if (rusi->sse[RESTORE_SGRPROJ] > rusi->sse[RESTORE_NONE])*/ {
       // Remove unit of RESTORE_NONE type only if its sse is worse (higher)
       // than no_restore ss.
       aom_vector_pop_back(current_unit_stack);
     }
   }
+  /*
+  intf("sgrproj(%d) [merge %f < nomerge %f] : %d, bank_size %d\n",
+       rsc->plane, cost_merge, cost_nomerge, (cost_merge < cost_nomerge),
+       rsc->sgrproj_bank.bank_size);
+       */
 #else   // CONFIG_RST_MERGECOEFFS
   const int64_t bits_sgr =
       x->mode_costs.sgrproj_restore_cost[1] +
@@ -2096,7 +2101,7 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       x->mode_costs.wiener_restore_cost[1] +
       count_wiener_bits_set(wiener_win, &x->mode_costs, &rusi->wiener_info,
                             &rsc->wiener_bank);
-  // Only test the reference in rusi->wiener.bank_ref, generated from
+  // Only test the reference in rusi->wiener_info.bank_ref, generated from
   // the count call above.
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(
       &rsc->wiener_bank, rusi->wiener_info.bank_ref);
@@ -2310,12 +2315,17 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       av1_add_to_wiener_bank(&rsc->wiener_bank, &rusi->wiener_info);
       // aom_vector_clear(current_unit_stack);
       // aom_vector_push_back(current_unit_stack, &unit_snapshot);
-    } else if (rusi->sse[RESTORE_WIENER] > rusi->sse[RESTORE_NONE]) {
+    } else /*if (rusi->sse[RESTORE_WIENER] > rusi->sse[RESTORE_NONE])*/ {
       // Remove unit of RESTORE_NONE type only if its sse is worse (higher)
       // than no_restore ss.
       aom_vector_pop_back(current_unit_stack);
     }
   }
+  /*
+  printf("wiener(%d) [merge %f < nomerge %f] : %d, bank_size %d\n",
+         rsc->plane, cost_merge, cost_nomerge, (cost_merge < cost_nomerge),
+         rsc->wiener_bank.bank_size);
+         */
 #else   // CONFIG_RST_MERGECOEFFS
   const int64_t bits_wiener =
       x->mode_costs.wiener_restore_cost[1] +
@@ -3494,10 +3504,15 @@ static void search_wienerns(const RestorationTileLimits *limits,
       av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info);
       // aom_vector_clear(current_unit_stack);
       // aom_vector_push_back(current_unit_stack, &unit_snapshot);
-    } else if (rusi->sse[RESTORE_WIENER_NONSEP] > rusi->sse[RESTORE_NONE]) {
+    } else /*if (rusi->sse[RESTORE_WIENER_NONSEP] > rusi->sse[RESTORE_NONE])*/ {
       aom_vector_pop_back(current_unit_stack);
     }
   }
+  /*
+  printf("wienerns(%d) [merge %f < nomerge %f] : %d, bank_size %d\n",
+         rsc->plane, cost_merge, cost_nomerge, (cost_merge < cost_nomerge),
+         rsc->wienerns_bank.bank_size);
+         */
 #else   // CONFIG_RST_MERGECOEFFS
   const int64_t bits_wienerns =
       x->mode_costs.wienerns_restore_cost[1] +
@@ -3595,249 +3610,10 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
 #endif  // CONFIG_PC_WIENER
     default: assert(0); break;
   }
-  int64_t bits;
-  bits = get_switchable_restore_cost(rsc->cm, x, rest_type) + coeff_bits;
-#if CONFIG_RST_MERGECOEFFS
-  // RESTORE_NONE and RESTORE_CNN units don't have a merge parameter.
-  int merged = 0;
-  switch (rest_type) {
-    case RESTORE_WIENER:
-      if (check_wiener_eq(&rusi->wiener_info,
-                          av1_ref_from_wiener_bank(&rsc->wiener_bank, 0)))
-        merged = 1;
-      break;
-    case RESTORE_SGRPROJ:
-      if (check_sgrproj_eq(&rusi->sgrproj_info,
-                           av1_ref_from_sgrproj_bank(&rsc->sgrproj_bank, 0)))
-        merged = 1;
-      break;
-#if CONFIG_WIENER_NONSEP
-    case RESTORE_WIENER_NONSEP: {
-      int is_uv = (rsc->plane != AOM_PLANE_Y);
-      if (check_wienerns_eq(is_uv, &rusi->wienerns_info,
-                            av1_ref_from_wienerns_bank(&rsc->wienerns_bank, 0),
-                            wnsf))
-        merged = 1;
-    } break;
-#endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_PC_WIENER
-    case RESTORE_PC_WIENER:
-      // No side-information for now.
-      merged = 1;
-      break;
-#endif  // CONFIG_PC_WIENER
-    default: break;
-  }
-  if (rest_type != RESTORE_NONE) {
-    bits += x->mode_costs.merged_param_cost[merged];
-    // If merged, we don't need the raw bit count.
-    if (merged == 1) {
-      bits -= coeff_bits;
-    }
-  }
-#endif  // CONFIG_RST_MERGECOEFFS
+  const int64_t bits =
+      get_switchable_restore_cost(rsc->cm, x, rest_type) + coeff_bits;
   return bits;
 }
-
-#if CONFIG_RST_MERGECOEFFS
-// Given a path of node indices, where node index can be used to derive
-//  restoration unit index and restoration type of unit, this function
-//  duplicates current RestSearchCtxt and updates reference filters/SSE/
-//  bitcount/indicated restoration types for RESTORE_SWITCHABLE according
-//  to traversed nodes.
-// path : pointer to Vector storing path as int indices of nodes
-// rsc : current RestSearchCtxt, will not be altered
-// collect_stats : indicates if SSE/bitcount/indicated restoration types
-//  should be updated
-// Returns updated RestSearchCtxt
-RestSearchCtxt switchable_update_refs(Vector *path, const RestSearchCtxt *rsc,
-                                      bool collect_stats) {
-  // Duplicate rsc to avoid overwriting
-  RestSearchCtxt rsc_dup = *rsc;
-
-  const WienernsFilterConfigPairType *wnsf =
-      get_wienerns_filters(rsc->cm->quant_params.base_qindex);
-
-  int is_uv = (rsc->plane != AOM_PLANE_Y);
-  int nunits = rest_tiles_in_plane(rsc->cm, is_uv);
-  int max_out = RESTORE_SWITCHABLE_TYPES;
-  int num_nodes = nunits * max_out + 2;
-  VECTOR_FOR_EACH(path, listed_unit) {
-    int visited_node = *(int *)(listed_unit.pointer);
-    // Ignore src and dest nodes.
-    if (visited_node == 0 || visited_node == num_nodes - 1) continue;
-    int unit_idx = (((visited_node - 1 + max_out) / max_out) - 1);
-    int visited_rtype = (visited_node - 1) % max_out;
-    RestUnitSearchInfo *visited_rusi = &rsc_dup.rusi[unit_idx];
-    if (visited_rtype > RESTORE_NONE) {
-      if (visited_rusi->best_rtype[visited_rtype - 1] == RESTORE_NONE)
-        visited_rtype = RESTORE_NONE;
-    }
-    // Collect sse/bits for rtype evaluation.
-    if (collect_stats) {
-      rsc_dup.sse += visited_rusi->sse[visited_rtype];
-      rsc_dup.bits +=
-          count_switchable_bits(visited_rtype, &rsc_dup, visited_rusi);
-      visited_rusi->best_rtype[RESTORE_SWITCHABLE - 1] = visited_rtype;
-    }
-    switch (visited_rtype) {
-      case RESTORE_NONE: break;
-      case RESTORE_WIENER:
-        if (!check_wiener_eq(&visited_rusi->wiener_info,
-                             av1_ref_from_wiener_bank(&rsc_dup.wiener_bank, 0)))
-          av1_add_to_wiener_bank(&rsc_dup.wiener_bank,
-                                 &visited_rusi->wiener_info);
-        break;
-      case RESTORE_SGRPROJ:
-        if (!check_sgrproj_eq(
-                &visited_rusi->sgrproj_info,
-                av1_ref_from_sgrproj_bank(&rsc_dup.sgrproj_bank, 0)))
-          av1_add_to_sgrproj_bank(&rsc_dup.sgrproj_bank,
-                                  &visited_rusi->sgrproj_info);
-        break;
-#if CONFIG_WIENER_NONSEP
-      case RESTORE_WIENER_NONSEP:
-        if (!check_wienerns_eq(
-                is_uv, &visited_rusi->wienerns_info,
-                av1_ref_from_wienerns_bank(&rsc_dup.wienerns_bank, 0), wnsf))
-          av1_add_to_wienerns_bank(&rsc_dup.wienerns_bank,
-                                   &visited_rusi->wienerns_info);
-        break;
-#endif  // CONFIG_WIENER_NONSEP
-#if CONFIG_PC_WIENER
-      case RESTORE_PC_WIENER:
-        // No side-information for now.
-        break;
-#endif  // CONFIG_PC_WIENER
-      default: assert(0); break;
-    }
-  }
-  return rsc_dup;
-}
-
-// Given a path of node indices, where node index can be used to derive
-//  restoration unit index, this function calculates the cost of choosing
-//  the restoration type indicated by out_edge for the next unit in
-//  RESTORE_SWITCHABLE.
-// info: pointer to RestSearchCtxt
-// path : pointer to Vector storing path as int indices of nodes
-// node_idx : node where path ends and edge starts
-// max_out_nodes: max outgoing edges from node
-// out_edge: proposed restoration type for the next unit in
-//  RESTORE_SWITCHABLE.
-// Returns cost of choosing specified restoration type.
-double switchable_edge_cost(const void *info, Vector *path, int node_idx,
-                            int max_out_nodes, int out_edge) {
-  RestSearchCtxt *rsc = (RestSearchCtxt *)info;
-  const MACROBLOCK *const x = rsc->x;
-  const double dual_sgr_penalty_sf_mult =
-      1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level;
-  int is_uv = (rsc->plane != AOM_PLANE_Y);
-  int nunits = rest_tiles_in_plane(rsc->cm, is_uv);
-  int start_unit_idx = (((node_idx - 1 + max_out_nodes) / max_out_nodes) - 1);
-  // If edge is from last unit to dest, cost is 0.
-  if (start_unit_idx >= nunits - 1) return 0;
-
-  int end_unit_idx = start_unit_idx + 1;
-  int end_rtype = out_edge;
-  RestUnitSearchInfo *rusi = &rsc->rusi[end_unit_idx];
-  // Update reference values based on path.
-  RestSearchCtxt path_rsc = switchable_update_refs(path, rsc, false);
-
-  int64_t end_unit_sse = (end_rtype == RESTORE_NONE)
-                             ? rusi->sse[RESTORE_NONE]
-                             : rusi->sse[rusi->best_rtype[end_rtype - 1]];
-  int64_t end_unit_bits = count_switchable_bits(end_rtype, &path_rsc, rusi);
-  double edge_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, end_unit_bits >> 4, end_unit_sse,
-      rsc->cm->seq_params.bit_depth);
-  if (end_rtype == RESTORE_SGRPROJ &&
-      rusi->sgrproj_info.ep < DUAL_SGR_EP_PENALTY_THRESHOLD)
-    edge_cost *= dual_sgr_penalty_sf_mult;
-  return edge_cost;
-}
-
-// src_idx : start of path
-// dest_idx : destination of path
-// max_out_nodes: max outgoing edges from node
-// graph: pointer to adjacency matrix to indicate edges between nodes. If no
-//  edge is present between nodes, element is set to INFINITY.
-// best_path : pointer to Vector storing best path from start to destination
-//  as int indexes of nodes
-// subsets : indicates whether graph needs to be organized into subsets
-// cost_fn : function to dynamically determine edge cost
-// info : pointer to unspecified structure type cast in function, holds any
-//  information needed to calculate edge cost
-// Returns cost of min-cost path.
-double min_cost_graphsearch(int src_idx, int dest_idx, int max_out_nodes,
-                            const double *graph, Vector *best_path,
-                            bool subsets, graph_edge_cost_t cost_fn,
-                            const void *info) {
-  Vector node_best_path;
-  int tmp_int = 0;
-  aom_vector_setup(&node_best_path, 1, sizeof(tmp_int));
-  aom_vector_push_back(best_path, &src_idx);
-  double node_dest_cost = INFINITY;
-  if (src_idx == dest_idx) {
-    aom_vector_destroy(&node_best_path);
-    return 0;
-  }
-
-  // Shortest path from this node to dest.
-  for (int out_edge = 0; out_edge < max_out_nodes; ++out_edge) {
-    int out_idx;
-    if (!subsets) {
-      out_idx = out_edge;
-    } else {
-      out_idx =
-          (((src_idx - 1 + max_out_nodes) / max_out_nodes) * max_out_nodes) +
-          out_edge + 1;
-    }
-    bool revisiting = false;
-    // Confirm this isn't a cycle.
-    VECTOR_FOR_EACH(best_path, listed_unit) {
-      int visited_idx = *(int *)(listed_unit.pointer);
-      if (visited_idx == out_idx) revisiting = true;
-    }
-    // Adjacency matrix blank fields are set to INFINITY.
-    if (graph[src_idx * max_out_nodes + out_edge] != INFINITY && !revisiting) {
-      Vector out_best_path;
-      aom_vector_setup(&out_best_path, 1, sizeof(tmp_int));
-      aom_vector_copy_assign(&out_best_path, best_path);
-      double out_dest_cost =
-          min_cost_graphsearch(out_idx, dest_idx, max_out_nodes, graph,
-                               &out_best_path, subsets, cost_fn, info);
-      // If path with retrieved cost reaches destination, apply min cost.
-      if (out_dest_cost < INFINITY) {
-        out_dest_cost +=
-            cost_fn(info, best_path, src_idx, max_out_nodes, out_edge);
-        if (out_dest_cost < node_dest_cost) {
-          node_dest_cost = out_dest_cost;
-          aom_vector_copy_assign(&node_best_path, &out_best_path);
-        }
-      }
-      aom_vector_destroy(&out_best_path);
-    }
-  }
-  aom_vector_copy_assign(best_path, &node_best_path);
-  aom_vector_destroy(&node_best_path);
-  return node_dest_cost;
-}
-
-double min_cost_type_path(int src_idx, int dest_idx, int max_out_nodes,
-                          const double *graph, Vector *best_path,
-                          graph_edge_cost_t cost_fn, const void *info) {
-  return min_cost_graphsearch(src_idx, dest_idx, max_out_nodes, graph,
-                              best_path, true, cost_fn, info);
-}
-
-double min_cost_path(int src_idx, int dest_idx, int max_out_nodes,
-                     const double *graph, Vector *best_path,
-                     graph_edge_cost_t cost_fn, const void *info) {
-  return min_cost_graphsearch(src_idx, dest_idx, max_out_nodes, graph,
-                              best_path, false, cost_fn, info);
-}
-#endif  // CONFIG_RST_MERGECOEFFS
 
 static void search_switchable(const RestorationTileLimits *limits,
                               const AV1PixelRect *tile_rect, int rest_unit_idx,
@@ -3849,86 +3625,76 @@ static void search_switchable(const RestorationTileLimits *limits,
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
 
-#if CONFIG_RST_MERGECOEFFS
+  const MACROBLOCK *const x = rsc->x;
+  RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
   int is_uv = (rsc->plane != AOM_PLANE_Y);
-  int nunits = rest_tiles_in_plane(rsc->cm, is_uv);
-  if (nunits < MAX_UNITS_FOR_GRAPH_SWITCHABLE) {
-    (void)rest_unit_idx;
-    int max_out = RESTORE_SWITCHABLE_TYPES;
-    int num_nodes = nunits * max_out + 2;
-    double tmp_double = 0;
+  (void)is_uv;
 
-    double *graph = (double *)calloc(num_nodes * max_out, sizeof(tmp_double));
-    // Last subset only has one outgoing edge, dst has none - set corresponding
-    // edges to INFINITY.
-    int rm_edge = ((nunits - 1) * max_out + 1) * max_out;
-    for (; rm_edge < num_nodes * max_out; ++rm_edge) {
-      if (rm_edge % max_out != 0 || rm_edge / max_out >= num_nodes - 1) {
-        graph[rm_edge] = INFINITY;
-      }
+  double best_cost = 0;
+  int64_t best_bits = 0;
+  RestorationType best_rtype = RESTORE_NONE;
+
+  for (RestorationType r = 0; r < RESTORE_SWITCHABLE_TYPES; ++r) {
+    // Check for the condition that wiener or sgrproj search could not
+    // find a solution or the solution was worse than RESTORE_NONE.
+    // In either case the best_rtype will be set as RESTORE_NONE. These
+    // should be skipped from the test below.
+    if (r > RESTORE_NONE) {
+      if (rusi->best_rtype[r - 1] == RESTORE_NONE) continue;
     }
 
-    int tmp_int = 0;
-    Vector best_path;
-    aom_vector_setup(&best_path, 1, sizeof(tmp_int));
-    min_cost_type_path(0, num_nodes - 1, max_out, graph, &best_path,
-                       switchable_edge_cost, rsc);
-
-    // Update restoration type, SSE, and bits in rsc.
-    *rsc = switchable_update_refs(&best_path, rsc, true);
-    free(graph);
-    aom_vector_destroy(&best_path);
-#else   // CONFIG_RST_MERGECOEFFS
-  if (false) {
-    // Purposefully empty to simplify flag use.
-#endif  // CONFIG_RST_MERGECOEFFS
-  } else {
-    const MACROBLOCK *const x = rsc->x;
-    RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-
-    double best_cost = 0;
-    int64_t best_bits = 0;
-    RestorationType best_rtype = RESTORE_NONE;
-
-    for (RestorationType r = 0; r < RESTORE_SWITCHABLE_TYPES; ++r) {
-      // Check for the condition that wiener or sgrproj search could not
-      // find a solution or the solution was worse than RESTORE_NONE.
-      // In either case the best_rtype will be set as RESTORE_NONE. These
-      // should be skipped from the test below.
-      if (r > RESTORE_NONE) {
-        if (rusi->best_rtype[r - 1] == RESTORE_NONE) continue;
-      }
-
-      const int64_t sse = rusi->sse[r];
-      int64_t bits = count_switchable_bits(r, rsc, rusi);
-      double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-          x->rdmult, bits >> 4, sse, rsc->cm->seq_params.bit_depth);
-      if (r == RESTORE_SGRPROJ && rusi->sgrproj_info.ep < 10)
-        cost *=
-            (1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level);
-      if (r == 0 || cost < best_cost) {
-        best_cost = cost;
-        best_bits = bits;
-        best_rtype = r;
-      }
+    const int64_t sse = rusi->sse[r];
+    int64_t bits = count_switchable_bits(r, rsc, rusi);
+    double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, sse,
+                                                 rsc->cm->seq_params.bit_depth);
+    if (r == RESTORE_SGRPROJ && rusi->sgrproj_info.ep < 10)
+      cost *= (1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level);
+    if (r == 0 || cost < best_cost) {
+      best_cost = cost;
+      best_bits = bits;
+      best_rtype = r;
     }
+  }
 
-    rusi->best_rtype[RESTORE_SWITCHABLE - 1] = best_rtype;
+  rusi->best_rtype[RESTORE_SWITCHABLE - 1] = best_rtype;
 
-    rsc->sse += rusi->sse[best_rtype];
-    rsc->bits += best_bits;
-    if (best_rtype == RESTORE_WIENER)
+  rsc->sse += rusi->sse[best_rtype];
+  rsc->bits += best_bits;
+
+  if (best_rtype == RESTORE_WIENER) {
+#if CONFIG_RST_MERGECOEFFS
+    const int equal =
+        check_wiener_bank_eq(&rsc->wiener_bank, &rusi->wiener_info);
+    if (equal == -1 || rsc->wiener_bank.bank_size == 0)
       av1_add_to_wiener_bank(&rsc->wiener_bank, &rusi->wiener_info);
-    if (best_rtype == RESTORE_SGRPROJ)
+#else
+    av1_add_to_wiener_bank(&rsc->wiener_bank, &rusi->wiener_info);
+#endif  // CONFIG_RST_MERGECOEFFS
+  } else if (best_rtype == RESTORE_SGRPROJ) {
+#if CONFIG_RST_MERGECOEFFS
+    const int equal =
+        check_sgrproj_bank_eq(&rsc->sgrproj_bank, &rusi->sgrproj_info);
+    if (equal == -1 || rsc->sgrproj_bank.bank_size == 0)
       av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rusi->sgrproj_info);
+#else
+    av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rusi->sgrproj_info);
+#endif  // CONFIG_RST_MERGECOEFFS
 #if CONFIG_WIENER_NONSEP
-    if (best_rtype == RESTORE_WIENER_NONSEP)
+  } else if (best_rtype == RESTORE_WIENER_NONSEP) {
+#if CONFIG_RST_MERGECOEFFS
+    const WienernsFilterConfigPairType *wnsf =
+        get_wienerns_filters(rsc->cm->quant_params.base_qindex);
+    const int equal = check_wienerns_bank_eq(rsc->plane, &rsc->wienerns_bank,
+                                             &rusi->wienerns_info, wnsf);
+    if (equal == -1 || rsc->wienerns_bank.bank_size == 0)
       av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info);
+#else
+    av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info);
+#endif  // CONFIG_RST_MERGECOEFFS
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
-    if (best_rtype == RESTORE_PC_WIENER) {
-      // No side-information for now.
-    }
+  } else if (best_rtype == RESTORE_PC_WIENER) {
+    // No side-information for now.
 #endif  // CONFIG_PC_WIENER
   }
 }
@@ -4018,19 +3784,6 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
 
   reset_rsc(rsc);
   rsc_on_tile(rsc);
-
-#if CONFIG_RST_MERGECOEFFS
-  int is_uv = (rsc->plane != AOM_PLANE_Y);
-  int nunits = rest_tiles_in_plane(rsc->cm, is_uv);
-  // Limiting number of units for graph search to prevent hanging.
-  if (rtype == RESTORE_SWITCHABLE && nunits < MAX_UNITS_FOR_GRAPH_SWITCHABLE) {
-    search_switchable(NULL, NULL, 0, rsc, NULL, NULL);
-    aom_vector_clear(rsc->unit_stack);
-    return RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, rsc->bits >> 4,
-                                          rsc->sse,
-                                          rsc->cm->seq_params.bit_depth);
-  }
-#endif  // CONFIG_RST_MERGECOEFFS
 
   av1_foreach_rest_unit_in_plane(rsc->cm, rsc->plane, funs[rtype], rsc,
                                  &rsc->tile_rect, rsc->cm->rst_tmpbuf, NULL);
