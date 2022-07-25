@@ -134,7 +134,7 @@ static INLINE int check_wienerns_bank_eq(
     const WienernsFilterConfigPairType *wnsf) {
   for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
     if (check_wienerns_eq(chroma, info,
-                          av1_constref_from_wiener_nonsep_bank(bank, k), wnsf))
+                          av1_constref_from_wienerns_bank(bank, k), wnsf))
       return k;
   }
   return -1;
