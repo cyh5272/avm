@@ -1301,7 +1301,7 @@ typedef struct FRAME_COUNTS {
   unsigned int wiener_restore[2];
   unsigned int sgrproj_restore[2];
 #if CONFIG_WIENER_NONSEP
-  unsigned int wiener_nonsep_restore[2];
+  unsigned int wienerns_restore[2];
 #endif  // CONFIG_WIENER_NONSEP
 #endif  // CONFIG_ENTROPY_STATS
 

@@ -1669,7 +1669,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
     case 10: max_pixel_value = 1023; break;
     case 12: max_pixel_value = 4095; break;
   }
-#endif
+#endif  // !USE_CONVOLVE_SYM
 
   assert(filter_config->strict_bounds == false);
   const bool dir_strict = filter_config->strict_bounds;
@@ -1765,6 +1765,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #else
       const int16_t singleton_tap =
           filter[singleton_tap_index] + (1 << filter_config->prec_bits);
+
       for (int r = block_row_begin; r < block_row_end; ++r) {
         for (int c = block_col_begin; c < block_col_end; ++c) {
           int dgd_id = r * stride + c;
@@ -1838,11 +1839,11 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
 #endif  // CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP
-void apply_wiener_nonsep_highbd(const uint8_t *dgd8, int width, int height,
-                                int stride, int base_qindex,
-                                const int16_t *filter, uint8_t *dst8,
-                                int dst_stride, int plane, const uint8_t *luma8,
-                                int luma_stride, int bit_depth) {
+void apply_wienerns_highbd(const uint8_t *dgd8, int width, int height,
+                           int stride, int base_qindex, const int16_t *filter,
+                           uint8_t *dst8, int dst_stride, int plane,
+                           const uint8_t *luma8, int luma_stride,
+                           int bit_depth) {
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
@@ -1875,12 +1876,14 @@ const uint8_t *get_pc_wiener_sub_classifier(int num_classes) {
   }
 }
 
-void apply_wiener_nonsep_class_id_highbd(
-    const uint8_t *dgd8, int width, int height, int stride, int base_qindex,
-    const WienerNonsepInfo *wiener_nonsep_info, uint8_t *dst8, int dst_stride,
-    int plane, const uint8_t *luma8, int luma_stride, int bit_depth,
-    const uint8_t *class_id, int class_id_stride, int class_id_restrict,
-    int num_classes) {
+void apply_wienerns_class_id_highbd(const uint8_t *dgd8, int width, int height,
+                                    int stride, int base_qindex,
+                                    const WienerNonsepInfo *wienerns_info,
+                                    uint8_t *dst8, int dst_stride, int plane,
+                                    const uint8_t *luma8, int luma_stride,
+                                    int bit_depth, const uint8_t *class_id,
+                                    int class_id_stride, int class_id_restrict,
+                                    int num_classes) {
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
@@ -1889,8 +1892,8 @@ void apply_wiener_nonsep_class_id_highbd(
       is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   if (is_uv && nsfilter->num_pixels2 != 0) {
-    assert(wiener_nonsep_info->num_classes == 1);
-    const int16_t *filter = const_nsfilter_taps(wiener_nonsep_info, 0);
+    assert(wienerns_info->num_classes == 1);
+    const int16_t *filter = const_nsfilter_taps(wienerns_info, 0);
     const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
 
     // TODO: This branch needs a classified dual filtering.
@@ -1923,8 +1926,7 @@ void apply_wiener_nonsep_class_id_highbd(
         }
       }
 
-      const int16_t *filter =
-          const_nsfilter_taps(wiener_nonsep_info, sub_class_id);
+      const int16_t *filter = const_nsfilter_taps(wienerns_info, sub_class_id);
       const int16_t *block_filter = is_uv ? filter + wnsf->y->ncoeffs : filter;
       av1_convolve_nonsep_highbd(dgd8_row + c, w, h, stride, nsfilter,
                                  block_filter, dst8_row + c, dst_stride,
@@ -1960,34 +1962,34 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
     }
   }
 #else
-  assert(rui->wiener_nonsep_info.num_classes == 1);
-  const int16_t *rui_wiener_nonsep_info_nsfilter =
-      const_nsfilter_taps(&rui->wiener_nonsep_info, 0);
+  assert(rui->wienerns_info.num_classes == 1);
+  const int16_t *rui_wienerns_info_nsfilter =
+      const_nsfilter_taps(&rui->wienerns_info, 0);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
 #if CONFIG_COMBINE_PC_NS_WIENER
-    apply_wiener_nonsep_class_id_highbd(
+    apply_wienerns_class_id_highbd(
         src + j, w, stripe_height, src_stride, rui->base_qindex,
-        &rui->wiener_nonsep_info, dst + j, dst_stride, rui->plane,
+        &rui->wienerns_info, dst + j, dst_stride, rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
         rui->luma + j, rui->luma_stride,
 #else
         NULL, -1,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
         bit_depth, rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
-        rui->class_id_restrict, rui->wiener_nonsep_info.num_classes);
+        rui->class_id_restrict, rui->wienerns_info.num_classes);
 #else
-    apply_wiener_nonsep_highbd(
-        src + j, w, stripe_height, src_stride, rui->base_qindex,
-        rui_wiener_nonsep_info_nsfilter, dst + j, dst_stride, rui->plane,
+    apply_wienerns_highbd(src + j, w, stripe_height, src_stride,
+                          rui->base_qindex, rui_wienerns_info_nsfilter, dst + j,
+                          dst_stride, rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-        rui->luma + j, rui->luma_stride,
+                          rui->luma + j, rui->luma_stride,
 #else
-        NULL, -1,
+                          NULL, -1,
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-        bit_depth);
+                          bit_depth);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
 }
