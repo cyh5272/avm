@@ -2589,10 +2589,11 @@ static AOM_INLINE void write_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                            WienerInfoBank *bank,
                                            aom_writer *wb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal = check_wiener_bank_eq(bank, wiener_info);
-  aom_write_symbol(wb, equal >= 0, xd->tile_ctx->merged_param_cdf, 2);
+  const int equal_ref = check_wiener_bank_eq(bank, wiener_info);
+  const int exact_match = (equal_ref >= 0);
+  aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
   const int ref = wiener_info->bank_ref;
-  assert(IMPLIES(equal >= 0, ref == equal));
+  assert(IMPLIES(exact_match, ref == equal_ref));
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2601,7 +2602,7 @@ static AOM_INLINE void write_wiener_filter(MACROBLOCKD *xd, int wiener_win,
     if (match) break;
   }
   assert(IMPLIES(!match, ref == AOMMAX(0, bank->bank_size - 1)));
-  if (equal >= 0) {
+  if (exact_match) {
     if (bank->bank_size == 0) av1_add_to_wiener_bank(bank, wiener_info);
     return;
   }
@@ -2657,10 +2658,11 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
                                             SgrprojInfoBank *bank,
                                             aom_writer *wb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal = check_sgrproj_bank_eq(bank, sgrproj_info);
-  aom_write_symbol(wb, equal >= 0, xd->tile_ctx->merged_param_cdf, 2);
+  const int equal_ref = check_sgrproj_bank_eq(bank, sgrproj_info);
+  const int exact_match = (equal_ref >= 0);
+  aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
   const int ref = sgrproj_info->bank_ref;
-  assert(IMPLIES(equal >= 0, ref == equal));
+  assert(IMPLIES(exact_match, ref == equal_ref));
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2669,7 +2671,7 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
     if (match) break;
   }
   assert(IMPLIES(!match, ref == AOMMAX(0, bank->bank_size - 1)));
-  if (equal >= 0) {
+  if (exact_match) {
     if (bank->bank_size == 0) av1_add_to_sgrproj_bank(bank, sgrproj_info);
     return;
   }
@@ -2713,10 +2715,12 @@ static AOM_INLINE void write_wienerns_filter(
   const WienernsFilterConfigPairType *wnsf =
       get_wienerns_filters(xd->base_qindex);
 #if CONFIG_RST_MERGECOEFFS
-  const int equal = check_wienerns_bank_eq(plane, bank, wienerns_info, wnsf);
-  aom_write_symbol(wb, equal >= 0, xd->tile_ctx->merged_param_cdf, 2);
+  const int equal_ref =
+      check_wienerns_bank_eq(plane, bank, wienerns_info, wnsf);
+  const int exact_match = (equal_ref >= 0);
+  aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
   const int ref = wienerns_info->bank_ref;
-  assert(IMPLIES(equal >= 0, ref == equal));
+  assert(IMPLIES(exact_match, ref == equal_ref));
   assert(ref < AOMMAX(1, bank->bank_size));
   int match = 0;
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
@@ -2725,7 +2729,7 @@ static AOM_INLINE void write_wienerns_filter(
     if (match) break;
   }
   assert(IMPLIES(!match, ref == AOMMAX(0, bank->bank_size - 1)));
-  if (equal >= 0) {
+  if (exact_match) {
     if (bank->bank_size == 0) av1_add_to_wienerns_bank(bank, wienerns_info);
     return;
   }

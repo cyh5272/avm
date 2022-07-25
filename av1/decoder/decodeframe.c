@@ -2317,14 +2317,14 @@ static AOM_INLINE void read_wiener_filter(MACROBLOCKD *xd, int wiener_win,
                                           WienerInfoBank *bank,
                                           aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
+  const int exact_match =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
-  if (equal) {
+  if (exact_match) {
     memcpy(wiener_info, av1_constref_from_wiener_bank(bank, ref),
            sizeof(*wiener_info));
     wiener_info->bank_ref = ref;
@@ -2399,14 +2399,14 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
                                            SgrprojInfoBank *bank,
                                            aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
+  const int exact_match =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
-  if (equal) {
+  if (exact_match) {
     memcpy(sgrproj_info, av1_constref_from_sgrproj_bank(bank, ref),
            sizeof(*sgrproj_info));
     sgrproj_info->bank_ref = ref;
@@ -2457,14 +2457,14 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
                                  WienerNonsepInfo *wienerns_info,
                                  WienerNonsepInfoBank *bank, aom_reader *rb) {
 #if CONFIG_RST_MERGECOEFFS
-  const int equal =
+  const int exact_match =
       aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
   int k;
   for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     if (aom_read_literal(rb, 1, ACCT_STR)) break;
   }
   const int ref = k;
-  if (equal) {
+  if (exact_match) {
     memcpy(wienerns_info, av1_constref_from_wienerns_bank(bank, ref),
            sizeof(*wienerns_info));
     wienerns_info->bank_ref = ref;

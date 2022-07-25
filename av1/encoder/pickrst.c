@@ -951,31 +951,33 @@ static int64_t count_sgrproj_bits(const ModeCosts *mode_costs,
   const int ref = sgrproj_info->bank_ref;
   const SgrprojInfo *ref_sgrproj_info =
       av1_constref_from_sgrproj_bank(bank, ref);
-  const int equal = check_sgrproj_eq(sgrproj_info, ref_sgrproj_info);
+  const int equal_ref = check_sgrproj_eq(sgrproj_info, ref_sgrproj_info);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
     bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
-  bits += mode_costs->merged_param_cost[equal];
-  if (equal) return bits;
+  bits += mode_costs->merged_param_cost[equal_ref];
+  if (equal_ref) return bits;
 #else
   const SgrprojInfo *ref_sgrproj_info = av1_constref_from_sgrproj_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
   bits += (SGRPROJ_PARAMS_BITS << AV1_PROB_COST_SHIFT);
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
-  if (params->r[0] > 0)
+  if (params->r[0] > 0) {
     bits += aom_count_primitive_refsubexpfin(
                 SGRPROJ_PRJ_MAX0 - SGRPROJ_PRJ_MIN0 + 1, SGRPROJ_PRJ_SUBEXP_K,
                 ref_sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0,
                 sgrproj_info->xqd[0] - SGRPROJ_PRJ_MIN0)
             << AV1_PROB_COST_SHIFT;
-  if (params->r[1] > 0)
+  }
+  if (params->r[1] > 0) {
     bits += aom_count_primitive_refsubexpfin(
                 SGRPROJ_PRJ_MAX1 - SGRPROJ_PRJ_MIN1 + 1, SGRPROJ_PRJ_SUBEXP_K,
                 ref_sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1,
                 sgrproj_info->xqd[1] - SGRPROJ_PRJ_MIN1)
             << AV1_PROB_COST_SHIFT;
+  }
   return bits;
 }
 
@@ -1104,12 +1106,12 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
   // Handles special case where no-merge filter is equal to merged
   // filter for the stack - we don't want to perform another merge and
   // get a less optimal filter, but we want to continue building the stack.
-  int equal;
+  int equal_ref;
   if (rtype == RESTORE_SGRPROJ &&
-      (equal = check_sgrproj_bank_eq(&rsc->sgrproj_bank,
-                                     &rusi->sgrproj_info)) >= 0) {
+      (equal_ref = check_sgrproj_bank_eq(&rsc->sgrproj_bank,
+                                         &rusi->sgrproj_info)) >= 0) {
     rsc->bits -= bits_nomerge;
-    rusi->sgrproj_info.bank_ref = equal;
+    rusi->sgrproj_info.bank_ref = equal_ref;
     unit_snapshot.current_bits =
         x->mode_costs.sgrproj_restore_cost[1] +
         count_sgrproj_bits(&x->mode_costs, &rusi->sgrproj_info,
@@ -1194,10 +1196,10 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
           &x->mode_costs, &rui_temp.sgrproj_info, &old_unit->ref_sgrproj_bank);
       old_unit->merge_bits = x->mode_costs.sgrproj_restore_cost[1] + new_bits;
     } else {
-      equal =
+      equal_ref =
           check_sgrproj_bank_eq(&old_unit->ref_sgrproj_bank, ref_sgrproj_info);
-      assert(equal >= 0);  // Must exist in bank
-      ref_sgrproj_info_tmp.bank_ref = equal;
+      assert(equal_ref >= 0);  // Must exist in bank
+      ref_sgrproj_info_tmp.bank_ref = equal_ref;
       const int merge_bits = count_sgrproj_bits(
           &x->mode_costs, &ref_sgrproj_info_tmp, &old_unit->ref_sgrproj_bank);
       old_unit->merge_bits = x->mode_costs.sgrproj_restore_cost[1] + merge_bits;
@@ -1222,10 +1224,10 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
         continue;
 
       if (old_unit->rest_unit_idx != begin_idx) {
-        equal = check_sgrproj_bank_eq(&old_unit->ref_sgrproj_bank,
-                                      ref_sgrproj_info);
-        assert(equal >= 0);  // Must exist in bank
-        av1_upd_to_sgrproj_bank(&old_unit->ref_sgrproj_bank, equal,
+        equal_ref = check_sgrproj_bank_eq(&old_unit->ref_sgrproj_bank,
+                                          ref_sgrproj_info);
+        assert(equal_ref >= 0);  // Must exist in bank
+        av1_upd_to_sgrproj_bank(&old_unit->ref_sgrproj_bank, equal_ref,
                                 &rui_temp.sgrproj_info);
       }
       old_rusi->best_rtype[RESTORE_SGRPROJ - 1] = RESTORE_SGRPROJ;
@@ -1239,10 +1241,11 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       old_unit->current_bits = old_unit->merge_bits;
     }
     RstUnitSnapshot *last_unit = aom_vector_back(current_unit_stack);
-    equal = check_sgrproj_bank_eq(&last_unit->ref_sgrproj_bank,
-                                  &rui_temp.sgrproj_info);
-    assert(equal >= 0);  // Must exist in bank
-    av1_upd_to_sgrproj_bank(&rsc->sgrproj_bank, equal, &rui_temp.sgrproj_info);
+    equal_ref = check_sgrproj_bank_eq(&last_unit->ref_sgrproj_bank,
+                                      &rui_temp.sgrproj_info);
+    assert(equal_ref >= 0);  // Must exist in bank
+    av1_upd_to_sgrproj_bank(&rsc->sgrproj_bank, equal_ref,
+                            &rui_temp.sgrproj_info);
   } else {
     // Copy current unit from the top of the stack.
     // memset(&unit_snapshot, 0, sizeof(unit_snapshot));
@@ -1706,14 +1709,14 @@ static int64_t count_wiener_bits(int wiener_win, const ModeCosts *mode_costs,
 #if CONFIG_RST_MERGECOEFFS
   const int ref = wiener_info->bank_ref;
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, ref);
-  const int equal = check_wiener_eq(wiener_info, ref_wiener_info);
+  const int equal_ref = check_wiener_eq(wiener_info, ref_wiener_info);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
     bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
-  bits += mode_costs->merged_param_cost[equal];
-  if (equal) return bits;
+  bits += mode_costs->merged_param_cost[equal_ref];
+  if (equal_ref) return bits;
 #else
   const WienerInfo *ref_wiener_info = av1_constref_from_wiener_bank(bank, 0);
 #endif  // CONFIG_RST_MERGECOEFFS
@@ -2140,12 +2143,12 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
   // Handles special case where no-merge filter is equal to merged
   // filter for the stack - we don't want to perform another merge and
   // get a less optimal filter, but we want to continue building the stack.
-  int equal;
+  int equal_ref;
   if (rtype == RESTORE_WIENER &&
-      (equal = check_wiener_bank_eq(&rsc->wiener_bank, &rusi->wiener_info)) >=
-          0) {
+      (equal_ref =
+           check_wiener_bank_eq(&rsc->wiener_bank, &rusi->wiener_info)) >= 0) {
     rsc->bits -= bits_nomerge;
-    rusi->wiener_info.bank_ref = equal;
+    rusi->wiener_info.bank_ref = equal_ref;
     unit_snapshot.current_bits =
         x->mode_costs.wiener_restore_cost[1] +
         count_wiener_bits_set(wiener_win, &x->mode_costs, &rusi->wiener_info,
@@ -2256,9 +2259,10 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                                  &old_unit->ref_wiener_bank);
       old_unit->merge_bits = x->mode_costs.wiener_restore_cost[1] + new_bits;
     } else {
-      equal = check_wiener_bank_eq(&old_unit->ref_wiener_bank, ref_wiener_info);
-      assert(equal >= 0);  // Must exist in bank
-      ref_wiener_info_tmp.bank_ref = equal;
+      equal_ref =
+          check_wiener_bank_eq(&old_unit->ref_wiener_bank, ref_wiener_info);
+      assert(equal_ref >= 0);  // Must exist in bank
+      ref_wiener_info_tmp.bank_ref = equal_ref;
       const int merge_bits =
           count_wiener_bits(wiener_win, &x->mode_costs, &ref_wiener_info_tmp,
                             &old_unit->ref_wiener_bank);
@@ -2283,10 +2287,10 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
         continue;
 
       if (old_unit->rest_unit_idx != begin_idx) {  // Not the first
-        equal =
+        equal_ref =
             check_wiener_bank_eq(&old_unit->ref_wiener_bank, ref_wiener_info);
-        assert(equal >= 0);  // Must exist in bank
-        av1_upd_to_wiener_bank(&old_unit->ref_wiener_bank, equal,
+        assert(equal_ref >= 0);  // Must exist in bank
+        av1_upd_to_wiener_bank(&old_unit->ref_wiener_bank, equal_ref,
                                &rui_temp.wiener_info);
       }
       old_rusi->best_rtype[RESTORE_WIENER - 1] = RESTORE_WIENER;
@@ -2301,10 +2305,10 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     }
     assert(has_begun);
     RstUnitSnapshot *last_unit = aom_vector_back(current_unit_stack);
-    equal = check_wiener_bank_eq(&last_unit->ref_wiener_bank,
-                                 &rui_temp.wiener_info);
-    assert(equal >= 0);  // Must exist in bank
-    av1_upd_to_wiener_bank(&rsc->wiener_bank, equal, &rui_temp.wiener_info);
+    equal_ref = check_wiener_bank_eq(&last_unit->ref_wiener_bank,
+                                     &rui_temp.wiener_info);
+    assert(equal_ref >= 0);  // Must exist in bank
+    av1_upd_to_wiener_bank(&rsc->wiener_bank, equal_ref, &rui_temp.wiener_info);
   } else {
     // Copy current unit from the top of the stack.
     // memset(&unit_snapshot, 0, sizeof(unit_snapshot));
@@ -2385,15 +2389,15 @@ static int64_t count_wienerns_bits(int plane, const ModeCosts *mode_costs,
   const int ref = wienerns_info->bank_ref;
   const WienerNonsepInfo *ref_wienerns_info =
       av1_constref_from_wienerns_bank(bank, ref);
-  const int equal =
+  const int equal_ref =
       check_wienerns_eq(plane, wienerns_info, ref_wienerns_info, wnsf);
   for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
     const int match = (k == ref);
     bits += (1 << AV1_PROB_COST_SHIFT);
     if (match) break;
   }
-  bits += mode_costs->merged_param_cost[equal];
-  if (equal) return bits;
+  bits += mode_costs->merged_param_cost[equal_ref];
+  if (equal_ref) return bits;
 #else
   const WienerNonsepInfo *ref_wienerns_info =
       av1_constref_from_wienerns_bank(bank, 0);
@@ -3265,12 +3269,12 @@ static void search_wienerns(const RestorationTileLimits *limits,
   // Handles special case where no-merge filter is equal to merged
   // filter for the stack - we don't want to perform another merge and
   // get a less optimal filter, but we want to continue building the stack.
-  int equal;
+  int equal_ref;
   if (rtype == RESTORE_WIENER_NONSEP &&
-      (equal = check_wienerns_bank_eq(is_uv, &rsc->wienerns_bank,
-                                      &rusi->wienerns_info, wnsf)) >= 0) {
+      (equal_ref = check_wienerns_bank_eq(is_uv, &rsc->wienerns_bank,
+                                          &rusi->wienerns_info, wnsf)) >= 0) {
     rsc->bits -= bits_nomerge;
-    rusi->wienerns_info.bank_ref = equal;
+    rusi->wienerns_info.bank_ref = equal_ref;
     unit_snapshot.current_bits =
         x->mode_costs.wienerns_restore_cost[1] +
         count_wienerns_bits_set(is_uv, &x->mode_costs, &rusi->wienerns_info,
@@ -3443,10 +3447,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
           &old_unit->ref_wienerns_bank, wnsf);
       old_unit->merge_bits = x->mode_costs.wienerns_restore_cost[1] + new_bits;
     } else {
-      equal = check_wienerns_bank_eq(is_uv, &old_unit->ref_wienerns_bank,
-                                     ref_wienerns_info, wnsf);
-      assert(equal >= 0);  // Must exist in bank
-      ref_wienerns_info_tmp.bank_ref = equal;
+      equal_ref = check_wienerns_bank_eq(is_uv, &old_unit->ref_wienerns_bank,
+                                         ref_wienerns_info, wnsf);
+      assert(equal_ref >= 0);  // Must exist in bank
+      ref_wienerns_info_tmp.bank_ref = equal_ref;
       const int merge_bits =
           count_wienerns_bits(is_uv, &x->mode_costs, &ref_wienerns_info_tmp,
                               &old_unit->ref_wienerns_bank, wnsf);
@@ -3472,10 +3476,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
         continue;
 
       if (old_unit->rest_unit_idx != begin_idx) {
-        equal = check_wienerns_bank_eq(is_uv, &old_unit->ref_wienerns_bank,
-                                       ref_wienerns_info, wnsf);
-        assert(equal >= 0);  // Must exist in bank
-        av1_upd_to_wienerns_bank(&old_unit->ref_wienerns_bank, equal,
+        equal_ref = check_wienerns_bank_eq(is_uv, &old_unit->ref_wienerns_bank,
+                                           ref_wienerns_info, wnsf);
+        assert(equal_ref >= 0);  // Must exist in bank
+        av1_upd_to_wienerns_bank(&old_unit->ref_wienerns_bank, equal_ref,
                                  &rui_temp.wienerns_info);
       }
       old_rusi->best_rtype[RESTORE_WIENER_NONSEP - 1] = RESTORE_WIENER_NONSEP;
@@ -3489,10 +3493,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
       old_unit->current_bits = old_unit->merge_bits;
     }
     RstUnitSnapshot *last_unit = aom_vector_back(current_unit_stack);
-    equal = check_wienerns_bank_eq(is_uv, &last_unit->ref_wienerns_bank,
-                                   &rui_temp.wienerns_info, wnsf);
-    assert(equal >= 0);  // Must exist in bank
-    av1_upd_to_wienerns_bank(&rsc->wienerns_bank, equal,
+    equal_ref = check_wienerns_bank_eq(is_uv, &last_unit->ref_wienerns_bank,
+                                       &rui_temp.wienerns_info, wnsf);
+    assert(equal_ref >= 0);  // Must exist in bank
+    av1_upd_to_wienerns_bank(&rsc->wienerns_bank, equal_ref,
                              &rui_temp.wienerns_info);
   } else {
     // Copy current unit from the top of the stack.
@@ -3663,18 +3667,18 @@ static void search_switchable(const RestorationTileLimits *limits,
 
   if (best_rtype == RESTORE_WIENER) {
 #if CONFIG_RST_MERGECOEFFS
-    const int equal =
+    const int equal_ref =
         check_wiener_bank_eq(&rsc->wiener_bank, &rusi->wiener_info);
-    if (equal == -1 || rsc->wiener_bank.bank_size == 0)
+    if (equal_ref == -1 || rsc->wiener_bank.bank_size == 0)
       av1_add_to_wiener_bank(&rsc->wiener_bank, &rusi->wiener_info);
 #else
     av1_add_to_wiener_bank(&rsc->wiener_bank, &rusi->wiener_info);
 #endif  // CONFIG_RST_MERGECOEFFS
   } else if (best_rtype == RESTORE_SGRPROJ) {
 #if CONFIG_RST_MERGECOEFFS
-    const int equal =
+    const int equal_ref =
         check_sgrproj_bank_eq(&rsc->sgrproj_bank, &rusi->sgrproj_info);
-    if (equal == -1 || rsc->sgrproj_bank.bank_size == 0)
+    if (equal_ref == -1 || rsc->sgrproj_bank.bank_size == 0)
       av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rusi->sgrproj_info);
 #else
     av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rusi->sgrproj_info);
@@ -3684,9 +3688,9 @@ static void search_switchable(const RestorationTileLimits *limits,
 #if CONFIG_RST_MERGECOEFFS
     const WienernsFilterConfigPairType *wnsf =
         get_wienerns_filters(rsc->cm->quant_params.base_qindex);
-    const int equal = check_wienerns_bank_eq(rsc->plane, &rsc->wienerns_bank,
-                                             &rusi->wienerns_info, wnsf);
-    if (equal == -1 || rsc->wienerns_bank.bank_size == 0)
+    const int equal_ref = check_wienerns_bank_eq(
+        rsc->plane, &rsc->wienerns_bank, &rusi->wienerns_info, wnsf);
+    if (equal_ref == -1 || rsc->wienerns_bank.bank_size == 0)
       av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info);
 #else
     av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info);
@@ -3715,10 +3719,10 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
 #if CONFIG_RST_MERGECOEFFS
     const int wiener_win =
         (rsc->plane == AOM_PLANE_Y) ? WIENER_WIN : WIENER_WIN_CHROMA;
-    const int equal =
+    const int equal_ref =
         check_wiener_bank_eq(&rsc->wiener_bank, &rui->wiener_info);
-    if (equal >= 0) {
-      rui->wiener_info.bank_ref = equal;
+    if (equal_ref >= 0) {
+      rui->wiener_info.bank_ref = equal_ref;
       if (rsc->wiener_bank.bank_size == 0)
         av1_add_to_wiener_bank(&rsc->wiener_bank, &rui->wiener_info);
     } else {
@@ -3733,10 +3737,10 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
 #if CONFIG_RST_MERGECOEFFS
     const WienernsFilterConfigPairType *wnsf =
         get_wienerns_filters(rsc->cm->quant_params.base_qindex);
-    const int equal = check_wienerns_bank_eq(rsc->plane, &rsc->wienerns_bank,
-                                             &rui->wienerns_info, wnsf);
-    if (equal >= 0) {
-      rui->wienerns_info.bank_ref = equal;
+    const int equal_ref = check_wienerns_bank_eq(
+        rsc->plane, &rsc->wienerns_bank, &rui->wienerns_info, wnsf);
+    if (equal_ref >= 0) {
+      rui->wienerns_info.bank_ref = equal_ref;
       if (rsc->wienerns_bank.bank_size == 0)
         av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rui->wienerns_info);
     } else {
@@ -3753,10 +3757,10 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   } else if (rui->restoration_type == RESTORE_SGRPROJ) {
     rui->sgrproj_info = rusi->sgrproj_info;
 #if CONFIG_RST_MERGECOEFFS
-    const int equal =
+    const int equal_ref =
         check_sgrproj_bank_eq(&rsc->sgrproj_bank, &rui->sgrproj_info);
-    if (equal >= 0) {
-      rui->sgrproj_info.bank_ref = equal;
+    if (equal_ref >= 0) {
+      rui->sgrproj_info.bank_ref = equal_ref;
       if (rsc->sgrproj_bank.bank_size == 0)
         av1_add_to_sgrproj_bank(&rsc->sgrproj_bank, &rui->sgrproj_info);
     } else {
