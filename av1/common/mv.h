@@ -529,6 +529,13 @@ typedef struct candidate_mv {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 } CANDIDATE_MV;
 
+#if CONFIG_WARP_REF_LIST
+typedef struct warp_candidate {
+  WarpedMotionParams wm_params;
+  WarpProjectionType proj_type;
+} WARP_CANDIDATE;
+#endif
+
 static INLINE int is_zero_mv(const MV *mv) {
   return *((const uint32_t *)mv) == 0;
 }

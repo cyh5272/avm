@@ -28,6 +28,12 @@ extern "C" {
 /*!\cond */
 
 #undef MAX_SB_SIZE
+#if CONFIG_WARP_REF_LIST
+#define SEARCH_LOW_PRECISION_WARP_CAUSAL 0
+#define SEARCH_LOW_PRECISION_WARP_DELTA 0
+#define SEARCH_LOW_PRECISION_WARP_EXTEND 0
+#define RESET_WARP_BANK_AT_SB_ROW 1
+#endif
 
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
@@ -767,6 +773,11 @@ enum {
 #define USABLE_REF_MV_STACK_SIZE (MAX_REF_MV_STACK_SIZE)
 #define REF_CAT_LEVEL 640
 
+#if CONFIG_WARP_REF_LIST
+#define MAX_WARP_REF_CANDIDATES 4
+#define WARP_REF_CONTEXTS 1
+#endif
+
 #if CONFIG_CONTEXT_DERIVATION
 #define INTRA_INTER_SKIP_TXFM_CONTEXTS 2
 #endif  // CONFIG_CONTEXT_DERIVATION
@@ -962,6 +973,19 @@ enum {
 #define DIR_MODES_0_90 17
 #define IBP_WEIGHT_SHIFT 8
 #define IBP_WEIGHT_MAX 255
+#endif
+
+#if CONFIG_WARP_REF_LIST
+/*!\enum Warp projection type
+ * \brief This enumeration defines various warp projection type supported
+ */
+typedef enum {
+  PROJ_GLOBAL_MOTION,  /**< block is from global motion */
+  PROJ_SPATIAL,        /**< Project from spatial neighborhood */
+  PROJ_PARAM_BANK,     /**< Project from circular buffer */
+  PROJ_DEFAULT,        /**< Default values */
+  WARP_PROJ_TYPES = 5, /**< Num projection types */
+} WarpProjectionType;
 #endif
 
 /*!\endcond */

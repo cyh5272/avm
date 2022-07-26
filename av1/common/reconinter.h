@@ -211,6 +211,15 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
                            const struct buf_2d *ref_buf,
                            InterpFilter interp_filter);
 
+#if CONFIG_WARP_REF_LIST
+// Check if the signaling of the warp delta parameters are allowed
+static INLINE int allow_warp_parameter_signaling(const AV1_COMMON *const cm,
+                                                 const MB_MODE_INFO *mbmi) {
+  (void)cm;
+  return (mbmi->motion_mode == WARP_DELTA && mbmi->warp_ref_idx == 1);
+}
+#endif
+
 #if CONFIG_ADAPTIVE_MVD
 static INLINE int enable_adaptive_mvd_resolution(const AV1_COMMON *const cm,
                                                  const MB_MODE_INFO *mbmi) {
