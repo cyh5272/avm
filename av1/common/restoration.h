@@ -196,35 +196,45 @@ extern "C" {
 #define WIENERNS_PAR_ID 2
 
 typedef struct {
-  NonsepFilterConfig nsfilter;
+  NonsepFilterConfig nsfilter_config;
   int ncoeffs;
   const int (*coeffs)[WIENERNS_COEFCFG_LEN];
-} WienernsFilterConfigType;
+} WienernsFilterParameters;
 
 typedef struct {
-  const WienernsFilterConfigType *y;
-  const WienernsFilterConfigType *uv;
-} WienernsFilterConfigPairType;
+  const WienernsFilterParameters *y;
+  const WienernsFilterParameters *uv;
+} WienernsFilterPairParameters;
 
-extern const WienernsFilterConfigPairType wienerns_filters_lowqp;
-extern const WienernsFilterConfigPairType wienerns_filters_midqp;
-extern const WienernsFilterConfigPairType wienerns_filters_highqp;
+extern const WienernsFilterPairParameters wienerns_filters_lowqp;
+extern const WienernsFilterPairParameters wienerns_filters_midqp;
+extern const WienernsFilterPairParameters wienerns_filters_highqp;
 
 #define USE_QBASED_WIENER_NONSEP 0
 #define USE_CENTER_WIENER_NONSEP 0
-static INLINE const WienernsFilterConfigPairType *get_wienerns_filters(
-    int qindex) {
+
+static INLINE const WienernsFilterParameters *get_wienerns_parameters(
+    int qindex, int is_uv) {
+  const WienernsFilterPairParameters *pair_nsfilter_params = NULL;
 #if USE_QBASED_WIENER_NONSEP
   if (qindex <= 96)
-    return &wienerns_filters_midqp;
+    pair_nsfilter_params = &wienerns_filters_midqp;
   else if (qindex <= 200)
-    return &wienerns_filters_midqp;
+    pair_nsfilter_params = &wienerns_filters_midqp;
   else
-    return &wienerns_filters_highqp;
+    pair_nsfilter_params = &wienerns_filters_highqp;
 #else
   (void)qindex;
-  return &wienerns_filters_midqp;
+  pair_nsfilter_params = &wienerns_filters_midqp;
 #endif  // USE_QBASED_WIENER_NONSEP
+  return is_uv ? pair_nsfilter_params->y : pair_nsfilter_params->uv;
+}
+
+static INLINE const NonsepFilterConfig *get_wienerns_config(int qindex,
+                                                            int is_uv) {
+  const WienernsFilterParameters *base_nsfilter_params =
+      get_wienerns_parameters(qindex, is_uv);
+  return &base_nsfilter_params->nsfilter_config;
 }
 #endif  // CONFIG_WIENER_NONSEP
 
@@ -471,21 +481,17 @@ static INLINE void set_default_wiener(WienerInfo *wiener_info) {
 
 #if CONFIG_WIENER_NONSEP
 static INLINE void set_default_wienerns(WienerNonsepInfo *wienerns_info,
-                                        int qindex, int num_classes) {
-  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(qindex);
+                                        int qindex, int num_classes,
+                                        int chroma) {
+  const WienernsFilterParameters *nsfilter_params =
+      get_wienerns_parameters(qindex, chroma);
   wienerns_info->num_classes = num_classes;
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
     int16_t *wienerns_info_nsfilter = nsfilter_taps(wienerns_info, c_id);
-    for (int i = 0; i < wnsf->y->ncoeffs; ++i) {
+    for (int i = 0; i < nsfilter_params->ncoeffs; ++i) {
       wienerns_info_nsfilter[i] =
-          wnsf->y->coeffs[i][WIENERNS_MIN_ID] +
-          (1 << wnsf->y->coeffs[i][WIENERNS_BIT_ID]) / 2;
-    }
-    for (int i = wnsf->y->ncoeffs; i < wnsf->y->ncoeffs + wnsf->uv->ncoeffs;
-         ++i) {
-      wienerns_info_nsfilter[i] =
-          wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_MIN_ID] +
-          (1 << wnsf->uv->coeffs[i - wnsf->y->ncoeffs][WIENERNS_BIT_ID]) / 2;
+          nsfilter_params->coeffs[i][WIENERNS_MIN_ID] +
+          (1 << nsfilter_params->coeffs[i][WIENERNS_BIT_ID]) / 2;
     }
   }
 }
