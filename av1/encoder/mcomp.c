@@ -333,10 +333,17 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv
 
 ) {
 #if CONFIG_FLEX_MVRES
+  //  in case of CONFIG_FLEX_MVRES we have to make sure the generated mv_limits
+  //  are compaitable with target precision.
   MV low_prec_mv = *mv;
+  // prec_shift is the number of LSBs need to be 0 to make the mv/mv_limit
+  // compaitable
   const int prec_shift = (pb_mv_precision < MV_PRECISION_ONE_PEL)
                              ? (MV_PRECISION_ONE_PEL - pb_mv_precision)
                              : 0;
+  // offset is the steps for target precision
+  // Offset value need to be substracted from the max value to confirm the
+  // generated MV value does not go to out of bound
   const int offset = (1 << prec_shift);
   const int max_full_mv =
       ((MAX_FULL_PEL_VAL >> prec_shift) << prec_shift) - offset;
@@ -386,43 +393,6 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv
   if (mv_limits->col_max > col_max) mv_limits->col_max = col_max;
   if (mv_limits->row_min < row_min) mv_limits->row_min = row_min;
   if (mv_limits->row_max > row_max) mv_limits->row_max = row_max;
-
-#if 0  // DEBUG_MV_LIMIT
-    const MV diff_min = { abs(mv_limits->col_min - GET_MV_RAWPEL(low_prec_mv.col)),
-                          abs(mv_limits->row_min - GET_MV_RAWPEL(low_prec_mv.row)) };
-    CHECK_FLEX_MV(abs(diff_min.row) > MAX_FULL_PEL_VAL,
-                    " exceed limit diff.row in av1_set_mv_search_range");
-    CHECK_FLEX_MV(abs(diff_min.col) > MAX_FULL_PEL_VAL,
-                  " exceed limit diff.col av1_set_mv_search_range");
-
-    CHECK_FLEX_MV(((diff_min.row >> prec_shift) << prec_shift) != diff_min.row,
-                  " error in diff.row av1_set_mv_search_range");
-    CHECK_FLEX_MV(((diff_min.col >> prec_shift) << prec_shift) != diff_min.col,
-                  " error in diff.col av1_set_mv_search_range");
-
-        CHECK_FLEX_MV(((mv_limits->col_min >> prec_shift) << prec_shift) != mv_limits->col_min,
-                  " error in mv_limits->col_min av1_set_mv_search_range");
-    CHECK_FLEX_MV(((mv_limits->row_min >> prec_shift) << prec_shift) != mv_limits->row_min,
-                  " error in mv_limits->col_max av1_set_mv_search_range");
-
-
-    const MV diff_max = { abs(mv_limits->col_max - GET_MV_RAWPEL(low_prec_mv.col)),
-                          abs(mv_limits->row_max - GET_MV_RAWPEL(low_prec_mv.row)) };
-    CHECK_FLEX_MV(abs(diff_max.row) > MAX_FULL_PEL_VAL,
-                    " exceed limit diff.row av1_set_mv_search_range");
-    CHECK_FLEX_MV(abs(diff_max.col) > MAX_FULL_PEL_VAL,
-                  " exceed limit diff.row av1_set_mv_search_range");
-
-    CHECK_FLEX_MV(((diff_max.row >> prec_shift) << prec_shift) != diff_max.row,
-                  " error in diff.row av1_set_mv_search_range");
-    CHECK_FLEX_MV(((diff_max.col >> prec_shift) << prec_shift) != diff_max.col,
-                  " error in diff.col av1_set_mv_search_range");
-
-    CHECK_FLEX_MV(((mv_limits->col_max >> prec_shift) << prec_shift) != mv_limits->col_max,
-                  " error in mv_limits->col_min av1_set_mv_search_range");
-    CHECK_FLEX_MV(((mv_limits->row_max >> prec_shift) << prec_shift) != mv_limits->row_max,
-                  " error in mv_limits->col_max av1_set_mv_search_range");
-#endif
 }
 
 #if CONFIG_TIP
@@ -547,29 +517,6 @@ static INLINE int get_mv_cost_with_precision(
     lower_mv_precision(&low_prec_ref_mv, pb_mv_precision);
   const MV diff = { mv.row - low_prec_ref_mv.row,
                     mv.col - low_prec_ref_mv.col };
-
-#if DEBUG_MV_LIMIT
-  int shift = (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision);
-  CHECK_FLEX_MV(((diff.row >> shift) << shift) != diff.row,
-                " error in diff.row");
-  CHECK_FLEX_MV(((diff.col >> shift) << shift) != diff.col,
-                " error in diff.col");
-
-  if (abs(diff.row) > MV_MAX || abs(diff.col) > MV_MAX) {
-    printf(
-        " is_ibc_cost = %d is_adaptive_mvd = %d pb_mv_precision =%d diff.row = "
-        "%d diff.col = %d \n",
-        is_ibc_cost, is_adaptive_mvd, pb_mv_precision, diff.row, diff.col);
-    printf(
-        "  this_mv.row = %d ref_mv.row = %d  this_mv.col = %d ref_mv.col = "
-        "%d\n",
-        mv.row, low_prec_ref_mv.row, mv.col, low_prec_ref_mv.col);
-    assert(0);
-  }
-
-  CHECK_FLEX_MV(abs(diff.row) > MV_MAX, " exceed limit diff.row");
-  CHECK_FLEX_MV(abs(diff.col) > MV_MAX, " exceed limit diff.row");
-#endif
 
   if (mvcost) {
     return (int)ROUND_POWER_OF_TWO_64(
@@ -713,33 +660,6 @@ static INLINE int mvsad_err_cost(const FULLPEL_MV mv,
   const MV diff = { (this_mv.row - ref_mv.row), (this_mv.col - ref_mv.col) };
 
   const MV abs_diff = { abs(diff.row), abs(diff.col) };
-
-#if DEBUG_MV_LIMIT
-  int shift = (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision);
-  CHECK_FLEX_MV(((diff.row >> shift) << shift) != diff.row,
-                " error in diff.row");
-  CHECK_FLEX_MV(((diff.col >> shift) << shift) != diff.col,
-                " error in diff.col");
-
-  if (abs(diff.row) > MV_MAX || abs(diff.col) > MV_MAX) {
-    printf(
-        " is_ibc_cost = %d is_adaptive_mvd = %d pb_mv_precision =%d diff.row = "
-        "%d diff.col = %d \n",
-        mv_cost_params->is_ibc_cost, mv_cost_params->is_adaptive_mvd,
-        pb_mv_precision, diff.row, diff.col);
-    printf(
-        "  this_mv.row = %d ref_mv.row = %d  this_mv.col = %d ref_mv.col = "
-        "%d\n",
-        this_mv.row, ref_mv.row, this_mv.col, ref_mv.col);
-    printf(
-        " mv_cost_params->full_ref_mv.row = %d mv_cost_params->full_ref_mv.col "
-        "= %d \n",
-        mv_cost_params->full_ref_mv.row, mv_cost_params->full_ref_mv.col);
-    assert(0);
-  }
-  CHECK_FLEX_MV(abs(diff.row) > MV_MAX, " exceed limit diff.row");
-  CHECK_FLEX_MV(abs(diff.col) > MV_MAX, " exceed limit diff.col");
-#endif
 
   const MvCosts *mv_costs = mv_cost_params->mv_costs;
 
@@ -1305,9 +1225,6 @@ static AOM_FORCE_INLINE void calc_int_sad_list(
 #if CONFIG_FLEX_MVRES
   // costlist is not supported for the 2/4 MV precision
   assert(ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL);
-  CHECK_FLEX_MV(
-      ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL,
-      " costlist is not supported for the 2/4 MV precision");
 #endif
 
   // Refresh the costlist it does not contain valid sad
@@ -5156,35 +5073,11 @@ int av1_return_max_sub_pixel_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   bestmv->row = mv_limits->row_max;
   bestmv->col = mv_limits->col_max;
 
-  CHECK_FLEX_MV(abs(bestmv->row) > MV_MAX, " exceed limit bestmv->row ");
-  CHECK_FLEX_MV(abs(bestmv->col) > MV_MAX,
-                " exceed limit bestmv->col av1_set_mv_search_range");
-
   unsigned int besterr = 0;
 
   // In the sub-pel motion search, if hp is not used, then the last bit of mv
   // has to be 0.
-#if CONFIG_FLEX_MVRES
-#if 0
-  lower_mv_precision(bestmv, ms_params->mv_cost_params.pb_mv_precision);
-
-  const int prec_shift =
-      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
-  const int offset = 1 << prec_shift;
-  const int sign_mv_low = (MV_LOW < 0) ? -1 : 1;
-  const int sign_mv_upp = (MV_UPP < 0) ? -1 : 1;
-  const int mv_low =
-      ((((abs(MV_LOW)) >> prec_shift) << prec_shift) - offset) * sign_mv_low;
-  const int mv_upp =
-      ((((abs(MV_UPP)) >> prec_shift) << prec_shift) - offset) * sign_mv_upp;
-
-  // Clamp mv after the modification.
-  if (bestmv->row <= mv_low) bestmv->row = mv_low;
-  if (bestmv->row >= mv_upp) bestmv->row = mv_upp;
-  if (bestmv->col <= mv_low) bestmv->col = mv_low;
-  if (bestmv->col >= mv_upp) bestmv->col = mv_upp;
-#endif
-#else
+#if !CONFIG_FLEX_MVRES
   lower_mv_precision(bestmv, allow_hp, 0);
 #endif
   return besterr;
@@ -5211,35 +5104,11 @@ int av1_return_min_sub_pixel_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   bestmv->row = mv_limits->row_min;
   bestmv->col = mv_limits->col_min;
 
-  CHECK_FLEX_MV(abs(bestmv->row) > MV_MAX, " exceed limit bestmv->row ");
-  CHECK_FLEX_MV(abs(bestmv->col) > MV_MAX,
-                " exceed limit bestmv->col av1_set_mv_search_range");
-
   unsigned int besterr = 0;
   // In the sub-pel motion search, if hp is not used, then the last bit of mv
   // has to be 0.
 #if !CONFIG_FLEX_MVRES
   lower_mv_precision(bestmv, allow_hp, 0);
-#else
-#if 0
-  lower_mv_precision(bestmv, ms_params->mv_cost_params.pb_mv_precision);
-
-  const int prec_shift =
-      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
-  const int sign_mv_low = (MV_LOW < 0) ? -1 : 1;
-  const int sign_mv_upp = (MV_UPP < 0) ? -1 : 1;
-  const int offset = 1 << prec_shift;
-  const int mv_low =
-      ((((abs(MV_LOW)) >> prec_shift) << prec_shift) - offset) * sign_mv_low;
-  const int mv_upp =
-      ((((abs(MV_UPP)) >> prec_shift) << prec_shift) - offset) * sign_mv_upp;
-
-  // Clamp mv after the modification.
-  if (bestmv->row <= mv_low) bestmv->row = mv_low;
-  if (bestmv->row >= mv_upp) bestmv->row = mv_upp;
-  if (bestmv->col <= mv_low) bestmv->col = mv_low;
-  if (bestmv->col >= mv_upp) bestmv->col = mv_upp;
-#endif
 #endif
   return besterr;
 }

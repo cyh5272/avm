@@ -1752,12 +1752,6 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 #endif
 
           );
-#if 1
-          CHECK_FLEX_MV(abs(cur_mv[0].as_mv.row) > MV_MAX,
-                        " exceed limit bestmv->row ");
-          CHECK_FLEX_MV(abs(cur_mv[0].as_mv.col) > MV_MAX,
-                        " exceed limit bestmv->col av1_set_mv_search_range");
-#endif
         }
 #if CONFIG_ADAPTIVE_MVD
       }
@@ -1774,14 +1768,6 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
                                   ref_idx);
     if (best_mv.as_int == INVALID_MV) return INT64_MAX;
     cur_mv[0].as_int = best_mv.as_int;
-
-#if 1
-    CHECK_FLEX_MV(abs(cur_mv[0].as_mv.row) > MV_MAX,
-                  " exceed limit bestmv->row ");
-    CHECK_FLEX_MV(abs(cur_mv[0].as_mv.col) > MV_MAX,
-                  " exceed limit bestmv->col av1_set_mv_search_range");
-#endif
-
 #endif  // IMPROVED_AMVD
   } else {
     // Single ref case.
@@ -1870,12 +1856,6 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
       }
       av1_single_motion_search(cpi, x, bsize, ref_idx, rate_mv, search_range,
                                mode_info, &best_mv);
-#if 1
-      CHECK_FLEX_MV(abs(cur_mv[0].as_mv.row) > MV_MAX,
-                    " exceed limit bestmv->row ");
-      CHECK_FLEX_MV(abs(cur_mv[0].as_mv.col) > MV_MAX,
-                    " exceed limit bestmv->col av1_set_mv_search_range");
-#endif
 
 #if CONFIG_FLEX_MVRES
     }
@@ -1894,13 +1874,6 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 #endif
 
     cur_mv[0].as_int = best_mv.as_int;
-
-#if 0
-CHECK_FLEX_MV(abs(cur_mv[0].as_mv.row) > MV_MAX,
-                    " exceed limit bestmv->row ");
- CHECK_FLEX_MV(abs(cur_mv[0].as_mv.col) > MV_MAX,
-                  " exceed limit bestmv->col av1_set_mv_search_range");
-#endif
   }
 
   return 0;

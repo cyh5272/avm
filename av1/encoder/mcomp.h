@@ -510,23 +510,17 @@ static INLINE void av1_set_subpel_mv_search_range(
 ) {
 
 #if CONFIG_FLEX_MVRES
-
-#if 0  // DEBUG_MV_LIMIT
-  const int prec_shift = (pb_mv_precision < MV_PRECISION_ONE_PEL) ? (MV_PRECISION_ONE_PEL - pb_mv_precision) : 0;
-    CHECK_FLEX_MV(((mv_limits->col_max >> prec_shift) << prec_shift) != mv_limits->col_max,
-                  " error in mv_limits->col_min av1_set_mv_search_range");
-    CHECK_FLEX_MV(((mv_limits->row_max >> prec_shift) << prec_shift) != mv_limits->row_max,
-                  " error in mv_limits->col_max av1_set_mv_search_range");
-    CHECK_FLEX_MV(((mv_limits->col_min >> prec_shift) << prec_shift) != mv_limits->col_min,
-                  " error in mv_limits->col_min av1_set_mv_search_range");
-    CHECK_FLEX_MV(((mv_limits->row_min >> prec_shift) << prec_shift) != mv_limits->row_min,
-                  " error in mv_limits->col_max av1_set_mv_search_range");
-#endif
-
+  //  in case of CONFIG_FLEX_MVRES we have to make sure the generated mv_limits
+  //  are compaitable with target precision.
   MV low_prec_ref_mv = *ref_mv;
   lower_mv_precision(&low_prec_ref_mv, pb_mv_precision);
+  // sub_pel_prec_shift is the number of LSBs need to be 0 to make the
+  // mv/mv_limit compaitable
   const int sub_pel_prec_shift =
       (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision);
+  // offset is the steps for target precision
+  // Offset value need to be substracted from the max value to confirm the
+  // generated MV value does not go to out of bound
   const int offset = (1 << sub_pel_prec_shift);
   const int max_mv = ((GET_MV_SUBPEL(MAX_FULL_PEL_VAL) >> sub_pel_prec_shift)
                       << sub_pel_prec_shift) -
@@ -571,38 +565,6 @@ static INLINE void av1_set_subpel_mv_search_range(
   subpel_limits->col_max = AOMMIN(mv_upp - (1 << sub_pel_prec_shift), maxc);
   subpel_limits->row_min = AOMMAX(mv_low + (1 << sub_pel_prec_shift), minr);
   subpel_limits->row_max = AOMMIN(mv_upp - (1 << sub_pel_prec_shift), maxr);
-
-  CHECK_FLEX_MV(
-      abs(subpel_limits->row_max) > MV_MAX,
-      " exceed limit subpel_limits->row_max in av1_set_mv_search_range");
-  CHECK_FLEX_MV(abs(subpel_limits->row_min) > MV_MAX,
-                " exceed limit subpel_limits->row_min av1_set_mv_search_range");
-
-  CHECK_FLEX_MV(
-      abs(subpel_limits->col_min) > MV_MAX,
-      " exceed limit subpel_limits->col_min in av1_set_mv_search_range");
-  CHECK_FLEX_MV(abs(subpel_limits->col_max) > MV_MAX,
-                " exceed limit subpel_limits->col_max av1_set_mv_search_range");
-
-#if 0  // DEBUG_MV_LIMIT
-
-    const MV diff_min = { (int16_t) subpel_limits->col_min - (low_prec_ref_mv.col),
-                          (int16_t)subpel_limits->row_min - (low_prec_ref_mv.row) };
-    CHECK_FLEX_MV(abs(diff_min.row) > MV_MAX,
-                    " exceed limit diff.row in av1_set_mv_search_range");
-    CHECK_FLEX_MV(abs(diff_min.col) > MV_MAX,
-                  " exceed limit diff.col av1_set_mv_search_range");
-
-
-    const MV diff_max = { (int16_t)subpel_limits->col_max - (low_prec_ref_mv.col),
-                          (int16_t)subpel_limits->row_max - (low_prec_ref_mv.row) };
-    CHECK_FLEX_MV(abs(diff_max.row) > MV_MAX,
-                    " exceed limit diff.row in av1_set_mv_search_range");
-    CHECK_FLEX_MV(abs(diff_max.col) > MV_MAX,
-                  " exceed limit diff.col av1_set_mv_search_range");
-
-#endif
-
 #else
 
   const int max_mv = GET_MV_SUBPEL(MAX_FULL_PEL_VAL);
