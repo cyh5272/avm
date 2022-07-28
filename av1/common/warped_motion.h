@@ -109,13 +109,14 @@ static INLINE int16_t resolve_divisor_32_CfL(int32_t N, int32_t D,
     assert(f_d <= DIV_LUT_NUM);
     assert(f_n <= DIV_LUT_NUM * 2);
 
-    int shift_add = shift_d - shift_n - shift;
+    const int shift_add = shift_d - shift_n - shift;
 
-    if (shift_add <= 2)
+    if (shift_add <= 2) {
       ret =
           div_lut[f_d] * f_n >> (DIV_LUT_PREC_BITS + DIV_LUT_BITS + shift_add);
-    else
+    } else {
       ret = 0;
+    }
 
     if (ret >= (2 << shift) - 1) ret = (2 << shift) - 1;
 
