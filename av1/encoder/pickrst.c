@@ -2524,8 +2524,8 @@ static AOM_INLINE void search_norestore(const RestorationTileLimits *limits,
 
 #if CONFIG_WIENER_NONSEP
 static int64_t count_wienerns_bits(
-    int plane, const ModeCosts *mode_costs, const WienerNonsepInfo *wienerns_info,
-    const WienerNonsepInfoBank *bank,
+    int plane, const ModeCosts *mode_costs,
+    const WienerNonsepInfo *wienerns_info, const WienerNonsepInfoBank *bank,
     const WienernsFilterParameters *nsfilter_params) {
   (void)mode_costs;
   int is_uv = (plane != AOM_PLANE_Y);
