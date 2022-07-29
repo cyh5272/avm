@@ -334,19 +334,18 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv
 ) {
 #if CONFIG_FLEX_MVRES
   //  in case of CONFIG_FLEX_MVRES we have to make sure the generated mv_limits
-  //  are compaitable with target precision.
+  //  are compatible with target precision.
   // prec_shift is the number of LSBs need to be 0 to make the mv/mv_limit
-  // compaitable
+  // compatible
   const int prec_shift = (pb_mv_precision < MV_PRECISION_ONE_PEL)
                              ? (MV_PRECISION_ONE_PEL - pb_mv_precision)
                              : 0;
-  // offset is the steps for target precision
-  // Offset value need to be substracted from the max value in order to avoid
-  // any rounding mismatch between subpel/fullpel conversation to confirm the
-  // generated MVD value does not go to out of bound
-  const int offset = (1 << prec_shift);
-  const int max_full_mv =
-      ((MAX_FULL_PEL_VAL >> prec_shift) << prec_shift) - offset;
+
+  const int max_full_mv = av1_lower_mv_limit(MAX_FULL_PEL_VAL, prec_shift, -1);
+  const int mv_low =
+      av1_lower_mv_limit(GET_MV_RAWPEL(MV_LOW + 1), prec_shift, 1);
+  const int mv_upp =
+      av1_lower_mv_limit(GET_MV_RAWPEL(MV_UPP - 1), prec_shift, -1);
 
   // Producing the reference mv value to the target precision
   FULLPEL_MV full_ref_mv = get_fullmv_from_mv(mv);
@@ -361,14 +360,6 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv
                 (low_prec_mv.row & 7 ? 1 : 0);
   int col_max = GET_MV_RAWPEL(low_prec_mv.col) + max_full_mv;
   int row_max = GET_MV_RAWPEL(low_prec_mv.row) + max_full_mv;
-
-  // set upper limits of the mvs
-  const int mv_low =
-      (((GET_MV_RAWPEL(abs(MV_LOW + 1)) >> prec_shift) << prec_shift) -
-       offset) *
-      -1;
-  const int mv_upp =
-      (((GET_MV_RAWPEL(abs(MV_UPP - 1)) >> prec_shift) << prec_shift) - offset);
 
   col_min = AOMMAX(col_min, mv_low + (1 << prec_shift));
   row_min = AOMMAX(row_min, mv_low + (1 << prec_shift));
