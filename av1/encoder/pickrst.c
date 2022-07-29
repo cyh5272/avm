@@ -3775,7 +3775,7 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
   const MACROBLOCK *const x = rsc->x;
 #if CONFIG_WIENER_NONSEP
   const WienernsFilterParameters *nsfilter_params = get_wienerns_parameters(
-      rsc->cm->quant_params.base_qindex, rsc->plane == AOM_PLANE_Y);
+      rsc->cm->quant_params.base_qindex, rsc->plane != AOM_PLANE_Y);
 #endif  // CONFIG_WIENER_NONSEP
   const int wiener_win =
       (rsc->plane == AOM_PLANE_Y) ? WIENER_WIN : WIENER_WIN_CHROMA;
