@@ -227,7 +227,7 @@ static INLINE const WienernsFilterParameters *get_wienerns_parameters(
   (void)qindex;
   pair_nsfilter_params = &wienerns_filters_midqp;
 #endif  // USE_QBASED_WIENER_NONSEP
-  return is_uv ? pair_nsfilter_params->y : pair_nsfilter_params->uv;
+  return is_uv ? pair_nsfilter_params->uv : pair_nsfilter_params->y;
 }
 
 static INLINE const NonsepFilterConfig *get_wienerns_config(int qindex,
