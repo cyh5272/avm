@@ -941,36 +941,47 @@ typedef void (*highbd_convolve_nonsep_2d_func)(
 class AV1ConvolveNonSep2DHighbdTest
     : public AV1ConvolveTest<highbd_convolve_nonsep_2d_func> {
  public:
-  void RunTest() {
-    SetFilterTaps();
-
-    // CONFIG_WIENER_NONSEP use case.
-    TestConvolve(&UnitSumFilterConfig_, FilterTaps_);
-
-    // CONFIG_PC_WIENER use case.
-    TestConvolve(&UnconstrainedSumFilterConfig_, FilterTaps_);
+  void RunTest(RestorationType rtype) {
+    for (int i = 0; i < kTestIterations; i++) {
+      SetFilterTaps();
+      TestConvolve(FilterTaps_, rtype);
+    }
   }
-  void RunSpeedTest() {
-    SpeedTestConvolve(&UnconstrainedSumFilterConfig_, FilterTaps_);
+  void RunSpeedTest(RestorationType rtype) {
+    SpeedTestConvolve(FilterTaps_, rtype);
   };
 
  private:
   void BitMatchTest(const uint16_t *input, int input_stride, int width,
-                    int height, const NonsepFilterConfig *filter_config,
-                    const int16_t *filter, uint16_t *reference, uint16_t *test,
-                    int dst_stride, int bit_depth, int block_row_begin,
-                    int block_row_end, int block_col_begin, int block_col_end) {
-    av1_convolve_symmetric_highbd_c(input, input_stride, filter_config, filter,
-                                    reference, dst_stride, bit_depth,
-                                    block_row_begin, block_row_end,
-                                    block_col_begin, block_col_end);
+                    int height, const int16_t *filter, uint16_t *reference,
+                    uint16_t *test, int dst_stride, int bit_depth,
+                    int block_row_begin, int block_row_end, int block_col_begin,
+                    int block_col_end, RestorationType rtype) {
+    const NonsepFilterConfig *filter_config;
+    highbd_convolve_nonsep_2d_func ref_func;
+#if CONFIG_PC_WIENER
+    if (rtype == RESTORE_PC_WIENER) {
+      ref_func = av1_convolve_symmetric_highbd_c;
+      filter_config = &UnconstrainedSumFilterConfig_;
+    }
+#endif  // CONFIG_PC_WIENER
+
+#if CONFIG_WIENER_NONSEP
+    if (rtype == RESTORE_WIENER_NONSEP) {
+      ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
+      filter_config = &UnitSumFilterConfig_;
+    }
+#endif  // CONFIG_WIENER_NONSEP
+
+    ref_func(input, input_stride, filter_config, filter, reference, dst_stride,
+             bit_depth, block_row_begin, block_row_end, block_col_begin,
+             block_col_end);
     GetParam().TestFunction()(input, input_stride, filter_config, filter, test,
                               dst_stride, bit_depth, block_row_begin,
                               block_row_end, block_col_begin, block_col_end);
     AssertOutputBufferEq(reference, test, width, height);
   }
-  void TestConvolve(const NonsepFilterConfig *filter_config,
-                    const int16_t *filter) {
+  void TestConvolve(const int16_t *filter, RestorationType rtype) {
     const int width = GetParam().Block().Width();
     const int height = GetParam().Block().Height();
     const int bit_depth = GetParam().BitDepth();
@@ -985,9 +996,8 @@ class AV1ConvolveNonSep2DHighbdTest
         input + kMaxTapOffset * width + kMaxTapOffset;
     const int input_stride = width;
 
-    BitMatchTest(centered_input, input_stride, width, height, filter_config,
-                 filter, reference, test, kOutputStride, bit_depth, 0, height,
-                 0, width);
+    BitMatchTest(centered_input, input_stride, width, height, filter, reference,
+                 test, kOutputStride, bit_depth, 0, height, 0, width, rtype);
 
     // Extreme value test
     const uint16_t *extreme_input = FirstRandomInput16Extreme(GetParam());
@@ -997,12 +1007,11 @@ class AV1ConvolveNonSep2DHighbdTest
     RandomizeExtreamFilterTap(Extream_Tap_, kNumSymmetricTaps + 1,
                               kMaxPrecisionBeforeOverflow);
     BitMatchTest(centered_extreme_input, input_stride, width, height,
-                 filter_config, Extream_Tap_, reference, test, kOutputStride,
-                 bit_depth, 0, height, 0, width);
+                 Extream_Tap_, reference, test, kOutputStride, bit_depth, 0,
+                 height, 0, width, rtype);
   }
 
-  void SpeedTestConvolve(const NonsepFilterConfig *filter_config,
-                         const int16_t *filter) {
+  void SpeedTestConvolve(const int16_t *filter, RestorationType rtype) {
     const int width = GetParam().Block().Width();
     const int height = GetParam().Block().Height();
     const int bit_depth = GetParam().BitDepth();
@@ -1017,12 +1026,26 @@ class AV1ConvolveNonSep2DHighbdTest
         input + kMaxTapOffset * width + kMaxTapOffset;
 
     // Calculate time taken for C function
+    const NonsepFilterConfig *filter_config;
+    highbd_convolve_nonsep_2d_func ref_func;
+#if CONFIG_PC_WIENER
+    if (rtype == RESTORE_PC_WIENER) {
+      ref_func = av1_convolve_symmetric_highbd_c;
+      filter_config = &UnconstrainedSumFilterConfig_;
+    }
+#endif  // CONFIG_PC_WIENER
+
+#if CONFIG_WIENER_NONSEP
+    if (rtype == RESTORE_WIENER_NONSEP) {
+      ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
+      filter_config = &UnitSumFilterConfig_;
+    }
+#endif  // CONFIG_WIENER_NONSEP
     aom_usec_timer timer;
     aom_usec_timer_start(&timer);
     for (int i = 0; i < kSpeedIterations; ++i) {
-      av1_convolve_symmetric_highbd_c(centered_input, width, filter_config,
-                                      filter, reference, kOutputStride,
-                                      bit_depth, 0, height, 0, width);
+      ref_func(centered_input, width, filter_config, filter, reference,
+               kOutputStride, bit_depth, 0, height, 0, width);
     }
     aom_usec_timer_mark(&timer);
     auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
@@ -1043,10 +1066,9 @@ class AV1ConvolveNonSep2DHighbdTest
         (float)1000.0 * elapsed_time_opt / (kSpeedIterations * width * height);
     float scaling = c_time_per_pixel / opt_time_per_pixel;
     printf(
-        "\tconvolve symmetric: %2d bit,  %3dx%-3d: c_time_per_pixel=%10.5f, "
+        "%3dx%-3d: c_time_per_pixel=%10.5f, "
         "opt_time_per_pixel=%10.5f,  scaling=%f \n",
-        bit_depth, width, height, c_time_per_pixel, opt_time_per_pixel,
-        scaling);
+        width, height, c_time_per_pixel, opt_time_per_pixel, scaling);
   }
 
   // Generates NonsepFilterConfig compliant origin symmetric filter tap values.
@@ -1087,7 +1109,9 @@ class AV1ConvolveNonSep2DHighbdTest
   static constexpr int kNumSymmetricTaps = 12;
   static constexpr int kMaxTapOffset = 3;  // Filters are 7x7.
   static constexpr int kSpeedIterations = 10000;
+  static constexpr int kTestIterations = 100;
 
+#if CONFIG_PC_WIENER
   // Configuration for nonseparable 7x7 filters for DIAMOND shape.
   // Format is offset (i) row and (ii) column from center pixel
   // and the (iii) filter-tap index that multiplies the pixel at
@@ -1100,16 +1124,6 @@ class AV1ConvolveNonSep2DHighbdTest
     { 0, -2, 10 }, { 0, 2, 10 }, { 0, -1, 11 }, { 0, 1, 11 },  { 0, 0, 12 },
   };
 
-  // Filters use only the first (2 * kNumSymmetricTaps) taps. Center tap is
-  // constrained.
-  const NonsepFilterConfig UnitSumFilterConfig_ = { kMaxPrecisionBeforeOverflow,
-                                                    2 * kNumSymmetricTaps,
-                                                    0,
-                                                    NonsepConfig_,
-                                                    NULL,
-                                                    0,
-                                                    0 };
-
   // Filters use all unique taps.
   const NonsepFilterConfig UnconstrainedSumFilterConfig_ = {
     kMaxPrecisionBeforeOverflow,
@@ -1120,18 +1134,93 @@ class AV1ConvolveNonSep2DHighbdTest
     0,
     0
   };
+#endif  // CONFIG_PC_WIENER
+
+#if CONFIG_WIENER_NONSEP
+  // Configuration for UnitSumFilterConfig_ wiener nonseparable 7x7 filters for
+  // DIAMOND shape. Format is offset (i) row and (ii) column from center pixel
+  // and the (iii) filter-tap index that multiplies the pixel at the respective
+  // offset.
+  const int WienerNonsepConfig_[25][3] = {
+    { 1, 0, 0 },
+    { -1, 0, 0 },
+    { 0, 1, 1 },
+    { 0, -1, 1 },
+    { 2, 0, 2 },
+    { -2, 0, 2 },
+    { 0, 2, 3 },
+    { 0, -2, 3 },
+    { 1, 1, 4 },
+    { -1, -1, 4 },
+    { -1, 1, 5 },
+    { 1, -1, 5 },
+    { 2, 1, 6 },
+    { -2, -1, 6 },
+    { 2, -1, 7 },
+    { -2, 1, 7 },
+    { 1, 2, 8 },
+    { -1, -2, 8 },
+    { 1, -2, 9 },
+    { -1, 2, 9 },
+    { 3, 0, 10 },
+    { -3, 0, 10 },
+    { 0, 3, 11 },
+    { 0, -3, 11 },
+#if USE_CENTER_WIENER_NONSEP
+    { 0, 0, 12 },
+#endif  // USE_CENTER_WIENER_NONSEP
+  };
+
+  // Filters use only the first (2 * kNumSymmetricTaps) taps. Center tap is
+  // constrained.
+  const NonsepFilterConfig UnitSumFilterConfig_ = {
+    kMaxPrecisionBeforeOverflow,
+#if USE_CENTER_WIENER_NONSEP
+    2 * kNumSymmetricTaps + 1,
+#else
+    2 * kNumSymmetricTaps,
+#endif  // USE_CENTER_WIENER_NONSEP
+    0,
+    WienerNonsepConfig_,
+    NULL,
+    0,
+    1
+  };
+#endif  // CONFIG_WIENER_NONSEP
+
   int16_t FilterTaps_[kNumSymmetricTaps + 1];
 };
 
-TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(); }
+#if CONFIG_PC_WIENER
+TEST_P(AV1ConvolveNonSep2DHighbdTest, RunTest) { RunTest(RESTORE_PC_WIENER); }
 
-TEST_P(AV1ConvolveNonSep2DHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+TEST_P(AV1ConvolveNonSep2DHighbdTest, DISABLED_Speed) {
+  RunSpeedTest(RESTORE_PC_WIENER);
+}
 
 #if HAVE_AVX2
 INSTANTIATE_TEST_SUITE_P(AVX2, AV1ConvolveNonSep2DHighbdTest,
                          BuildHighbdParams(av1_convolve_symmetric_highbd_avx2));
 #endif
+#endif  // CONFIG_PC_WIENER
+
+#if CONFIG_WIENER_NONSEP
+class AV1ConvolveWienerNonSep2DHighbdTest
+    : public AV1ConvolveNonSep2DHighbdTest {};
+
+TEST_P(AV1ConvolveWienerNonSep2DHighbdTest, RunTest) {
+  RunTest(RESTORE_WIENER_NONSEP);
+}
+TEST_P(AV1ConvolveWienerNonSep2DHighbdTest, DISABLED_Speed) {
+  RunSpeedTest(RESTORE_WIENER_NONSEP);
+}
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1ConvolveWienerNonSep2DHighbdTest,
+    BuildHighbdParams(av1_convolve_symmetric_subtract_center_highbd_avx2));
+#endif
+#endif  // CONFIG_WIENER_NONSEP
 
 #endif  // CONFIG_WIENER_NONSEP || CONFIG_PC_WIENER
-
 }  // namespace
