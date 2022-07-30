@@ -152,13 +152,13 @@ const int wienerns_coeff_uv[][WIENERNS_COEFCFG_LEN] = {
 #endif  // CONFIG_LR_4PART_CODE
 };
 
-const WienernsFilterConfigType wienerns_filter_y = AOM_MAKE_WIENERNS_CONFIG(
+const WienernsFilterParameters wienerns_filter_y = AOM_MAKE_WIENERNS_CONFIG(
     wienerns_prec_bits_y, wienerns_config_y, wienerns_coeff_y);
-const WienernsFilterConfigType wienerns_filter_uv =
+const WienernsFilterParameters wienerns_filter_uv =
     AOM_MAKE_WIENERNS_CONFIG2(wienerns_prec_bits_uv, wienerns_config_uv_from_uv,
                               wienerns_config_uv_from_y, wienerns_coeff_uv);
 
-const WienernsFilterConfigPairType wienerns_filters_midqp = {
+const WienernsFilterPairParameters wienerns_filters_midqp = {
   &wienerns_filter_y, &wienerns_filter_uv
 };
 
@@ -222,10 +222,10 @@ const int wienerns_coeff_y2[][WIENERNS_COEFCFG_LEN] = {
 #endif  // CONFIG_LR_4PART_CODE
 };
 
-const WienernsFilterConfigType wienerns_filter_y2 = AOM_MAKE_WIENERNS_CONFIG(
+const WienernsFilterParameters wienerns_filter_y2 = AOM_MAKE_WIENERNS_CONFIG(
     wienerns_prec_bits_y2, wienerns_config_y2, wienerns_coeff_y2);
 
-const WienernsFilterConfigPairType wienerns_filters_highqp = {
+const WienernsFilterPairParameters wienerns_filters_highqp = {
   &wienerns_filter_y2, &wienerns_filter_uv
 };
 
@@ -299,10 +299,10 @@ const int wienerns_coeff_y3[][WIENERNS_COEFCFG_LEN] = {
 #endif  // CONFIG_LR_4PART_CODE
 };
 
-const WienernsFilterConfigType wienerns_filter_y3 = AOM_MAKE_WIENERNS_CONFIG(
+const WienernsFilterParameters wienerns_filter_y3 = AOM_MAKE_WIENERNS_CONFIG(
     wienerns_prec_bits_y3, wienerns_config_y3, wienerns_coeff_y3);
 
-const WienernsFilterConfigPairType wienerns_filters_lowqp = {
+const WienernsFilterPairParameters wienerns_filters_lowqp = {
   &wienerns_filter_y3, &wienerns_filter_uv
 };
 
@@ -1765,7 +1765,6 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #else
       const int16_t singleton_tap =
           filter[singleton_tap_index] + (1 << filter_config->prec_bits);
-
       for (int r = block_row_begin; r < block_row_end; ++r) {
         for (int c = block_col_begin; c < block_col_end; ++c) {
           int dgd_id = r * stride + c;
@@ -1847,22 +1846,21 @@ void apply_wienerns_highbd(const uint8_t *dgd8, int width, int height,
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
-  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
-  const NonsepFilterConfig *nsfilter =
-      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
-  const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
+  const NonsepFilterConfig *nsfilter_config =
+      get_wienerns_config(base_qindex, is_uv);
+  const int16_t *filter_ = filter;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (!is_uv || nsfilter->num_pixels2 == 0) {
-    av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter, filter_,
-                               dst8, dst_stride, bit_depth);
+  if (!is_uv || nsfilter_config->num_pixels2 == 0) {
+    av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter_config,
+                               filter_, dst8, dst_stride, bit_depth);
   } else {
     av1_convolve_nonsep_dual_highbd(dgd8, width, height, stride, luma8,
-                                    luma_stride, nsfilter, filter_, dst8,
+                                    luma_stride, nsfilter_config, filter_, dst8,
                                     dst_stride, bit_depth);
   }
 #else
-  av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter, filter_,
-                             dst8, dst_stride, bit_depth);
+  av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter_config,
+                             filter_, dst8, dst_stride, bit_depth);
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
   return;
 }
@@ -1887,18 +1885,17 @@ void apply_wienerns_class_id_highbd(const uint8_t *dgd8, int width, int height,
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
-  const WienernsFilterConfigPairType *wnsf = get_wienerns_filters(base_qindex);
-  const NonsepFilterConfig *nsfilter =
-      is_uv ? &wnsf->uv->nsfilter : &wnsf->y->nsfilter;
+  const NonsepFilterConfig *nsfilter_config =
+      get_wienerns_config(base_qindex, is_uv);
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (is_uv && nsfilter->num_pixels2 != 0) {
+  if (is_uv && nsfilter_config->num_pixels2 != 0) {
     assert(wienerns_info->num_classes == 1);
     const int16_t *filter = const_nsfilter_taps(wienerns_info, 0);
-    const int16_t *filter_ = is_uv ? filter + wnsf->y->ncoeffs : filter;
+    const int16_t *filter_ = filter;
 
     // TODO: This branch needs a classified dual filtering.
     av1_convolve_nonsep_dual_highbd(dgd8, width, height, stride, luma8,
-                                    luma_stride, nsfilter, filter_, dst8,
+                                    luma_stride, nsfilter_config, filter_, dst8,
                                     dst_stride, bit_depth);
     return;
   }
@@ -1927,8 +1924,8 @@ void apply_wienerns_class_id_highbd(const uint8_t *dgd8, int width, int height,
       }
 
       const int16_t *filter = const_nsfilter_taps(wienerns_info, sub_class_id);
-      const int16_t *block_filter = is_uv ? filter + wnsf->y->ncoeffs : filter;
-      av1_convolve_nonsep_highbd(dgd8_row + c, w, h, stride, nsfilter,
+      const int16_t *block_filter = filter;
+      av1_convolve_nonsep_highbd(dgd8_row + c, w, h, stride, nsfilter_config,
                                  block_filter, dst8_row + c, dst_stride,
                                  bit_depth);
     }
