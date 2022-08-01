@@ -143,6 +143,13 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   MACROBLOCKD *const xd = &dcb->xd;
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
+
+  eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
+  uint16_t *const eob = &(eob_data->eob);
+  uint16_t *const max_scan_line = &(eob_data->max_scan_line);
+  *max_scan_line = 0;
+  *eob = 0;
+
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u = 0;
@@ -161,12 +168,6 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);
 #endif  // CONFIG_CONTEXT_DERIVATION
-
-  eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-  uint16_t *const eob = &(eob_data->eob);
-  uint16_t *const max_scan_line = &(eob_data->max_scan_line);
-  *max_scan_line = 0;
-  *eob = 0;
 
 #if CONFIG_INSPECTION
   MB_MODE_INFO *const mbmi = xd->mi[0];
