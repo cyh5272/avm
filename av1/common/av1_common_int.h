@@ -466,6 +466,11 @@ typedef struct SequenceHeader {
 #if CONFIG_REF_MV_BANK
   uint8_t enable_refmvbank;  // To turn on/off Ref MV Bank
 #endif                       // CONFIG_REF_MV_BANK
+#if CONFIG_EXT_RECUR_PARTITIONS
+  uint8_t disable_3way_part_64xn;  // disable 3way part in 64xn/nx64(n <= 64)
+  uint8_t disable_3way_part_32xn;  // disable 3way part in 32xn/nx32(n <= 32)
+  uint8_t disable_3way_part_16xn;  // disable 3way part in 16xn/nx16(n <= 16)
+#endif                             // CONFIG_EXT_RECUR_PARTITIONS
   BITSTREAM_PROFILE profile;
 
   // Color config.
@@ -2208,6 +2213,7 @@ static INLINE int partition_cdf_length(BLOCK_SIZE bsize) {
     return EXT_PARTITION_TYPES;
 }
 
+#if CONFIG_EXT_RECUR_PARTITIONS
 static INLINE int limited_partition_cdf_length(BLOCK_SIZE bsize) {
   assert(block_size_wide[bsize] == block_size_high[bsize]);
   assert(is_bsize_geq(bsize, BLOCK_8X8));
@@ -2215,7 +2221,6 @@ static INLINE int limited_partition_cdf_length(BLOCK_SIZE bsize) {
   return partition_cdf_length(bsize) - 1;
 }
 
-#if CONFIG_EXT_RECUR_PARTITIONS
 static INLINE int partition_rec_cdf_length(BLOCK_SIZE bsize) {
   assert(block_size_wide[bsize] != block_size_high[bsize]);
 
@@ -2240,6 +2245,26 @@ static INLINE int partition_rec_cdf_length(BLOCK_SIZE bsize) {
   }
 }
 
+static INLINE int partition_noext_rec_cdf_length(BLOCK_SIZE bsize) {
+  assert(block_size_wide[bsize] != block_size_high[bsize]);
+
+  switch (bsize) {
+    case BLOCK_4X8:
+    case BLOCK_8X4:
+    case BLOCK_64X128:
+    case BLOCK_128X64: return 2;
+    case BLOCK_8X16:
+    case BLOCK_16X8:
+    case BLOCK_16X32:
+    case BLOCK_32X16:
+    case BLOCK_32X64:
+    case BLOCK_64X32: return PARTITION_TYPES;
+    default:
+      assert(0 && "Invalid splittable rectangular bsize");
+      return PARTITION_INVALID_REC;
+  }
+}
+
 static INLINE int is_1_to_2_block(BLOCK_SIZE bsize) {
   return 2 * block_size_high[bsize] == block_size_wide[bsize] ||
          block_size_high[bsize] == 2 * block_size_wide[bsize];
@@ -2252,6 +2277,15 @@ static INLINE int partition_middle_rec_cdf_length(BLOCK_SIZE bsize) {
   assert(is_bsize_geq(BLOCK_64X64, bsize));
   assert(is_1_to_2_block(bsize));
   return partition_rec_cdf_length(bsize) - 1;
+}
+
+static INLINE int partition_middle_noext_rec_cdf_length(BLOCK_SIZE bsize) {
+  // For some bock sizes, HORZ|VERT is already unavailable, so we shouldn't call
+  // this function.
+  assert(is_bsize_geq(bsize, BLOCK_8X8));
+  assert(is_bsize_geq(BLOCK_64X64, bsize));
+  assert(is_1_to_2_block(bsize));
+  return partition_noext_rec_cdf_length(bsize) - 1;
 }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
