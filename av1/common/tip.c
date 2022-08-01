@@ -635,6 +635,7 @@ static unsigned int get_highbd_sad_8X8(const uint8_t *src_ptr,
   }
 }
 
+// Build an 8x8 block in the TIP frame
 static AOM_INLINE void tip_build_inter_predictors_8x8(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, TIP_PLANE *tip_plane,
     const MV mv[2], int mi_x, int mi_y, uint8_t **mc_buf,
