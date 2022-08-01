@@ -435,6 +435,13 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
       av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
                       cm->features.reduced_tx_set_used);
 
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+  if (plane == AOM_PLANE_V) {
+    CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    if (!keep_chroma_c2(cctx_type)) return 0;
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = eob ? 1 : 0;
@@ -572,6 +579,12 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
 #if !CONFIG_FORWARDSKIP
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+  if (plane == AOM_PLANE_V) {
+    CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    if (!keep_chroma_c2(cctx_type)) return 0;
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
 #if CONFIG_CONTEXT_DERIVATION
   if (plane == AOM_PLANE_U) {
     xd->eob_u_flag = eob ? 1 : 0;
@@ -1393,6 +1406,9 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
       &x->coeff_costs.coeff_costs[txs_ctx][plane_type];
   const MACROBLOCKD *const xd = &x->e_mbd;
   if (eob == 0) {
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+    if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type)) return 0;
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
 #if CONFIG_CONTEXT_DERIVATION
     int txb_skip_ctx = txb_ctx->txb_skip_ctx;
     int skip_cost = 0;
@@ -2560,6 +2576,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
     return;
   }
 #endif  // CONFIG_FORWARDSKIP
+
   const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
   tran_low_t *tcoeff;
   assert(args->dry_run != DRY_RUN_COSTCOEFFS);
@@ -2574,6 +2591,28 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
                 0
 #endif  // CONFIG_FORWARDSKIP
     );
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+    if (plane == AOM_PLANE_V) {
+      CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+      if (!keep_chroma_c2(cctx_type)) {
+        assert(eob == 0);
+        CB_COEFF_BUFFER *cb_coef_buff = x->cb_coef_buff;
+        const int txb_offset =
+            x->mbmi_ext_frame
+                ->cb_offset[(plane > 0 && xd->tree_type == CHROMA_PART) ? 1
+                                                                        : 0] /
+            (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
+        uint16_t *eob_txb = cb_coef_buff->eobs[plane] + txb_offset;
+        uint8_t *const entropy_ctx =
+            cb_coef_buff->entropy_ctx[plane] + txb_offset;
+        entropy_ctx[block] = txb_ctx.txb_skip_ctx;
+        eob_txb[block] = 0;
+        av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, 0,
+                                 blk_col, blk_row);
+        return;
+      }
+    }
+#endif
     const int bwl = get_txb_bwl(tx_size);
     const int width = get_txb_wide(tx_size);
     const int height = get_txb_high(tx_size);

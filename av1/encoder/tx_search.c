@@ -3033,8 +3033,8 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
   tran_low_t *best_dqcoeff_v = this_dqcoeff_v;
 
-  const uint16_t *eobs_ptr_u = x->plane[AOM_PLANE_U].eobs;
-  const uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
+  uint16_t *eobs_ptr_u = x->plane[AOM_PLANE_U].eobs;
+  uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
   uint8_t best_txb_ctx_u = 0;
   uint8_t best_txb_ctx_v = 0;
 
@@ -3064,6 +3064,16 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
     forward_cross_chroma_transform(x, block, tx_size, cctx_type);
 
     for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+#if CCTX_C2_DROPPED
+      if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type)) {
+        memset(p_v->dqcoeff + BLOCK_OFFSET(block), 0,
+               max_eob * sizeof(p_v->dqcoeff));
+        eobs_ptr_v[block] = 0;
+        rate_cost[1] = 0;
+        break;
+      }
+#endif
+
       QUANT_PARAM quant_param;
       // TODO(kslu): need to search skip trellis?
       int xform_quant_idx = skip_trellis
@@ -3209,6 +3219,9 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
 
 #if CCTX_C1_NONZERO
   assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
+#endif
+#if CCTX_C2_DROPPED
+  assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_v == 0));
 #endif
 
 #if CCTX_INTRA

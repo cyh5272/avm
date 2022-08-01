@@ -565,8 +565,14 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
                    blk_row * bw + blk_col) &&
 #if CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
-      (cctx_type == CCTX_NONE || plane < AOM_PLANE_V ||
+#if CCTX_C2_DROPPED
+      (plane < AOM_PLANE_V ||
+       ((cctx_type == CCTX_NONE || x->plane[AOM_PLANE_U].eobs[block]) &&
+        keep_chroma_c2(cctx_type))) &&
+#else
+      (plane < AOM_PLANE_V || cctx_type == CCTX_NONE ||
        x->plane[AOM_PLANE_U].eobs[block]) &&
+#endif
 #endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
 #if CONFIG_SKIP_MODE_ENHANCEMENT
       !(mbmi->skip_mode == 1)) {
@@ -649,6 +655,13 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
 #endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
   } else {
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+    // Reset coeffs and dqcoeffs
+    if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type))
+      av1_quantize_skip(av1_get_max_eob(tx_size),
+                        p->coeff + BLOCK_OFFSET(block), dqcoeff,
+                        &p->eobs[block]);
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
     p->eobs[block] = 0;
     p->txb_entropy_ctx[block] = 0;
   }
@@ -1271,11 +1284,18 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
 
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
 #if CCTX_C1_NONZERO
+#if CCTX_C2_DROPPED
+    if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
+                                 (*eob_u == 0 && cctx_type > CCTX_NONE))) {
+#else
     if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
+#endif
       // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
       // when eob of U is 0.
-      update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
-      *eob_v = 0;
+      if (*eob_u == 0 && cctx_type > CCTX_NONE)
+        update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
+      av1_quantize_skip(av1_get_max_eob(tx_size),
+                        p_v->coeff + BLOCK_OFFSET(block), dqcoeff_v, eob_v);
       break;
     }
 #endif
