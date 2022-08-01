@@ -1893,7 +1893,7 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 
 #if CONFIG_WIENER_NONSEP
 void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
-                             int num_classes);
+                             int num_classes, int chroma);
 void av1_add_to_wienerns_bank(WienerNonsepInfoBank *bank,
                               const WienerNonsepInfo *info);
 WienerNonsepInfo *av1_ref_from_wienerns_bank(WienerNonsepInfoBank *bank,
@@ -1904,7 +1904,7 @@ void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
                               const WienerNonsepInfo *info);
 void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
                                 WienerNonsepInfo *info, int qindex,
-                                int num_classes);
+                                int num_classes, int chroma);
 #endif  // CONFIG_WIENER_NONSEP
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);

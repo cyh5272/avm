@@ -138,7 +138,7 @@ void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
     const int num_classes_per_frame = 1;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
     av1_reset_wienerns_bank(&xd->wienerns_info[p], xd->base_qindex,
-                            num_classes_per_frame);
+                            num_classes_per_frame, p != AOM_PLANE_Y);
 #endif  // CONFIG_WIENER_NONSEP
   }
 }
@@ -258,8 +258,8 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 
 #if CONFIG_WIENER_NONSEP
 void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
-                             int num_classes) {
-  set_default_wienerns(&bank->filter[0], qindex, num_classes);
+                             int num_classes, int chroma) {
+  set_default_wienerns(&bank->filter[0], qindex, num_classes, chroma);
   bank->bank_size = 0;
   bank->bank_ptr = 0;
 }
@@ -307,10 +307,10 @@ void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
 
 void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
                                 WienerNonsepInfo *info, int qindex,
-                                int num_classes) {
+                                int num_classes, int chroma) {
   (void)ndx;
   if (bank->bank_size == 0) {
-    set_default_wienerns(info, qindex, num_classes);
+    set_default_wienerns(info, qindex, num_classes, chroma);
   } else {
     assert(ndx < bank->bank_size);
     const int ptr =
