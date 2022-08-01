@@ -2475,13 +2475,11 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
   const int ref = 0;
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
-  const WienernsFilterConfigPairType *wnsf =
-      get_wienerns_filters(xd->base_qindex);
-  const int beg_feat = is_uv ? wnsf->y->ncoeffs : 0;
-  const int end_feat =
-      is_uv ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
-  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
-      is_uv ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  const WienernsFilterParameters *nsfilter_params =
+      get_wienerns_parameters(xd->base_qindex, is_uv);
+  const int beg_feat = 0;
+  const int end_feat = nsfilter_params->ncoeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
   WienerNonsepInfo *ref_wienerns_info = av1_ref_from_wienerns_bank(bank, ref);
 
   assert(wienerns_info->num_classes == ref_wienerns_info->num_classes);

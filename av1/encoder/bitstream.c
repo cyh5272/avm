@@ -2721,11 +2721,11 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
 static AOM_INLINE void write_wienerns_filter(
     MACROBLOCKD *xd, int plane, int ql, const WienerNonsepInfo *wienerns_info,
     WienerNonsepInfoBank *bank, aom_writer *wb) {
-  const WienernsFilterConfigPairType *wnsf =
-      get_wienerns_filters(xd->base_qindex);
+  const WienernsFilterParameters *nsfilter_params =
+      get_wienerns_parameters(xd->base_qindex, plane != AOM_PLANE_Y);
 #if CONFIG_RST_MERGECOEFFS
   const int equal_ref =
-      check_wienerns_bank_eq(plane, bank, wienerns_info, wnsf);
+      check_wienerns_bank_eq(bank, wienerns_info, nsfilter_params->ncoeffs);
   const int exact_match = (equal_ref >= 0);
   aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
   const int ref = wienerns_info->bank_ref;
@@ -2747,11 +2747,9 @@ static AOM_INLINE void write_wienerns_filter(
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
   WienerNonsepInfo *ref_wienerns_info = av1_ref_from_wienerns_bank(bank, ref);
-  int beg_feat = plane ? wnsf->y->ncoeffs : 0;
-  int end_feat =
-      plane ? wnsf->y->ncoeffs + wnsf->uv->ncoeffs : wnsf->y->ncoeffs;
-  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
-      plane ? wnsf->uv->coeffs : wnsf->y->coeffs;
+  const int beg_feat = 0;
+  const int end_feat = nsfilter_params->ncoeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
 
   // printf("Enc %s ", plane ? "UV:" : "Y: ");
   // Check how many trailing coefficients are 0.
