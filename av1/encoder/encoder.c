@@ -979,7 +979,7 @@ static INLINE void free_optflow_bufs(AV1_COMMON *const cm) {
   aom_free(cm->gx0);
   aom_free(cm->gx1);
 }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
 AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
@@ -1236,7 +1236,7 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
   init_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
   init_optflow_bufs(cm);
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
   cm->error.setjmp = 0;
@@ -1448,7 +1448,7 @@ void av1_remove_compressor(AV1_COMP *cpi) {
   free_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
   free_optflow_bufs(cm);
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
   av1_remove_common(cm);
@@ -2617,7 +2617,7 @@ static INLINE int compute_tip_direct_output_mode_RD(AV1_COMP *cpi,
     ThreadData *const td = &cpi->td;
     av1_setup_tip_frame(cm, &td->mb.e_mbd, NULL, td->mb.tmp_conv_dst,
                         av1_tip_enc_calc_subpel_params);
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
     av1_finalize_encoded_frame(cpi);
     if (av1_pack_bitstream(cpi, dest, size, largest_tile_id) != AOM_CODEC_OK)
       return AOM_CODEC_ERROR;

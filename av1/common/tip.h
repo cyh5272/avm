@@ -23,7 +23,7 @@ extern "C" {
 
 #if CONFIG_OPTFLOW_ON_TIP
 #define TIP_RD_CORRECTION 100000
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
 // Derive temporal motion field from one closest forward and one closet backward
 // reference frames, then fill the hole

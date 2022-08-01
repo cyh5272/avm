@@ -618,6 +618,7 @@ static AOM_INLINE void tip_build_one_inter_predictor(
 
 MAKE_BFP_SAD_WRAPPER_COMMON(aom_highbd_sad8x8)
 
+// Get the proper sad calculation function for an 8x8 block
 static unsigned int get_highbd_sad_8X8(const uint8_t *src_ptr,
                                        int source_stride,
                                        const uint8_t *ref_ptr, int ref_stride,
@@ -759,7 +760,7 @@ static AOM_INLINE void tip_build_inter_predictors_8x8(
   xd->tmp_conv_dst = org_buf;
   aom_free(mbmi);
 }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
 static AOM_INLINE void tip_build_inter_predictors_8x8_and_bigger(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, TIP_PLANE *tip_plane,
@@ -789,7 +790,7 @@ static AOM_INLINE void tip_build_inter_predictors_8x8_and_bigger(
                                    calc_subpel_params_func, dst, dst_stride);
     return;
   }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
   const int bd = cm->seq_params.bit_depth;
 

@@ -586,13 +586,13 @@ static INLINE int opfl_get_subblock_size(int bw, int bh, int plane
 #if CONFIG_OPTFLOW_ON_TIP
                                          ,
                                          int use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 ) {
 #if CONFIG_OPTFLOW_ON_TIP
   return ((plane || (bh <= 8 && bw <= 8)) && use_4x4) ? OF_MIN_BSIZE : OF_BSIZE;
 #else
   return (plane || (bh <= 8 && bw <= 8)) ? OF_MIN_BSIZE : OF_BSIZE;
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 }
 
 void av1_opfl_build_inter_predictor(
@@ -604,7 +604,7 @@ void av1_opfl_build_inter_predictor(
   const int is_intrabc = is_intrabc_block(mi, xd->tree_type);
 #if CONFIG_OPTFLOW_ON_TIP
   const int is_tip = mi->ref_frame[0] == TIP_FRAME;
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
   // Do references one at a time
   const int is_compound = 0;
@@ -622,7 +622,7 @@ void av1_opfl_build_inter_predictor(
 #else
   const struct scale_factors *const sf =
       is_intrabc ? &cm->sf_identity : xd->block_ref_scale_factors[ref];
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   const BLOCK_SIZE bsize = mi->sb_type[PLANE_TYPE_Y];
   const int ss_x = pd->subsampling_x;
   const int ss_y = pd->subsampling_y;
@@ -637,7 +637,7 @@ void av1_opfl_build_inter_predictor(
              : (is_intrabc ? dst_buf : &pd->pre[ref]);
 #else
   struct buf_2d *const pre_buf = is_intrabc ? dst_buf : &pd->pre[ref];
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
   av1_init_inter_params(inter_pred_params, bw, bh, pre_y, pre_x,
                         pd->subsampling_x, pd->subsampling_y, xd->bd,
@@ -1135,7 +1135,7 @@ int av1_get_optflow_based_mv_highbd(
 #if CONFIG_OPTFLOW_ON_TIP
     ,
     int do_pred, int use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 ) {
   const int target_prec = MV_REFINE_PREC_BITS;
   // Convert output MV to 1/16th pel
@@ -1144,7 +1144,7 @@ int av1_get_optflow_based_mv_highbd(
   const int num_mv = (mbmi->ref_frame[0] == TIP_FRAME) ? 4 : N_OF_OFFSETS;
 #else
   const int num_mv = N_OF_OFFSETS;
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   for (int mvi = 0; mvi < num_mv; mvi++) {
     mv_refined[mvi * 2].as_mv.row *= 1 << (MV_REFINE_PREC_BITS - 3);
     mv_refined[mvi * 2].as_mv.col *= 1 << (MV_REFINE_PREC_BITS - 3);
@@ -1175,7 +1175,7 @@ int av1_get_optflow_based_mv_highbd(
 
 #if CONFIG_OPTFLOW_ON_TIP
   if (do_pred) {
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
     // Obrain P0 and P1
     InterPredParams params0, params1;
     av1_opfl_build_inter_predictor(cm, xd, plane, mbmi, bw, bh, mi_x, mi_y,
@@ -1186,7 +1186,7 @@ int av1_get_optflow_based_mv_highbd(
                                    CONVERT_TO_BYTEPTR(dst1));
 #if CONFIG_OPTFLOW_ON_TIP
   }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 
   int n_blocks = 1;
   int grad_prec_bits;
@@ -1194,7 +1194,7 @@ int av1_get_optflow_based_mv_highbd(
 #if CONFIG_OPTFLOW_ON_TIP
                                  ,
                                  use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   );
 
 #if OPFL_BILINEAR_GRAD || OPFL_BICUBIC_GRAD
@@ -1214,7 +1214,7 @@ int av1_get_optflow_based_mv_highbd(
       (int16_t *)aom_memalign(16, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(int16_t));
   int16_t *tmp1 =
       (int16_t *)aom_memalign(16, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(int16_t));
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   av1_copy_pred_array_highbd(dst0, dst1, tmp0, tmp1, bw, bh, d0, d1);
   // Buffers gx0 and gy0 are used to store the gradients of tmp0
   av1_compute_subpel_gradients_interp(tmp0, bw, bh, &grad_prec_bits, gx0, gy0);
@@ -1330,7 +1330,7 @@ void av1_opfl_rebuild_inter_predictor(
 #if CONFIG_OPTFLOW_ON_TIP
     ,
     int use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 ) {
   SubpelParams subpel_params;
   int w = inter_pred_params->block_width;
@@ -1339,7 +1339,7 @@ void av1_opfl_rebuild_inter_predictor(
 #if CONFIG_OPTFLOW_ON_TIP
                                  ,
                                  use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   );
   make_inter_pred_of_nxn(dst, dst_stride, mv_refined, inter_pred_params, xd,
                          mi_x, mi_y, ref, mc_buf, calc_subpel_params_func, n,
@@ -1627,7 +1627,7 @@ static void build_inter_predictors_8x8_and_bigger(
 #if CONFIG_OPTFLOW_ON_TIP
                                        ,
         1, 1
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
     );
     aom_free(CONVERT_TO_SHORTPTR(dst0));
     aom_free(CONVERT_TO_SHORTPTR(dst1));
@@ -1672,7 +1672,7 @@ static void build_inter_predictors_8x8_and_bigger(
 #if CONFIG_OPTFLOW_ON_TIP
                                      ,
                                      1
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
       );
       inter_pred_params.interp_filter_params[0] =
           av1_get_interp_filter_params_with_block_size(mi->interp_fltr, n);
@@ -1684,7 +1684,7 @@ static void build_inter_predictors_8x8_and_bigger(
 #if CONFIG_OPTFLOW_ON_TIP
                                        ,
                                        1
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
       );
       continue;
     }

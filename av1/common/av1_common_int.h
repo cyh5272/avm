@@ -647,7 +647,7 @@ typedef struct {
    * Whether optflow refinement is used for TIP frames
    */
   int use_optflow_tip;
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
   /*!
    * Enables/disables hole fill for TIP
    */
@@ -1601,7 +1601,7 @@ typedef struct AV1Common {
    * Buffer of vertical gradient in buffer 1
    */
   int16_t *gy1;
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 } AV1_COMMON;
 

@@ -7478,7 +7478,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
               this_rd + TIP_RD_CORRECTION > search_state.best_rd) {
             continue;
           }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
           assert(IMPLIES(comp_pred,
                          cm->current_frame.reference_mode != SINGLE_REFERENCE));
 #if CONFIG_NEW_REF_SIGNALING || CONFIG_TIP

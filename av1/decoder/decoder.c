@@ -149,7 +149,7 @@ static INLINE void dec_free_optflow_bufs(AV1_COMMON *const cm) {
   aom_free(cm->gx0);
   aom_free(cm->gx1);
 }
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
 AV1Decoder *av1_decoder_create(BufferPool *const pool) {
@@ -209,7 +209,7 @@ AV1Decoder *av1_decoder_create(BufferPool *const pool) {
   dec_init_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
   dec_init_optflow_bufs(cm);
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
   cm->error.setjmp = 0;
@@ -296,7 +296,7 @@ void av1_decoder_remove(AV1Decoder *pbi) {
   dec_free_tip_ref_frame(&pbi->common);
 #if CONFIG_OPTFLOW_ON_TIP
   dec_free_optflow_bufs(&pbi->common);
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
 
   av1_dec_free_cb_buf(pbi);

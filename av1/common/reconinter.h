@@ -448,6 +448,7 @@ static INLINE int is_opfl_refine_allowed(const AV1_COMMON *cm,
           OPFL_DIST_RATIO_THR * AOMMIN(abs(d0), abs(d1)));
 }
 
+// Generate refined MVs using optflow refinement
 int av1_get_optflow_based_mv_highbd(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, const MB_MODE_INFO *mbmi,
     int_mv *mv_refined, int bw, int bh, int mi_x, int mi_y, uint8_t **mc_buf,
@@ -457,9 +458,10 @@ int av1_get_optflow_based_mv_highbd(
 #if CONFIG_OPTFLOW_ON_TIP
     ,
     int do_pred, int use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 );
 
+// With the refined MVs, generate the inter prediction for the block.
 void av1_opfl_rebuild_inter_predictor(
     uint8_t *dst, int dst_stride, int plane, int_mv *const mv_refined,
     InterPredParams *inter_pred_params, MACROBLOCKD *xd, int mi_x, int mi_y,
@@ -467,7 +469,7 @@ void av1_opfl_rebuild_inter_predictor(
 #if CONFIG_OPTFLOW_ON_TIP
     ,
     int use_4x4
-#endif
+#endif  // CONFIG_OPTFLOW_ON_TIP
 );
 
 // Integer division based on lookup table.
