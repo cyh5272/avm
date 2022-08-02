@@ -641,6 +641,13 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,
                          cm->quant_params.base_qindex);
     }
+#if CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
+    // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
+    // when eob of U is 0.
+    // TODO(kslu) why cctx_type can be > CCTX_NONE when eob_u is 0?
+    if (plane == AOM_PLANE_U && p->eobs[block] == 0)
+      update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
   } else {
     p->eobs[block] = 0;
     p->txb_entropy_ctx[block] = 0;
@@ -1266,6 +1273,9 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
 #if CCTX_C1_NONZERO
     if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
+      // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
+      // when eob of U is 0.
+      update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
       *eob_v = 0;
       break;
     }
