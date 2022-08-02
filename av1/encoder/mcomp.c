@@ -5253,6 +5253,9 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   params->wmmat[3] = base_params.wmmat[3];
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
+#if CONFIG_IMPROVED_WARP
+  av1_reduce_warp_model(params);
+#endif  // CONFIG_IMPROVED_WARP
   int valid = av1_get_shear_params(params);
   params->invalid = !valid;
   if (!valid) {
@@ -5346,6 +5349,9 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
+#if CONFIG_IMPROVED_WARP
+        av1_reduce_warp_model(params);
+#endif  // CONFIG_IMPROVED_WARP
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
@@ -5372,6 +5378,9 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
+#if CONFIG_IMPROVED_WARP
+        av1_reduce_warp_model(params);
+#endif  // CONFIG_IMPROVED_WARP
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
