@@ -556,7 +556,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   a = &args->ta[blk_col];
   l = &args->tl[blk_row];
 
-  TX_TYPE tx_type = DCT_DCT;
+  TX_TYPE tx_type = av1_get_tx_type(xd, pd->plane_type, blk_row, blk_col,
+                                    tx_size, cm->features.reduced_tx_set_used);
 #if CONFIG_CROSS_CHROMA_TX
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -572,8 +573,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #else
       !mbmi->skip_mode) {
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
-    tx_type = av1_get_tx_type(xd, pd->plane_type, blk_row, blk_col, tx_size,
-                              cm->features.reduced_tx_set_used);
+
     TxfmParam txfm_param;
     QUANT_PARAM quant_param;
 #if CONFIG_FORWARDSKIP
@@ -1230,14 +1230,13 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   av1_predict_intra_block_facade(cm, xd, AOM_PLANE_V, blk_col, blk_row,
                                  tx_size);
 
-  TX_TYPE tx_type = DCT_DCT;
+  TX_TYPE tx_type = av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col,
+                                    tx_size, cm->features.reduced_tx_set_used);
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
 
   av1_subtract_txb(x, AOM_PLANE_U, plane_bsize, blk_col, blk_row, tx_size);
   av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);
 
-  tx_type = av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
-                            cm->features.reduced_tx_set_used);
   TxfmParam txfm_param;
   QUANT_PARAM quant_param;
   const int use_trellis =
