@@ -508,7 +508,7 @@ static INLINE void av1_set_fractional_mv(int_mv *fractional_best_mv) {
 // generated MV value does not go to out of bound
 static INLINE int av1_lower_mv_limit(const int mv, const int shift,
                                      const int bias) {
-  const int offset = (1 << shift);
+  const int offset = 0;  //(1 << shift);
   int out = (((abs(mv) >> shift) << shift) + bias * offset);
   return out * (mv < 0 ? -1 : 1);
 }
