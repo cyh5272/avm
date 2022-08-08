@@ -658,15 +658,20 @@ static void set_max_drl_bits(struct AV1_COMP *cpi) {
 }
 
 #if CONFIG_LR_FLEX_SYNTAX
-static void set_lr_tools_mask(SequenceHeader *const seq_params,
-                              const AV1EncoderConfig *oxcf) {
+static void set_seq_lr_tools_mask(SequenceHeader *const seq_params,
+                                  const AV1EncoderConfig *oxcf) {
   (void)oxcf;
-  seq_params->lr_tools_disable_mask = 0;  // default - no tools disabled
+  seq_params->lr_tools_disable_mask[0] = 0;  // default - no tools disabled
+  seq_params->lr_tools_disable_mask[1] = 0;  // default - no tools disabled
 
   // Parse oxcf here to disable tools as requested through cmd lines
-  seq_params->lr_tools_disable_mask |= (1 << RESTORE_SGRPROJ);
+  // Disable SGRPROJ if needed
+  // seq_params->lr_tools_disable_mask[0] |= (1 << RESTORE_SGRPROJ);
+  // seq_params->lr_tools_disable_mask[1] |= (1 << RESTORE_SGRPROJ);
 
-  av1_set_lr_tools(seq_params);
+#if CONFIG_PC_WIENER
+  seq_params->lr_tools_disable_mask[1] |= DEF_UV_LR_TOOLS_DISABLE_MASK;
+#endif  // CONFIG_PC_WIENER
 }
 #endif  // CONFIG_LR_FLEX_SYNTAX
 
@@ -752,7 +757,7 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
 
 #endif  // CONFIG_TIP
 #if CONFIG_LR_FLEX_SYNTAX
-  if (seq_params->enable_restoration) set_lr_tools_mask(seq_params, oxcf);
+  if (seq_params->enable_restoration) set_seq_lr_tools_mask(seq_params, oxcf);
 #endif  // CONFIG_LR_FLEX_SYNTAX
   x->e_mbd.bd = (int)seq_params->bit_depth;
   x->e_mbd.global_motion = cm->global_motion;

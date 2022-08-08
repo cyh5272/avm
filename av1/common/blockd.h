@@ -35,8 +35,6 @@ extern "C" {
 
 #define USE_B_QUANT_NO_TRELLIS 1
 
-#define MAX_MB_PLANE 3
-
 #define MAX_DIFFWTD_MASK_BITS 1
 
 #define INTERINTRA_WEDGE_SIGN 0
