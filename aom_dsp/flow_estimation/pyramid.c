@@ -148,11 +148,16 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
 }
 
 // Allocate and fill out a pyramid structure for a given frame
-ImagePyramid *aom_compute_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
+ImagePyramid *aom_compute_pyramid(struct yv12_buffer_config *frm, int bit_depth,
                                   int n_levels) {
-  ImagePyramid *frm_pyr = alloc_pyramid(frm->y_width, frm->y_height, n_levels);
-  fill_pyramid(frm, bit_depth, frm_pyr);
-  return frm_pyr;
+  if (frm->y_pyramid) {
+    // Already computed, no need to do it again
+    return frm->y_pyramid;
+  }
+
+  frm->y_pyramid = alloc_pyramid(frm->y_width, frm->y_height, n_levels);
+  fill_pyramid(frm, bit_depth, frm->y_pyramid);
+  return frm->y_pyramid;
 }
 
 void aom_free_pyramid(ImagePyramid *pyr) {

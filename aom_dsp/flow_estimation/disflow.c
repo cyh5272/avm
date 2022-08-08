@@ -10,6 +10,9 @@
  * aomedia.org/license/patent-license/.
  */
 
+// Dense Inverse Search flow algorithm
+// Paper: https://arxiv.org/pdf/1603.03590.pdf
+
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/flow_estimation/disflow.h"
 #include "aom_dsp/flow_estimation/corner_detect.h"
@@ -25,11 +28,34 @@
 #include <assert.h>
 
 // Size of square patches in the disflow dense grid
-#define PATCH_SIZE 8
+// Must be a power of 2
+#define PATCH_SIZE_LOG2 3
+#define PATCH_SIZE (1 << PATCH_SIZE_LOG2)
 // Center point of square patch
-#define PATCH_CENTER ((PATCH_SIZE + 1) >> 1)
-// Step size between patches, lower value means greater patch overlap
-#define PATCH_STEP 1
+#define PATCH_CENTER ((PATCH_SIZE / 2) - 1)
+
+// Amount to downsample the flow field by.
+// eg. DOWNSAMPLE_SHIFT = 2 (DOWNSAMPLE_FACTOR == 4) means we calculate
+// one flow point for each 4x4 pixel region of the frame
+// Must be a power of 2
+#define DOWNSAMPLE_SHIFT 2
+#define DOWNSAMPLE_FACTOR (1 << DOWNSAMPLE_SHIFT)
+// Number of outermost flow field entries (on each edge) which can't be
+// computed, because the patch they correspond to extends outside of the
+// frame
+// The border is (PATCH_SIZE >> 1) pixels, which is
+// (PATCH_SIZE >> 1) >> DOWNSAMPLE_SHIFT many flow field entries
+#define FLOW_BORDER ((PATCH_SIZE >> 1) >> DOWNSAMPLE_SHIFT)
+// When downsampling the flow field, each flow field entry covers a square
+// region of pixels in the image pyramid. This value is equal to the position
+// of the center of that region, as an offset from the top/left edge.
+//
+// Note: Using ((DOWNSAMPLE_FACTOR - 1) / 2) is equivalent to the more
+// natural expression ((DOWNSAMPLE_FACTOR / 2) - 1),
+// unless DOWNSAMPLE_FACTOR == 1 (ie, no downsampling), in which case
+// this gives the correct offset of 0 instead of -1.
+#define UPSAMPLE_CENTER_OFFSET ((DOWNSAMPLE_FACTOR - 1) / 2)
+
 // Warp error convergence threshold for disflow
 #define DISFLOW_ERROR_TR 0.01
 // Max number of iterations if warp convergence is not found
@@ -37,36 +63,7 @@
 // and numbers of refinement steps per level
 #define DISFLOW_MAX_ITR 10
 
-// Don't use points around the frame border since they are less reliable
-static INLINE int valid_point(int x, int y, int width, int height) {
-  return (x > (PATCH_SIZE + PATCH_CENTER)) &&
-         (x < (width - PATCH_SIZE - PATCH_CENTER)) &&
-         (y > (PATCH_SIZE + PATCH_CENTER)) &&
-         (y < (height - PATCH_SIZE - PATCH_CENTER));
-}
-
-static int determine_disflow_correspondence(int *frm_corners,
-                                            int num_frm_corners, double *flow_u,
-                                            double *flow_v, int width,
-                                            int height, int stride,
-                                            Correspondence *correspondences) {
-  int num_correspondences = 0;
-  int x, y;
-  for (int i = 0; i < num_frm_corners; ++i) {
-    x = frm_corners[2 * i];
-    y = frm_corners[2 * i + 1];
-    if (valid_point(x, y, width, height)) {
-      correspondences[num_correspondences].x = x;
-      correspondences[num_correspondences].y = y;
-      correspondences[num_correspondences].rx = x + flow_u[y * stride + x];
-      correspondences[num_correspondences].ry = y + flow_v[y * stride + x];
-      num_correspondences++;
-    }
-  }
-  return num_correspondences;
-}
-
-static void getCubicKernel(double x, double *kernel) {
+static INLINE void getCubicKernel(double x, double *kernel) {
   assert(0 <= x && x < 1);
   double x2 = x * x;
   double x3 = x2 * x;
@@ -76,9 +73,75 @@ static void getCubicKernel(double x, double *kernel) {
   kernel[3] = -0.5 * x2 + 0.5 * x3;
 }
 
-static double getCubicValue(double *p, double *kernel) {
+static INLINE double getCubicValue(double *p, double *kernel) {
   return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
          kernel[3] * p[3];
+}
+
+static INLINE double bicubic_interp_one(double *arr, int stride,
+                                        double *h_kernel, double *v_kernel) {
+  double tmp[1 * 4];
+
+  // Horizontal convolution
+  for (int i = -1; i < 3; ++i) {
+    tmp[i + 1] = getCubicValue(&arr[i * stride - 1], h_kernel);
+  }
+
+  // Vertical convolution
+  return getCubicValue(tmp, v_kernel);
+}
+
+static int determine_disflow_correspondence(int *frm_corners,
+                                            int num_frm_corners,
+                                            FlowField *flow,
+                                            Correspondence *correspondences) {
+  int width = flow->width;
+  int height = flow->height;
+  int stride = flow->stride;
+
+  int num_correspondences = 0;
+  for (int i = 0; i < num_frm_corners; ++i) {
+    int x0 = frm_corners[2 * i];
+    int y0 = frm_corners[2 * i + 1];
+
+    // Offset points, to compensate for the fact that (say) a flow field entry
+    // at horizontal index i, is nominally associated with the pixel at
+    // horizontal coordinate (i << DOWNSAMPLE_FACTOR) + UPSAMPLE_CENTER_OFFSET
+    // This offset must be applied before we split the coordinate into integer
+    // and fractional parts, in order for the interpolation to be correct.
+    int x = x0 - UPSAMPLE_CENTER_OFFSET;
+    int y = y0 - UPSAMPLE_CENTER_OFFSET;
+
+    // Split the pixel coordinates into integer flow field coordinates and
+    // an offset for interpolation
+    int flow_x = x >> DOWNSAMPLE_SHIFT;
+    int flow_sub_x = x & (DOWNSAMPLE_FACTOR - 1);
+    int flow_y = y >> DOWNSAMPLE_SHIFT;
+    int flow_sub_y = y & (DOWNSAMPLE_FACTOR - 1);
+
+    // Make sure that bicubic interpolation won't read outside of the flow field
+    if (flow_x < 1 || (flow_x + 2) >= width) continue;
+    if (flow_y < 1 || (flow_y + 2) >= height) continue;
+
+    double h_kernel[4];
+    double v_kernel[4];
+    getCubicKernel(flow_sub_x, h_kernel);
+    getCubicKernel(flow_sub_y, v_kernel);
+
+    double flow_u = bicubic_interp_one(&flow->u[flow_y * stride + flow_x],
+                                       stride, h_kernel, v_kernel);
+    double flow_v = bicubic_interp_one(&flow->v[flow_y * stride + flow_x],
+                                       stride, h_kernel, v_kernel);
+
+    // Use original points (without offsets) when filling in correspondence
+    // array
+    correspondences[num_correspondences].x = x0;
+    correspondences[num_correspondences].y = y0;
+    correspondences[num_correspondences].rx = x0 + flow_u;
+    correspondences[num_correspondences].ry = y0 + flow_v;
+    num_correspondences++;
+  }
+  return num_correspondences;
 }
 
 // Warps a block using flow vector [u, v] and computes the mse
@@ -166,27 +229,36 @@ static double compute_warp_and_error(unsigned char *ref, unsigned char *frm,
 // 2.)   b = |sum(dx * dt)|
 //           |sum(dy * dt)|
 // Where the sums are computed over a square window of PATCH_SIZE.
-static INLINE void compute_flow_system(const double *dx, int dx_stride,
-                                       const double *dy, int dy_stride,
-                                       const int16_t *dt, int dt_stride,
-                                       double *M, double *b) {
+static INLINE void compute_hessian(const double *dx, int dx_stride,
+                                   const double *dy, int dy_stride, double *M) {
+  memset(M, 0, 4 * sizeof(*M));
+
   for (int i = 0; i < PATCH_SIZE; i++) {
     for (int j = 0; j < PATCH_SIZE; j++) {
       M[0] += dx[i * dx_stride + j] * dx[i * dx_stride + j];
       M[1] += dx[i * dx_stride + j] * dy[i * dy_stride + j];
       M[3] += dy[i * dy_stride + j] * dy[i * dy_stride + j];
-
-      b[0] += dx[i * dx_stride + j] * dt[i * dt_stride + j];
-      b[1] += dy[i * dy_stride + j] * dt[i * dt_stride + j];
     }
   }
 
   M[2] = M[1];
 }
 
-// Solves a general Mx = b where M is a 2x2 matrix and b is a 2x1 matrix
-static INLINE void solve_2x2_system(const double *M, const double *b,
-                                    double *output_vec) {
+static INLINE void compute_flow_vector(const double *dx, int dx_stride,
+                                       const double *dy, int dy_stride,
+                                       const int16_t *dt, int dt_stride,
+                                       double *b) {
+  memset(b, 0, 2 * sizeof(*b));
+
+  for (int i = 0; i < PATCH_SIZE; i++) {
+    for (int j = 0; j < PATCH_SIZE; j++) {
+      b[0] += dx[i * dx_stride + j] * dt[i * dt_stride + j];
+      b[1] += dy[i * dy_stride + j] * dt[i * dt_stride + j];
+    }
+  }
+}
+
+static INLINE void invert_2x2(const double *M, double *M_inv) {
   double M_0 = M[0];
   double M_3 = M[3];
   double det = (M_0 * M_3) - (M[1] * M[2]);
@@ -198,61 +270,57 @@ static INLINE void solve_2x2_system(const double *M, const double *b,
     det = (M_0 * M_3) - (M[1] * M[2]);
   }
   const double det_inv = 1 / det;
-  const double mult_b0 = det_inv * b[0];
-  const double mult_b1 = det_inv * b[1];
-  output_vec[0] = M_3 * mult_b0 - M[1] * mult_b1;
-  output_vec[1] = -M[2] * mult_b0 + M_0 * mult_b1;
+
+  // TODO(rachelbarker): Is using regularized values
+  // or original values better here?
+  M_inv[0] = M_3 * det_inv;
+  M_inv[1] = -M[1] * det_inv;
+  M_inv[2] = -M[2] * det_inv;
+  M_inv[3] = M_0 * det_inv;
 }
 
-/*
-static INLINE void image_difference(const uint8_t *src, int src_stride,
-                                    const uint8_t *ref, int ref_stride,
-                                    int16_t *dst, int dst_stride, int height,
-                                    int width) {
-  const int block_unit = 8;
-  // Take difference in 8x8 blocks to make use of optimized diff function
-  for (int i = 0; i < height; i += block_unit) {
-    for (int j = 0; j < width; j += block_unit) {
-      aom_subtract_block(block_unit, block_unit, dst + i * dst_stride + j,
-                         dst_stride, src + i * src_stride + j, src_stride,
-                         ref + i * ref_stride + j, ref_stride);
-    }
-  }
+// Solves a general Mx = b where M is a 2x2 matrix and b is a 2x1 matrix
+static INLINE void solve_2x2_system(const double *M_inv, const double *b,
+                                    double *output_vec) {
+  output_vec[0] = M_inv[0] * b[0] + M_inv[1] * b[1];
+  output_vec[1] = M_inv[2] * b[0] + M_inv[3] * b[1];
 }
-*/
 
 static INLINE void compute_flow_at_point(unsigned char *frm, unsigned char *ref,
                                          int x, int y, int width, int height,
                                          int stride, double *u, double *v) {
-  double M[4] = { 0 };
-  double b[2] = { 0 };
-  double tmp_output_vec[2] = { 0 };
+  double M[4];
+  double M_inv[4];
+  double b[2];
+  double tmp_output_vec[2];
   double error = 0;
   int16_t dt[PATCH_SIZE * PATCH_SIZE];
   double o_u = *u;
   double o_v = *v;
 
-  double dx_tmp[PATCH_SIZE * PATCH_SIZE];
-  double dy_tmp[PATCH_SIZE * PATCH_SIZE];
+  double dx[PATCH_SIZE * PATCH_SIZE];
+  double dy[PATCH_SIZE * PATCH_SIZE];
 
   // Compute gradients within this patch
   unsigned char *frm_patch = &frm[y * stride + x];
-  av1_convolve_2d_sobel_y_c(frm_patch, stride, dx_tmp, PATCH_SIZE, PATCH_SIZE,
+  av1_convolve_2d_sobel_y_c(frm_patch, stride, dx, PATCH_SIZE, PATCH_SIZE,
                             PATCH_SIZE, 1, 1.0);
-  av1_convolve_2d_sobel_y_c(frm_patch, stride, dy_tmp, PATCH_SIZE, PATCH_SIZE,
+  av1_convolve_2d_sobel_y_c(frm_patch, stride, dy, PATCH_SIZE, PATCH_SIZE,
                             PATCH_SIZE, 0, 1.0);
+
+  compute_hessian(dx, PATCH_SIZE, dy, PATCH_SIZE, M);
+  invert_2x2(M, M_inv);
 
   for (int itr = 0; itr < DISFLOW_MAX_ITR; itr++) {
     error = compute_warp_and_error(ref, frm, width, height, stride, x, y, *u,
                                    *v, dt);
     if (error <= DISFLOW_ERROR_TR) break;
-    compute_flow_system(dx_tmp, PATCH_SIZE, dy_tmp, PATCH_SIZE, dt, PATCH_SIZE,
-                        M, b);
-    solve_2x2_system(M, b, tmp_output_vec);
+    compute_flow_vector(dx, PATCH_SIZE, dy, PATCH_SIZE, dt, PATCH_SIZE, b);
+    solve_2x2_system(M_inv, b, tmp_output_vec);
     *u += tmp_output_vec[0];
     *v += tmp_output_vec[1];
   }
-  if (fabs(*u - o_u) > PATCH_SIZE || fabs(*v - o_u) > PATCH_SIZE) {
+  if (fabs(*u - o_u) > PATCH_SIZE || fabs(*v - o_v) > PATCH_SIZE) {
     *u = o_u;
     *v = o_v;
   }
@@ -263,13 +331,13 @@ static void fill_flow_field_borders(double *flow, int width, int height,
   // Calculate the bounds of the rectangle which was filled in by
   // compute_flow_field() before calling this function.
   // These indices are inclusive on both ends.
-  const int left_index = PATCH_CENTER;
-  const int right_index = (width - PATCH_SIZE - 1) + PATCH_CENTER;
-  const int top_index = PATCH_CENTER;
-  const int bottom_index = (height - PATCH_SIZE - 1) + PATCH_CENTER;
+  const int left_index = FLOW_BORDER;
+  const int right_index = (width - FLOW_BORDER - 1);
+  const int top_index = FLOW_BORDER;
+  const int bottom_index = (height - FLOW_BORDER - 1);
 
   // Left area
-  for (int i = top_index; i <= bottom_index; i += PATCH_STEP) {
+  for (int i = top_index; i <= bottom_index; i += 1) {
     double *row = flow + i * stride;
     double left = row[left_index];
     for (int j = 0; j < left_index; j++) {
@@ -278,7 +346,7 @@ static void fill_flow_field_borders(double *flow, int width, int height,
   }
 
   // Right area
-  for (int i = top_index; i <= bottom_index; i += PATCH_STEP) {
+  for (int i = top_index; i <= bottom_index; i += 1) {
     double *row = flow + i * stride;
     double right = row[right_index];
     for (int j = right_index + 1; j < width; j++) {
@@ -303,8 +371,12 @@ static void fill_flow_field_borders(double *flow, int width, int height,
 
 // make sure flow_u and flow_v start at 0
 static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
-                               double *flow_u, double *flow_v) {
-  int cur_width, cur_height, cur_stride, cur_loc, patch_loc, patch_center;
+                               FlowField *flow) {
+  int cur_width, cur_height, cur_stride, cur_loc;
+  int cur_flow_width, cur_flow_height, cur_flow_stride;
+
+  double *flow_u = flow->u;
+  double *flow_v = flow->v;
   double *u_upscale =
       aom_malloc(frm_pyr->strides[0] * frm_pyr->heights[0] * sizeof(*flow_u));
   double *v_upscale =
@@ -313,52 +385,68 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
   assert(frm_pyr->n_levels == ref_pyr->n_levels);
 
   // Compute flow field from coarsest to finest level of the pyramid
-#if PATCH_STEP != 1
-  // TODO(rachelbarker): This function, as written, only works if PATCH_STEP
-  // == 1. For any other value, the border filling and interpolation code will
-  // need to be reworked to handle the fact that there will be rows and columns
-  // with no flow data
-#error "compute_flow_field() needs updating for PATCH_STEP != 1"
-#endif
-
   for (int level = frm_pyr->n_levels - 1; level >= 0; --level) {
     cur_width = frm_pyr->widths[level];
     cur_height = frm_pyr->heights[level];
     cur_stride = frm_pyr->strides[level];
     cur_loc = frm_pyr->level_loc[level];
 
-    for (int i = 0; i < cur_height - PATCH_SIZE; i += PATCH_STEP) {
-      for (int j = 0; j < cur_width - PATCH_SIZE; j += PATCH_STEP) {
-        patch_loc = i * cur_stride + j;
-        patch_center = patch_loc + PATCH_CENTER * cur_stride + PATCH_CENTER;
+    cur_flow_width = cur_width >> DOWNSAMPLE_SHIFT;
+    cur_flow_height = cur_height >> DOWNSAMPLE_SHIFT;
+    cur_flow_stride = flow->stride;
+
+    for (int i = FLOW_BORDER; i < cur_flow_height - FLOW_BORDER; i += 1) {
+      for (int j = FLOW_BORDER; j < cur_flow_width - FLOW_BORDER; j += 1) {
+        int flow_field_idx = i * cur_flow_stride + j;  // In flow field entries
+
+        // Calculate the position of a patch of size PATCH_SIZE pixels, which is
+        // centered on the region covered by this flow field entry
+        int patch_center_x =
+            (j << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;  // In pixels
+        int patch_center_y =
+            (i << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;  // In pixels
+        int patch_tl_x = patch_center_x - PATCH_CENTER;
+        int patch_tl_y = patch_center_y - PATCH_CENTER;
+        assert(patch_tl_x >= 0);
+        assert(patch_tl_y >= 0);
+
         compute_flow_at_point(frm_pyr->level_buffer + cur_loc,
-                              ref_pyr->level_buffer + cur_loc, j, i, cur_width,
-                              cur_height, cur_stride, flow_u + patch_center,
-                              flow_v + patch_center);
+                              ref_pyr->level_buffer + cur_loc, patch_tl_x,
+                              patch_tl_y, cur_width, cur_height, cur_stride,
+                              &flow_u[flow_field_idx], &flow_v[flow_field_idx]);
       }
     }
 
     // Fill in the areas which we haven't explicitly computed, with copies
     // of the outermost values which we did compute
-    fill_flow_field_borders(flow_u, cur_width, cur_height, cur_stride);
-    fill_flow_field_borders(flow_v, cur_width, cur_height, cur_stride);
+    fill_flow_field_borders(flow_u, cur_flow_width, cur_flow_height,
+                            cur_flow_stride);
+    fill_flow_field_borders(flow_v, cur_flow_width, cur_flow_height,
+                            cur_flow_stride);
 
     if (level > 0) {
       int h_upscale = frm_pyr->heights[level - 1];
       int w_upscale = frm_pyr->widths[level - 1];
-      int s_upscale = frm_pyr->strides[level - 1];
-      av1_upscale_plane_double_prec(flow_u, cur_height, cur_width, cur_stride,
-                                    u_upscale, h_upscale, w_upscale, s_upscale);
-      av1_upscale_plane_double_prec(flow_v, cur_height, cur_width, cur_stride,
-                                    v_upscale, h_upscale, w_upscale, s_upscale);
+      // int s_upscale = frm_pyr->strides[level - 1];
+
+      int upscale_flow_width = w_upscale >> DOWNSAMPLE_SHIFT;
+      int upscale_flow_height = h_upscale >> DOWNSAMPLE_SHIFT;
+      int upscale_stride = flow->stride;
+
+      av1_upscale_plane_double_prec(
+          flow_u, cur_flow_height, cur_flow_width, cur_flow_stride, u_upscale,
+          upscale_flow_height, upscale_flow_width, upscale_stride);
+      av1_upscale_plane_double_prec(
+          flow_v, cur_flow_height, cur_flow_width, cur_flow_stride, v_upscale,
+          upscale_flow_height, upscale_flow_width, upscale_stride);
 
       // Multiply all flow vectors by 2.
       // When we move down a pyramid level, the image resolution doubles.
       // Thus we need to double all vectors in order for them to represent
       // the same translation at the next level down
-      for (int i = 0; i < h_upscale; i++) {
-        for (int j = 0; j < w_upscale; j++) {
-          int index = i * s_upscale + j;
+      for (int i = 0; i < upscale_flow_height; i++) {
+        for (int j = 0; j < upscale_flow_width; j++) {
+          int index = i * upscale_stride + j;
           flow_u[index] = u_upscale[index] * 2.0;
           flow_v[index] = v_upscale[index] * 2.0;
         }
@@ -404,26 +492,15 @@ FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
   assert(frm->y_width == ref->y_width);
   assert(frm->y_height == ref->y_height);
 
-  // Compute pyramids if necessary.
-  // These are cached alongside the framebuffer to avoid unnecessary
-  // recomputation. When the framebuffer is freed, or reused for a new frame,
-  // these pyramids will be automatically freed.
-  if (!frm->y_pyramid) {
-    frm->y_pyramid = aom_compute_pyramid(frm, bit_depth, MAX_PYRAMID_LEVELS);
-    assert(frm->y_pyramid);
-  }
-  if (!ref->y_pyramid) {
-    ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
-    assert(ref->y_pyramid);
-  }
-
-  ImagePyramid *frm_pyr = frm->y_pyramid;
-  ImagePyramid *ref_pyr = ref->y_pyramid;
+  ImagePyramid *frm_pyr =
+      aom_compute_pyramid(frm, bit_depth, MAX_PYRAMID_LEVELS);
+  ImagePyramid *ref_pyr =
+      aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
 
   FlowField *flow =
       aom_alloc_flow_field(frm_width, frm_height, frm_pyr->strides[0]);
 
-  compute_flow_field(frm_pyr, ref_pyr, flow->u, flow->v);
+  compute_flow_field(frm_pyr, ref_pyr, flow);
 
   return flow;
 }
@@ -435,20 +512,26 @@ bool aom_fit_global_model_to_flow_field(FlowField *flow,
                                         int num_motions) {
   int num_correspondences;
 
-  if (!frm->corners) {
-    aom_find_corners_in_frame(frm, bit_depth);
-  }
+  aom_find_corners_in_frame(frm, bit_depth);
 
   // find correspondences between the two images using the flow field
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+  Correspondence *correspondences =
+      aom_malloc(frm->num_subset_corners * sizeof(*correspondences));
+  num_correspondences = determine_disflow_correspondence(
+      frm->subset_corners, frm->num_subset_corners, flow, correspondences);
+#else
   Correspondence *correspondences =
       aom_malloc(frm->num_corners * sizeof(*correspondences));
   num_correspondences = determine_disflow_correspondence(
-      frm->corners, frm->num_corners, flow->u, flow->v, flow->width,
-      flow->height, flow->stride, correspondences);
+      frm->corners, frm->num_corners, flow, correspondences);
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
+
   ransac(correspondences, num_correspondences, type, params_by_motion,
          num_motions);
 
   aom_free(correspondences);
+
   // Set num_inliers = 0 for motions with too few inliers so they are ignored.
   for (int i = 0; i < num_motions; ++i) {
     if (params_by_motion[i].num_inliers <
@@ -467,21 +550,37 @@ bool aom_fit_global_model_to_flow_field(FlowField *flow,
 bool aom_fit_local_model_to_flow_field(const FlowField *flow,
                                        const PixelRect *rect,
                                        TransformationType type, double *mat) {
-  int width = rect_height(rect);
-  int height = rect_width(rect);
+  // Transform input rectangle to flow-field space
+  // Generally `rect` will be the rectangle of a single coding block,
+  // so the edges will be aligned to multiples of DOWNSAMPLE_FACTOR already.
+  PixelRect downsampled_rect = { .left = rect->left >> DOWNSAMPLE_SHIFT,
+                                 .right = rect->right >> DOWNSAMPLE_SHIFT,
+                                 .top = rect->top >> DOWNSAMPLE_SHIFT,
+                                 .bottom = rect->bottom >> DOWNSAMPLE_SHIFT };
+
+  // Generate one point for each flow field entry covered by the rectangle
+  int width = rect_height(&downsampled_rect);
+  int height = rect_width(&downsampled_rect);
+
   int num_points = width * height;
 
-  // TODO(rachelbarker): Downsample if num_points is > some threshold?
   double *pts1 = aom_malloc(num_points * 2 * sizeof(double));
   double *pts2 = aom_malloc(num_points * 2 * sizeof(double));
-  int index = 0;
 
-  for (int y = rect->top; y < rect->bottom; y++) {
-    for (int x = rect->left; x < rect->right; x++) {
-      pts1[2 * index + 0] = (double)x;
-      pts1[2 * index + 1] = (double)y;
-      pts2[2 * index + 0] = (double)x + flow->u[y * flow->stride + x];
-      pts2[2 * index + 1] = (double)y + flow->v[y * flow->stride + x];
+  int flow_stride = flow->stride;
+
+  int index = 0;
+  for (int i = rect->top; i < rect->bottom; i++) {
+    for (int j = rect->left; j < rect->right; j++) {
+      int flow_pos = i * flow_stride + j;
+      // Associate each flow field entry with the center-most pixel that
+      // it covers
+      int patch_center_x = (j << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
+      int patch_center_y = (i << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
+      pts1[2 * index + 0] = (double)patch_center_x;
+      pts1[2 * index + 1] = (double)patch_center_y;
+      pts2[2 * index + 0] = (double)patch_center_x + flow->u[flow_pos];
+      pts2[2 * index + 1] = (double)patch_center_y + flow->v[flow_pos];
       index++;
     }
   }

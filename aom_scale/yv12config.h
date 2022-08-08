@@ -97,6 +97,10 @@ typedef struct yv12_buffer_config {
   ImagePyramid *y_pyramid;
   int *corners;
   int num_corners;
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+  int *subset_corners;
+  int num_subset_corners;
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
 #endif  // CONFIG_AV1_ENCODER
 
   uint8_t *buffer_alloc;

@@ -3510,19 +3510,23 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
   // so we need to do that before we discard the source frame.
   // We do not need to compute the corner list, as this will be derived
   // from the pyramid when needed.
-  if (!cpi->source->y_pyramid) {
-    cpi->source->y_pyramid = aom_compute_pyramid(
-        cpi->source, cm->seq_params.bit_depth, MAX_PYRAMID_LEVELS);
-    assert(cpi->source->y_pyramid);
-  }
-
-  cm->cur_frame->buf.y_pyramid = cpi->source->y_pyramid;
+  cm->cur_frame->buf.y_pyramid = aom_compute_pyramid(
+      cpi->source, cm->seq_params.bit_depth, MAX_PYRAMID_LEVELS);
   cm->cur_frame->buf.corners = cpi->source->corners;
   cm->cur_frame->buf.num_corners = cpi->source->num_corners;
 
   cpi->source->y_pyramid = NULL;
   cpi->source->corners = NULL;
   cpi->source->num_corners = 0;
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+  // The corner subset is only used when a frame is used as a source,
+  // so can be freed at this point
+  if (cpi->source->subset_corners) {
+    aom_free(cpi->source->subset_corners);
+  }
+  cpi->source->subset_corners = NULL;
+  cpi->source->num_subset_corners = 0;
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
 #endif  // CONFIG_GM_USE_SRC_FRAMES
 
   refresh_reference_frames(cpi);

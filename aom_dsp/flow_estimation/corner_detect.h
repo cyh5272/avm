@@ -23,9 +23,6 @@
 extern "C" {
 #endif
 
-int aom_fast_corner_detect(unsigned char *buf, int width, int height,
-                           int stride, int *points, int max_points);
-
 void aom_find_corners_in_frame(YV12_BUFFER_CONFIG *frm, int bit_depth);
 
 #ifdef __cplusplus

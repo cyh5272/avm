@@ -200,29 +200,19 @@ CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
                                              YV12_BUFFER_CONFIG *ref,
                                              int bit_depth) {
   // Ensure that all relevant per-frame data is available
-  if (!src->y_pyramid) {
-    src->y_pyramid = aom_compute_pyramid(src, bit_depth, MAX_PYRAMID_LEVELS);
-    assert(src->y_pyramid);
-  }
-  if (!ref->y_pyramid) {
-    ref->y_pyramid = aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
-    assert(ref->y_pyramid);
-  }
-  if (!src->corners) {
-    aom_find_corners_in_frame(src, bit_depth);
-  }
-  if (!ref->corners) {
-    aom_find_corners_in_frame(ref, bit_depth);
-  }
+  aom_find_corners_in_frame(src, bit_depth);
+  aom_find_corners_in_frame(ref, bit_depth);
 
-  ImagePyramid *src_pyr = src->y_pyramid;
+  ImagePyramid *src_pyr =
+      aom_compute_pyramid(src, bit_depth, MAX_PYRAMID_LEVELS);
 
   unsigned char *src_buffer = src_pyr->level_buffer + src_pyr->level_loc[0];
   int src_width = src_pyr->widths[0];
   int src_height = src_pyr->heights[0];
   int src_stride = src_pyr->strides[0];
 
-  ImagePyramid *ref_pyr = ref->y_pyramid;
+  ImagePyramid *ref_pyr =
+      aom_compute_pyramid(ref, bit_depth, MAX_PYRAMID_LEVELS);
 
   unsigned char *ref_buffer = ref_pyr->level_buffer + ref_pyr->level_loc[0];
   int ref_stride = ref_pyr->strides[0];
@@ -231,12 +221,21 @@ CorrespondenceList *aom_compute_corner_match(YV12_BUFFER_CONFIG *src,
 
   // Compute correspondences
   CorrespondenceList *list = aom_malloc(sizeof(CorrespondenceList));
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+  list->correspondences = (Correspondence *)aom_malloc(
+      src->num_subset_corners * sizeof(*list->correspondences));
+  list->num_correspondences = determine_correspondence(
+      src_buffer, src->subset_corners, src->num_subset_corners, ref_buffer,
+      ref->corners, ref->num_corners, src_width, src_height, src_stride,
+      ref_stride, list->correspondences);
+#else
   list->correspondences = (Correspondence *)aom_malloc(
       src->num_corners * sizeof(*list->correspondences));
   list->num_correspondences = determine_correspondence(
       src_buffer, src->corners, src->num_corners, ref_buffer, ref->corners,
       ref->num_corners, src_width, src_height, src_stride, ref_stride,
       list->correspondences);
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
   return list;
 }
 

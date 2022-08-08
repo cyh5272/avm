@@ -21,7 +21,11 @@ extern "C" {
 #endif
 
 #define MAX_PARAMDIM 9
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+#define MAX_CORNERS 1024
+#else
 #define MAX_CORNERS 4096
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
 #define MIN_INLIER_PROB 0.1
 
 /* clang-format off */

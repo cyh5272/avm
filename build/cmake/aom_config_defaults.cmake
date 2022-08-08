@@ -248,6 +248,8 @@ set_aom_config_var(
   0
   "Encoder-only: Compute flow using source frames rather than reconstructed frames"
 )
+set_aom_config_var(CONFIG_GM_IMPROVED_CORNER_MATCH 0
+                   "Encoder-only: Improve corner detection for large frames")
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1

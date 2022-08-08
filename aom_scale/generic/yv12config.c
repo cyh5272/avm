@@ -40,6 +40,11 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf) {
     if (ybf->corners) {
       aom_free(ybf->corners);
     }
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+    if (ybf->subset_corners) {
+      aom_free(ybf->subset_corners);
+    }
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
 #endif  // CONFIG_AV1_ENCODER
     aom_remove_metadata_from_frame_buffer(ybf);
     /* buffer_alloc isn't accessed by most functions.  Rather y_buffer,
@@ -68,6 +73,13 @@ void aom_invalidate_gm_data(YV12_BUFFER_CONFIG *ybf) {
     ybf->corners = NULL;
   }
   ybf->num_corners = 0;
+#if CONFIG_GM_IMPROVED_CORNER_MATCH
+  if (ybf->subset_corners) {
+    aom_free(ybf->subset_corners);
+    ybf->subset_corners = NULL;
+  }
+  ybf->num_subset_corners = 0;
+#endif  // CONFIG_GM_IMPROVED_CORNER_MATCH
 }
 #endif  // CONFIG_AV1_ENCODER
 
