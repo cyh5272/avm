@@ -2478,10 +2478,11 @@ static AOM_INLINE void wb_write_uniform(struct aom_write_bit_buffer *wb, int n,
 
 #if CONFIG_LR_FLEX_SYNTAX
 static int frame_restoration_type_to_index(
-    const AV1_COMMON *const cm, RestorationType frame_restoration_type) {
+    const AV1_COMMON *const cm, int plane,
+    RestorationType frame_restoration_type) {
   int ndx = 0;
   for (RestorationType r = RESTORE_NONE; r < frame_restoration_type; ++r) {
-    if (((cm->seq_params.lr_tools_disable_mask >> r) & 1) == 0) ndx++;
+    if (((cm->features.lr_tools_disable_mask[plane] >> r) & 1) == 0) ndx++;
   }
   return ndx;
 }
@@ -2507,11 +2508,30 @@ static AOM_INLINE void encode_restoration_mode(
       chroma_none &= p == 0;
     }
 #if CONFIG_LR_FLEX_SYNTAX
-    assert(IMPLIES(cm->seq_params.lr_tools_count < 2,
+    assert(IMPLIES(cm->features.lr_tools_count[p] < 2,
                    rsi->frame_restoration_type != RESTORE_SWITCHABLE));
     const int ndx =
-        frame_restoration_type_to_index(cm, rsi->frame_restoration_type);
-    wb_write_uniform(wb, cm->seq_params.lr_frame_tools_count, ndx);
+        frame_restoration_type_to_index(cm, p, rsi->frame_restoration_type);
+    wb_write_uniform(wb, cm->features.lr_frame_tools_count[p], ndx);
+    uint8_t plane_lr_tools_disable_mask = cm->features.lr_tools_disable_mask[p];
+    uint8_t sw_lr_tools_disable_mask = rsi->sw_lr_tools_disable_mask;
+    if (rsi->frame_restoration_type == RESTORE_SWITCHABLE &&
+        cm->features.lr_tools_count[p] > 2) {
+      if ((sw_lr_tools_disable_mask | plane_lr_tools_disable_mask) ==
+          plane_lr_tools_disable_mask) {
+        aom_wb_write_bit(wb, 0);
+      } else {
+        aom_wb_write_bit(wb, 1);
+        for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+          if (!(plane_lr_tools_disable_mask & (1 << i))) {
+            aom_wb_write_bit(wb, ((sw_lr_tools_disable_mask >> i) & 1));
+            plane_lr_tools_disable_mask |=
+                (sw_lr_tools_disable_mask & (1 << i));
+          }
+        }
+        av1_set_lr_tools(plane_lr_tools_disable_mask, p, &cm->features);
+      }
+    }
 #else
     switch (rsi->frame_restoration_type) {
       case RESTORE_NONE: aom_wb_write_bit(wb, 0); aom_wb_write_bit(wb, 0);
@@ -2859,7 +2879,7 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 
   RestorationType unit_rtype = rui->restoration_type;
 #if CONFIG_LR_FLEX_SYNTAX
-  assert(((cm->seq_params.lr_tools_disable_mask >> rui->restoration_type) &
+  assert(((cm->features.lr_tools_disable_mask[plane] >> rui->restoration_type) &
           1) == 0);
 #endif  // CONFIG_LR_FLEX_SYNTAX
 #if CONFIG_MULTIQ_LR_SIGNALING
@@ -2871,15 +2891,17 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
   if (frame_rtype == RESTORE_SWITCHABLE) {
 #if CONFIG_LR_FLEX_SYNTAX
     int found = 0;
-    for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
-      if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+    for (int re = 0; re <= cm->features.lr_last_switchable_ndx[plane]; re++) {
+      if (cm->features.lr_tools_disable_mask[plane] & (1 << re)) continue;
       found = (re == (int)unit_rtype);
       aom_write_symbol(w, found,
-                       xd->tile_ctx->switchable_flex_restore_cdf[ql][re], 2);
+                       xd->tile_ctx->switchable_flex_restore_cdf[ql][re][plane],
+                       2);
       if (found) break;
     }
-    assert(IMPLIES(!found, (int)unit_rtype ==
-                               cm->seq_params.lr_last_switchable_ndx_0_type));
+    assert(IMPLIES(
+        !found,
+        (int)unit_rtype == cm->features.lr_last_switchable_ndx_0_type[plane]));
 #else
     aom_write_symbol(w, unit_rtype, xd->tile_ctx->switchable_restore_cdf[ql],
                      RESTORE_SWITCHABLE_TYPES);
@@ -3999,7 +4021,17 @@ static AOM_INLINE void write_sequence_header(
 #if CONFIG_LR_FLEX_SYNTAX
   if (seq_params->enable_restoration) {
     for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
-      aom_wb_write_bit(wb, (seq_params->lr_tools_disable_mask >> i) & 1);
+      aom_wb_write_bit(wb, (seq_params->lr_tools_disable_mask[0] >> i) & 1);
+    }
+    const int uv_neq_y =
+        (seq_params->lr_tools_disable_mask[1] !=
+         (seq_params->lr_tools_disable_mask[0] | DEF_UV_LR_TOOLS_DISABLE_MASK));
+    aom_wb_write_bit(wb, uv_neq_y);
+    if (uv_neq_y) {
+      for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+        if (DEF_UV_LR_TOOLS_DISABLE_MASK | (1 << i)) continue;
+        aom_wb_write_bit(wb, (seq_params->lr_tools_disable_mask[1] >> i) & 1);
+      }
     }
   }
 #endif  // CONFIG_LR_FLEX_SYNTAX

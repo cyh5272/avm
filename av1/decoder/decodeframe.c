@@ -2206,10 +2206,10 @@ static int rb_read_uniform(struct aom_read_bit_buffer *const rb, int n) {
 
 #if CONFIG_LR_FLEX_SYNTAX
 static RestorationType index_to_frame_restoration_type(
-    const AV1_COMMON *const cm, int ndx) {
+    const AV1_COMMON *const cm, int plane, int ndx) {
   RestorationType r = RESTORE_NONE;
   for (r = RESTORE_NONE; r < RESTORE_TYPES; ++r) {
-    if (((cm->seq_params.lr_tools_disable_mask >> r) & 1) == 0) {
+    if (((cm->features.lr_tools_disable_mask[plane] >> r) & 1) == 0) {
       ndx--;
       if (ndx < 0) break;
     }
@@ -2234,8 +2234,21 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
     }
 #endif  // CONFIG_CNN_RESTORATION
 #if CONFIG_LR_FLEX_SYNTAX
-    const int ndx = rb_read_uniform(rb, cm->seq_params.lr_frame_tools_count);
-    rsi->frame_restoration_type = index_to_frame_restoration_type(cm, ndx);
+    uint8_t plane_lr_tools_disable_mask =
+        cm->seq_params.lr_tools_disable_mask[p > 0];
+    av1_set_lr_tools(plane_lr_tools_disable_mask, p, &cm->features);
+    const int ndx = rb_read_uniform(rb, cm->features.lr_frame_tools_count[p]);
+    rsi->frame_restoration_type = index_to_frame_restoration_type(cm, p, ndx);
+    if (rsi->frame_restoration_type == RESTORE_SWITCHABLE &&
+        cm->features.lr_tools_count[p] > 2) {
+      if (aom_rb_read_bit(rb)) {
+        for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+          if (!(plane_lr_tools_disable_mask & (1 << i)))
+            plane_lr_tools_disable_mask |= (aom_rb_read_bit(rb) << i);
+        }
+        av1_set_lr_tools(plane_lr_tools_disable_mask, p, &cm->features);
+      }
+    }
 #else
     if (aom_rb_read_bit(rb)) {
       if (aom_rb_read_bit(rb)) {
@@ -2573,9 +2586,8 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
 
   const int wiener_win = (plane > 0) ? WIENER_WIN_CHROMA : WIENER_WIN;
-#if CONFIG_WIENER_NONSEP
   const int is_uv = (plane > 0);
-#endif  // CONFIG_WIENER_NONSEP
+  (void)is_uv;
 #if CONFIG_WIENER_NONSEP
   rui->wienerns_info.num_classes =
       xd->wienerns_info[plane].filter[0].num_classes;
@@ -2583,11 +2595,12 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
 #if CONFIG_LR_FLEX_SYNTAX
-    rui->restoration_type = cm->seq_params.lr_last_switchable_ndx_0_type;
-    for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
-      if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+    rui->restoration_type = cm->features.lr_last_switchable_ndx_0_type[plane];
+    for (int re = 0; re <= cm->features.lr_last_switchable_ndx[plane]; re++) {
+      if (cm->features.lr_tools_disable_mask[plane] & (1 << re)) continue;
       const int found = aom_read_symbol(
-          r, xd->tile_ctx->switchable_flex_restore_cdf[ql][re], 2, ACCT_STR);
+          r, xd->tile_ctx->switchable_flex_restore_cdf[ql][re][plane], 2,
+          ACCT_STR);
       if (found) {
         rui->restoration_type = re;
         break;
@@ -2659,7 +2672,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
 #endif  // CONFIG_PC_WIENER
   }
 #if CONFIG_LR_FLEX_SYNTAX
-  assert(((cm->seq_params.lr_tools_disable_mask >> rui->restoration_type) &
+  assert(((cm->features.lr_tools_disable_mask[plane] >> rui->restoration_type) &
           1) == 0);
 #endif  // CONFIG_LR_FLEX_SYNTAX
 }
@@ -5491,11 +5504,19 @@ void av1_read_sequence_header(AV1_COMMON *cm, struct aom_read_bit_buffer *rb,
   seq_params->enable_restoration = aom_rb_read_bit(rb);
 #if CONFIG_LR_FLEX_SYNTAX
   if (seq_params->enable_restoration) {
-    seq_params->lr_tools_disable_mask = 0;  // default - no tools disabled
     for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
-      seq_params->lr_tools_disable_mask |= (aom_rb_read_bit(rb) << i);
+      seq_params->lr_tools_disable_mask[0] |= (aom_rb_read_bit(rb) << i);
     }
-    av1_set_lr_tools(seq_params);
+    if (aom_rb_read_bit(rb)) {
+      seq_params->lr_tools_disable_mask[1] = DEF_UV_LR_TOOLS_DISABLE_MASK;
+      for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i) {
+        if (DEF_UV_LR_TOOLS_DISABLE_MASK | (1 << i)) continue;
+        seq_params->lr_tools_disable_mask[1] |= (aom_rb_read_bit(rb) << i);
+      }
+    } else {
+      seq_params->lr_tools_disable_mask[1] =
+          (seq_params->lr_tools_disable_mask[0] | DEF_UV_LR_TOOLS_DISABLE_MASK);
+    }
   }
 #endif  // CONFIG_LR_FLEX_SYNTAX
 }

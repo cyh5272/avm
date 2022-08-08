@@ -38,10 +38,6 @@
 #include "third_party/vector/vector.h"
 #endif  // CONFIG_RST_MERGECOEFFS
 
-// When set to RESTORE_WIENER or RESTORE_SGRPROJ only those are allowed.
-// When set to RESTORE_TYPES we allow switchable.
-static const RestorationType force_restore_type = RESTORE_TYPES;
-
 // Number of Wiener iterations
 #define NUM_WIENER_ITERS 5
 
@@ -3753,15 +3749,16 @@ static void search_wienerns(const RestorationTileLimits *limits,
 #endif  // CONFIG_WIENER_NONSEP
 
 static int get_switchable_restore_cost(const AV1_COMMON *const cm,
-                                       const MACROBLOCK *const x,
+                                       const MACROBLOCK *const x, int plane,
                                        int rest_type) {
   (void)cm;
+  (void)plane;
 #if CONFIG_LR_FLEX_SYNTAX
   int cost = 0;
-  for (int re = 0; re <= cm->seq_params.lr_last_switchable_ndx; re++) {
-    if (cm->seq_params.lr_tools_disable_mask & (1 << re)) continue;
+  for (int re = 0; re <= cm->features.lr_last_switchable_ndx[plane]; re++) {
+    if (cm->features.lr_tools_disable_mask[plane] & (1 << re)) continue;
     const int found = (re == rest_type);
-    cost += x->mode_costs.switchable_flex_restore_cost[re][found];
+    cost += x->mode_costs.switchable_flex_restore_cost[re][plane][found];
     if (found) break;
   }
   return cost;
@@ -3826,7 +3823,8 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
     default: assert(0); break;
   }
   const int64_t bits =
-      get_switchable_restore_cost(rsc->cm, x, rest_type) + coeff_bits;
+      get_switchable_restore_cost(rsc->cm, x, rsc->plane, rest_type) +
+      coeff_bits;
   return bits;
 }
 
@@ -3842,10 +3840,8 @@ static void search_switchable(const RestorationTileLimits *limits,
 
   const MACROBLOCK *const x = rsc->x;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-  int is_uv = (rsc->plane != AOM_PLANE_Y);
-  (void)is_uv;
 
-  double best_cost = 0;
+  double best_cost = DBL_MAX;
   int64_t best_bits = 0;
   RestorationType best_rtype = RESTORE_NONE;
 
@@ -3857,6 +3853,13 @@ static void search_switchable(const RestorationTileLimits *limits,
     if (r > RESTORE_NONE) {
       if (rusi->best_rtype[r - 1] == RESTORE_NONE) continue;
     }
+#if CONFIG_LR_FLEX_SYNTAX
+    if (rsc->cm->features.lr_tools_disable_mask[rsc->plane] & (1 << r))
+      continue;
+#endif  // CONFIG_LR_FLEX_SYNTAX
+#if CONFIG_PC_WIENER
+    if (rsc->plane != AOM_PLANE_Y && r == RESTORE_PC_WIENER) continue;
+#endif  // CONFIG_PC_WIENER
 
     const int64_t sse = rusi->sse[r];
     int64_t bits = count_switchable_bits(r, rsc, rusi);
@@ -3924,7 +3927,9 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   (void)rsc;
 #endif  // CONFIG_RST_MERGECOEFFS
   assert(frame_rtype > 0);
-  rui->restoration_type = rusi->best_rtype[frame_rtype - 1];
+  rui->restoration_type = frame_rtype == RESTORE_NONE
+                              ? RESTORE_NONE
+                              : rusi->best_rtype[frame_rtype - 1];
   if (rui->restoration_type == RESTORE_WIENER) {
     rui->wiener_info = rusi->wiener_info;
 #if CONFIG_RST_MERGECOEFFS
@@ -4010,6 +4015,41 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
       rsc->x->rdmult, rsc->bits >> 4, rsc->sse, rsc->cm->seq_params.bit_depth);
 }
 
+static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
+                               RestSearchCtxt *rsc) {
+  (void)rsc;
+#if CONFIG_LR_FLEX_SYNTAX
+  rsi->sw_lr_tools_disable_mask = 0;
+  uint8_t sw_lr_tools_disable_mask = 0;
+#endif  // CONFIG_LR_FLEX_SYNTAX
+  if (rsi->frame_restoration_type == RESTORE_NONE) return;
+  int tool_count[RESTORE_SWITCHABLE_TYPES] = { 0 };
+  for (int u = 0; u < plane_ntiles; ++u) {
+    RestorationType rt = rsi->unit_info[u].restoration_type;
+    tool_count[rt]++;
+  }
+  int ntools = 0;
+  RestorationType rused = RESTORE_NONE;
+  for (int j = 1; j < RESTORE_SWITCHABLE_TYPES; ++j) {
+    if (tool_count[j] > 0) {
+      ntools++;
+      rused = j;
+#if CONFIG_LR_FLEX_SYNTAX
+    } else {
+      sw_lr_tools_disable_mask |= (1 << j);
+#endif  // CONFIG_LR_FLEX_SYNTAX
+    }
+  }
+  rsi->frame_restoration_type = ntools < 2 ? rused : RESTORE_SWITCHABLE;
+#if CONFIG_LR_FLEX_SYNTAX
+  if (rsi->frame_restoration_type == RESTORE_SWITCHABLE &&
+      rsc->cm->features.lr_tools_count[rsc->plane] > 2) {
+    rsi->sw_lr_tools_disable_mask = sw_lr_tools_disable_mask;
+  }
+#endif  // CONFIG_LR_FLEX_SYNTAX
+  return;
+}
+
 void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &cpi->td.mb;
@@ -4087,12 +4127,12 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
 
       for (RestorationType r = 0; r < num_rtypes; ++r) {
 #if CONFIG_LR_FLEX_SYNTAX
-        if (cpi->common.seq_params.lr_tools_disable_mask & (1 << r)) continue;
-#endif  // CONFIG_LR_FLEX_SYNTAX
-
-        if ((force_restore_type != RESTORE_TYPES) && (r != RESTORE_NONE) &&
-            (r != force_restore_type))
+        if (cpi->common.features.lr_tools_disable_mask[plane > 0] & (1 << r))
           continue;
+#endif  // CONFIG_LR_FLEX_SYNTAX
+#if CONFIG_PC_WIENER
+        if (plane > AOM_PLANE_Y && r == RESTORE_PC_WIENER) continue;
+#endif  // CONFIG_PC_WIENER
 
         double cost = search_rest_type(&rsc, r);
         // printf("Plane[%d] r[%d]: cost %f\n", plane, r, cost);
@@ -4120,9 +4160,6 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     if (plane == plane_start) cm->lr_y_rdcost = best_cost;
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
-    if (force_restore_type != RESTORE_TYPES)
-      assert(best_rtype == force_restore_type || best_rtype == RESTORE_NONE);
-
     reset_all_banks(&rsc);
     if (best_rtype != RESTORE_NONE) {
       for (int u = 0; u < plane_ntiles; ++u) {
@@ -4130,6 +4167,12 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
                        &rsc);
       }
     }
+#if CONFIG_LR_FLEX_SYNTAX
+    assert(IMPLIES(
+        cm->features.lr_tools_count[plane] < 2,
+        cm->rst_info[plane].frame_restoration_type != RESTORE_SWITCHABLE));
+#endif  // CONFIG_LR_FLEX_SYNTAX
+    adjust_frame_rtype(&cm->rst_info[plane], plane_ntiles, &rsc);
   }
 
 #if CONFIG_SAVE_IN_LOOP_DATA
