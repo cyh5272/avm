@@ -47,6 +47,9 @@ extern "C" {
 #define IMPROVED_AMVD 0
 #endif  // CONFIG_ADAPTIVE_MVD
 
+// Max number of planes
+#define MAX_MB_PLANE 3
+
 // Max superblock size
 #define MAX_SB_SIZE_LOG2 7
 #define MAX_SB_SIZE (1 << MAX_SB_SIZE_LOG2)

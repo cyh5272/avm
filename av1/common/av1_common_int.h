@@ -467,25 +467,13 @@ typedef struct SequenceHeader {
   uint8_t enable_refmvbank;  // To turn on/off Ref MV Bank
 #endif                       // CONFIG_REF_MV_BANK
 #if CONFIG_LR_FLEX_SYNTAX
-  uint8_t lr_tools_disable_mask;  // mask of lr tool(s) to disable.
-                                  // To disable tool i in RestorationType
-                                  // enum where:
-                                  // 1 <= i <= RESTORE_SWITCHABLE_TYPES, set
-                                  // the ith bit from least to most iognificant
-                                  // order to 1.
-  int lr_tools_count;             // Number of lr tools enabled
-  int lr_switchable_tools_count;  // Number of lr options in switchable mode
-  int lr_frame_tools_count;       // Number of lr modes available at frame level
-  int lr_last_switchable_ndx;     // index of last bit transmitted for
-                                  // convenience. Beyond this index there is
-                                  // exactly one allowed option, and therefore
-                                  // there is no need to signal anything.
-  int lr_last_switchable_ndx_0_type;  // Restoration Type if last bit
-                                      // transmitted is 0 for convenience. If
-                                      // the last bit (lr_last_switchable_ndx)
-                                      // transmitted is 0, the restoration type
-                                      // is lr_last_switchable_ndx_0_type.
-#endif                                // CONFIG_LR_FLEX_SYNTAX
+  uint8_t lr_tools_disable_mask[2];  // mask of lr tool(s) to disable.
+                                     // To disable tool i in RestorationType
+                                     // enum where:
+                                     // 1 <= i <= RESTORE_SWITCHABLE_TYPES, set
+                                     // the ith bit in least to most significant
+                                     // order to 1.
+#endif                               // CONFIG_LR_FLEX_SYNTAX
   BITSTREAM_PROFILE profile;
 
   // Color config.
@@ -642,6 +630,33 @@ typedef struct {
    */
   bool allow_tip_hole_fill;
 #endif  // CONFIG_TIP
+
+#if CONFIG_LR_FLEX_SYNTAX
+  uint8_t lr_tools_disable_mask[MAX_MB_PLANE];  // mask of lr tool(s) to
+                                                // disable. To disable tool i in
+                                                // RestorationType enum where:
+                                                // 1 <= i <=
+                                                // RESTORE_SWITCHABLE_TYPES, set
+                                                // the ith bit in least to most
+                                                // significant order to 1.
+  int lr_tools_count[MAX_MB_PLANE];             // Number of lr tools enabled
+  int lr_switchable_tools_count[MAX_MB_PLANE];  // Number of lr options in
+                                                // switchable mode
+  int lr_frame_tools_count[MAX_MB_PLANE];  // Number of lr modes available at
+                                           // frame level
+  int lr_last_switchable_ndx
+      [MAX_MB_PLANE];  // index of last bit transmitted for
+                       // convenience. Beyond this index there is
+                       // exactly one allowed option, and therefore
+                       // there is no need to signal anything.
+  int lr_last_switchable_ndx_0_type
+      [MAX_MB_PLANE];  // Restoration Type if last bit
+                       // transmitted is 0 for convenience. If
+                       // the last bit
+                       // (lr_last_switchable_ndx) transmitted
+                       // is 0, the restoration type is
+                       // lr_last_switchable_ndx_0_type.
+#endif                 // CONFIG_LR_FLEX_SYNTAX
 } FeatureFlags;
 
 /*!
@@ -2720,30 +2735,32 @@ static INLINE void set_sb_size(SequenceHeader *const seq_params,
 }
 
 #if CONFIG_LR_FLEX_SYNTAX
-static INLINE void av1_set_lr_tools(SequenceHeader *const seq_params) {
+static INLINE void av1_set_lr_tools(uint8_t lr_tools_disable_mask, int plane,
+                                    FeatureFlags *const fea_params) {
+  fea_params->lr_tools_disable_mask[plane] = lr_tools_disable_mask;
   int tools_count = 0;
   for (int i = 1; i < RESTORE_SWITCHABLE_TYPES; ++i)
-    tools_count += !((seq_params->lr_tools_disable_mask >> i) & 1);
-  seq_params->lr_tools_count = tools_count;
-  seq_params->lr_switchable_tools_count = tools_count + 1;
+    tools_count += !((fea_params->lr_tools_disable_mask[plane] >> i) & 1);
+  fea_params->lr_tools_count[plane] = tools_count;
+  fea_params->lr_switchable_tools_count[plane] = tools_count + 1;
 
   // If total tools is < 2, no need no need to have switchable
   if (tools_count < 2)
-    seq_params->lr_tools_disable_mask |= (1 << RESTORE_SWITCHABLE);
+    fea_params->lr_tools_disable_mask[plane] |= (1 << RESTORE_SWITCHABLE);
   else
     tools_count++;
-  seq_params->lr_frame_tools_count = tools_count + 1;
+  fea_params->lr_frame_tools_count[plane] = tools_count + 1;
 
   // If switchable is allowed get last index for transmitted bit, and the
   // type if that bit is 0.
-  if (!((seq_params->lr_tools_disable_mask >> RESTORE_SWITCHABLE) & 1)) {
+  if (!((fea_params->lr_tools_disable_mask[plane] >> RESTORE_SWITCHABLE) & 1)) {
     for (int t = 0, i = RESTORE_SWITCHABLE_TYPES - 1; i >= 0; --i) {
-      if (!((seq_params->lr_tools_disable_mask >> i) & 1)) {
+      if (!((fea_params->lr_tools_disable_mask[plane] >> i) & 1)) {
         t++;
         if (t == 1) {
-          seq_params->lr_last_switchable_ndx_0_type = i;
+          fea_params->lr_last_switchable_ndx_0_type[plane] = i;
         } else if (t == 2) {
-          seq_params->lr_last_switchable_ndx = i;
+          fea_params->lr_last_switchable_ndx[plane] = i;
           break;
         }
       }
@@ -2751,8 +2768,8 @@ static INLINE void av1_set_lr_tools(SequenceHeader *const seq_params) {
   }
   /*
   printf("lr_tools_count %d, lr_frame_tools_count %d [mask %d]\n",
-         seq_params->lr_tools_count, seq_params->lr_frame_tools_count,
-         seq_params->lr_tools_disable_mask);
+         fea_params->lr_tools_count[0], fea_params->lr_frame_tools_count[0],
+         fea_params->lr_tools_disable_mask[0]);
          */
 }
 #endif  // CONFIG_LR_FLEX_SYNTAX
