@@ -457,9 +457,9 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (plane == AOM_PLANE_U && eob > 0) {
+  if (plane == AOM_PLANE_U) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
-    av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
+    if (eob > 0) av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -858,9 +858,10 @@ int get_cctx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd, int plane,
                        TX_SIZE tx_size, int block, CctxType cctx_type) {
   const int is_inter = is_inter_block(xd->mi[0], xd->tree_type);
   const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+  const int cctx_ctx = get_cctx_context(xd, tx_size);
   if (plane == AOM_PLANE_U && x->plane[plane].eobs[block] &&
       ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)))
-    return x->mode_costs.cctx_type_cost[square_tx_size][cctx_type];
+    return x->mode_costs.cctx_type_cost[square_tx_size][cctx_ctx][cctx_type];
   else
     return 0;
 }
@@ -2173,11 +2174,12 @@ static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
       !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+    const int cctx_ctx = get_cctx_context(xd, tx_size);
     if (allow_update_cdf)
-      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]], cctx_type,
-                 CCTX_TYPES);
+      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]][cctx_ctx],
+                 cctx_type, CCTX_TYPES);
 #if CONFIG_ENTROPY_STATS
-    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_type];
+    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_ctx][cctx_type];
 #endif  // CONFIG_ENTROPY_STATS
   }
 }

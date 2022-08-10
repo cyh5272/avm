@@ -874,9 +874,13 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         int blk_row, int blk_col, TX_SIZE tx_size,
                         aom_reader *r) {
   MB_MODE_INFO *mbmi = xd->mi[0];
-  CctxType *cctx_type =
-      &xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
-  *cctx_type = CCTX_NONE;
+  // If it is a sub 8x8 chroma block, derive the mi_row and mi_col of the
+  // parent block area. Then apply cctx type update to this area w.r.t the
+  // offsets derived
+  int row_offset, col_offset;
+  get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+  update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                    CCTX_NONE);
 
   // No need to read transform type if block is skipped.
   if (mbmi->skip_txfm[xd->tree_type == CHROMA_PART] ||
@@ -888,11 +892,16 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   if (qindex == 0) return;
 
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
+  CctxType cctx_type = CCTX_NONE;
   if ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) {
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    *cctx_type = aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size],
-                                 CCTX_TYPES, ACCT_STR);
+    const int cctx_ctx = get_cctx_context(xd, tx_size);
+    cctx_type =
+        aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+                        CCTX_TYPES, ACCT_STR);
+    update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                      cctx_type);
   }
 }
 #endif  // CONFIG_CROSS_CHROMA_TX

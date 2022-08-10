@@ -375,10 +375,11 @@ int main(int argc, const char **argv) {
 #if CONFIG_CROSS_CHROMA_TX
   /* cctx type */
   cts_each_dim[0] = EXT_TX_SIZES;
-  cts_each_dim[1] = CCTX_TYPES;
-  optimize_cdf_table(&fc.cctx_type[0][0], probsfile, 2, cts_each_dim,
+  cts_each_dim[1] = CCTX_CONTEXTS;
+  cts_each_dim[2] = CCTX_TYPES;
+  optimize_cdf_table(&fc.cctx_type[0][0][0], probsfile, 3, cts_each_dim,
                      "static const aom_cdf_prob default_cctx_type[EXT_TX_SIZES]"
-                     "[CDF_SIZE(CCTX_TYPES)]");
+                     "[CCTX_CONTEXTS][CDF_SIZE(CCTX_TYPES)]");
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   /* tx type */

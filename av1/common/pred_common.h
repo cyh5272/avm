@@ -357,6 +357,47 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+static INLINE void get_above_and_left_cctx_type(const MACROBLOCKD *xd,
+                                                int blk_row, int blk_col,
+                                                TX_SIZE tx_size,
+                                                int *above_cctx,
+                                                int *left_cctx) {
+  const int ss_x = xd->plane[AOM_PLANE_U].subsampling_x;
+  const int ss_y = xd->plane[AOM_PLANE_U].subsampling_y;
+  const int txh = tx_size_high_unit[tx_size];
+  const int txw = tx_size_wide_unit[tx_size];
+  // Offsets are needed for sub 8x8 blocks to reach the actual above and left
+  // neighbors
+  const int mi_row_offset = (xd->mi_row & 0x01) && (txh & 0x01) && ss_y;
+  const int mi_col_offset = (xd->mi_col & 0x01) && (txw & 0x01) && ss_x;
+  *above_cctx = xd->chroma_up_available
+                    ? av1_get_cctx_type(xd, blk_row - mi_row_offset - 1,
+                                        blk_col - mi_col_offset)
+                    : -1;
+  *left_cctx = xd->chroma_left_available
+                   ? av1_get_cctx_type(xd, blk_row - mi_row_offset,
+                                       blk_col - mi_col_offset - 1)
+                   : -1;
+  assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
+  assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
+}
+
+// 0: CCTX_NONE, unequal top and left context, or unavailable context
+// 1: positive angle cctx
+// 2: negative angle cctx
+static INLINE int get_cctx_context(const MACROBLOCKD *xd, TX_SIZE tx_size) {
+  int above, left;
+  get_above_and_left_cctx_type(xd, 0, 0, tx_size, &above, &left);
+  int above_ctx =
+      xd->chroma_up_available ? ((above > CCTX_60) + (above > CCTX_NONE)) : 0;
+  int left_ctx =
+      xd->chroma_left_available ? ((left > CCTX_60) + (left > CCTX_NONE)) : 0;
+  if (above_ctx == 0 || left_ctx == 0) return AOMMAX(above_ctx, left_ctx);
+  return (above_ctx == left_ctx) ? above_ctx : 0;
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 int av1_get_pred_context_switchable_interp(const MACROBLOCKD *xd, int dir);
 
 // Get a list of palette base colors that are used in the above and left blocks,

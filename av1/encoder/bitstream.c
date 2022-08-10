@@ -1171,7 +1171,9 @@ void av1_write_cctx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    aom_write_symbol(w, cctx_type, ec_ctx->cctx_type_cdf[square_tx_size],
+    const int cctx_ctx = get_cctx_context(xd, tx_size);
+    aom_write_symbol(w, cctx_type,
+                     ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
                      CCTX_TYPES);
   }
 }
@@ -2185,6 +2187,23 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   const int bw = mi_size_wide[bsize];
   set_mi_row_col(xd, tile, mi_row, bh, mi_col, bw, mi_params->mi_rows,
                  mi_params->mi_cols);
+
+#if CONFIG_CROSS_CHROMA_TX
+  // For skip blocks, reset the corresponding area in cctx_type_map to
+  // CCTX_NONE, which will be used as contexts for later blocks. No need to use
+  // av1_get_adjusted_tx_size because uv_txsize is intended to cover the entire
+  // prediction block area
+  if (mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
+      xd->tree_type != LUMA_PART && xd->is_chroma_ref) {
+    struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_U];
+    const BLOCK_SIZE uv_bsize =
+        get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+    const TX_SIZE uv_txsize = max_txsize_rect_lookup[uv_bsize];
+    int row_offset, col_offset;
+    get_offsets_to_8x8(xd, uv_txsize, &row_offset, &col_offset);
+    update_cctx_array(xd, 0, 0, row_offset, col_offset, uv_txsize, CCTX_NONE);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   xd->above_txfm_context = cm->above_contexts.txfm[tile->tile_row] + mi_col;
   xd->left_txfm_context =

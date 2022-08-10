@@ -1575,27 +1575,43 @@ static INLINE int keep_chroma_c2(CctxType cctx_type) {
 }
 #endif
 
+// When the current block is sub 8x8, obtain amounts of offset to its parent
+// 8x8 block. Otherwise set the offsets to 0.
+static INLINE void get_offsets_to_8x8(MACROBLOCKD *const xd, TX_SIZE tx_size,
+                                      int *row_offset, int *col_offset) {
+  const struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_U];
+  const int ss_x = pd->subsampling_x;
+  const int ss_y = pd->subsampling_y;
+  *row_offset =
+      (xd->mi_row & 0x01) && (tx_size_high_unit[tx_size] & 0x01) && ss_y;
+  *col_offset =
+      (xd->mi_col & 0x01) && (tx_size_wide_unit[tx_size] & 0x01) && ss_x;
+}
+
 static INLINE void update_cctx_array(MACROBLOCKD *const xd, int blk_row,
-                                     int blk_col, TX_SIZE tx_size,
+                                     int blk_col, int blk_row_offset,
+                                     int blk_col_offset, TX_SIZE tx_size,
                                      CctxType cctx_type) {
   const int stride = xd->tx_type_map_stride;
-  xd->cctx_type_map[blk_row * stride + blk_col] = cctx_type;
+  const struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_U];
+  const int ss_x = pd->subsampling_x;
+  const int ss_y = pd->subsampling_y;
+  assert(xd->is_chroma_ref);
 
-  const int txw = tx_size_wide_unit[tx_size];
-  const int txh = tx_size_high_unit[tx_size];
-  // The 16x16 unit is due to the constraint from tx_64x64 which sets the
-  // maximum tx size for chroma as 32x32. Coupled with 4x1 transform block
-  // size, the constraint takes effect in 32x16 / 16x32 size too. To solve
-  // the intricacy, cover all the 16x16 units inside a 64 level transform.
-  if (txw == tx_size_wide_unit[TX_64X64] ||
-      txh == tx_size_high_unit[TX_64X64]) {
-    const int tx_unit = tx_size_wide_unit[TX_16X16];
-    for (int idy = 0; idy < txh; idy += tx_unit) {
-      for (int idx = 0; idx < txw; idx += tx_unit) {
-        xd->cctx_type_map[(blk_row + idy) * stride + blk_col + idx] = cctx_type;
-      }
-    }
-  }
+  // For sub 8x8 block, offsets will be applied to reach the mi_row and mi_col
+  // of the >= 8x8 block area. Transform block size is upscaled to match the
+  // luma block size.
+  const int br = (blk_row << ss_y) - blk_row_offset;
+  const int bc = (blk_col << ss_x) - blk_col_offset;
+  const int txw = tx_size_wide_unit[tx_size] << ss_x;
+  const int txh = tx_size_high_unit[tx_size] << ss_y;
+
+  // To make cctx_type available for its right and bottom neighbors, cover
+  // all elements in cctx_type_map within the transform block range with the
+  // current cctx type
+  for (int idy = 0; idy < txh; idy++)
+    memset(&xd->cctx_type_map[(br + idy) * stride + bc], cctx_type,
+           txw * sizeof(xd->cctx_type_map[0]));
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

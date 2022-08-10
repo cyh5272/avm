@@ -650,9 +650,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #if CONFIG_CROSS_CHROMA_TX
     // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
     // when eob of U is 0.
-    // TODO(kslu) why cctx_type can be > CCTX_NONE when eob_u is 0?
     if (plane == AOM_PLANE_U && p->eobs[block] == 0)
-      update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 #endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
@@ -1283,16 +1282,16 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                             INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
 
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+    // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
+    // when eob of U is 0.
+    if (plane == AOM_PLANE_V && *eob_u == 0)
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 #if CCTX_C2_DROPPED
     if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
                                  (*eob_u == 0 && cctx_type > CCTX_NONE))) {
 #else
     if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
 #endif
-      // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
-      // when eob of U is 0.
-      if (*eob_u == 0 && cctx_type > CCTX_NONE)
-        update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
       av1_quantize_skip(av1_get_max_eob(tx_size),
                         p_v->coeff + BLOCK_OFFSET(block), dqcoeff_v, eob_v);
       break;

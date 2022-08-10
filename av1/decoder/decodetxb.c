@@ -14,6 +14,7 @@
 
 #include "aom_ports/mem.h"
 #include "av1/common/idct.h"
+#include "av1/common/pred_common.h"
 #include "av1/common/scan.h"
 #include "av1/common/txb_common.h"
 #if CONFIG_FORWARDSKIP
@@ -193,10 +194,14 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 
 #if CONFIG_CROSS_CHROMA_TX
   if (plane == AOM_PLANE_U) {
-    if (!all_zero)
+    if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-    else
-      xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                        CCTX_NONE);
+    }
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -352,8 +357,15 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (plane == AOM_PLANE_U && !all_zero) {
-    av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+  if (plane == AOM_PLANE_U) {
+    if (!all_zero) {
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                        CCTX_NONE);
+    }
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
@@ -701,9 +713,6 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
         for (int idy = 0; idy < txh; idy += tx_unit) {
           for (int idx = 0; idx < txw; idx += tx_unit) {
             xd->tx_type_map[(row + idy) * stride + col + idx] = tx_type;
-#if CONFIG_CROSS_CHROMA_TX
-            xd->cctx_type_map[(row + idy) * stride + col + idx] = CCTX_NONE;
-#endif  // CONFIG_CROSS_CHROMA_TX
           }
         }
       }

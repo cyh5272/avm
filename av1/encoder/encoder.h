@@ -1298,7 +1298,7 @@ typedef struct FRAME_COUNTS {
                            [TX_TYPES];
 #endif  // CONFIG_DDT_INTER
 #if CONFIG_CROSS_CHROMA_TX
-  unsigned int cctx_type[EXT_TX_SIZES][CCTX_TYPES];
+  unsigned int cctx_type[EXT_TX_SIZES][CCTX_CONTEXTS][CCTX_TYPES];
 #endif  // CONFIG_CROSS_CHROMA_TX
   unsigned int filter_intra_mode[FILTER_INTRA_MODES];
   unsigned int filter_intra[BLOCK_SIZES_ALL][2];
