@@ -341,11 +341,9 @@ void av1_set_mv_search_range(FullMvLimits *mv_limits, const MV *mv
                              ? (MV_PRECISION_ONE_PEL - pb_mv_precision)
                              : 0;
 
-  const int max_full_mv = av1_lower_mv_limit(MAX_FULL_PEL_VAL, prec_shift, -1);
-  const int mv_low =
-      av1_lower_mv_limit(GET_MV_RAWPEL(MV_LOW + 1), prec_shift, 1);
-  const int mv_upp =
-      av1_lower_mv_limit(GET_MV_RAWPEL(MV_UPP - 1), prec_shift, -1);
+  const int max_full_mv = av1_lower_mv_limit(MAX_FULL_PEL_VAL, prec_shift);
+  const int mv_low = av1_lower_mv_limit(GET_MV_RAWPEL(MV_LOW + 1), prec_shift);
+  const int mv_upp = av1_lower_mv_limit(GET_MV_RAWPEL(MV_UPP - 1), prec_shift);
 
   // Producing the reference mv value to the target precision
   FULLPEL_MV full_ref_mv = get_fullmv_from_mv(mv);
@@ -596,34 +594,6 @@ static INLINE int mv_err_cost(const MV mv,
 
   const MV abs_diff = { abs(diff.row), abs(diff.col) };
 
-#if DEBUG_DV_COST
-  int shift = (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision);
-  CHECK_FLEX_MV(((diff.row >> shift) << shift) != diff.row,
-                " error in diff.row");
-  CHECK_FLEX_MV(((diff.col >> shift) << shift) != diff.col,
-                " error in diff.col");
-  if (abs(diff.row) > MV_MAX || abs(diff.col) > MV_MAX) {
-    printf(
-        " is_ibc_cost = %d is_adaptive_mvd = %d pb_mv_precision =%d diff.row = "
-        "%d diff.col = %d \n",
-        mv_cost_params->is_ibc_cost, mv_cost_params->is_adaptive_mvd,
-        pb_mv_precision, diff.row, diff.col);
-    printf(
-        "  this_mv.row = %d ref_mv.row = %d  this_mv.col = %d ref_mv.col = "
-        "%d\n",
-        mv.row, low_prec_ref_mv.row, mv.col, low_prec_ref_mv.col);
-    assert(0);
-  }
-
-  CHECK_FLEX_MV(abs(diff.row) > MV_MAX, " exceed limit diff.row");
-  CHECK_FLEX_MV(abs(diff.col) > MV_MAX, " exceed limit diff.row");
-
-  CHECK_FLEX_MV(
-      mv_cost_params->is_ibc_cost && (pb_mv_precision != MV_PRECISION_ONE_PEL),
-      " error precision of IBC");
-
-#endif
-
   switch (mv_cost_type) {
     case MV_COST_ENTROPY:
 #if CONFIG_FLEX_MVRES
@@ -690,33 +660,6 @@ static INLINE int mvsad_err_cost(const FULLPEL_MV mv,
   const MV abs_diff = { abs(diff.row), abs(diff.col) };
 
   const MvCosts *mv_costs = mv_cost_params->mv_costs;
-
-#if DEBUG_DV_COST
-  int shift = (MV_PRECISION_ONE_EIGHTH_PEL - pb_mv_precision);
-  CHECK_FLEX_MV(((diff.row >> shift) << shift) != diff.row,
-                " error in diff.row");
-  CHECK_FLEX_MV(((diff.col >> shift) << shift) != diff.col,
-                " error in diff.col");
-
-  if (abs(diff.row) > MV_MAX || abs(diff.col) > MV_MAX) {
-    printf(
-        " is_ibc_cost = %d is_adaptive_mvd = %d pb_mv_precision =%d diff.row = "
-        "%d diff.col = %d \n",
-        mv_cost_params->is_ibc_cost, mv_cost_params->is_adaptive_mvd,
-        pb_mv_precision, diff.row, diff.col);
-    printf(
-        "  this_mv.row = %d ref_mv.row = %d  this_mv.col = %d ref_mv.col = "
-        "%d\n",
-        mv.row, ref_mv.row, mv.col, ref_mv.col);
-    assert(0);
-  }
-
-  CHECK_FLEX_MV(abs(diff.row) > MV_MAX, " exceed limit diff.row");
-  CHECK_FLEX_MV(abs(diff.col) > MV_MAX, " exceed limit diff.row");
-  CHECK_FLEX_MV(
-      mv_cost_params->is_ibc_cost && (pb_mv_precision != MV_PRECISION_ONE_PEL),
-      " error precision of IBC");
-#endif
 
 #if CONFIG_BVCOST_UPDATE
   const int *mvjcost =
