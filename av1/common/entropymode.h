@@ -218,7 +218,7 @@ typedef struct frame_contexts {
   // For disallowed tools, the corresponding bit is skipped.
   aom_cdf_prob switchable_flex_restore_cdf[MULTIQ_LR_LEVELS]
                                           [MAX_LR_FLEX_SWITCHABLE_BITS]
-                                          [CDF_SIZE(2)];
+                                          [MAX_MB_PLANE][CDF_SIZE(2)];
 #else
   aom_cdf_prob switchable_restore_cdf[MULTIQ_LR_LEVELS]
                                      [CDF_SIZE(RESTORE_SWITCHABLE_TYPES)];

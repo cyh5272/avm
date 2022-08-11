@@ -445,6 +445,13 @@ typedef struct {
    * are used on the encoder side.
    */
   int optimized_lr;
+
+#if CONFIG_LR_FLEX_SYNTAX
+  /*!
+   * Additional tools disable mask in switchable frame mode
+   */
+  uint8_t sw_lr_tools_disable_mask;
+#endif  // CONFIG_LR_FLEX_SYNTAX
 } RestorationInfo;
 
 /*!\cond */
@@ -627,6 +634,14 @@ void av1_loop_restoration_filter_frame(YV12_BUFFER_CONFIG *frame,
                                        struct AV1Common *cm, int optimized_lr,
                                        void *lr_ctxt);
 /*!\cond */
+
+#if CONFIG_LR_FLEX_SYNTAX
+#if CONFIG_PC_WIENER
+#define DEF_UV_LR_TOOLS_DISABLE_MASK (1 << RESTORE_PC_WIENER)
+#else
+#define DEF_UV_LR_TOOLS_DISABLE_MASK 0
+#endif  // CONFIG_PC_WIENER
+#endif  // CONFIG_LR_FLEX_SYNTAX
 
 void av1_loop_restoration_precal();
 
