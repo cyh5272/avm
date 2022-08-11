@@ -469,7 +469,11 @@ TEST_P(AVxEncoderThreadLSTestLarge, EncoderResultTest) {
   DoTest();
 }
 
+// TODO(debargha): Disable row_mt to resolve:
+// https://gitlab.com/AOMediaCodec/avm/-/issues/91 for now,
+// To allow row-mt with ref_mv_bank, the banks need to be reset for each
+// superblock-row. That optimization can be done in Phase 2.
 AV1_INSTANTIATE_TEST_SUITE(AVxEncoderThreadLSTestLarge, GOODQUALITY_TEST_MODES,
                            ::testing::Range(0, 4), ::testing::Values(0, 6),
-                           ::testing::Values(0, 6), ::testing::Values(0, 1));
+                           ::testing::Values(0, 6), ::testing::Values(0));
 }  // namespace
