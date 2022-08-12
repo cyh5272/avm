@@ -432,10 +432,6 @@ typedef struct SequenceHeader {
 #if CONFIG_ORIP
   uint8_t enable_orip;  // To turn on/off sub-block based ORIP
 #endif
-#if CONFIG_NEW_TX_PARTITION
-  uint8_t enable_tx_split_4way;  // To turn on/off VERT4 and HORZ4 mode
-                                 // in the NEW_TX_PARTITION tool
-#endif
 #if CONFIG_IST
   uint8_t enable_ist;  // enables/disables intra secondary transform
 #endif
@@ -2481,8 +2477,6 @@ static const TX_PARTITION_BIT_SHIFT
           { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 4 },  // TX_PARTITION_SPLIT
           { { 1, 1 }, { 0, 0 }, 2 },              // TX_PARTITION_HORZ
           { { 0, 0 }, { 1, 1 }, 2 },              // TX_PARTITION_VERT
-          { { 2, 2, 2, 2 }, { 0, 0, 0, 0 }, 4 },  // TX_PARTITION_HORZ4
-          { { 0, 0, 0, 0 }, { 2, 2, 2, 2 }, 4 },  // TX_PARTITION_VERT4
       },
       // Rectangular
       {
@@ -2490,8 +2484,6 @@ static const TX_PARTITION_BIT_SHIFT
           { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 4 },  // TX_PARTITION_SPLIT
           { { 1, 1 }, { 0, 0 }, 2 },              // TX_PARTITION_HORZ
           { { 0, 0 }, { 1, 1 }, 2 },              // TX_PARTITION_VERT
-          { { 2, 2, 2, 2 }, { 0, 0, 0, 0 }, 4 },  // TX_PARTITION_HORZ4
-          { { 0, 0, 0, 0 }, { 2, 2, 2, 2 }, 4 },  // TX_PARTITION_VERT4
       },
     };
 
@@ -2523,8 +2515,6 @@ static INLINE int get_split4_partition(TX_PARTITION_TYPE partition) {
     case TX_PARTITION_SPLIT:
     case TX_PARTITION_VERT:
     case TX_PARTITION_HORZ: return partition;
-    case TX_PARTITION_VERT4: return TX_PARTITION_VERT;
-    case TX_PARTITION_HORZ4: return TX_PARTITION_HORZ;
     default: assert(0);
   }
   assert(0);
@@ -2563,15 +2553,11 @@ static INLINE int use_tx_partition(TX_PARTITION_TYPE partition,
                                    TX_SIZE max_tx_size) {
   const int allow_horz = allow_tx_horz_split(max_tx_size);
   const int allow_vert = allow_tx_vert_split(max_tx_size);
-  const int allow_horz4 = allow_tx_horz4_split(max_tx_size);
-  const int allow_vert4 = allow_tx_vert4_split(max_tx_size);
   switch (partition) {
     case TX_PARTITION_NONE: return 1;
     case TX_PARTITION_SPLIT: return (allow_horz && allow_vert);
     case TX_PARTITION_HORZ: return allow_horz;
     case TX_PARTITION_VERT: return allow_vert;
-    case TX_PARTITION_HORZ4: return allow_horz4;
-    case TX_PARTITION_VERT4: return allow_vert4;
     default: assert(0);
   }
   assert(0);

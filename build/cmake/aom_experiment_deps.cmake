@@ -58,5 +58,4 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_TIP AND CONFIG_OPTFLOW_ON_TIP)
     change_config_and_warn(CONFIG_OPTFLOW_ON_TIP 0 !CONFIG_TIP)
   endif()
-
 endmacro()

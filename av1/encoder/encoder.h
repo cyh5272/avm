@@ -332,12 +332,6 @@ typedef struct {
    */
   bool enable_ist;
 #endif
-#if CONFIG_NEW_TX_PARTITION
-  /*!
-   * Flag to indicate if 4-way transform split should be enabled.
-   */
-  bool enable_tx_split_4way;
-#endif
 } TxfmSizeTypeCfg;
 
 /*!
@@ -1285,11 +1279,9 @@ typedef struct FRAME_COUNTS {
 #if CONFIG_NEW_TX_PARTITION
   unsigned int intra_4way_txfm_partition[2][TX_SIZE_CONTEXTS][4];
   unsigned int intra_2way_txfm_partition[2];
-  unsigned int intra_2way_rect_txfm_partition[2];
   unsigned int inter_4way_txfm_partition[2][TXFM_PARTITION_INTER_CONTEXTS][4];
   unsigned int inter_2way_txfm_partition[2];
-  unsigned int inter_2way_rect_txfm_partition[2];
-#else   // CONFIG_NEW_TX_PARTITION
+#else
   unsigned int txfm_partition[TXFM_PARTITION_CONTEXTS][2];
   unsigned int intra_tx_size[MAX_TX_CATS][TX_SIZE_CONTEXTS][MAX_TX_DEPTH + 1];
 #endif  // CONFIG_NEW_TX_PARTITION
