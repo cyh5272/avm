@@ -687,7 +687,7 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
                                                [CDF_SIZE(CCTX_TYPES)] = {
 #if CCTX_ANGLE_CONFIG == 4
-#if CCTX_NEG_ANGLES
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
                                                  { AOM_CDF3(10923, 21845) },
                                                  { AOM_CDF3(10923, 21845) },
                                                  { AOM_CDF3(10923, 21845) },
@@ -697,9 +697,9 @@ static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
                                                  { AOM_CDF2(16384) },
                                                  { AOM_CDF2(16384) },
                                                  { AOM_CDF2(16384) },
-#endif  // CCTX_NEG_ANGLES
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
 #elif CCTX_ANGLE_CONFIG == 3
-#if CCTX_NEG_ANGLES
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
                                                  { AOM_CDF5(6554, 13107, 19661,
                                                             26214) },
                                                  { AOM_CDF5(6554, 13107, 19661,
@@ -713,9 +713,9 @@ static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
                                                  { AOM_CDF3(10923, 21845) },
                                                  { AOM_CDF3(10923, 21845) },
                                                  { AOM_CDF3(10923, 21845) },
-#endif  // CCTX_NEG_ANGLES
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
 #else
-#if CCTX_NEG_ANGLES
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
                                                  { AOM_CDF7(4681, 9362, 14043,
                                                             18725, 23406,
                                                             28087) },
@@ -737,7 +737,7 @@ static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
                                                             24576) },
                                                  { AOM_CDF4(8192, 16384,
                                                             24576) },
-#endif  // CCTX_NEG_ANGLES
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
 #endif
                                                };
 #endif  // CONFIG_CROSS_CHROMA_TX

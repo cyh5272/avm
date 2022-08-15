@@ -1564,11 +1564,14 @@ static INLINE void update_txk_array(MACROBLOCKD *const xd, int blk_row,
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C2_DROPPED
 static INLINE int keep_chroma_c2(CctxType cctx_type) {
-  return cctx_type == CCTX_NONE ||
+  return
 #if CCTX_NEG_ANGLES
-         cctx_type == CCTX_M30 || cctx_type == CCTX_M60 ||
+      cctx_type == CCTX_M30 || cctx_type == CCTX_M60 ||
 #endif
-         cctx_type == CCTX_30 || cctx_type == CCTX_60;
+#if CCTX_POS_ANGLES
+      cctx_type == CCTX_30 || cctx_type == CCTX_60 ||
+#endif
+      cctx_type == CCTX_NONE;
 }
 #endif
 

@@ -202,41 +202,51 @@ const int16_t
 // stores two values: cos(t) and sin(t) for each rotation angle.
 const int32_t cctx_mtx[CCTX_TYPES - 1][2] = {
 #if CCTX_ANGLE_CONFIG == 0
+#if CCTX_POS_ANGLES
   { 181, 181 },  // t = 45 degrees
   { 222, 128 },  // t = 30 degrees
   { 128, 222 },  // t = 60 degrees
+#endif           // CCTX_POS_ANGLES
 #if CCTX_NEG_ANGLES
   { 181, -181 },  // t = -45 degrees
   { 222, -128 },  // t = -30 degrees
   { 128, -222 },  // t = -60 degrees
 #endif            // CCTX_NEG_ANGLES
 #elif CCTX_ANGLE_CONFIG == 1
+#if CCTX_POS_ANGLES
   { 181, 181 },   // t = 45 degrees
   { 236, 98 },    // t = 22.5 degrees
   { 98, 236 },    // t = 67.5 degrees
+#endif  // CCTX_POS_ANGLES
 #if CCTX_NEG_ANGLES
   { 181, -181 },  // t = -45 degrees
   { 236, -98 },   // t = -22.5 degrees
   { 98, -236 },   // t = -67.5 degrees
 #endif  // CCTX_NEG_ANGLES
 #elif CCTX_ANGLE_CONFIG == 2
+#if CCTX_POS_ANGLES
   { 181, 181 },   // t = 45 degrees
   { 232, 108 },   // t = 25 degrees
   { 108, 232 },   // t = 65 degrees
+#endif  // CCTX_POS_ANGLES
 #if CCTX_NEG_ANGLES
   { 181, -181 },  // t = -45 degrees
   { 232, -108 },  // t = -25 degrees
   { 108, -232 },  // t = -65 degrees
 #endif  // CCTX_NEG_ANGLES
 #elif CCTX_ANGLE_CONFIG == 3
+#if CCTX_POS_ANGLES
   { 222, 128 },   // t = 30 degrees
   { 128, 222 },   // t = 60 degrees
+#endif  // CCTX_POS_ANGLES
 #if CCTX_NEG_ANGLES
   { 222, -128 },  // t = -30 degrees
   { 128, -222 },  // t = -60 degrees
 #endif  // CCTX_NEG_ANGLES
 #elif CCTX_ANGLE_CONFIG == 4
+#if CCTX_POS_ANGLES
   { 181, 181 },   // t = 45 degrees
+#endif  // CCTX_POS_ANGLES
 #if CCTX_NEG_ANGLES
   { 181, -181 },  // t = -45 degrees
 #endif  // CCTX_NEG_ANGLES
