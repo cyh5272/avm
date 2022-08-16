@@ -3132,48 +3132,8 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       // When eob is 0, pixel domain distortion is more efficient and accurate.
       this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
     } else {
-      // TODO(kslu): transform domain distortion?
-      int64_t sse_diff = INT64_MAX;
-      // high_energy threshold assumes that every pixel within a txfm block
-      // has a residue energy of at least 25% of the maximum, i.e. 128 *
-      // 128 for 8 bit.
-      const int64_t high_energy_thresh =
-          ((int64_t)128 * 128 * tx_size_2d[tx_size]);
-      const int is_high_energy = best_rd_stats->sse >= 2 * high_energy_thresh;
-      if (tx_size == TX_64X64 || is_high_energy) {
-        int64_t dist_tx_u = 0;
-        int64_t dist_tx_v = 0;
-        int64_t sse_tx_u = 0;
-        int64_t sse_tx_v = 0;
-        // Because 3 out 4 quadrants of transform coefficients are forced to
-        // zero, the inverse transform has a tendency to overflow. sse_diff
-        // is effectively the energy of those 3 quadrants, here we use it
-        // to decide if we should do pixel domain distortion. If the energy
-        // is mostly in first quadrant, then it is unlikely that we have
-        // overflow issue in inverse transform.
-        dist_block_tx_domain(x, AOM_PLANE_U, block, tx_size, &dist_tx_u,
-                             &sse_tx_u);
-        dist_block_tx_domain(x, AOM_PLANE_V, block, tx_size, &dist_tx_v,
-                             &sse_tx_v);
-        this_rd_stats.dist = dist_tx_u + dist_tx_v;
-        this_rd_stats.sse = sse_tx_u + sse_tx_v;
-        sse_diff = best_rd_stats->sse - this_rd_stats.sse;
-      }
-      if (tx_size != TX_64X64 || !is_high_energy ||
-          sse_diff < this_rd_stats.sse) {
-        const int64_t tx_domain_dist = this_rd_stats.dist;
-        this_rd_stats.dist = joint_uv_dist_block_px_domain(
-            cpi, x, plane_bsize, block, blk_row, blk_col, tx_size);
-        // For high energy blocks, occasionally, the pixel domain distortion
-        // can be artificially low due to clamping at reconstruction stage
-        // even when inverse transform output is hugely different from the
-        // actual residue.
-        if (is_high_energy && this_rd_stats.dist < tx_domain_dist)
-          this_rd_stats.dist = tx_domain_dist;
-      } else {
-        assert(sse_diff < INT64_MAX);
-        this_rd_stats.dist += sse_diff;
-      }
+      this_rd_stats.dist = joint_uv_dist_block_px_domain(
+          cpi, x, plane_bsize, block, blk_row, blk_col, tx_size);
       this_rd_stats.sse = best_rd_stats->sse;
     }
 
