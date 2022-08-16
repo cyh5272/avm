@@ -783,6 +783,10 @@ static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
                                             const CANDIDATE_MV *ref_mv_stack,
                                             WarpedMotionParams *params,
                                             int_mv *center_mv) {
+#if CONFIG_FLEX_MVRES
+  (void)cm;
+#endif
+
   if (mbmi->mode != GLOBALMV) {
     // Look at the reference block selected via the DRL.
     // If it is warped, use that warp model as a base; otherwise, use global
@@ -815,6 +819,11 @@ static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
             BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
             int mi_row = xd->mi_row;
             int mi_col = xd->mi_col;
+#if CONFIG_FLEX_MVRES
+            *center_mv = get_warp_motion_vector(&ref_mi->wm_params[0],
+                                                mbmi->pb_mv_precision, bsize,
+                                                mi_col, mi_row);
+#else
             const int allow_high_precision_mv =
                 cm->features.allow_high_precision_mv;
             const int force_integer_mv =
@@ -822,6 +831,7 @@ static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
             *center_mv = get_warp_motion_vector(
                 &ref_mi->wm_params[0], allow_high_precision_mv, bsize, mi_col,
                 mi_row, force_integer_mv);
+#endif
 
           } else {
             *center_mv = mbmi->mv[0];

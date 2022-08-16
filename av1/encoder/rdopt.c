@@ -2332,11 +2332,22 @@ static int64_t motion_mode_rd(
       if (ret < 0) continue;
 #if CONFIG_EXTENDED_WARP_PREDICTION
     } else if (mbmi->motion_mode == WARP_DELTA) {
+#if CONFIG_FLEX_MVRES
+      if (mbmi->mode == NEWMV && mbmi->pb_mv_precision < MV_PRECISION_ONE_PEL) {
+        // Don't bother with warp modes for MV precisions >1px
+        continue;
+      }
+#endif
+
       int_mv mv0 = mbmi->mv[0];
       const int_mv ref_mv = av1_get_ref_mv(x, 0);
       SUBPEL_MOTION_SEARCH_PARAMS ms_params;
       av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
-                                        &ref_mv.as_mv, NULL);
+                                        &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                        mbmi->pb_mv_precision,
+#endif
+                                        NULL);
 
       int valid = av1_pick_warp_delta(cm, xd, mbmi, mbmi_ext, &ms_params,
                                       &x->mode_costs);
@@ -2347,15 +2358,34 @@ static int64_t motion_mode_rd(
       // If we changed the MV, update costs
       if (mv0.as_int != mbmi->mv[0].as_int) {
         // Keep the refined MV and WM parameters.
+#if CONFIG_FLEX_MVRES
+        tmp_rate_mv =
+            av1_mv_bit_cost(&mbmi->mv[0].as_mv, &ref_mv.as_mv,
+                            mbmi->pb_mv_precision, &x->mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                            ,
+                            ms_params.mv_cost_params.is_adaptive_mvd
+#endif
+            );
+#else
         tmp_rate_mv = av1_mv_bit_cost(
             &mbmi->mv[0].as_mv, &ref_mv.as_mv, x->mv_costs.nmv_joint_cost,
             x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
+#endif
+
         tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
       }
 
       av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
                                     av1_num_planes(cm) - 1);
     } else if (mbmi->motion_mode == WARP_EXTEND) {
+#if CONFIG_FLEX_MVRES
+      if (mbmi->mode == NEWMV && mbmi->pb_mv_precision < MV_PRECISION_ONE_PEL) {
+        // Don't bother with warp modes for MV precisions >1px
+        continue;
+      }
+#endif
+
       CANDIDATE_MV *neighbor =
           &mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]][mbmi->ref_mv_idx];
       assert(neighbor->row_offset == -1 || neighbor->col_offset == -1);
@@ -2382,7 +2412,11 @@ static int64_t motion_mode_rd(
         const int_mv ref_mv = av1_get_ref_mv(x, 0);
         SUBPEL_MOTION_SEARCH_PARAMS ms_params;
         av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
-                                          &ref_mv.as_mv, NULL);
+                                          &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                          mbmi->pb_mv_precision,
+#endif
+                                          NULL);
         const SubpelMvLimits *mv_limits = &ms_params.mv_limits;
 
         // Note: The warp filter is only able to accept small deviations from
@@ -2412,9 +2446,14 @@ static int64_t motion_mode_rd(
           // NEWMV search did not produce a valid model, so fall back to
           // starting with the motion vector predicted by the neighbor's
           // warp model (if any)
+#if CONFIG_FLEX_MVRES
+          mbmi->mv[0] = get_warp_motion_vector(
+              &neighbor_params, mbmi->pb_mv_precision, bsize, mi_col, mi_row);
+#else
           mbmi->mv[0] = get_warp_motion_vector(
               &neighbor_params, features->allow_high_precision_mv, bsize,
               mi_col, mi_row, features->cur_frame_force_integer_mv);
+#endif
           // Check that the prediction is in range
           if (!av1_is_subpelmv_in_range(mv_limits, mbmi->mv[0].as_mv)) {
             continue;
@@ -2445,9 +2484,20 @@ static int64_t motion_mode_rd(
         // If we changed the MV, update costs
         if (mv0.as_int != mbmi->mv[0].as_int) {
           // Keep the refined MV and WM parameters.
+#if CONFIG_FLEX_MVRES
+          tmp_rate_mv = av1_mv_bit_cost(&mbmi->mv[0].as_mv, &ref_mv.as_mv,
+                                        mbmi->pb_mv_precision, &x->mv_costs,
+                                        MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                                        ,
+                                        ms_params.mv_cost_params.is_adaptive_mvd
+#endif
+          );
+#else
           tmp_rate_mv = av1_mv_bit_cost(
               &mbmi->mv[0].as_mv, &ref_mv.as_mv, x->mv_costs.nmv_joint_cost,
               x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
+#endif
           tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
         } else {
           // Restore the old MV and WM parameters.

@@ -5162,23 +5162,18 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                   BLOCK_SIZE bsize, const int *pts0,
                                   const int *pts_inref0, int total_samples) {
   MB_MODE_INFO *mbmi = xd->mi[0];
-  // TODO(rachelbarker): Fix combination here
-#if CONFIG_FLEX_MVRES
-  static const MV neighbors[16] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
-                                    { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 },
-                                    { 0, -4 }, { 4, 0 }, { 0, 4 }, { -4, 0 },
-                                    { 0, -8 }, { 8, 0 }, { 0, 8 }, { -8, 0 } };
-#endif
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
-  static const MV neighbors[16] = {
-    { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
-    { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
-    { 2, -2 },  { 2, 2 },  { -2, -2 }, { -2, 2 }
-  };
+  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 },   { -1, 0 },
+                                   { 1, -1 }, { 1, 1 }, { -1, -1 }, { -1, 1 } };
+  static const int num_iterations = 8;
+  static const int num_neighbors = 8;
 #else
-  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
-                                   { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
+  static const MV neighbors[4] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
+  static const int num_iterations = 2;
+  static const int num_neighbors = 4;
 #endif
+
   MV *best_mv = &mbmi->mv[0].as_mv;
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
@@ -5190,17 +5185,11 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
-  // TODO(rachelbarker): Fix combination here
 #if CONFIG_FLEX_MVRES
-  assert(ms_params->mv_cost_params.pb_mv_precision >= MV_PRECISION_ONE_PEL);
-  const int start = (MV_PRECISION_ONE_EIGHTH_PEL -
-                     ms_params->mv_cost_params.pb_mv_precision) *
-                    4;
-#endif
-#if CONFIG_EXTENDED_WARP_PREDICTION
-  const int start = ms_params->allow_hp ? 0 : 8;
+  const int mv_shift =
+      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
 #else
-  const int start = ms_params->allow_hp ? 0 : 4;
+  const int mv_shift = ms_params->allow_hp ? 0 : 1;
 #endif
 
   // Calculate the center position's error
@@ -5211,23 +5200,15 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   int pts[SAMPLES_ARRAY_SIZE], pts_inref[SAMPLES_ARRAY_SIZE];
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-  // TODO(rachelbarker): Fix combination here
-#if CONFIG_EXTENDED_WARP_PREDICTION
-  for (int ite = 0; ite < 8; ++ite) {
-#else
-  for (int ite = 0; ite < 2; ++ite) {
-#endif
+
+  for (int ite = 0; ite < num_iterations; ++ite) {
     int best_idx = -1;
 
-#if CONFIG_EXTENDED_WARP_PREDICTION
-    for (int idx = start; idx < start + 8; ++idx) {
-#else
-    for (int idx = start; idx < start + 4; ++idx) {
-#endif
+    for (int idx = 0; idx < num_neighbors; ++idx) {
       unsigned int thismse;
 
-      MV this_mv = { best_mv->row + neighbors[idx].row,
-                     best_mv->col + neighbors[idx].col };
+      MV this_mv = { best_mv->row + neighbors[idx].row * (1 << mv_shift),
+                     best_mv->col + neighbors[idx].col * (1 << mv_shift) };
       if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
         memcpy(pts, pts0, total_samples * 2 * sizeof(*pts0));
         memcpy(pts_inref, pts_inref0, total_samples * 2 * sizeof(*pts_inref0));
@@ -5262,8 +5243,8 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
     if (best_idx == -1) break;
 
     if (best_idx >= 0) {
-      best_mv->row += neighbors[best_idx].row;
-      best_mv->col += neighbors[best_idx].col;
+      best_mv->row += neighbors[best_idx].row * (1 << mv_shift);
+      best_mv->col += neighbors[best_idx].col * (1 << mv_shift);
     }
   }
 
@@ -5347,10 +5328,22 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   int delta;
   uint64_t best_rd, inc_rd, dec_rd;
 
-  // TODO(rachelbarker): Add FLEX_MVRES stuff here
-  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
-                                   { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
-  const int start = ms_params->allow_hp ? 0 : 4;
+  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 },   { -1, 0 },
+                                   { 1, -1 }, { 1, 1 }, { -1, -1 }, { -1, 1 } };
+  static const int num_neighbors = 8;
+
+#if CONFIG_FLEX_MVRES
+  const int mv_shift =
+      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
+#else
+  const int mv_shift = ms_params->allow_hp ? 0 : 1;
+#endif
+
+#if CONFIG_FLEX_MVRES
+  const int error_per_bit = ms_params->mv_cost_params.mv_costs->errorperbit;
+#else
+  const int error_per_bit = ms_params->mv_cost_params.error_per_bit;
+#endif
 
   // Set up initial model by copying global motion model
   // and adjusting for the chosen motion vector
@@ -5371,10 +5364,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   best_wm_params = *params;
   rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
   sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
-  best_rd = sse + (int)ROUND_POWER_OF_TWO_64(
-                      (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
-                      RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
-                          PIXEL_TRANSFORM_ERROR_SCALE);
+  best_rd = sse + (int)ROUND_POWER_OF_TWO_64((int64_t)rate * error_per_bit,
+                                             RDDIV_BITS + AV1_PROB_COST_SHIFT -
+                                                 RD_EPB_SHIFT +
+                                                 PIXEL_TRANSFORM_ERROR_SCALE);
 
   // Refine model, by making a few passes through the available
   // parameters and trying to increase/decrease them
@@ -5400,9 +5393,9 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // not change between iterations of the following loop
       rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
 
-      for (int idx = start; idx < start + 4; ++idx) {
-        MV this_mv = { best_mv->row + neighbors[idx].row,
-                       best_mv->col + neighbors[idx].col };
+      for (int idx = 0; idx < num_neighbors; ++idx) {
+        MV this_mv = { best_mv->row + neighbors[idx].row * (1 << mv_shift),
+                       best_mv->col + neighbors[idx].col * (1 << mv_shift) };
         if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
           // Update model and costs according to the motion vector which
           // is being tried out this iteration
@@ -5411,11 +5404,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
           unsigned int this_sse =
               compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
           uint64_t this_rd =
-              this_sse +
-              (int)ROUND_POWER_OF_TWO_64(
-                  (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
-                  RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
-                      PIXEL_TRANSFORM_ERROR_SCALE);
+              this_sse + (int)ROUND_POWER_OF_TWO_64(
+                             (int64_t)rate * error_per_bit,
+                             RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
+                                 PIXEL_TRANSFORM_ERROR_SCALE);
 
           if (this_rd < best_rd) {
             best_idx = idx;
@@ -5427,8 +5419,8 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
       if (best_idx >= 0) {
         // Commit to this motion vector
-        best_mv->row += neighbors[best_idx].row;
-        best_mv->col += neighbors[best_idx].col;
+        best_mv->row += neighbors[best_idx].row * (1 << mv_shift);
+        best_mv->col += neighbors[best_idx].col * (1 << mv_shift);
         center_mv.as_mv = *best_mv;
       }
     }
@@ -5450,11 +5442,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         if (valid) {
           rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
-          inc_rd =
-              sse + (int)ROUND_POWER_OF_TWO_64(
-                        (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
-                        RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
-                            PIXEL_TRANSFORM_ERROR_SCALE);
+          inc_rd = sse + (int)ROUND_POWER_OF_TWO_64(
+                             (int64_t)rate * error_per_bit,
+                             RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
+                                 PIXEL_TRANSFORM_ERROR_SCALE);
         } else {
           inc_rd = UINT64_MAX;
         }
@@ -5477,11 +5468,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         if (valid) {
           rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
-          dec_rd =
-              sse + (int)ROUND_POWER_OF_TWO_64(
-                        (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
-                        RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
-                            PIXEL_TRANSFORM_ERROR_SCALE);
+          dec_rd = sse + (int)ROUND_POWER_OF_TWO_64(
+                             (int64_t)rate * error_per_bit,
+                             RDDIV_BITS + AV1_PROB_COST_SHIFT - RD_EPB_SHIFT +
+                                 PIXEL_TRANSFORM_ERROR_SCALE);
         } else {
           dec_rd = UINT64_MAX;
         }
@@ -5525,20 +5515,23 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                    const WarpedMotionParams *neighbor_params) {
   MB_MODE_INFO *mbmi = xd->mi[0];
 
-  // TODO(rachelbarker): Add FLEX_MVRES stuff here
-  static const MV neighbors[16] = {
-    { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
-    { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
-    { 2, -2 },  { 2, 2 },  { -2, -2 }, { -2, 2 }
-  };
+  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 },   { -1, 0 },
+                                   { 1, -1 }, { 1, 1 }, { -1, -1 }, { -1, 1 } };
+  static const int num_iterations = 8;
+  static const int num_neighbors = 8;
+
+#if CONFIG_FLEX_MVRES
+  const int mv_shift =
+      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
+#else
+  const int mv_shift = ms_params->allow_hp ? 0 : 1;
+#endif
 
   MV *best_mv = &mbmi->mv[0].as_mv;
 
   WarpedMotionParams best_wm_params = mbmi->wm_params[0];
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
-
-  const int start = ms_params->allow_hp ? 0 : 8;
 
   // Before this function is called, motion_mode_rd will have selected a valid
   // warp model, and stored it into mbmi->wm_params, but we have not yet
@@ -5548,14 +5541,14 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-  for (int ite = 0; ite < 8; ++ite) {
+  for (int ite = 0; ite < num_iterations; ++ite) {
     int best_idx = -1;
 
-    for (int idx = start; idx < start + 8; ++idx) {
+    for (int idx = 0; idx < num_neighbors; ++idx) {
       unsigned int thismse;
 
-      MV this_mv = { best_mv->row + neighbors[idx].row,
-                     best_mv->col + neighbors[idx].col };
+      MV this_mv = { best_mv->row + neighbors[idx].row * (1 << mv_shift),
+                     best_mv->col + neighbors[idx].col * (1 << mv_shift) };
       if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
         if (!av1_extend_warp_model(neighbor_is_above, bsize, &this_mv, mi_row,
                                    mi_col, neighbor_params,
@@ -5574,8 +5567,8 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
     if (best_idx == -1) break;
 
     if (best_idx >= 0) {
-      best_mv->row += neighbors[best_idx].row;
-      best_mv->col += neighbors[best_idx].col;
+      best_mv->row += neighbors[best_idx].row * (1 << mv_shift);
+      best_mv->col += neighbors[best_idx].col * (1 << mv_shift);
     }
   }
 
