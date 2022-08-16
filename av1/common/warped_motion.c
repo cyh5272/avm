@@ -823,7 +823,7 @@ int av1_find_projection(int np, const int *pts1, const int *pts2,
   return 0;
 }
 
-#if CONFIG_WARP_EXTEND
+#if CONFIG_EXTENDED_WARP_PREDICTION
 /* Given a neighboring block's warp model and the motion vector at the center
    of the current block, construct a new warp model which is continuous with
    the neighbor at the common edge but which has the given motion vector at
@@ -923,4 +923,4 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
 
   return 0;
 }
-#endif  // CONFIG_WARP_EXTEND
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION

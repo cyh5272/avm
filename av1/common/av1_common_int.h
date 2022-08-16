@@ -139,13 +139,11 @@ extern "C" {
 #define TIP_MV_SEARCH_RANGE 4
 #endif  // CONFIG_TIP
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 #define MIN_BSIZE_WARP_DELTA 16
-#endif  // CONFIG_WARP_DELTA
 
-#if CONFIG_WARP_DELTA && CONFIG_WARP_EXTEND
-// When WARP_DELTA and WARP_EXTEND are enabled, we can use a nearby block's
-// warp model as a prediction and then modify it with an explicitly coded delta.
+// Using the WARP_DELTA motion mode, we can use a nearby block's warp model as
+// a prediction and then modify it with an explicitly coded delta.
 //
 // If this flag is set to 0, then any spatial reference block (ie, a DRL entry
 // which came from a block in the current frame) can provide a warp model which
@@ -169,7 +167,7 @@ extern "C" {
 // a warp model, then this is used as a base; otherwise the global warp model
 // (or a translational model) is used.
 #define WARP_DELTA_REQUIRES_NEIGHBOR 1
-#endif  // CONFIG_WARP_DELTA && CONFIG_WARP_EXTEND
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 /*!\cond */
 
@@ -2987,9 +2985,7 @@ static INLINE bool is_warp_mode(MOTION_MODE motion_mode) {
  */
 static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd,
-#if CONFIG_WARP_EXTEND
                                       const CANDIDATE_MV *ref_mv_stack,
-#endif  // CONFIG_WARP_EXTEND
                                       const MB_MODE_INFO *mbmi) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int allowed_motion_modes = (1 << SIMPLE_TRANSLATION);
@@ -3051,7 +3047,6 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     allowed_motion_modes |= (1 << WARPED_CAUSAL);
   }
 
-#if CONFIG_WARP_EXTEND
   bool warp_extend_allowed = false;
   PREDICTION_MODE mode = mbmi->mode;
 
@@ -3079,15 +3074,12 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   if (warp_extend_allowed) {
     allowed_motion_modes |= (1 << WARP_EXTEND);
   }
-#endif  // CONFIG_WARP_EXTEND
 
-#if CONFIG_WARP_DELTA
   bool warp_delta_allowed =
       allow_warped_motion &&
       AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >=
           MIN_BSIZE_WARP_DELTA;
 
-#if CONFIG_WARP_EXTEND
   if (warp_delta_allowed && mode == NEARMV) {
 #if WARP_DELTA_REQUIRES_NEIGHBOR
     // Only allow WARP_DELTA on a NEARMV block when there is a neighboring
@@ -3107,12 +3099,10 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     }
 #endif
   }
-#endif  // CONFIG_WARP_EXTEND
 
   if (warp_delta_allowed) {
     allowed_motion_modes |= (1 << WARP_DELTA);
   }
-#endif  // CONFIG_WARP_DELTA
 
   return allowed_motion_modes;
 }

@@ -179,14 +179,6 @@ set_aom_config_var(
   "AV2 experiment flag to enable modified context derivation : CWG-B065.")
 set_aom_config_var(CONFIG_EXTENDED_WARP_PREDICTION 0
                    "AV2 experiment flag to add rework motion modes")
-set_aom_config_var(CONFIG_WARP_DELTA 0
-                   "AV2 experiment flag to add directly-signaled warp models")
-set_aom_config_var(
-  CONFIG_WARP_EXTEND 0
-  "AV2 experiment flag to allow extending local warp into adjacent blocks")
-set_aom_config_var(
-  CONFIG_MORE_SEARCH_LOCAL_WARP 0
-  "AV2 experiment flag to allow more search of the existing local warp mode")
 
 # Source of throughput analysis : CWG-B065
 set_aom_config_var(CONFIG_THROUGHPUT_ANALYSIS 0

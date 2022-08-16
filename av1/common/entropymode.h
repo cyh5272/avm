@@ -83,7 +83,7 @@ extern "C" {
 #define MAX_REFS_ARF 4
 #endif  // CONFIG_NEW_REF_SIGNALING
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 // Parameters which determine the warp delta coding
 // The raw values which can be signaled are
 //   {-WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX}
@@ -102,15 +102,13 @@ extern "C" {
 #define WARP_DELTA_CODED_MAX 7
 #define WARP_DELTA_NUM_SYMBOLS (2 * WARP_DELTA_CODED_MAX + 1)
 #define WARP_DELTA_MAX (WARP_DELTA_STEP * WARP_DELTA_CODED_MAX)
-#endif  // CONFIG_WARP_DELTA
 
-#if CONFIG_WARP_EXTEND
 // The use_warp_extend symbol has two components to its context:
 // First context is the extension type (copy, extend from warp model, etc.)
 // Second context is log2(number of MI units along common edge)
 #define WARP_EXTEND_CTXS1 4
 #define WARP_EXTEND_CTXS2 (MAX_SB_SIZE_LOG2 - MI_SIZE_LOG2 + 1)
-#endif
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 struct AV1Common;
 
@@ -173,14 +171,10 @@ typedef struct frame_contexts {
 #if CONFIG_EXTENDED_WARP_PREDICTION
   aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
-#if CONFIG_WARP_DELTA
   aom_cdf_prob warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)];
-#endif  // CONFIG_WARP_DELTA
-#if CONFIG_WARP_EXTEND
   aom_cdf_prob warp_extend_cdf[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2]
                               [CDF_SIZE(2)];
-#endif  // CONFIG_WARP_EXTEND
 #else
   aom_cdf_prob motion_mode_cdf[BLOCK_SIZES_ALL][CDF_SIZE(MOTION_MODES)];
   aom_cdf_prob obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];

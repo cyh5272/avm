@@ -292,7 +292,7 @@ static void read_drl_idx(int max_drl_bits, const int16_t mode_ctx,
   assert(mbmi->ref_mv_idx < max_drl_bits + 1);
 }
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 // Read the delta for a single warp parameter
 // Each delta is coded as a symbol in the range
 // -WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX
@@ -318,10 +318,7 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   // Figure out what parameters to use as a base
   WarpedMotionParams base_params;
   int_mv center_mv;
-  av1_get_warp_base_params(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                           xd->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
+  av1_get_warp_base_params(cm, xd, mbmi, xd->ref_mv_stack[mbmi->ref_frame[0]],
                            &base_params, &center_mv);
 
   // TODO(rachelbarker): Allow signaling warp type?
@@ -340,18 +337,12 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #endif
   }
 }
-#endif  // CONFIG_WARP_DELTA
 
-#if CONFIG_EXTENDED_WARP_PREDICTION
 static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
                                     MB_MODE_INFO *mbmi, aom_reader *r) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   const int allowed_motion_modes =
-      motion_mode_allowed(cm, xd,
-#if CONFIG_WARP_EXTEND
-                          xd->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
-                          mbmi);
+      motion_mode_allowed(cm, xd, xd->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
 
   mbmi->use_wedge_interintra = 0;
   if (allowed_motion_modes & (1 << INTERINTRA)) {
@@ -387,7 +378,6 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
   }
 
-#if CONFIG_WARP_EXTEND
   if (allowed_motion_modes & (1 << WARP_EXTEND)) {
     int ctx1 = av1_get_warp_extend_ctx1(
         xd, xd->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
@@ -399,7 +389,6 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
       return WARP_EXTEND;
     }
   }
-#endif  // CONFIG_WARP_EXTEND
 
   if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
     int use_warped_causal =
@@ -409,7 +398,6 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
   }
 
-#if CONFIG_WARP_DELTA
   if (allowed_motion_modes & (1 << WARP_DELTA)) {
     int use_warp_delta =
         aom_read_symbol(r, xd->tile_ctx->warp_delta_cdf[bsize], 2, ACCT_STR);
@@ -418,7 +406,6 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
       return WARP_DELTA;
     }
   }
-#endif  // CONFIG_WARP_DELTA
 
   return SIMPLE_TRANSLATION;
 }
@@ -1133,10 +1120,10 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     for (int i = 0; i < MAX_REF_BV_STACK_SIZE; ++i) {
       xd->ref_mv_stack[INTRA_FRAME][i].this_mv.as_int = 0;
       xd->ref_mv_stack[INTRA_FRAME][i].comp_mv.as_int = 0;
-#if CONFIG_WARP_EXTEND
+#if CONFIG_EXTENDED_WARP_PREDICTION
       xd->ref_mv_stack[INTRA_FRAME][i].row_offset = OFFSET_NONSPATIAL;
       xd->ref_mv_stack[INTRA_FRAME][i].col_offset = OFFSET_NONSPATIAL;
-#endif  // CONFIG_WARP_EXTEND
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
     }
 #endif  // CONFIG_BVP_IMPROVEMENT
     av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME, dcb->ref_mv_count,
@@ -2651,7 +2638,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       mbmi->wm_params[0].invalid = 1;
     }
   }
-#if CONFIG_WARP_EXTEND
+
   if (mbmi->motion_mode == WARP_EXTEND) {
     CANDIDATE_MV *neighbor = &xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx];
     assert(neighbor->row_offset == -1 || neighbor->col_offset == -1);
@@ -2680,7 +2667,6 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       }
     }
   }
-#endif  // CONFIG_WARP_EXTEND
 #else
   if (mbmi->motion_mode == WARPED_CAUSAL) {
     mbmi->wm_params.wmtype = DEFAULT_WMTYPE;

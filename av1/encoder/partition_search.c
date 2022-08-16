@@ -856,7 +856,7 @@ static void update_intrabc_drl_idx_stats(int max_ref_bv_num, FRAME_CONTEXT *fc,
 }
 #endif  // CONFIG_BVP_IMPROVEMENT
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 static void update_warp_delta_param_stats(int index, int value,
 #if CONFIG_ENTROPY_STATS
                                           FRAME_COUNTS *counts,
@@ -876,9 +876,7 @@ static void update_warp_delta_param_stats(int index, int value,
 
 static void update_warp_delta_stats(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                                     const MB_MODE_INFO *mbmi,
-#if CONFIG_WARP_EXTEND
                                     const MB_MODE_INFO_EXT *mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
 #if CONFIG_ENTROPY_STATS
                                     FRAME_COUNTS *counts,
 #endif  // CONFIG_ENTROPY_STATS
@@ -886,9 +884,7 @@ static void update_warp_delta_stats(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   const WarpedMotionParams *params = &mbmi->wm_params[0];
   WarpedMotionParams base_params;
   av1_get_warp_base_params(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
                            mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
                            &base_params, NULL);
 
   // The RDO stage should not give us a model which is not warpable.
@@ -908,7 +904,7 @@ static void update_warp_delta_stats(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #endif  // CONFIG_ENTROPY_STATS
                                 fc);
 }
-#endif  // CONFIG_WARP_DELTA
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   MACROBLOCK *x = &td->mb;
@@ -1269,12 +1265,8 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
       }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-      const int allowed_motion_modes =
-          motion_mode_allowed(cm, xd,
-#if CONFIG_WARP_EXTEND
-                              mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
-                              mbmi);
+      const int allowed_motion_modes = motion_mode_allowed(
+          cm, xd, mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
       MOTION_MODE motion_mode = mbmi->motion_mode;
       bool continue_motion_mode_signaling = true;
 
@@ -1321,7 +1313,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
       }
 
-#if CONFIG_WARP_EXTEND
       if (continue_motion_mode_signaling &&
           allowed_motion_modes & (1 << WARP_EXTEND)) {
         int ctx1 = av1_get_warp_extend_ctx1(
@@ -1337,7 +1328,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           continue_motion_mode_signaling = false;
         }
       }
-#endif  // CONFIG_WARP_EXTEND
 
       if (continue_motion_mode_signaling &&
           allowed_motion_modes & (1 << WARPED_CAUSAL)) {
@@ -1351,7 +1341,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
         }
       }
 
-#if CONFIG_WARP_DELTA
       if (continue_motion_mode_signaling &&
           allowed_motion_modes & (1 << WARP_DELTA)) {
 #if CONFIG_ENTROPY_STATS
@@ -1359,10 +1348,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif
         update_cdf(fc->warp_delta_cdf[bsize], motion_mode == WARP_DELTA, 2);
         if (motion_mode == WARP_DELTA) {
-          update_warp_delta_stats(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                                  mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
+          update_warp_delta_stats(cm, xd, mbmi, mbmi_ext,
 #if CONFIG_ENTROPY_STATS
                                   counts,
 #endif  // CONFIG_ENTROPY_STATS
@@ -1370,7 +1356,6 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           continue_motion_mode_signaling = false;
         }
       }
-#endif  // CONFIG_WARP_DELTA
 #else
       if (cm->seq_params.enable_interintra_compound &&
           is_interintra_allowed(mbmi)) {
@@ -1757,12 +1742,8 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #endif  // CONFIG_NEW_REF_SIGNALING
       if (!seg_ref_active && inter_block) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
-        const int allowed_motion_modes =
-            motion_mode_allowed(cm, xd,
-#if CONFIG_WARP_EXTEND
-                                x->mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
-                                mbmi);
+        const int allowed_motion_modes = motion_mode_allowed(
+            cm, xd, x->mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
         if (mbmi->motion_mode != INTERINTRA) {
           if (allowed_motion_modes & (1 << OBMC_CAUSAL)) {
             td->rd_counts.obmc_used[bsize][mbmi->motion_mode == OBMC_CAUSAL]++;
@@ -1770,12 +1751,8 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
           if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
             td->rd_counts.warped_used[mbmi->motion_mode == WARPED_CAUSAL]++;
           }
-#if CONFIG_WARP_DELTA
-          // TODO(rachelbarker): Add counts and pruning for WARP_DELTA
-#endif  // CONFIG_WARP_DELTA
-#if CONFIG_WARP_EXTEND
-          // TODO(rachelbarker): Add counts and pruning for WARP_EXTEND
-#endif  // CONFIG_WARP_EXTEND
+          // TODO(rachelbarker): Add counts and pruning for WARP_DELTA and
+          // WARP_EXTEND
         }
 #else
         const MOTION_MODE motion_allowed = motion_mode_allowed(cm, xd, mbmi);

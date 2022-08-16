@@ -736,7 +736,7 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             const MB_MODE_INFO *const mbmi);
 #endif  // CONFIG_REF_MV_BANK
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 // Decide what the base warp model should be when using WARP_DELTA.
 // The warp model to use is signalled as a delta from this.
 // The base model is stored into `params`, and can be modified further
@@ -748,7 +748,7 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
 //   av1_set_warp_translation(mi_row, mi_col, bsize, mv, params);
 //
 // If `center_mv` is not needed, the pointer can be set to NULL.
-#if CONFIG_WARP_EXTEND
+//
 // The logic behind doing this is as follows:
 // * If the current block is GLOBALMV, then we want to use the motion vector
 //   inferred from the global model. Conveniently, in this case that is already
@@ -777,16 +777,12 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
 //     MV from whatever ref block we used, is probably better than using the
 //     predicted MV from the global model, because if we wanted the latter
 //     then we would have used the GLOBALMV mode.
-#endif  // CONFIG_WARP_EXTEND
 static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
                                             const MACROBLOCKD *xd,
                                             const MB_MODE_INFO *mbmi,
-#if CONFIG_WARP_EXTEND
                                             const CANDIDATE_MV *ref_mv_stack,
-#endif  // CONFIG_WARP_EXTEND
                                             WarpedMotionParams *params,
                                             int_mv *center_mv) {
-#if CONFIG_WARP_EXTEND
   if (mbmi->mode != GLOBALMV) {
     // Look at the reference block selected via the DRL.
     // If it is warped, use that warp model as a base; otherwise, use global
@@ -835,15 +831,12 @@ static INLINE void av1_get_warp_base_params(const AV1_COMMON *cm,
       }
     }
   }
-#endif  // CONFIG_WARP_EXTEND
   *params = xd->global_motion[mbmi->ref_frame[0]];
   if (center_mv != NULL) {
     *center_mv = mbmi->mv[0];
   }
 }
-#endif  // CONFIG_WARP_DELTA
 
-#if CONFIG_WARP_EXTEND
 static INLINE void av1_get_neighbor_warp_model(const AV1_COMMON *cm,
                                                const MB_MODE_INFO *neighbor_mi,
                                                WarpedMotionParams *wm_params) {
@@ -915,7 +908,7 @@ static INLINE int av1_get_warp_extend_ctx2(const MACROBLOCKD *xd,
   assert(common_length_log2 < WARP_EXTEND_CTXS2);
   return common_length_log2;
 }
-#endif
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 #ifdef __cplusplus
 }  // extern "C"

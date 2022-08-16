@@ -460,7 +460,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       av1_cost_tokens_from_cdf(mode_costs->warped_causal_cost[i],
                                fc->warped_causal_cdf[i], NULL);
     }
-#if CONFIG_WARP_DELTA
     for (i = BLOCK_8X8; i < BLOCK_SIZES_ALL; i++) {
       av1_cost_tokens_from_cdf(mode_costs->warp_delta_cost[i],
                                fc->warp_delta_cdf[i], NULL);
@@ -469,15 +468,12 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       av1_cost_tokens_from_cdf(mode_costs->warp_delta_param_cost[i],
                                fc->warp_delta_param_cdf[i], NULL);
     }
-#endif  // CONFIG_WARP_DELTA
-#if CONFIG_WARP_EXTEND
     for (i = 0; i < WARP_EXTEND_CTXS1; i++) {
       for (j = 0; j < WARP_EXTEND_CTXS2; j++) {
         av1_cost_tokens_from_cdf(mode_costs->warp_extend_cost[i][j],
                                  fc->warp_extend_cdf[i][j], NULL);
       }
     }
-#endif  // CONFIG_WARP_EXTEND
 #else
     for (i = BLOCK_8X8; i < BLOCK_SIZES_ALL; i++) {
       av1_cost_tokens_from_cdf(mode_costs->motion_mode_cost[i],

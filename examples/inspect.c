@@ -249,12 +249,10 @@ const map_entry motion_mode_map[] = {
 #endif                  // CONFIG_EXTENDED_WARP_PREDICTION
   ENUM(OBMC_CAUSAL),    // 2-sided OBMC
   ENUM(WARPED_CAUSAL),  // 2-sided WARPED
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
   ENUM(WARP_DELTA),
-#endif  // CONFIG_WARP_DELTA
-#if CONFIG_WARP_EXTEND
   ENUM(WARP_EXTEND),  // Extension of an existing warp model into another block
-#endif
+#endif                // CONFIG_EXTENDED_WARP_PREDICTION
   LAST_ENUM
 };
 

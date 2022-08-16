@@ -5169,7 +5169,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                     { 0, -4 }, { 4, 0 }, { 0, 4 }, { -4, 0 },
                                     { 0, -8 }, { 8, 0 }, { 0, 8 }, { -8, 0 } };
 #endif
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
+#if CONFIG_EXTENDED_WARP_PREDICTION
   static const MV neighbors[16] = {
     { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
     { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
@@ -5197,7 +5197,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                      ms_params->mv_cost_params.pb_mv_precision) *
                     4;
 #endif
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
+#if CONFIG_EXTENDED_WARP_PREDICTION
   const int start = ms_params->allow_hp ? 0 : 8;
 #else
   const int start = ms_params->allow_hp ? 0 : 4;
@@ -5212,14 +5212,14 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
   // TODO(rachelbarker): Fix combination here
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
+#if CONFIG_EXTENDED_WARP_PREDICTION
   for (int ite = 0; ite < 8; ++ite) {
 #else
   for (int ite = 0; ite < 2; ++ite) {
 #endif
     int best_idx = -1;
 
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
+#if CONFIG_EXTENDED_WARP_PREDICTION
     for (int idx = start; idx < start + 8; ++idx) {
 #else
     for (int idx = start; idx < start + 4; ++idx) {
@@ -5276,7 +5276,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   return bestmse;
 }
 
-#if CONFIG_WARP_DELTA
+#if CONFIG_EXTENDED_WARP_PREDICTION
 // Amount to increase/decrease parameters by each step
 //
 // Some factors which feed into the precision selection:
@@ -5307,10 +5307,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 
 // Returns 1 if able to select a good model, 0 if not
 int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
-                        MB_MODE_INFO *mbmi,
-#if CONFIG_WARP_EXTEND
-                        const MB_MODE_INFO_EXT *mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
+                        MB_MODE_INFO *mbmi, const MB_MODE_INFO_EXT *mbmi_ext,
                         const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
                         const ModeCosts *mode_costs) {
   WarpedMotionParams *params = &mbmi->wm_params[0];
@@ -5341,9 +5338,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   int_mv center_mv;
 
   av1_get_warp_base_params(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
                            mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  // CONFIG_WARP_EXTEND
                            &base_params, &center_mv);
 
   MV *best_mv = &mbmi->mv[0].as_mv;
@@ -5374,11 +5369,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   // Calculate initial error
   best_wm_params = *params;
-  rate = av1_cost_warp_delta(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                             mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
-                             mode_costs);
+  rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
   sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
   best_rd = sse + (int)ROUND_POWER_OF_TWO_64(
                       (int64_t)rate * ms_params->mv_cost_params.error_per_bit,
@@ -5407,11 +5398,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
       // Cost up the non-translational part of the model. Again, this will
       // not change between iterations of the following loop
-      rate = av1_cost_warp_delta(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                                 mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
-                                 mode_costs);
+      rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
 
       for (int idx = start; idx < start + 4; ++idx) {
         MV this_mv = { best_mv->row + neighbors[idx].row,
@@ -5461,11 +5448,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
-          rate = av1_cost_warp_delta(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                                     mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
-                                     mode_costs);
+          rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           inc_rd =
               sse + (int)ROUND_POWER_OF_TWO_64(
@@ -5492,11 +5475,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
-          rate = av1_cost_warp_delta(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                                     mbmi_ext,
-#endif  // CONFIG_WARP_EXTEND
-                                     mode_costs);
+          rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           dec_rd =
               sse + (int)ROUND_POWER_OF_TWO_64(
@@ -5535,9 +5514,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
   return 1;
 }
-#endif  // CONFIG_WARP_DELTA
 
-#if CONFIG_WARP_EXTEND
 // Try to improve the motion vector over the one determined by NEWMV search,
 // by running the full WARP_EXTEND prediction pipeline.
 // For now, this uses the same method as av1_refine_warped_mv()
@@ -5549,16 +5526,11 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
   MB_MODE_INFO *mbmi = xd->mi[0];
 
   // TODO(rachelbarker): Add FLEX_MVRES stuff here
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
   static const MV neighbors[16] = {
     { 0, -1 },  { 1, 0 },  { 0, 1 },   { -1, 0 }, { 1, -1 }, { 1, 1 },
     { -1, -1 }, { -1, 1 }, { 0, -2 },  { 2, 0 },  { 0, 2 },  { -2, 0 },
     { 2, -2 },  { 2, 2 },  { -2, -2 }, { -2, 2 }
   };
-#else
-  static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 },
-                                   { 0, -2 }, { 2, 0 }, { 0, 2 }, { -2, 0 } };
-#endif
 
   MV *best_mv = &mbmi->mv[0].as_mv;
 
@@ -5566,11 +5538,7 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
   const int start = ms_params->allow_hp ? 0 : 8;
-#else
-  const int start = ms_params->allow_hp ? 0 : 4;
-#endif
 
   // Before this function is called, motion_mode_rd will have selected a valid
   // warp model, and stored it into mbmi->wm_params, but we have not yet
@@ -5580,19 +5548,10 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
   for (int ite = 0; ite < 8; ++ite) {
-#else
-  for (int ite = 0; ite < 2; ++ite) {
-#endif
-
     int best_idx = -1;
 
-#if CONFIG_MORE_SEARCH_LOCAL_WARP
     for (int idx = start; idx < start + 8; ++idx) {
-#else
-    for (int idx = start; idx < start + 4; ++idx) {
-#endif
       unsigned int thismse;
 
       MV this_mv = { best_mv->row + neighbors[idx].row,
@@ -5622,7 +5581,7 @@ void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
   mbmi->wm_params[0] = best_wm_params;
 }
-#endif  // CONFIG_WARP_EXTEND
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
 // =============================================================================
 //  Subpixel Motion Search: OBMC

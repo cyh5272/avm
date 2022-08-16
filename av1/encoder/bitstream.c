@@ -346,7 +346,6 @@ static AOM_INLINE void write_is_inter(const AV1_COMMON *cm,
 }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-#if CONFIG_WARP_DELTA
 static void write_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
                                    aom_writer *w) {
   assert(2 <= index && index <= 5);
@@ -361,16 +360,11 @@ static void write_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
 
 static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                              const MB_MODE_INFO *mbmi,
-#if CONFIG_WARP_EXTEND
                              const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
-#endif  // CONFIG_WARP_EXTEND
                              aom_writer *w) {
   const WarpedMotionParams *params = &mbmi->wm_params[0];
   WarpedMotionParams base_params;
-  av1_get_warp_base_params(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                           mbmi_ext_frame->ref_mv_stack,
-#endif  // CONFIG_WARP_EXTEND
+  av1_get_warp_base_params(cm, xd, mbmi, mbmi_ext_frame->ref_mv_stack,
                            &base_params, NULL);
 
   // The RDO stage should not give us a model which is not warpable.
@@ -382,21 +376,13 @@ static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   write_warp_delta_param(xd, 2, params->wmmat[2] - base_params.wmmat[2], w);
   write_warp_delta_param(xd, 3, params->wmmat[3] - base_params.wmmat[3], w);
 }
-#endif  // CONFIG_WARP_DELTA
 
 static AOM_INLINE void write_motion_mode(
     const AV1_COMMON *cm, MACROBLOCKD *xd, const MB_MODE_INFO *mbmi,
-#if CONFIG_WARP_EXTEND
-    const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame,
-#endif  // CONFIG_WARP_EXTEND
-    aom_writer *w) {
+    const MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame, aom_writer *w) {
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   const int allowed_motion_modes =
-      motion_mode_allowed(cm, xd,
-#if CONFIG_WARP_EXTEND
-                          mbmi_ext_frame->ref_mv_stack,
-#endif  // CONFIG_WARP_EXTEND
-                          mbmi);
+      motion_mode_allowed(cm, xd, mbmi_ext_frame->ref_mv_stack, mbmi);
   assert((allowed_motion_modes & (1 << mbmi->motion_mode)) != 0);
 
   MOTION_MODE motion_mode = mbmi->motion_mode;
@@ -435,7 +421,6 @@ static AOM_INLINE void write_motion_mode(
     }
   }
 
-#if CONFIG_WARP_EXTEND
   if (allowed_motion_modes & (1 << WARP_EXTEND)) {
     int ctx1 = av1_get_warp_extend_ctx1(xd, mbmi_ext_frame->ref_mv_stack, mbmi);
     int ctx2 = av1_get_warp_extend_ctx2(xd, mbmi_ext_frame->ref_mv_stack, mbmi);
@@ -445,7 +430,6 @@ static AOM_INLINE void write_motion_mode(
       return;
     }
   }
-#endif  // CONFIG_WARP_EXTEND
 
   if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
     aom_write_symbol(w, motion_mode == WARPED_CAUSAL,
@@ -456,21 +440,15 @@ static AOM_INLINE void write_motion_mode(
     }
   }
 
-#if CONFIG_WARP_DELTA
   if (allowed_motion_modes & (1 << WARP_DELTA)) {
     aom_write_symbol(w, motion_mode == WARP_DELTA,
                      xd->tile_ctx->warp_delta_cdf[bsize], 2);
 
     if (motion_mode == WARP_DELTA) {
-      write_warp_delta(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                       mbmi_ext_frame,
-#endif  // CONFIG_WARP_EXTEND
-                       w);
+      write_warp_delta(cm, xd, mbmi, mbmi_ext_frame, w);
       return;
     }
   }
-#endif  // CONFIG_WARP_DELTA
 }
 #else
 static AOM_INLINE void write_motion_mode(const AV1_COMMON *cm, MACROBLOCKD *xd,
@@ -1953,11 +1931,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-    write_motion_mode(cm, xd, mbmi,
-#if CONFIG_WARP_EXTEND
-                      mbmi_ext_frame,
-#endif  // CONFIG_WARP_EXTEND
-                      w);
+    write_motion_mode(cm, xd, mbmi, mbmi_ext_frame, w);
 #else
     if (cpi->common.current_frame.reference_mode != COMPOUND_REFERENCE &&
         cpi->common.seq_params.enable_interintra_compound &&
