@@ -252,8 +252,8 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
 #if CCTX_C1_NONZERO
-    if (eob_data->eob || (av1_get_cctx_type(xd, row, col) > CCTX_NONE &&
-                          plane == AOM_PLANE_V && eob_data_u->eob)) {
+    if (eob_data->eob || (plane == AOM_PLANE_V && eob_data_u->eob &&
+                          av1_get_cctx_type(xd, row, col) > CCTX_NONE)) {
 #else
     eob_info *eob_data_v =
         dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
