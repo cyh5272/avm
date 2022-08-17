@@ -3411,7 +3411,8 @@ double set_cand_merge_sse_and_bits(
           equal_ref_for_class[class_id];
       copy_nsfilter_taps_for_class(&tmp_filters, token_wienerns_info_cand,
                                    class_id);
-      const int merge_bits = count_wienerns_bits(
+      // Using count_wienerns_bits_set just in case.
+      const int merge_bits = count_wienerns_bits_set(
           is_uv, &x->mode_costs, &tmp_filters, &old_unit->ref_wienerns_bank,
           nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =
@@ -3436,7 +3437,8 @@ double set_cand_merge_sse_and_bits(
 
       // TODO: Merge bits calculated this way is not entirely correct since we
       //  don't know the optimal merge status for classes > class_id.
-      const int merge_bits = count_wienerns_bits(
+      // Using count_wienerns_bits_set just in case.
+      const int merge_bits = count_wienerns_bits_set(
           is_uv, &x->mode_costs, token_wienerns_info_cand,
           &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =
