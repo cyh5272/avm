@@ -2469,20 +2469,24 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
 static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
                                  WienerNonsepInfo *wienerns_info,
                                  WienerNonsepInfoBank *bank, aom_reader *rb) {
+  int skip_filter_read_for_class[WIENERNS_MAX_CLASSES] = { 0 };
+  int ref_for_class[WIENERNS_MAX_CLASSES] = { 0 };
 #if CONFIG_RST_MERGECOEFFS
-  const int exact_match =
-      aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
-  int k;
-  for (k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
-    if (aom_read_literal(rb, 1, ACCT_STR)) break;
-  }
-  const int ref = k;
-  if (exact_match) {
-    memcpy(wienerns_info, av1_constref_from_wienerns_bank(bank, ref),
-           sizeof(*wienerns_info));
-    wienerns_info->bank_ref = ref;
-    if (bank->bank_size == 0) av1_add_to_wienerns_bank(bank, wienerns_info);
-    return;
+  for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    const int exact_match =
+        aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
+    int ref;
+    for (ref = 0; ref < AOMMAX(0, bank->bank_size_for_class[c_id] - 1); ++ref) {
+      if (aom_read_literal(rb, 1, ACCT_STR)) break;
+    }
+    if (exact_match) {
+      copy_nsfilter_taps_for_class(
+          wienerns_info, av1_constref_from_wienerns_bank(bank, ref, c_id),
+          c_id);
+    }
+    wienerns_info->bank_ref_for_class[c_id] = ref;
+    skip_filter_read_for_class[c_id] = exact_match;
+    ref_for_class[c_id] = ref;
   }
 #else
   const int ref = 0;
@@ -2493,14 +2497,17 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
   const int beg_feat = 0;
   const int end_feat = nsfilter_params->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
-  WienerNonsepInfo *ref_wienerns_info = av1_ref_from_wienerns_bank(bank, ref);
-
-  assert(wienerns_info->num_classes == ref_wienerns_info->num_classes);
   int reduce_step[WIENERNS_REDUCE_STEPS];
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    if (skip_filter_read_for_class[c_id]) continue;
+    const int ref = ref_for_class[c_id];
+
+    const WienerNonsepInfo *ref_wienerns_info =
+        av1_ref_from_wienerns_bank(bank, ref, c_id);
+    assert(wienerns_info->num_classes == ref_wienerns_info->num_classes);
     int16_t *wienerns_info_nsfilter = nsfilter_taps(wienerns_info, c_id);
-    int16_t *ref_wienerns_info_nsfilter =
-        nsfilter_taps(ref_wienerns_info, c_id);
+    const int16_t *ref_wienerns_info_nsfilter =
+        const_nsfilter_taps(ref_wienerns_info, c_id);
 
     // printf("Dec %s ", is_uv ? "UV:" : "Y: ");
     memset(reduce_step, 0, sizeof(reduce_step));
@@ -2565,8 +2572,8 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
       // ref_wienerns_info->nsfilter[i]);
     }
     // printf("\n");
+    av1_add_to_wienerns_bank(bank, wienerns_info, c_id);
   }
-  av1_add_to_wienerns_bank(bank, wienerns_info);
 }
 #endif  // CONFIG_WIENER_NONSEP
 

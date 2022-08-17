@@ -259,65 +259,65 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 #if CONFIG_WIENER_NONSEP
 void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
                              int num_classes, int chroma) {
-  set_default_wienerns(&bank->filter[0], qindex, num_classes, chroma);
-  bank->bank_size = 0;
-  bank->bank_ptr = 0;
+  for (int i = 0; i < LR_BANK_SIZE; ++i) {
+    // TODO: Change the default initialization.
+    set_default_wienerns(&bank->filter[i], qindex, num_classes, chroma);
+  }
+  for (int c_id = 0; c_id < num_classes; ++c_id) {
+    bank->bank_size_for_class[c_id] = 1;
+    bank->bank_ptr_for_class[c_id] = 0;
+  }
 }
 
 void av1_add_to_wienerns_bank(WienerNonsepInfoBank *bank,
-                              const WienerNonsepInfo *info) {
-  if (bank->bank_size < LR_BANK_SIZE) {
-    bank->bank_ptr = bank->bank_size;
-    memcpy(&bank->filter[bank->bank_ptr], info, sizeof(*info));
-    bank->bank_size++;
-  } else {
-    bank->bank_ptr = (bank->bank_ptr + 1) % LR_BANK_SIZE;
-    memcpy(&bank->filter[bank->bank_ptr], info, sizeof(*info));
+                              const WienerNonsepInfo *info, int class_id) {
+  int c_id_begin = class_id;
+  int c_id_end = class_id + 1;
+  if (class_id == ALL_WIENERNS_CLASSES) {
+    c_id_begin = 0;
+    c_id_end = info->num_classes;
+  }
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    if (bank->bank_size_for_class[c_id] < LR_BANK_SIZE) {
+      bank->bank_ptr_for_class[c_id] = bank->bank_size_for_class[c_id];
+      bank->bank_size_for_class[c_id]++;
+    } else {
+      bank->bank_ptr_for_class[c_id] =
+          (bank->bank_ptr_for_class[c_id] + 1) % LR_BANK_SIZE;
+    }
+    copy_nsfilter_taps_for_class(&bank->filter[bank->bank_ptr_for_class[c_id]],
+                                 info, c_id);
   }
 }
 
 WienerNonsepInfo *av1_ref_from_wienerns_bank(WienerNonsepInfoBank *bank,
-                                             int ndx) {
-  if (bank->bank_size == 0) {
-    return &bank->filter[0];
-  } else {
-    assert(ndx < bank->bank_size);
-    const int ptr =
-        bank->bank_ptr - ndx + (bank->bank_ptr < ndx ? LR_BANK_SIZE : 0);
-    return &bank->filter[ptr];
-  }
+                                             int ndx, int class_id) {
+  assert(class_id != ALL_WIENERNS_CLASSES);
+  assert(bank->bank_size_for_class[class_id] > 0);
+
+  assert(ndx < bank->bank_size_for_class[class_id]);
+  const int ptr = bank->bank_ptr_for_class[class_id] - ndx +
+                  (bank->bank_ptr_for_class[class_id] < ndx ? LR_BANK_SIZE : 0);
+  return &bank->filter[ptr];
 }
 
 const WienerNonsepInfo *av1_constref_from_wienerns_bank(
-    const WienerNonsepInfoBank *bank, int ndx) {
-  if (bank->bank_size == 0) {
-    return &bank->filter[0];
-  } else {
-    assert(ndx < bank->bank_size);
-    const int ptr =
-        bank->bank_ptr - ndx + (bank->bank_ptr < ndx ? LR_BANK_SIZE : 0);
-    return &bank->filter[ptr];
-  }
+    const WienerNonsepInfoBank *bank, int ndx, int class_id) {
+  assert(class_id != ALL_WIENERNS_CLASSES);
+  assert(bank->bank_size_for_class[class_id] > 0);
+
+  assert(ndx < bank->bank_size_for_class[class_id]);
+  const int ptr = bank->bank_ptr_for_class[class_id] - ndx +
+                  (bank->bank_ptr_for_class[class_id] < ndx ? LR_BANK_SIZE : 0);
+  return &bank->filter[ptr];
 }
 
 void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
-                              const WienerNonsepInfo *info) {
-  memcpy(av1_ref_from_wienerns_bank(bank, ndx), info, sizeof(*info));
+                              const WienerNonsepInfo *info, int class_id) {
+  copy_nsfilter_taps_for_class(av1_ref_from_wienerns_bank(bank, ndx, class_id),
+                               info, class_id);
 }
 
-void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
-                                WienerNonsepInfo *info, int qindex,
-                                int num_classes, int chroma) {
-  (void)ndx;
-  if (bank->bank_size == 0) {
-    set_default_wienerns(info, qindex, num_classes, chroma);
-  } else {
-    assert(ndx < bank->bank_size);
-    const int ptr =
-        bank->bank_ptr - ndx + (bank->bank_ptr < ndx ? LR_BANK_SIZE : 0);
-    memcpy(info, &bank->filter[ptr], sizeof(*info));
-  }
-}
 #endif  // CONFIG_WIENER_NONSEP
 
 void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
@@ -348,21 +348,28 @@ const int16_t *const_nsfilter_taps(const WienerNonsepInfo *nsinfo,
 }
 
 void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
-                                  WienerNonsepInfo *from_info, int class_id) {
-  // TODO(oguleryuz): Should one do to_info->bank_ref = from_info->bank_ref?
+                                  const WienerNonsepInfo *from_info,
+                                  int class_id) {
   assert(class_id >= 0 && class_id < to_info->num_classes);
   assert(class_id >= 0 && class_id < from_info->num_classes);
   const int offset = class_id * WIENERNS_YUV_MAX;
   memcpy(to_info->allfiltertaps + offset, from_info->allfiltertaps + offset,
          WIENERNS_YUV_MAX * sizeof(*to_info->allfiltertaps));
+#if CONFIG_RST_MERGECOEFFS
+  to_info->bank_ref_for_class[class_id] =
+      from_info->bank_ref_for_class[class_id];
+#endif  // CONFIG_RST_MERGECOEFFS
 }
 
 void copy_nsfilter_taps(WienerNonsepInfo *to_info,
-                        WienerNonsepInfo *from_info) {
-  // TODO(oguleryuz): Should one do to_info->bank_ref = from_info->bank_ref?
+                        const WienerNonsepInfo *from_info) {
   assert(to_info->num_classes == from_info->num_classes);
   memcpy(to_info->allfiltertaps, from_info->allfiltertaps,
          sizeof(to_info->allfiltertaps));
+#if CONFIG_RST_MERGECOEFFS
+  memcpy(to_info->bank_ref_for_class, from_info->bank_ref_for_class,
+         sizeof(to_info->bank_ref_for_class));
+#endif  // CONFIG_RST_MERGECOEFFS
 }
 #endif
 
