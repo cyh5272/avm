@@ -376,10 +376,10 @@ static AOM_INLINE void add_ref_mv_candidate(
 #if CONFIG_TIP
     if (!is_tip_ref_frame(candidate->ref_frame[0]) &&
         !is_tip_ref_frame(candidate->ref_frame[1]) &&
-        (is_inter_ref_frame(candidate->ref_frame[0]) ||
+        (is_inter_ref_frame(candidate->ref_frame[0]) &&
          is_inter_ref_frame(candidate->ref_frame[1]))) {
 #else
-    if (is_inter_ref_frame(candidate->ref_frame[0]) ||
+    if (is_inter_ref_frame(candidate->ref_frame[0]) &&
         is_inter_ref_frame(candidate->ref_frame[1])) {
 #endif
 #else
