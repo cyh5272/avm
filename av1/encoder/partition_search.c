@@ -354,8 +354,17 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     }
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
     for (int plane = plane_start; plane < plane_end; ++plane) {
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+      if (plane == AOM_PLANE_Y)
+        av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
+                                     cpi->optimize_seg_arr[mbmi->segment_id]);
+      else if (plane == AOM_PLANE_U)
+        av1_encode_intra_block_joint_uv(
+            cpi, x, bsize, dry_run, cpi->optimize_seg_arr[mbmi->segment_id]);
+#else
       av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
                                    cpi->optimize_seg_arr[mbmi->segment_id]);
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
     }
 
     // If there is at least one lossless segment, force the skip for intra
@@ -744,6 +753,9 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
 
   // Sets up the tx_type_map buffer in MACROBLOCKD.
   xd->tx_type_map = txfm_info->tx_type_map_;
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map = txfm_info->cctx_type_map_;
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_size_wide[bsize];
 
   for (i = 0; i < num_planes; ++i) {

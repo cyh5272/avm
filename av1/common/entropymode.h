@@ -272,6 +272,9 @@ typedef struct frame_contexts {
 #if CONFIG_IST
   aom_cdf_prob stx_cdf[TX_SIZES][CDF_SIZE(STX_TYPES)];
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  aom_cdf_prob cctx_type_cdf[EXT_TX_SIZES][CDF_SIZE(CCTX_TYPES)];
+#endif  // CONFIG_CROSS_CHROMA_TX
   int initialized;
 } FRAME_CONTEXT;
 

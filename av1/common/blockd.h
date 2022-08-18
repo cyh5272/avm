@@ -897,6 +897,12 @@ typedef struct macroblockd {
    * 'MACROBLOCK' structs.
    */
   TX_TYPE *tx_type_map;
+#if CONFIG_CROSS_CHROMA_TX
+  /*!
+   * Array of CCTX types.
+   */
+  CctxType *cctx_type_map;
+#endif  // CONFIG_CROSS_CHROMA_TX
   /*!
    * Stride for 'tx_type_map'. Note that this may / may not be same as
    * 'mi_stride', depending on which actual array 'tx_type_map' points to.
@@ -1555,6 +1561,44 @@ static INLINE void update_txk_array(MACROBLOCKD *const xd, int blk_row,
   }
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+#if CCTX_C2_DROPPED
+static INLINE int keep_chroma_c2(CctxType cctx_type) {
+  return
+#if CCTX_NEG_ANGLES
+      cctx_type == CCTX_M30 || cctx_type == CCTX_M60 ||
+#endif
+#if CCTX_POS_ANGLES
+      cctx_type == CCTX_30 || cctx_type == CCTX_60 ||
+#endif
+      cctx_type == CCTX_NONE;
+}
+#endif
+
+static INLINE void update_cctx_array(MACROBLOCKD *const xd, int blk_row,
+                                     int blk_col, TX_SIZE tx_size,
+                                     CctxType cctx_type) {
+  const int stride = xd->tx_type_map_stride;
+  xd->cctx_type_map[blk_row * stride + blk_col] = cctx_type;
+
+  const int txw = tx_size_wide_unit[tx_size];
+  const int txh = tx_size_high_unit[tx_size];
+  // The 16x16 unit is due to the constraint from tx_64x64 which sets the
+  // maximum tx size for chroma as 32x32. Coupled with 4x1 transform block
+  // size, the constraint takes effect in 32x16 / 16x32 size too. To solve
+  // the intricacy, cover all the 16x16 units inside a 64 level transform.
+  if (txw == tx_size_wide_unit[TX_64X64] ||
+      txh == tx_size_high_unit[TX_64X64]) {
+    const int tx_unit = tx_size_wide_unit[TX_16X16];
+    for (int idy = 0; idy < txh; idy += tx_unit) {
+      for (int idx = 0; idx < txw; idx += tx_unit) {
+        xd->cctx_type_map[(blk_row + idy) * stride + blk_col + idx] = cctx_type;
+      }
+    }
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 #if CONFIG_IST
 static INLINE int tx_size_is_depth0(TX_SIZE tx_size, BLOCK_SIZE bsize) {
   TX_SIZE ctx_size = max_txsize_rect_lookup[bsize];
@@ -1732,6 +1776,13 @@ static INLINE TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
 #endif  // CONFIG_IST
   return tx_type;
 }
+
+#if CONFIG_CROSS_CHROMA_TX
+static INLINE CctxType av1_get_cctx_type(const MACROBLOCKD *xd, int blk_row,
+                                         int blk_col) {
+  return xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
                             const int num_planes);

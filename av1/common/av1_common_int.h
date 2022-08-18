@@ -764,6 +764,15 @@ struct CommonModeInfoParams {
    * primary tx_type
    */
   TX_TYPE *tx_type_map;
+#if CONFIG_CROSS_CHROMA_TX
+  /*!
+   * An array of cctx types for each 4x4 block in the frame.
+   * Number of allocated elements is same as 'mi_grid_size', and stride is
+   * same as 'mi_grid_size'. So, indexing into 'tx_type_map' is same as that of
+   * 'mi_grid_base'.
+   */
+  CctxType *cctx_type_map;
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   /**
    * \name Function pointers to allow separate logic for encoder and decoder.
@@ -2219,8 +2228,12 @@ static INLINE void set_mi_offsets(const CommonModeInfoParams *const mi_params,
   // 'xd->mi' should point to an offset in 'mi_grid_base';
   xd->mi = mi_params->mi_grid_base + mi_grid_idx;
   // 'xd->tx_type_map' should point to an offset in 'mi_params->tx_type_map'.
-  if (xd->tree_type != CHROMA_PART)
+  if (xd->tree_type != CHROMA_PART) {
     xd->tx_type_map = mi_params->tx_type_map + mi_grid_idx;
+#if CONFIG_CROSS_CHROMA_TX
+    xd->cctx_type_map = mi_params->cctx_type_map + mi_grid_idx;
+#endif  // CONFIG_CROSS_CHROMA_TX
+  }
   xd->tx_type_map_stride = mi_params->mi_stride;
 }
 
@@ -2238,6 +2251,9 @@ static INLINE void set_blk_offsets(const CommonModeInfoParams *const mi_params,
   xd->mi[mi_params->mi_stride * blk_row + blk_col] =
       mi_params->mi_grid_base[mi_grid_idx];
   xd->tx_type_map = mi_params->tx_type_map + mi_grid_idx;
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map = mi_params->cctx_type_map + mi_grid_idx;
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 }
 // Return the number of sub-blocks whose width and height are

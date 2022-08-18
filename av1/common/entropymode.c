@@ -683,6 +683,65 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
                                                     };
 #endif  // CONFIG_DDT_INTER
 
+#if CONFIG_CROSS_CHROMA_TX
+static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
+                                               [CDF_SIZE(CCTX_TYPES)] = {
+#if CCTX_ANGLE_CONFIG == 4
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+#else
+                                                 { AOM_CDF2(16384) },
+                                                 { AOM_CDF2(16384) },
+                                                 { AOM_CDF2(16384) },
+                                                 { AOM_CDF2(16384) },
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+#elif CCTX_ANGLE_CONFIG == 3
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+                                                 { AOM_CDF5(6554, 13107, 19661,
+                                                            26214) },
+                                                 { AOM_CDF5(6554, 13107, 19661,
+                                                            26214) },
+                                                 { AOM_CDF5(6554, 13107, 19661,
+                                                            26214) },
+                                                 { AOM_CDF5(6554, 13107, 19661,
+                                                            26214) },
+#else
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+                                                 { AOM_CDF3(10923, 21845) },
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+#else
+#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+                                                 { AOM_CDF7(4681, 9362, 14043,
+                                                            18725, 23406,
+                                                            28087) },
+                                                 { AOM_CDF7(4681, 9362, 14043,
+                                                            18725, 23406,
+                                                            28087) },
+                                                 { AOM_CDF7(4681, 9362, 14043,
+                                                            18725, 23406,
+                                                            28087) },
+                                                 { AOM_CDF7(4681, 9362, 14043,
+                                                            18725, 23406,
+                                                            28087) },
+#else
+                                                 { AOM_CDF4(8192, 16384,
+                                                            24576) },
+                                                 { AOM_CDF4(8192, 16384,
+                                                            24576) },
+                                                 { AOM_CDF4(8192, 16384,
+                                                            24576) },
+                                                 { AOM_CDF4(8192, 16384,
+                                                            24576) },
+#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+#endif
+                                               };
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 static const aom_cdf_prob default_cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)] = {
   AOM_CDF8(1418, 2123, 13340, 18405, 26972, 28343, 32294)
 };
@@ -1943,6 +2002,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #if CONFIG_IST
   av1_copy(fc->stx_cdf, default_stx_cdf);
 #endif
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy(fc->cctx_type_cdf, default_cctx_type_cdf);
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 void av1_set_default_ref_deltas(int8_t *ref_deltas) {

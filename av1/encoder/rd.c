@@ -320,6 +320,13 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   }
 #endif  // CONFIG_IST
 
+#if CONFIG_CROSS_CHROMA_TX
+  for (i = 0; i < EXT_TX_SIZES; ++i) {
+    av1_cost_tokens_from_cdf(mode_costs->cctx_type_cost[i],
+                             fc->cctx_type_cdf[i], NULL);
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
+
   if (!frame_is_intra_only(cm)) {
     for (i = 0; i < COMP_INTER_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_inter_cost[i],

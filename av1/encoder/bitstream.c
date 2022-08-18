@@ -510,6 +510,8 @@ static AOM_INLINE void av1_write_coeffs_txb_facade(
     }
   }
 #else
+  (void)xd;
+  (void)mbmi;
   av1_write_coeffs_txb(cm, x, w, blk_row, blk_col, plane, block, tx_size);
 #endif  // CONFIG_FORWARDSKIP
 }
@@ -1155,6 +1157,25 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
     }
   }
 }
+
+#if CONFIG_CROSS_CHROMA_TX
+void av1_write_cctx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
+                         CctxType cctx_type, TX_SIZE tx_size, aom_writer *w) {
+  MB_MODE_INFO *mbmi = xd->mi[0];
+  assert(xd->is_chroma_ref);
+  const int is_inter = is_inter_block(mbmi, xd->tree_type);
+  if (((!cm->seg.enabled && cm->quant_params.base_qindex > 0) ||
+       (cm->seg.enabled && xd->qindex[mbmi->segment_id] > 0)) &&
+      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) &&
+      !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
+      !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
+    FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+    const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+    aom_write_symbol(w, cctx_type, ec_ctx->cctx_type_cdf[square_tx_size],
+                     CCTX_TYPES);
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_IST
 void av1_write_sec_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
@@ -2148,6 +2169,9 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
       get_mi_ext_idx(mi_row, mi_col, cm->mi_params.mi_alloc_bsize,
                      cpi->mbmi_ext_info.stride);
   xd->tx_type_map = mi_params->tx_type_map + grid_idx;
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map = mi_params->cctx_type_map + grid_idx;
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 
   MB_MODE_INFO *mbmi = xd->mi[0];
