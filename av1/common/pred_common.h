@@ -420,11 +420,13 @@ static INLINE int av1_get_compound_ref_bit_type(
 static INLINE aom_cdf_prob *av1_get_pred_cdf_compound_ref(
     const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref, int n_bits, int bit_type,
     int num_total_refs) {
+#if !CONFIG_ALLOW_SAME_REF_COMPOUND
   assert((ref + 1) < num_total_refs);
   assert(n_bits < 2);
   assert(ref - n_bits < num_total_refs - 2);
   assert(bit_type < COMPREF_BIT_TYPES);
   assert(IMPLIES(n_bits == 0, ref < RANKED_REF0_TO_PRUNE - 1));
+#endif
   return n_bits == 0 ? xd->tile_ctx->comp_ref0_cdf[av1_get_ref_pred_context(
                            xd, ref, num_total_refs)][ref]
                      : xd->tile_ctx->comp_ref1_cdf[av1_get_ref_pred_context(
