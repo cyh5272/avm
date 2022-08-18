@@ -1070,6 +1070,9 @@ typedef struct {
    */
   int num_cur_refs;
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
+  /*!
+   * Number of references for the compound mode with the same slot.
+   */
   int num_same_ref_compound;
 #endif
 } RefFramesInfo;
