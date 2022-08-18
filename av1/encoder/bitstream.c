@@ -2738,35 +2738,52 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
 }
 
 #if CONFIG_WIENER_NONSEP
+
+#if CONFIG_RST_MERGECOEFFS
+static int check_and_write_merge_info(
+    const WienerNonsepInfo *wienerns_info, const WienerNonsepInfoBank *bank,
+    const WienernsFilterParameters *nsfilter_params, int class_id,
+    int *ref_for_class, MACROBLOCKD *xd, aom_writer *wb) {
+  const int is_equal = check_wienerns_bank_eq(
+      bank, wienerns_info, nsfilter_params->ncoeffs, class_id, ref_for_class);
+  const int exact_match = (is_equal >= 0);
+  aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
+
+  if (!exact_match) {
+    // check_wienerns_bank_eq fills the correct ref with exact_match but not
+    // otherwise.
+    ref_for_class[class_id] = wienerns_info->bank_ref_for_class[class_id];
+  }
+  const int ref = ref_for_class[class_id];
+
+  assert(ref < AOMMAX(1, bank->bank_size_for_class[class_id]));
+  int match = 0;
+  for (int k = 0; k < AOMMAX(0, bank->bank_size_for_class[class_id] - 1); ++k) {
+    match = (k == ref);
+    aom_write_literal(wb, match, 1);
+    if (match) break;
+  }
+  assert(IMPLIES(!match,
+                 ref == AOMMAX(0, bank->bank_size_for_class[class_id] - 1)));
+  return exact_match;
+}
+#endif  // CONFIG_RST_MERGECOEFFS
+
 static AOM_INLINE void write_wienerns_filter(
     MACROBLOCKD *xd, int plane, int ql, const WienerNonsepInfo *wienerns_info,
     WienerNonsepInfoBank *bank, aom_writer *wb) {
   const WienernsFilterParameters *nsfilter_params =
       get_wienerns_parameters(xd->base_qindex, plane != AOM_PLANE_Y);
+  int skip_filter_write_for_class[WIENERNS_MAX_CLASSES] = { 0 };
+  int ref_for_class[WIENERNS_MAX_CLASSES] = { 0 };
 #if CONFIG_RST_MERGECOEFFS
-  const int equal_ref =
-      check_wienerns_bank_eq(bank, wienerns_info, nsfilter_params->ncoeffs);
-  const int exact_match = (equal_ref >= 0);
-  aom_write_symbol(wb, exact_match, xd->tile_ctx->merged_param_cdf, 2);
-  const int ref = wienerns_info->bank_ref;
-  assert(IMPLIES(exact_match, ref == equal_ref));
-  assert(ref < AOMMAX(1, bank->bank_size));
-  int match = 0;
-  for (int k = 0; k < AOMMAX(0, bank->bank_size - 1); ++k) {
-    match = (k == ref);
-    aom_write_literal(wb, match, 1);
-    if (match) break;
-  }
-  assert(IMPLIES(!match, ref == AOMMAX(0, bank->bank_size - 1)));
-  if (exact_match) {
-    if (bank->bank_size == 0) av1_add_to_wienerns_bank(bank, wienerns_info);
-    return;
+  for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    skip_filter_write_for_class[c_id] = check_and_write_merge_info(
+        wienerns_info, bank, nsfilter_params, c_id, ref_for_class, xd, wb);
   }
 #else
-  const int ref = 0;
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
-  WienerNonsepInfo *ref_wienerns_info = av1_ref_from_wienerns_bank(bank, ref);
   const int beg_feat = 0;
   const int end_feat = nsfilter_params->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
@@ -2776,6 +2793,11 @@ static AOM_INLINE void write_wienerns_filter(
   // TODO(debargha): simplify the logic
   int reduce_step[WIENERNS_REDUCE_STEPS];
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+    if (skip_filter_write_for_class[c_id]) continue;
+    const int ref = ref_for_class[c_id];
+
+    const WienerNonsepInfo *ref_wienerns_info =
+        av1_constref_from_wienerns_bank(bank, ref, c_id);
     const int16_t *wienerns_info_nsfilter =
         const_nsfilter_taps(wienerns_info, c_id);
     const int16_t *ref_wienerns_info_nsfilter =
@@ -2857,9 +2879,9 @@ static AOM_INLINE void write_wienerns_filter(
               wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID]);
 #endif  // CONFIG_LR_4PART_CODE
     }
+    av1_add_to_wienerns_bank(bank, wienerns_info, c_id);
   }
   // printf("\n");
-  av1_add_to_wienerns_bank(bank, wienerns_info);
   return;
 }
 #endif  // CONFIG_WIENER_NONSEP
