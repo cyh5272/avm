@@ -832,7 +832,7 @@ struct CommonModeInfoParams {
                     int height);
   /**@}*/
 };
-#if CONFIG_FLEX_MVRES
+
 typedef struct CommonSBInfoParams CommonSBInfoParams;
 /*!
  * \brief Params related to SB_INFO arrays and related info.
@@ -859,7 +859,6 @@ struct CommonSBInfoParams {
    */
   int sbi_alloc_size;
 };
-#endif
 
 typedef struct CommonQuantParams CommonQuantParams;
 /*!
@@ -1357,12 +1356,11 @@ typedef struct AV1Common {
    */
   CommonModeInfoParams mi_params;
 
-#if CONFIG_FLEX_MVRES
   /*!
    * Params related to SB_INFO arrays and related info.
    */
   CommonSBInfoParams sbi_params;
-#endif
+
 #if CONFIG_ENTROPY_STATS
   /*!
    * Context type used by token CDFs, in the range 0 .. (TOKEN_CDF_Q_CTXS - 1).
@@ -2698,7 +2696,6 @@ static INLINE void set_sb_size(SequenceHeader *const seq_params,
   seq_params->mib_size_log2 = mi_size_wide_log2[seq_params->sb_size];
 }
 
-#if CONFIG_FLEX_MVRES
 static INLINE SB_INFO *av1_get_sb_info(AV1_COMMON *cm, int mi_row, int mi_col) {
   const int sb_row = mi_row >> cm->seq_params.mib_size_log2;
   const int sb_col = mi_col >> cm->seq_params.mib_size_log2;
@@ -2713,9 +2710,10 @@ static INLINE void av1_set_sb_info(AV1_COMMON *cm, MACROBLOCKD *xd, int mi_row,
   sbi->mi_row = mi_row;
   sbi->mi_col = mi_col;
 
+#if CONFIG_FLEX_MVRES
   sbi->sb_mv_precision = cm->features.fr_mv_precision;
-}
 #endif
+}
 
 // Returns true if the frame is fully lossless at the coded resolution.
 // Note: If super-resolution is used, such a frame will still NOT be lossless at

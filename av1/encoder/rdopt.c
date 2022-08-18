@@ -6114,17 +6114,12 @@ static int inter_mode_search_order_independent_skip(
 static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
                              const MV_REFERENCE_FRAME *ref_frames,
 #if CONFIG_IBC_SR_EXT
-                             const AV1_COMMON *cm, MACROBLOCKD *const xd
+                             const AV1_COMMON *cm, MACROBLOCKD *const xd,
 #else
-                             const AV1_COMMON *cm
+                             const AV1_COMMON *cm,
 #endif  // CONFIG_IBC_SR_EXT
-
-#if CONFIG_FLEX_MVRES
-                             ,
-                             const SB_INFO *sbi
-#endif
-) {
-
+                             const SB_INFO *sbi) {
+  (void)sbi;
   PALETTE_MODE_INFO *const pmi = &mbmi->palette_mode_info;
   mbmi->ref_mv_idx = 0;
   mbmi->mode = curr_mode;
@@ -7318,20 +7313,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         const int comp_pred = is_inter_ref_frame(second_ref_frame);
 
 #if CONFIG_IBC_SR_EXT
-        init_mbmi(mbmi, this_mode, ref_frames, cm, xd
-#if CONFIG_FLEX_MVRES
-                  ,
-                  xd->sbi
-#endif
-
-        );
+        init_mbmi(mbmi, this_mode, ref_frames, cm, xd, xd->sbi);
 #else
-    init_mbmi(mbmi, this_mode, ref_frames, cm
-#if CONFIG_FLEX_MVRES
-              ,
-              xd->sbi
-#endif
-    );
+    init_mbmi(mbmi, this_mode, ref_frames, cm, xd->sbi);
 #endif  // CONFIG_IBC_SR_EXT
 
 #if CONFIG_FLEX_MVRES
@@ -7664,19 +7648,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 #if CONFIG_IBC_SR_EXT
-        init_mbmi(mbmi, this_mode, refs, cm, xd
-#if CONFIG_FLEX_MVRES
-                  ,
-                  xd->sbi
-#endif
-        );
+        init_mbmi(mbmi, this_mode, refs, cm, xd, xd->sbi);
 #else
-      init_mbmi(mbmi, this_mode, refs, cm
-#if CONFIG_FLEX_MVRES
-                ,
-                xd->sbi
-#endif
-      );
+      init_mbmi(mbmi, this_mode, refs, cm, xd->sbi);
 #endif  // CONFIG_IBC_SR_EXT
         txfm_info->skip_txfm = 0;
 

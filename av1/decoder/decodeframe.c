@@ -1764,11 +1764,9 @@ static void set_sb_mv_precision(SB_INFO *sbi, AV1Decoder *const pbi) {
 static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                                         ThreadData *const td, int mi_row,
                                         int mi_col, aom_reader *reader,
-                                        BLOCK_SIZE bsize,
-#if CONFIG_FLEX_MVRES
-                                        SB_INFO *sbi,
-#endif
+                                        BLOCK_SIZE bsize, SB_INFO *sbi,
                                         int parse_decode_flag) {
+  (void)sbi;
   assert(bsize < BLOCK_SIZES_ALL);
   AV1_COMMON *const cm = &pbi->common;
   DecoderCodingBlock *const dcb = &td->dcb;
@@ -1848,15 +1846,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
   block_visit[parse_decode_flag](pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), \
                                  reader, DEC_BLOCK_EPT_ARG(db_subsize))
 
-#if CONFIG_FLEX_MVRES
 #define DEC_PARTITION(db_r, db_c, db_subsize)                        \
   decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader, \
                    (db_subsize), sbi, parse_decode_flag)
-#else
-#define DEC_PARTITION(db_r, db_c, db_subsize)                        \
-  decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader, \
-                   (db_subsize), parse_decode_flag)
-#endif
 
   switch (partition) {
     case PARTITION_NONE: DEC_BLOCK(mi_row, mi_col, subsize); break;
@@ -1953,17 +1945,11 @@ static AOM_INLINE void decode_partition_sb(AV1Decoder *const pbi,
           ? 2
           : 1;
   xd->tree_type = (total_loop_num == 1 ? SHARED_PART : LUMA_PART);
-  decode_partition(pbi, td, mi_row, mi_col, reader, bsize,
-#if CONFIG_FLEX_MVRES
-                   xd->sbi,
-#endif
+  decode_partition(pbi, td, mi_row, mi_col, reader, bsize, xd->sbi,
                    parse_decode_flag);
   if (total_loop_num == 2) {
     xd->tree_type = CHROMA_PART;
-    decode_partition(pbi, td, mi_row, mi_col, reader, bsize,
-#if CONFIG_FLEX_MVRES
-                     xd->sbi,
-#endif
+    decode_partition(pbi, td, mi_row, mi_col, reader, bsize, xd->sbi,
                      parse_decode_flag);
     xd->tree_type = SHARED_PART;
   }
@@ -3388,9 +3374,7 @@ static AOM_INLINE void decode_tile_sb_row(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_IBC_SR_EXT
     av1_reset_is_mi_coded_map(&td->dcb.xd, cm->seq_params.mib_size);
 #endif  // CONFIG_IBC_SR_EXT
-#if CONFIG_FLEX_MVRES
     td->dcb.xd.sbi = av1_get_sb_info(cm, mi_row, mi_col);
-#endif
     set_cb_buffer(pbi, &td->dcb, pbi->cb_buffer_base, num_planes, mi_row,
                   mi_col);
 
