@@ -761,6 +761,8 @@ typedef struct {
 #define WIENERNS_MAX_CLASSES 1
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 #define WIENERNS_YUV_MAX 32
+// Special symbol to indicate the set of all classes.
+#define ALL_WIENERNS_CLASSES -17
 /*!
  * Nonseparable Wiener filter parameters.
  */
@@ -774,9 +776,15 @@ typedef struct {
 
 #if CONFIG_RST_MERGECOEFFS
   /*!
-   * Best Reference from dynamic bank
+   * Best Reference from dynamic bank for each class.
    */
-  int bank_ref;
+
+  // TODO: Having bank_ref_for_class here is awkward and confusing. Both ns and
+  //  switchable use the same filter-taps but have different banks.
+  //  WienerNonsepInfoBank also stores WienerNonsepInfo whose bank_refs are not
+  //  needed. Hence the bank_ref here is at best ambiguous. It should be
+  //  renamed to st like filter_ptr and moved to WienerNonsepInfoBank.
+  int bank_ref_for_class[WIENERNS_MAX_CLASSES];
 #endif  // CONFIG_RST_MERGECOEFFS
 } WienerNonsepInfo;
 
@@ -787,23 +795,24 @@ typedef struct {
    */
   WienerNonsepInfo filter[LR_BANK_SIZE];
   /*!
-   * Size of the bank
+   * Size of the bank for each class.
    */
-  int bank_size;
+  int bank_size_for_class[WIENERNS_MAX_CLASSES];
   /*!
-   * Pointer to the most current filter
+   * Pointer to the most current filter for each class.
    */
-  int bank_ptr;
+  int bank_ptr_for_class[WIENERNS_MAX_CLASSES];
 } WienerNonsepInfoBank;
 
 int16_t *nsfilter_taps(WienerNonsepInfo *nsinfo, int class_id);
 
 const int16_t *const_nsfilter_taps(const WienerNonsepInfo *nsinfo,
                                    int class_id);
-
 void copy_nsfilter_taps_for_class(WienerNonsepInfo *to_info,
-                                  WienerNonsepInfo *from_info, int class_id);
-void copy_nsfilter_taps(WienerNonsepInfo *to_info, WienerNonsepInfo *from_info);
+                                  const WienerNonsepInfo *from_info,
+                                  int class_id);
+void copy_nsfilter_taps(WienerNonsepInfo *to_info,
+                        const WienerNonsepInfo *from_info);
 #endif  // CONFIG_WIENER_NONSEP
 
 /*!\cond */
@@ -1893,16 +1902,13 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
                              int num_classes, int chroma);
 void av1_add_to_wienerns_bank(WienerNonsepInfoBank *bank,
-                              const WienerNonsepInfo *info);
+                              const WienerNonsepInfo *info, int class_id);
 WienerNonsepInfo *av1_ref_from_wienerns_bank(WienerNonsepInfoBank *bank,
-                                             int ndx);
+                                             int ndx, int class_id);
 const WienerNonsepInfo *av1_constref_from_wienerns_bank(
-    const WienerNonsepInfoBank *bank, int ndx);
+    const WienerNonsepInfoBank *bank, int ndx, int class_id);
 void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
-                              const WienerNonsepInfo *info);
-void av1_get_from_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
-                                WienerNonsepInfo *info, int qindex,
-                                int num_classes, int chroma);
+                              const WienerNonsepInfo *info, int class_id);
 #endif  // CONFIG_WIENER_NONSEP
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);

@@ -109,10 +109,16 @@ int get_wiener_best_ref(int wiener_win, const ModeCosts *mode_costs,
 #if CONFIG_WIENER_NONSEP
 
 static INLINE int check_wienerns_eq(const WienerNonsepInfo *info,
-                                    const WienerNonsepInfo *ref,
-                                    int num_coeffs) {
+                                    const WienerNonsepInfo *ref, int num_coeffs,
+                                    int class_id) {
   assert(info->num_classes == ref->num_classes);
-  for (int c_id = 0; c_id < info->num_classes; ++c_id) {
+  int c_id_begin = 0;
+  int c_id_end = info->num_classes;
+  if (class_id != ALL_WIENERNS_CLASSES) {
+    c_id_begin = class_id;
+    c_id_end = class_id + 1;
+  }
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
     const int16_t *info_nsfilter = const_nsfilter_taps(info, c_id);
     const int16_t *ref_nsfilter = const_nsfilter_taps(ref, c_id);
     if (memcmp(info_nsfilter, ref_nsfilter,
@@ -124,13 +130,29 @@ static INLINE int check_wienerns_eq(const WienerNonsepInfo *info,
 
 static INLINE int check_wienerns_bank_eq(const WienerNonsepInfoBank *bank,
                                          const WienerNonsepInfo *info,
-                                         int num_coeffs) {
-  for (int k = 0; k < AOMMAX(1, bank->bank_size); ++k) {
-    if (check_wienerns_eq(info, av1_constref_from_wienerns_bank(bank, k),
-                          num_coeffs))
-      return k;
+                                         int num_coeffs, int class_id,
+                                         int *refs) {
+  int c_id_begin = 0;
+  int c_id_end = info->num_classes;
+  if (class_id != ALL_WIENERNS_CLASSES) {
+    c_id_begin = class_id;
+    c_id_end = class_id + 1;
   }
-  return -1;
+  int num_equal = 0;
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    refs[c_id] = -1;
+    for (int k = 0; k < AOMMAX(1, bank->bank_size_for_class[c_id]); ++k) {
+      if (check_wienerns_eq(info,
+                            av1_constref_from_wienerns_bank(bank, k, c_id),
+                            num_coeffs, c_id)) {
+        refs[c_id] = k;
+        num_equal++;
+        break;
+      }
+    }
+  }
+
+  return num_equal == (c_id_end - c_id_begin) ? 0 : -1;
 }
 
 static INLINE int wienerns_info_diff(
@@ -149,11 +171,6 @@ static INLINE int wienerns_info_diff(
   }
   return diff;
 }
-
-int get_wienerns_best_ref(int plane, const ModeCosts *mode_costs,
-                          const WienerNonsepInfo *info,
-                          const WienerNonsepInfoBank *bank,
-                          const WienernsFilterParameters *nsfilter_params);
 #endif  // CONFIG_WIENER_NONSEP
 #endif  // CONFIG_RST_MERGECOEFFS
 
