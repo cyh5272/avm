@@ -185,6 +185,7 @@ static INLINE void comb2single(int n, int8_t combindex, int8_t *rf) {
     i += j;
   }
   rf[1] = combindex - i + j + rf[0];
+  assert(rf[1] >= rf[0]);
 }
 #else
 // Converts a pair of distinct indices (rf) each in [0, n-1],
