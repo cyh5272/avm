@@ -959,6 +959,8 @@ class AV1ConvolveNonSep2DHighbdTest
                     int block_col_end, RestorationType rtype) {
     const NonsepFilterConfig *filter_config;
     highbd_convolve_nonsep_2d_func ref_func;
+
+    int num_planes = 1;
 #if CONFIG_PC_WIENER
     if (rtype == RESTORE_PC_WIENER) {
       ref_func = av1_convolve_symmetric_highbd_c;
@@ -967,19 +969,29 @@ class AV1ConvolveNonSep2DHighbdTest
 #endif  // CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP
+    // When CONFIG_WIENER_NONSEP=1, luma and chroma plane uses different number
+    // of filter taps and both needs to be tested. Here, luma is tested for
+    // 12/13-tap filtering whereas chroma is tested for 6-tap filtering.
     if (rtype == RESTORE_WIENER_NONSEP) {
       ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
       filter_config = &UnitSumFilterConfig_;
+      num_planes = 2;
     }
 #endif  // CONFIG_WIENER_NONSEP
 
-    ref_func(input, input_stride, filter_config, filter, reference, dst_stride,
-             bit_depth, block_row_begin, block_row_end, block_col_begin,
-             block_col_end);
-    GetParam().TestFunction()(input, input_stride, filter_config, filter, test,
-                              dst_stride, bit_depth, block_row_begin,
-                              block_row_end, block_col_begin, block_col_end);
-    AssertOutputBufferEq(reference, test, width, height);
+    for (int plane = 0; plane < num_planes; plane++) {
+#if CONFIG_WIENER_NONSEP
+      if (plane && rtype == RESTORE_WIENER_NONSEP)
+        filter_config = &UnitSumFilterConfigChroma_;
+#endif  // CONFIG_WIENER_NONSEP
+      ref_func(input, input_stride, filter_config, filter, reference,
+               dst_stride, bit_depth, block_row_begin, block_row_end,
+               block_col_begin, block_col_end);
+      GetParam().TestFunction()(input, input_stride, filter_config, filter,
+                                test, dst_stride, bit_depth, block_row_begin,
+                                block_row_end, block_col_begin, block_col_end);
+      AssertOutputBufferEq(reference, test, width, height);
+    }
   }
   void TestConvolve(const int16_t *filter, RestorationType rtype) {
     const int width = GetParam().Block().Width();
@@ -995,10 +1007,8 @@ class AV1ConvolveNonSep2DHighbdTest
     const uint16_t *centered_input =
         input + kMaxTapOffset * width + kMaxTapOffset;
     const int input_stride = width;
-
     BitMatchTest(centered_input, input_stride, width, height, filter, reference,
                  test, kOutputStride, bit_depth, 0, height, 0, width, rtype);
-
     // Extreme value test
     const uint16_t *extreme_input = FirstRandomInput16Extreme(GetParam());
     const uint16_t *centered_extreme_input =
@@ -1020,6 +1030,8 @@ class AV1ConvolveNonSep2DHighbdTest
     DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
     DECLARE_ALIGNED(32, uint16_t, reference[MAX_SB_SQUARE]);
 
+    int num_planes = 1;
+
     ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
         << "Not enough padding for 7x7 filters";
     const uint16_t *centered_input =
@@ -1036,39 +1048,50 @@ class AV1ConvolveNonSep2DHighbdTest
 #endif  // CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP
+    // When CONFIG_WIENER_NONSEP=1, luma and chroma uses different number of
+    // filter taps and both needs to be tested. Here, luma is tested for
+    // 12/13-tap filtering whereas chroma is tested for 6-tap filtering.
     if (rtype == RESTORE_WIENER_NONSEP) {
       ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
       filter_config = &UnitSumFilterConfig_;
+      num_planes = 2;
     }
 #endif  // CONFIG_WIENER_NONSEP
-    aom_usec_timer timer;
-    aom_usec_timer_start(&timer);
-    for (int i = 0; i < kSpeedIterations; ++i) {
-      ref_func(centered_input, width, filter_config, filter, reference,
-               kOutputStride, bit_depth, 0, height, 0, width);
-    }
-    aom_usec_timer_mark(&timer);
-    auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+    for (int plane = 0; plane < num_planes; plane++) {
+#if CONFIG_WIENER_NONSEP
+      if (plane && rtype == RESTORE_WIENER_NONSEP)
+        filter_config = &UnitSumFilterConfigChroma_;
+#endif  // CONFIG_WIENER_NONSEP
+      // Calculate time taken by reference/c function
+      aom_usec_timer timer;
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        ref_func(centered_input, width, filter_config, filter, reference,
+                 kOutputStride, bit_depth, 0, height, 0, width);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
 
-    // Calculate time taken for optimized/intrinsic function
-    aom_usec_timer_start(&timer);
-    for (int i = 0; i < kSpeedIterations; ++i) {
-      GetParam().TestFunction()(centered_input, width, filter_config, filter,
-                                test, kOutputStride, bit_depth, 0, height, 0,
-                                width);
-    }
-    aom_usec_timer_mark(&timer);
-    auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
+      // Calculate time taken by optimized/intrinsic function
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        GetParam().TestFunction()(centered_input, width, filter_config, filter,
+                                  test, kOutputStride, bit_depth, 0, height, 0,
+                                  width);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
 
-    float c_time_per_pixel =
-        (float)1000.0 * elapsed_time_c / (kSpeedIterations * width * height);
-    float opt_time_per_pixel =
-        (float)1000.0 * elapsed_time_opt / (kSpeedIterations * width * height);
-    float scaling = c_time_per_pixel / opt_time_per_pixel;
-    printf(
-        "%3dx%-3d: c_time_per_pixel=%10.5f, "
-        "opt_time_per_pixel=%10.5f,  scaling=%f \n",
-        width, height, c_time_per_pixel, opt_time_per_pixel, scaling);
+      float c_time_per_pixel =
+          (float)1000.0 * elapsed_time_c / (kSpeedIterations * width * height);
+      float opt_time_per_pixel = (float)1000.0 * elapsed_time_opt /
+                                 (kSpeedIterations * width * height);
+      float scaling = c_time_per_pixel / opt_time_per_pixel;
+      printf(
+          "plane=%3d, %3dx%-3d: c_time_per_pixel=%10.5f, "
+          "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+          plane, width, height, c_time_per_pixel, opt_time_per_pixel, scaling);
+    }
   }
 
   // Generates NonsepFilterConfig compliant origin symmetric filter tap values.
@@ -1107,6 +1130,7 @@ class AV1ConvolveNonSep2DHighbdTest
   libaom_test::ACMRandom rnd_;
   static constexpr int kMaxPrecisionBeforeOverflow = 12;
   static constexpr int kNumSymmetricTaps = 12;
+  static constexpr int kNumSymmetricTapsChroma = 6;
   static constexpr int kMaxTapOffset = 3;  // Filters are 7x7.
   static constexpr int kSpeedIterations = 10000;
   static constexpr int kTestIterations = 100;
@@ -1171,6 +1195,12 @@ class AV1ConvolveNonSep2DHighbdTest
 #endif  // USE_CENTER_WIENER_NONSEP
   };
 
+  const int WienerNonsepConfigChroma_[12][3] = {
+    { 1, 0, 0 }, { -1, 0, 0 },  { 0, 1, 1 },  { 0, -1, 1 },
+    { 1, 1, 2 }, { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 },
+    { 2, 0, 4 }, { -2, 0, 4 },  { 0, 2, 5 },  { 0, -2, 5 },
+  };
+
   // Filters use only the first (2 * kNumSymmetricTaps) taps. Center tap is
   // constrained.
   const NonsepFilterConfig UnitSumFilterConfig_ = {
@@ -1182,6 +1212,17 @@ class AV1ConvolveNonSep2DHighbdTest
 #endif  // USE_CENTER_WIENER_NONSEP
     0,
     WienerNonsepConfig_,
+    NULL,
+    0,
+    1
+  };
+
+  // Config used for filtering of chroma when CONFIG_WIENER_NONSEP=1.
+  const NonsepFilterConfig UnitSumFilterConfigChroma_ = {
+    kMaxPrecisionBeforeOverflow,
+    2 * kNumSymmetricTapsChroma,
+    0,
+    WienerNonsepConfigChroma_,
     NULL,
     0,
     1
