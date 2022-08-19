@@ -5364,7 +5364,7 @@ static INLINE int get_disp_order_hint(AV1_COMMON *const cm) {
   // For key frames, the implicit derivation of display_order_hit is not
   // applied.
   if (current_frame->frame_type == KEY_FRAME) return current_frame->order_hint;
-#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
+#endif  // CONFIG_DISPLAY_ORDER_HINT_FIX
   // Derive the exact display order hint from the signaled order_hint.
   // This requires scaling up order_hints corresponding to frame
   // numbers that exceed the number of bits available to send the order_hints.

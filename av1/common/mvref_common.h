@@ -168,7 +168,7 @@ static INLINE int8_t single2comb(int n, const int8_t *const rf) {
   assert(rfr[0] < RANKED_REF0_TO_PRUNE - 1);
   int off = (n + 1) * rfr[0] - rfr[0] * (rfr[0] + 1) / 2;
   int combindex = off + rfr[1] - rfr[0];
-  assert(combindex < 31 && combindex >= 0);
+  assert(combindex >= 0);
   return combindex;
 }
 
@@ -228,7 +228,7 @@ static INLINE void comb2single(int n, int8_t combindex, int8_t *rf) {
   rf[1] = combindex - i + j + rf[0] + 1;
   assert(rf[1] > rf[0]);
 }
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 
 static INLINE int8_t av1_ref_frame_type(const MV_REFERENCE_FRAME *const rf) {
   if (!is_inter_ref_frame(rf[0])) {

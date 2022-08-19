@@ -5720,8 +5720,15 @@ static AOM_INLINE int prune_ref_frame(const AV1_COMP *cpi, const MACROBLOCK *x,
 static AOM_INLINE int is_ref_frame_used_by_compound_ref(
     int ref_frame, int skip_ref_frame_mask) {
 #if CONFIG_NEW_REF_SIGNALING
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   for (int r = INTER_REFS_PER_FRAME; r < INTRA_FRAME; ++r) {
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+    if (!(skip_ref_frame_mask_64 & ((uint64_t)1 << r))) {
+#else
     if (!(skip_ref_frame_mask & (1 << r))) {
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
       MV_REFERENCE_FRAME rf[2];
       av1_set_ref_frame(rf, r);
 #else
@@ -5779,7 +5786,12 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
 #endif  // CONFIG_NEW_REF_SIGNALING
       if (mbmi->partition != PARTITION_NONE &&
           mbmi->partition != PARTITION_SPLIT) {
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+        uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
+        if (skip_ref_frame_mask_64 & ((uint64_t)1 << ref_frame) &&
+#else
         if (skip_ref_frame_mask & (1 << ref_frame) &&
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
             !is_ref_frame_used_by_compound_ref(ref_frame, skip_ref_frame_mask))
           continue;
       }
@@ -5834,7 +5846,12 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
 
       if (mbmi->partition != PARTITION_NONE &&
           mbmi->partition != PARTITION_SPLIT) {
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+        uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
+        if (skip_ref_frame_mask_64 & ((uint64_t)1 << ref_frame)) {
+#else
         if (skip_ref_frame_mask & (1 << ref_frame)) {
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
           continue;
         }
       }
@@ -6123,7 +6140,12 @@ static int inter_mode_search_order_independent_skip(
 
   int skip_motion_mode = 0;
   if (mbmi->partition != PARTITION_NONE && mbmi->partition != PARTITION_SPLIT) {
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+    uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
+    int skip_ref = (int)(skip_ref_frame_mask_64 & ((uint64_t)1 << ref_type));
+#else
     int skip_ref = skip_ref_frame_mask & (1 << ref_type);
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 #if CONFIG_NEW_REF_SIGNALING
     if (ref_type < INTER_REFS_PER_FRAME && skip_ref) {
       // Since the compound ref modes depends on the motion estimation result
@@ -6131,7 +6153,11 @@ static int inter_mode_search_order_independent_skip(
       // point ) If current single ref mode is marked skip, we need to check
       // if it will be used in compound ref modes.
       for (int r = INTER_REFS_PER_FRAME; r < INTRA_FRAME; ++r) {
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+        if (skip_ref_frame_mask_64 & ((uint64_t)1 << r)) continue;
+#else
         if (skip_ref_frame_mask & (1 << r)) continue;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
         MV_REFERENCE_FRAME rf[2];
         av1_set_ref_frame(rf, r);
 #else

@@ -330,7 +330,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       for (j = 0; j < INTER_REFS_PER_FRAME - 1; ++j) {
 #else
       for (j = 0; j < INTER_REFS_PER_FRAME - 2; ++j) {
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
         av1_cost_tokens_from_cdf(mode_costs->comp_ref0_cost[i][j],
                                  fc->comp_ref0_cdf[i][j], NULL);
       }

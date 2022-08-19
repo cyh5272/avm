@@ -175,7 +175,7 @@ typedef struct frame_contexts {
                             [CDF_SIZE(2)];
   aom_cdf_prob comp_ref1_cdf[REF_CONTEXTS][COMPREF_BIT_TYPES]
                             [INTER_REFS_PER_FRAME - 2][CDF_SIZE(2)];
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 #else
   aom_cdf_prob single_ref_cdf[REF_CONTEXTS][SINGLE_REFS - 1][CDF_SIZE(2)];
   aom_cdf_prob comp_ref_type_cdf[COMP_REF_TYPE_CONTEXTS][CDF_SIZE(2)];

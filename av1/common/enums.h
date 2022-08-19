@@ -780,7 +780,7 @@ typedef uint8_t TXFM_CONTEXT;
 #else
 #define MODE_CTX_REF_FRAMES \
   (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 1)
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 #endif  // CONFIG_TIP
 // With k=INTER_REFS_PER_FRAMES, indices 0 to k-1 represent rank 1 to rank k
 // references. The next k(k-1)/2 indices are left for compound reference types

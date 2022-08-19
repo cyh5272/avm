@@ -1074,7 +1074,7 @@ typedef struct {
    * Number of references for the compound mode with the same slot.
    */
   int num_same_ref_compound;
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 } RefFramesInfo;
 #endif  // CONFIG_NEW_REF_SIGNALING
 

@@ -1545,13 +1545,13 @@ static AOM_INLINE void read_compound_ref(
   const int n_refs = ref_frames_info->num_total_refs;
 #if !CONFIG_ALLOW_SAME_REF_COMPOUND
   assert(n_refs >= 2);
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   int n_bits = 0;
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
   for (int i = 0; i < n_refs - 1 && n_bits < 2; i++) {
 #else
   for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
     // bit_type: -1 for ref0, 0 for opposite sided ref1, 1 for same sided ref1
     const int bit_type = n_bits == 0 ? -1
                                      : av1_get_compound_ref_bit_type(
@@ -1574,7 +1574,7 @@ static AOM_INLINE void read_compound_ref(
   if (n_bits < 1) ref_frame[0] = n_refs - 1;
 #else
   if (n_bits < 1) ref_frame[0] = n_refs - 2;
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 }
 #else
 #define READ_REF_BIT(pname) \

@@ -1914,7 +1914,7 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
 
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
   if (mbmi->ref_frame[0] == mbmi->ref_frame[1]) return SIMPLE_TRANSLATION;
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 
   if (xd->cur_frame_force_integer_mv == 0) {
     const TransformationType gm_type = gm_params[mbmi->ref_frame[0]].wmtype;

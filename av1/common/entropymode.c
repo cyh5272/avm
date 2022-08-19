@@ -1002,7 +1002,7 @@ static const aom_cdf_prob
     default_comp_ref0_cdf[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1]
 #else
     default_comp_ref0_cdf[REF_CONTEXTS][INTER_REFS_PER_FRAME - 2]
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
                          [CDF_SIZE(2)] = { { { AOM_CDF2(9565) },
                                              { AOM_CDF2(20372) },
                                              { AOM_CDF2(26108) },

@@ -676,7 +676,7 @@ static AOM_INLINE void write_compound_ref(
 #else
   assert(n_refs >= 2);
   assert(ref0 < ref1);
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   int n_bits = 0;
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
   for (int i = 0; i < n_refs - 1 && n_bits < 2; i++) {
@@ -704,7 +704,7 @@ static AOM_INLINE void write_compound_ref(
 #if !CONFIG_ALLOW_SAME_REF_COMPOUND
   assert(IMPLIES(n_bits < 2, AOMMAX(ref0, ref1) == n_refs - 1));
   assert(IMPLIES(n_bits < 1, AOMMIN(ref0, ref1) == n_refs - 2));
-#endif
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 }
 #else
 #define WRITE_REF_BIT(bname, pname) \
