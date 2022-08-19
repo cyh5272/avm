@@ -1179,7 +1179,11 @@ typedef struct macroblock {
    * within a superblock, in MI resolution. They can be used to prune ref frames
    * for rectangular blocks.
    */
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  uint64_t picked_ref_frames_mask[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#else
   int picked_ref_frames_mask[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 
   /**@}*/
 

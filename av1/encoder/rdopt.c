@@ -5718,14 +5718,15 @@ static AOM_INLINE int prune_ref_frame(const AV1_COMP *cpi, const MACROBLOCK *x,
 #endif  // CONFIG_NEW_REF_SIGNALING
 
 static AOM_INLINE int is_ref_frame_used_by_compound_ref(
-    int ref_frame, int skip_ref_frame_mask) {
-#if CONFIG_NEW_REF_SIGNALING
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-  uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
+    int ref_frame, uint64_t skip_ref_frame_mask) {
+#else
+    int ref_frame, int skip_ref_frame_mask) {
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
+#if CONFIG_NEW_REF_SIGNALING
   for (int r = INTER_REFS_PER_FRAME; r < INTRA_FRAME; ++r) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-    if (!(skip_ref_frame_mask_64 & ((uint64_t)1 << r))) {
+    if (!(skip_ref_frame_mask & ((uint64_t)1 << r))) {
 #else
     if (!(skip_ref_frame_mask & (1 << r))) {
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -5752,7 +5753,12 @@ static AOM_INLINE int is_ref_frame_used_by_compound_ref(
 // and easy to read and maintain.
 static AOM_INLINE void set_params_rd_pick_inter_mode(
     const AV1_COMP *cpi, MACROBLOCK *x, HandleInterModeArgs *args,
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+    BLOCK_SIZE bsize, mode_skip_mask_t *mode_skip_mask,
+    uint64_t skip_ref_frame_mask,
+#else
     BLOCK_SIZE bsize, mode_skip_mask_t *mode_skip_mask, int skip_ref_frame_mask,
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
     unsigned int *ref_costs_single, unsigned int (*ref_costs_comp)[REF_FRAMES],
     struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE]) {
   const AV1_COMMON *const cm = &cpi->common;
@@ -5787,8 +5793,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
       if (mbmi->partition != PARTITION_NONE &&
           mbmi->partition != PARTITION_SPLIT) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-        uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
-        if (skip_ref_frame_mask_64 & ((uint64_t)1 << ref_frame) &&
+        if (skip_ref_frame_mask & ((uint64_t)1 << ref_frame) &&
 #else
         if (skip_ref_frame_mask & (1 << ref_frame) &&
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -5847,8 +5852,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
       if (mbmi->partition != PARTITION_NONE &&
           mbmi->partition != PARTITION_SPLIT) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-        uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
-        if (skip_ref_frame_mask_64 & ((uint64_t)1 << ref_frame)) {
+        if (skip_ref_frame_mask & ((uint64_t)1 << ref_frame)) {
 #else
         if (skip_ref_frame_mask & (1 << ref_frame)) {
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -6087,8 +6091,12 @@ static int inter_mode_compatible_skip(const AV1_COMP *cpi, const MACROBLOCK *x,
   return 0;
 }
 
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+static uint64_t fetch_picked_ref_frames_mask(const MACROBLOCK *const x,
+#else
 static int fetch_picked_ref_frames_mask(const MACROBLOCK *const x,
-                                        BLOCK_SIZE bsize, int mib_size) {
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
+                                             BLOCK_SIZE bsize, int mib_size) {
   const int sb_size_mask = mib_size - 1;
   const MACROBLOCKD *const xd = &x->e_mbd;
   const int mi_row = xd->mi_row;
@@ -6097,7 +6105,11 @@ static int fetch_picked_ref_frames_mask(const MACROBLOCK *const x,
   const int mi_col_in_sb = mi_col & sb_size_mask;
   const int mi_w = mi_size_wide[bsize];
   const int mi_h = mi_size_high[bsize];
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  uint64_t picked_ref_frames_mask = 0;
+#else
   int picked_ref_frames_mask = 0;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   for (int i = mi_row_in_sb; i < mi_row_in_sb + mi_h; ++i) {
     for (int j = mi_col_in_sb; j < mi_col_in_sb + mi_w; ++j) {
       picked_ref_frames_mask |= x->picked_ref_frames_mask[i * 32 + j];
@@ -6112,13 +6124,20 @@ static int fetch_picked_ref_frames_mask(const MACROBLOCK *const x,
 // modes
 static int inter_mode_search_order_independent_skip(
     const AV1_COMP *cpi, const MACROBLOCK *x, mode_skip_mask_t *mode_skip_mask,
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+    InterModeSearchState *search_state, uint64_t skip_ref_frame_mask,
+#else
     InterModeSearchState *search_state, int skip_ref_frame_mask,
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
     PREDICTION_MODE mode, const MV_REFERENCE_FRAME *ref_frame) {
   if (mask_says_skip(mode_skip_mask, ref_frame, mode)) {
     return 1;
   }
-
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  const uint8_t ref_type = av1_ref_frame_type(ref_frame);
+#else
   const int ref_type = av1_ref_frame_type(ref_frame);
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUNDs
   if (prune_ref_frame(cpi, x, ref_type)) return 1;
 
   // This is only used in motion vector unit test.
@@ -6141,8 +6160,7 @@ static int inter_mode_search_order_independent_skip(
   int skip_motion_mode = 0;
   if (mbmi->partition != PARTITION_NONE && mbmi->partition != PARTITION_SPLIT) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-    uint64_t skip_ref_frame_mask_64 = (uint64_t)skip_ref_frame_mask;
-    int skip_ref = (int)(skip_ref_frame_mask_64 & ((uint64_t)1 << ref_type));
+    int skip_ref = (int)(skip_ref_frame_mask & ((uint64_t)1 << ref_type));
 #else
     int skip_ref = skip_ref_frame_mask & (1 << ref_type);
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -6154,7 +6172,7 @@ static int inter_mode_search_order_independent_skip(
       // if it will be used in compound ref modes.
       for (int r = INTER_REFS_PER_FRAME; r < INTRA_FRAME; ++r) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-        if (skip_ref_frame_mask_64 & ((uint64_t)1 << r)) continue;
+        if (skip_ref_frame_mask & ((uint64_t)1 << r)) continue;
 #else
         if (skip_ref_frame_mask & (1 << r)) continue;
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -6765,7 +6783,11 @@ typedef struct {
   int *skip_motion_mode;
   mode_skip_mask_t *mode_skip_mask;
   InterModeSearchState *search_state;
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  uint64_t skip_ref_frame_mask;
+#else
   int skip_ref_frame_mask;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   int reach_first_comp_mode;
   int mode_thresh_mul_fact;
   int *num_single_modes_processed;
@@ -7166,7 +7188,11 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   av1_invalid_rd_stats(rd_cost);
 
   // Ref frames that are selected by square partition blocks.
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  uint64_t picked_ref_frames_mask = 0;
+#else
   int picked_ref_frames_mask = 0;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   if (cpi->sf.inter_sf.prune_ref_frame_for_rect_partitions &&
       mbmi->partition != PARTITION_NONE && mbmi->partition != PARTITION_SPLIT) {
     // prune_ref_frame_for_rect_partitions = 1 implies prune only extended
@@ -7181,8 +7207,13 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
   }
 
   // Skip ref frames that never selected by square blocks.
+#if CONFIG_ALLOW_SAME_REF_COMPOUND
+  const uint64_t skip_ref_frame_mask =
+      picked_ref_frames_mask ? ~picked_ref_frames_mask : 0;
+#else
   const int skip_ref_frame_mask =
       picked_ref_frames_mask ? ~picked_ref_frames_mask : 0;
+#endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
   mode_skip_mask_t mode_skip_mask;
   unsigned int ref_costs_single[SINGLE_REF_FRAMES];
   struct buf_2d yv12_mb[SINGLE_REF_FRAMES][MAX_MB_PLANE];
