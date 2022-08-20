@@ -474,10 +474,9 @@ static INLINE void init_encode_rd_sb(AV1_COMP *cpi, ThreadData *td,
   const AV1_COMMON *cm = &cpi->common;
   const TileInfo *tile_info = &tile_data->tile_info;
   MACROBLOCK *x = &td->mb;
-#if CONFIG_FLEX_MVRES
   MACROBLOCKD *const xd = &x->e_mbd;
   SB_INFO *sbi = xd->sbi;
-#endif
+  (void)sbi;
 
   const SPEED_FEATURES *sf = &cpi->sf;
   const int use_simple_motion_search =
@@ -489,10 +488,6 @@ static INLINE void init_encode_rd_sb(AV1_COMP *cpi, ThreadData *td,
   if (use_simple_motion_search) {
     init_simple_motion_search_mvs(sms_root);
   }
-
-#if CONFIG_FLEX_MVRES
-  (void)sbi;
-#endif
 
   init_ref_frame_space(cpi, td, mi_row, mi_col);
   x->sb_energy_level = 0;
@@ -1519,6 +1514,12 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
 #endif  // CONFIG_SMVP_IMPROVEMENT
 #if CONFIG_COLLECT_COMPONENT_TIMING
   end_timing(cpi, av1_setup_motion_field_time);
+#endif
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  if (cm->features.allow_ref_frame_mvs) {
+    av1_fill_hole_smooth_single_ref_mv_field(cm);
+  }
 #endif
 
 #if CONFIG_TIP

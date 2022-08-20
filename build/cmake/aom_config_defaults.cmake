@@ -205,6 +205,8 @@ set_aom_config_var(CONFIG_OPTFLOW_ON_TIP 1
                    "Enable optical flow refinement on top of TIP")
 set_aom_config_var(CONFIG_FLEX_MVRES 1
                    "AV2 flexible mv precision experiment flag")
+set_aom_config_var(CONFIG_TEMPORAL_GLOBAL_MV 0
+                   "AV2 experiment flag for temporal global MV")
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1

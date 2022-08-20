@@ -2239,10 +2239,9 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
   int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
   int pts[SAMPLES_ARRAY_SIZE], pts_inref[SAMPLES_ARRAY_SIZE];
   MACROBLOCKD *const xd = &dcb->xd;
-#if CONFIG_FLEX_MVRES
   SB_INFO *sbi = xd->sbi;
-#endif
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+  (void)sbi;
 
   mbmi->uv_mode = UV_DC_PRED;
   mbmi->palette_mode_info.palette_size[0] = 0;

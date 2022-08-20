@@ -278,4 +278,10 @@ int av1_find_projection(int np, const int *pts1, const int *pts2,
                         WarpedMotionParams *wm_params, int mi_row, int mi_col);
 
 int av1_get_shear_params(WarpedMotionParams *wm);
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
+                                      WarpedMotionParams *wm_params, int mi_row,
+                                      int mi_col);
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
 #endif  // AOM_AV1_COMMON_WARPED_MOTION_H_
