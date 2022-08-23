@@ -50,9 +50,11 @@ extern const int16_t dst7_32x32[32][32];
 #endif  // CONFIG_DDT_INTER
 
 #if CONFIG_CROSS_CHROMA_TX
+#define CCTX_INTER 1
+#define CCTX_INTRA 1
 #define CCTX_DC_ONLY 0
 #define CCTX_PREC_BITS 8
-extern const int32_t cctx_mtx[4];
+extern const int32_t cctx_mtx[CCTX_TYPES - 1][2];
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 #define MAX_TXFM_STAGE_NUM 12

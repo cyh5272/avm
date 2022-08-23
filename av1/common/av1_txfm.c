@@ -197,8 +197,61 @@ const int16_t
 #endif  // CONFIG_DST_32X32
 
 #if CONFIG_CROSS_CHROMA_TX
-// Haar transform [1, 1; 1, -1] * 1/sqrt(2) * (1<<CCTX_PREC_BITS)
-const int32_t cctx_mtx[4] = { 181, 181, 181, -181 };
+// Given a rotation angle t, the CCTX transform matrix is defined as
+// [cos(t), sin(t); -sin(t), cos(t)] * 1<<CCTX_PREC_BITS). The array below only
+// stores two values: cos(t) and sin(t) for each rotation angle.
+const int32_t cctx_mtx[CCTX_TYPES - 1][2] = {
+#if CCTX_ANGLE_CONFIG == 0
+#if CCTX_POS_ANGLES
+  { 181, 181 },  // t = 45 degrees
+  { 222, 128 },  // t = 30 degrees
+  { 128, 222 },  // t = 60 degrees
+#endif           // CCTX_POS_ANGLES
+#if CCTX_NEG_ANGLES
+  { 181, -181 },  // t = -45 degrees
+  { 222, -128 },  // t = -30 degrees
+  { 128, -222 },  // t = -60 degrees
+#endif            // CCTX_NEG_ANGLES
+#elif CCTX_ANGLE_CONFIG == 1
+#if CCTX_POS_ANGLES
+  { 181, 181 },   // t = 45 degrees
+  { 236, 98 },    // t = 22.5 degrees
+  { 98, 236 },    // t = 67.5 degrees
+#endif  // CCTX_POS_ANGLES
+#if CCTX_NEG_ANGLES
+  { 181, -181 },  // t = -45 degrees
+  { 236, -98 },   // t = -22.5 degrees
+  { 98, -236 },   // t = -67.5 degrees
+#endif  // CCTX_NEG_ANGLES
+#elif CCTX_ANGLE_CONFIG == 2
+#if CCTX_POS_ANGLES
+  { 181, 181 },   // t = 45 degrees
+  { 232, 108 },   // t = 25 degrees
+  { 108, 232 },   // t = 65 degrees
+#endif  // CCTX_POS_ANGLES
+#if CCTX_NEG_ANGLES
+  { 181, -181 },  // t = -45 degrees
+  { 232, -108 },  // t = -25 degrees
+  { 108, -232 },  // t = -65 degrees
+#endif  // CCTX_NEG_ANGLES
+#elif CCTX_ANGLE_CONFIG == 3
+#if CCTX_POS_ANGLES
+  { 222, 128 },   // t = 30 degrees
+  { 128, 222 },   // t = 60 degrees
+#endif  // CCTX_POS_ANGLES
+#if CCTX_NEG_ANGLES
+  { 222, -128 },  // t = -30 degrees
+  { 128, -222 },  // t = -60 degrees
+#endif  // CCTX_NEG_ANGLES
+#elif CCTX_ANGLE_CONFIG == 4
+#if CCTX_POS_ANGLES
+  { 181, 181 },   // t = 45 degrees
+#endif  // CCTX_POS_ANGLES
+#if CCTX_NEG_ANGLES
+  { 181, -181 },  // t = -45 degrees
+#endif  // CCTX_NEG_ANGLES
+#endif
+};
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 // av1_sinpi_arr_data[i][j] = (int)round((sqrt(2) * sin(j*Pi/9) * 2 / 3) * (1
