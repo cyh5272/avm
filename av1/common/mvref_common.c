@@ -649,9 +649,7 @@ static AOM_INLINE void update_processed_cols(const MACROBLOCKD *xd, int mi_row,
                                              int col_offset, int max_col_offset,
                                              int *processed_cols) {
   const TileInfo *const tile = &xd->tile;
-  POSITION mi_pos;
-  mi_pos.row = row_offset;
-  mi_pos.col = col_offset;
+  const POSITION mi_pos = { row_offset, col_offset };
   if (is_inside(tile, mi_col, mi_row, &mi_pos)) {
     const MB_MODE_INFO *const candidate =
         xd->mi[row_offset * xd->mi_stride + col_offset];
@@ -660,8 +658,8 @@ static AOM_INLINE void update_processed_cols(const MACROBLOCKD *xd, int mi_row,
         candidate->sb_type[xd->tree_type == CHROMA_PART];
     const int n4_h = mi_size_high[candidate_bsize];
     if (xd->height >= n8_h_8 && xd->height <= n4_h) {
-      int inc = AOMMIN(-max_col_offset + col_offset + 1,
-                       mi_size_wide[candidate_bsize]);
+      const int inc = AOMMIN(-max_col_offset + col_offset + 1,
+                             mi_size_wide[candidate_bsize]);
       // Update processed cols.
       *processed_cols = inc - col_offset - 1;
     }
