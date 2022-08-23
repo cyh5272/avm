@@ -635,9 +635,14 @@ void av1_convolve_symmetric_highbd_avx2(const uint16_t *dgd, int stride,
   }
 }
 
-// AVX2 intrinsic for convolve wiener non-separable loop restoration with 6-tap
-// filtering. The output for a particular pixel in a 4x4 block is calculated
-// with DIAMOND shaped filter considering a 5x5 grid surrounded by that pixel.
+// TODO(Arun Negi): Difference of source and center pixel needs to go through
+// clip_base(). Implement clip_base() in intrinsic once the support is added.
+//
+// Implementation of DIAMOND shaped 6-tap filtering for block size of 4x4.
+// The output for a particular pixel in a 4x4 block is calculated by considering
+// a 5x5 grid surrounded by that pixel. The registers accum_out_r0r1 and
+// accum_out_r2r3 are used to store the output. The following describes the
+// algorithm briefly.
 // Filter Coefficients: fc0 fc1 fc2 fc3 fc4 fc5 x x
 // Load Source Data:
 // src_ra0 = a0 a1 a2 a3 a4 a5 a6 a7
@@ -666,20 +671,13 @@ void av1_convolve_symmetric_highbd_avx2(const uint16_t *dgd, int stride,
 //                   = ((a2-c2)*fc4+(e2-c2)*fc4) (a3-c3)*fc4+(e3-c3)*fc4) .. |
 //                   (b2-d2)*fc4 +(f2-d2)*fc4) . .
 // Here, out_f4_01 contains partial output of rows 0 and 1 corresponding to fc4.
-void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
-    const uint16_t *dgd, int stride, const NonsepFilterConfig *filter_config,
-    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
-    int block_row_begin, int block_col_begin) {
-  // Derive singleton_tap and dc_offset.
-  const int32_t singleton_tap = 1 << filter_config->prec_bits;
-  int32_t dc_offset = 0;
-  if (filter_config->num_pixels % 2) {
-    const int dc_offset_tap_index =
-        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
-    dc_offset = filter[dc_offset_tap_index];
-  }
-
-  // Load source data.
+static INLINE void apply_6tap_filtering(const uint16_t *dgd, int stride,
+                                        const __m128i filt_coeff,
+                                        __m256i *accum_out_r0r1,
+                                        __m256i *accum_out_r2r3,
+                                        int block_row_begin,
+                                        int block_col_begin) {
+  // Load source data
   const int src_index_start = block_row_begin * stride + block_col_begin;
   const uint16_t *src_ptr = dgd + src_index_start - 2 * stride - 2;
   const __m128i src_a0 = _mm_loadu_si128((__m128i const *)src_ptr);
@@ -696,13 +694,6 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
       _mm_loadu_si128((__m128i const *)(src_ptr + 6 * stride));
   const __m128i src_h0 =
       _mm_loadu_si128((__m128i const *)(src_ptr + 7 * stride));
-
-  // Load filter tap values.
-  // fc0 fc1 fc2 fc3 fc4 fc5 center_tap x
-  const __m128i filt_coeff_0 = _mm_loadu_si128((__m128i const *)(filter));
-  // Replace the center_tap with derived singleton_tap.
-  const __m128i center_tap = _mm_set1_epi16(singleton_tap);
-  const __m128i filt_coeff_1 = _mm_blend_epi16(filt_coeff_0, center_tap, 0x40);
 
   // Form 256bit source registers.
   // a0 a1 a2 a3 a4 a5 a6 a7 | b0 b1 b2 b3 b4 b5 b6 b7
@@ -767,11 +758,12 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
   const __m256i ru9 = _mm256_sub_epi16(ru9_0, center_pixel_row23_0);
 
   // f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4 f4
-  const __m256i fc4 = _mm256_set1_epi16(filter[4]);
+  const __m256i fc4 =
+      _mm256_broadcastd_epi32(_mm_unpackhi_epi16(filt_coeff, filt_coeff));
   // r00 r01 r02 r03 | r10 r11 r12 r13
-  __m256i accum_out_r0r1 = _mm256_madd_epi16(ru8, fc4);
+  __m256i out_f4_r0r1 = _mm256_madd_epi16(ru8, fc4);
   // r20 r21 r22 r23 | r30 r31 r32 r33
-  __m256i accum_out_r2r3 = _mm256_madd_epi16(ru9, fc4);
+  __m256i out_f4_r2r3 = _mm256_madd_epi16(ru9, fc4);
 
   // Output corresponding to filter coefficient 2, 0, 3.
   // b1 d1 b2 d2 b3 d3 b4 d4 | c1 e1 c2 e2 c3 e3 c4 e4
@@ -797,12 +789,12 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
 
   // f2 f3 f2 f3 - - - -
   const __m256i fc23 =
-      _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt_coeff_0, 0x0E));
+      _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt_coeff, 0x0E));
   // f0 f0 f0 f0 - - - -
-  const __m256i fc00 = _mm256_set1_epi16(filter[0]);
+  const __m256i fc00 = _mm256_broadcastw_epi16(filt_coeff);
   // f3 f2 f3 f2 - - - -
   const __m256i fc32 =
-      _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt_coeff_0, 0x0B));
+      _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt_coeff, 0x0B));
 
   const __m256i res_0 = _mm256_madd_epi16(ru10, fc23);
   const __m256i res_1 = _mm256_madd_epi16(ru11, fc23);
@@ -814,11 +806,13 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
   // r00 r01 r02 r03 | r10 r11 r12 r13
   const __m256i out_0 = _mm256_add_epi32(res_0, res_2);
   const __m256i out_1 = _mm256_add_epi32(res_4, out_0);
-  accum_out_r0r1 = _mm256_add_epi32(accum_out_r0r1, out_1);
+  out_f4_r0r1 = _mm256_add_epi32(out_f4_r0r1, out_1);
+  *accum_out_r0r1 = _mm256_add_epi32(out_f4_r0r1, *accum_out_r0r1);
   // r20 r21 r22 r23 | r30 r31 r32 r33
   const __m256i out_2 = _mm256_add_epi32(res_1, res_3);
   const __m256i out_3 = _mm256_add_epi32(res_5, out_2);
-  accum_out_r2r3 = _mm256_add_epi32(accum_out_r2r3, out_3);
+  out_f4_r2r3 = _mm256_add_epi32(out_f4_r2r3, out_3);
+  *accum_out_r2r3 = _mm256_add_epi32(out_f4_r2r3, *accum_out_r2r3);
 
   // Output corresponding to filter coefficient 5, 1, 6.
   // c0 c1 c1 c2 c2 c3 c3 c4 || d0 d1 d1 d2 d2 d3 d3 d4
@@ -844,12 +838,12 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
 
   // f5 f1 f5 f1 - - - -
   const __m128i filt51 =
-      _mm_blend_epi16(filt_coeff_0, _mm_bsrli_si128(filt_coeff_0, 4), 0x08);
+      _mm_blend_epi16(filt_coeff, _mm_bsrli_si128(filt_coeff, 4), 0x08);
   const __m256i fc51 =
       _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt51, 0x07));
   // f6 f1 f6 f1 - - - -
   const __m128i filt61 =
-      _mm_blend_epi16(filt_coeff_1, _mm_bsrli_si128(filt_coeff_1, 6), 0x08);
+      _mm_blend_epi16(filt_coeff, _mm_bsrli_si128(filt_coeff, 6), 0x08);
   const __m256i fc61 =
       _mm256_broadcastd_epi32(_mm_shufflelo_epi16(filt61, 0x07));
   // f5 0 f5 0 f5 0 f5 0 - -
@@ -865,12 +859,23 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
   // r00 r01 r02 r03 | r10 r11 r12 r13
   const __m256i out_4 = _mm256_add_epi32(res_6, res_8);
   const __m256i out_5 = _mm256_add_epi32(res_10, out_4);
-  accum_out_r0r1 = _mm256_add_epi32(accum_out_r0r1, out_5);
+  *accum_out_r0r1 = _mm256_add_epi32(*accum_out_r0r1, out_5);
   // r20 r21 r22 r23 | r30 r31 r32 r33
   const __m256i out_6 = _mm256_add_epi32(res_7, res_9);
   const __m256i out_7 = _mm256_add_epi32(res_11, out_6);
-  accum_out_r2r3 = _mm256_add_epi32(accum_out_r2r3, out_7);
+  *accum_out_r2r3 = _mm256_add_epi32(*accum_out_r2r3, out_7);
+}
 
+// The registers accum_out_r0r1 and accum_out_r2r3 holds the filtered output.
+// This function adds the dc_offset to filtered output and perform round,
+// clip operations before storing it to the destination.
+static INLINE void round_and_store_avx2(const uint16_t *dst, int dst_stride,
+                                        int32_t dc_offset,
+                                        const NonsepFilterConfig *filter_config,
+                                        int bit_depth, __m256i accum_out_r0r1,
+                                        __m256i accum_out_r2r3,
+                                        int block_row_begin,
+                                        int block_col_begin) {
   // Offset addition
   const __m128i offset_reg = _mm_set1_epi32(dc_offset);
   const __m256i ofs = _mm256_inserti128_si256(
@@ -901,6 +906,74 @@ void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
                    _mm_bsrli_si128(out_r1r3, 8));
 }
 
+// AVX2 intrinsic for convolve wiener non-separable loop restoration with 6-tap
+// filtering. The output for a particular pixel in a 4x4 block is calculated
+// with DIAMOND shaped filter considering a 5x5 grid surrounded by that pixel.
+// Filter Coefficients: fc0 fc1 fc2 fc3 fc4 fc5 x x
+// Load Source Data:
+// src_ra0 = a0 a1 a2 a3 a4 a5 a6 a7
+// src_rb0 = b0 b1 b2 b3 b4 b5 b6 b7
+// src_rc0 = c0 c1 c2 c3 c4 c5 c6 c7
+// src_rd0 = d0 d1 d2 d3 d4 d5 d6 d7
+// src_re0 = e0 e1 e2 e3 e4 e5 e6 e7
+// src_rf0 = f0 f1 f2 f3 f4 f5 f6 f7
+// src_rg0 = g0 g1 g2 g3 g4 g5 g6 g7
+// The output for a pixel located at c2 position is calculated as below.
+// Filtered_c2 = ((a2-c2)+(e2-c2))*fc4 + ((b1-c2+d3-c2))*fc2 +
+// (b2-c2+d2-c2)*fc0 + (b3-c2+d1-c2)*fc3 + (c0-c2+c4-c2)*fc5 +
+// (c1-c2+c3-c2)*fc1 + c2*singleton_tap + dc_offset
+// The source registers are unpacked such that the output corresponding to 2
+// rows will be produced in a single register (i.e., processing 2 rows
+// simultaneously).
+//
+// Example:
+// The output corresponding to fc4 of rows 0 and 1 is achieved like below.
+// __m256i centerpixel_row01 = c2 c2 c3 c3 c4 c4 c5 c5 | d2 d2 d3 d3 d4 d4 d5 d5
+// __m256i src_reg3 = a2 e2 a3 e3 a4 e4 a5 e5 | b2 f2 b3 f3 b4 f4 b5 f5
+// __m256i filter_4 = fc4 fc4 fc4 fc4 fc4 fc4 fc4 fc4 | fc4 fc4 fc4 fc4 fc4 fc4
+// fc4 fc4
+// __m256 src_reg3 = _mm256_sub_epi16(src_reg3, centerpixel_row01);
+//  __m256i out_f4_01 = _mm256_madd_epi16(src_reg3, filter_4);
+//                   = ((a2-c2)*fc4+(e2-c2)*fc4) (a3-c3)*fc4+(e3-c3)*fc4) .. |
+//                   (b2-d2)*fc4 +(f2-d2)*fc4) . .
+// Here, out_f4_01 contains partial output of rows 0 and 1 corresponding to fc4.
+void av1_convolve_symmetric_subtract_center_highbd_6tap_avx2(
+    const uint16_t *dgd, int stride, const NonsepFilterConfig *filter_config,
+    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
+    int block_row_begin, int block_col_begin) {
+  // Derive singleton_tap and dc_offset.
+  const int32_t singleton_tap = 1 << filter_config->prec_bits;
+  int32_t dc_offset = 0;
+  if (filter_config->num_pixels % 2) {
+    const int dc_offset_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    dc_offset = filter[dc_offset_tap_index];
+  }
+
+  // Load filter tap values.
+  // fc0 fc1 fc2 fc3 fc4 fc5 center_tap x
+  const __m128i filt_coeff_0 = _mm_loadu_si128((__m128i const *)(filter));
+  // Replace the center_tap with derived singleton_tap.
+  const __m128i center_tap = _mm_set1_epi16(singleton_tap);
+  const __m128i filt_coeff = _mm_blend_epi16(filt_coeff_0, center_tap, 0x40);
+
+  // Initializing the output registers with zero
+  __m256i accum_out_r0r1 = _mm256_setzero_si256();
+  __m256i accum_out_r2r3 = _mm256_setzero_si256();
+
+  // Perform 6-tap filtering on source buffer
+  apply_6tap_filtering(dgd, stride, filt_coeff, &accum_out_r0r1,
+                       &accum_out_r2r3, block_row_begin, block_col_begin);
+
+  // Store the output after rounding and clipping
+  round_and_store_avx2(dst, dst_stride, dc_offset, filter_config, bit_depth,
+                       accum_out_r0r1, accum_out_r2r3, block_row_begin,
+                       block_col_begin);
+}
+
+// TODO(Arun Negi): Difference of source and center pixel needs to go through
+// clip_base(). Implement clip_base() in intrinsic once the support is added.
+//
 // AVX2 intrinsic for convolve wiener non-separable loop restoration with
 // 12/13-tap filtering. The output for a particular pixel in a 4x4 block is
 // calculated with DIAMOND shaped filter considering a 7x7 grid surrounded by
@@ -1378,4 +1451,108 @@ void av1_convolve_symmetric_subtract_center_highbd_avx2(
         block_row_begin, block_col_begin);
     return;
   }
+}
+
+// AVX2 intrinsic for convolve wiener non-separable dual loop restoration
+// filtering. The output for a particular pixel in a 4x4 block is calculated
+// with DIAMOND shaped filter considering a 5x5 grid surrounded by that pixel.
+// Filter Coefficients: fc0 fc1 fc2 fc3 fc4 fc5 f6 f7 f8 f9 f10 f11
+// 6-tap filtering for dgd (first) buffer:
+// dgd_reg_a = a0 a1 a2 a3 a4 a5 a6 a7
+// dgd_reg_b = b0 b1 b2 b3 b4 b5 b6 b7
+// dgd_reg_c = c0 c1 c2 c3 c4 c5 c6 c7
+// dgd_reg_d = d0 d1 d2 d3 d4 d5 d6 d7
+// dgd_reg_e = e0 e1 e2 e3 e4 e5 e6 e7
+// The output for a pixel located at c2 position is calculated as below.
+// dgd_output_c2 = ((a2-c2)+(e2-c2))*fc4 + ((b1-c2+d3-c2))*fc2 +
+// (b2-c2+d2-c2)*fc0 + (b3-c2+d1-c2)*fc3 + (c0-c2+c4-c2)*fc5 +
+// (c1-c2+c3-c2)*fc1 + c2*singleton_tap + dc_offset
+//
+// 6-tap filtering for dgd_dual (second) buffer:
+// dgd_dual_reg_a = a0 a1 a2 a3 a4 a5 a6 a7
+// dgd_dual_reg_b = b0 b1 b2 b3 b4 b5 b6 b7
+// dgd_dual_reg_c = c0 c1 c2 c3 c4 c5 c6 c7
+// dgd_dual_reg_d = d0 d1 d2 d3 d4 d5 d6 d7
+// dgd_dual_reg_e = e0 e1 e2 e3 e4 e5 e6 e7
+// dgd_dual_output_c2 = ((a2-c2)+(e2-c2))*fc10 + ((b1-c2+d3-c2))*fc8 +
+// (b2-c2+d2-c2)*fc6 + (b3-c2+d1-c2)*fc9 + (c0-c2+c4-c2)*fc11 +
+// (c1-c2+c3-c2)*fc7
+// output_c2 = dgd_output_c2 + dgd_dual_output_c2
+// The source registers are unpacked such that the output corresponding to 2
+// rows will be produced in a single register (i.e., processing 2 rows
+// simultaneously).
+//
+// Example:
+// The output corresponding to fc4 of rows 0 and 1 is achieved like below.
+// __m256i centerpixel_row01 = c2 c2 c3 c3 c4 c4 c5 c5 | d2 d2 d3 d3 d4 d4 d5 d5
+// __m256i src_reg3 = a2 e2 a3 e3 a4 e4 a5 e5 | b2 f2 b3 f3 b4 f4 b5 f5
+// __m256i filter_4 = fc4 fc4 fc4 fc4 fc4 fc4 fc4 fc4 | fc4 fc4 fc4 fc4 fc4 fc4
+// fc4 fc4
+// __m256 src_reg3 = _mm256_sub_epi16(src_reg3, centerpixel_row01);
+//  __m256i out_f4_01 = _mm256_madd_epi16(src_reg3, filter_4);
+//                   = ((a2-c2)*fc4+(e2-c2)*fc4) (a3-c3)*fc4+(e3-c3)*fc4) .. |
+//                   (b2-d2)*fc4 +(f2-d2)*fc4) . .
+// Here, out_f4_01 contains partial output of rows 0 and 1 corresponding to fc4.
+void av1_convolve_symmetric_dual_subtract_center_highbd_avx2(
+    const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual,
+    int dgd_dual_stride, const NonsepFilterConfig *filter_config,
+    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
+    int block_row_begin, int block_row_end, int block_col_begin,
+    int block_col_end) {
+  assert(filter_config->subtract_center);
+
+  const int num_rows = block_row_end - block_row_begin;
+  const int num_cols = block_col_end - block_col_begin;
+  const int num_sym_taps = filter_config->num_pixels / 2;
+  const int num_sym_taps_dual = filter_config->num_pixels2 / 2;
+
+  // SIMD is mainly implemented for diamond shape filter with 6 taps for a block
+  // size of 4x4. For any other cases invoke the C function.
+  if (num_rows != 4 || num_cols != 4 || num_sym_taps != 6 ||
+      num_sym_taps_dual != 6) {
+    av1_convolve_symmetric_dual_subtract_center_highbd_c(
+        dgd, dgd_stride, dgd_dual, dgd_dual_stride, filter_config, filter, dst,
+        dst_stride, bit_depth, block_row_begin, block_row_end, block_col_begin,
+        block_col_end);
+    return;
+  }
+
+  const int32_t singleton_tap = 1 << filter_config->prec_bits;
+  int32_t dc_offset = 0;
+  if (filter_config->num_pixels % 2) {
+    const int dc_offset_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    dc_offset = filter[dc_offset_tap_index];
+  }
+
+  // Prepare filter coefficients for dgd buffer 6-tap filtering
+  // fc0 fc1 fc2 fc3 fc4 fc5 center_tap x
+  __m128i filter_coeff = _mm_loadu_si128((__m128i const *)(filter));
+  // Replace the center_tap with derived singleton_tap.
+  const __m128i center_tap = _mm_set1_epi16(singleton_tap);
+  const __m128i filter_coeff_dgd =
+      _mm_blend_epi16(filter_coeff, center_tap, 0x40);
+
+  // Prepare filter coefficients for dgd_dual buffer 6-tap filtering
+  // fc6 fc7 fc8 fc9 fc10 fc11 0 0
+  filter_coeff = _mm_loadu_si128((__m128i const *)(filter + 4));
+  const __m128i filter_coeff_dgd_dual = _mm_bsrli_si128(filter_coeff, 4);
+
+  // Initialize the output registers with zero
+  __m256i accum_out_r0r1 = _mm256_setzero_si256();
+  __m256i accum_out_r2r3 = _mm256_setzero_si256();
+
+  // 6-tap filtering for dgd (first) buffer
+  apply_6tap_filtering(dgd, dgd_stride, filter_coeff_dgd, &accum_out_r0r1,
+                       &accum_out_r2r3, block_row_begin, block_col_begin);
+
+  // 6-tap filtering for dgd_dual (second) buffer
+  apply_6tap_filtering(dgd_dual, dgd_dual_stride, filter_coeff_dgd_dual,
+                       &accum_out_r0r1, &accum_out_r2r3, block_row_begin,
+                       block_col_begin);
+
+  // Store the output after rounding and clipping
+  round_and_store_avx2(dst, dst_stride, dc_offset, filter_config, bit_depth,
+                       accum_out_r0r1, accum_out_r2r3, block_row_begin,
+                       block_col_begin);
 }
