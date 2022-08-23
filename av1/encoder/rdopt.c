@@ -1129,18 +1129,18 @@ static AOM_INLINE void estimate_ref_frame_costs(
               const int bit_type =
                   av1_get_compound_ref_bit_type(&cm->ref_frames_info, i, j);
               ref_costs_comp[i][j] +=
-                  mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][1];
+                  mode_costs->comp_ref1_cost[ctx][bit_type][j][1];
               ref_costs_comp[j][i] +=
-                  mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][1];
+                  mode_costs->comp_ref1_cost[ctx][bit_type][j][1];
               // Maintain the cost of sending a 0 bit for the 2nd reference to
               // be used in the next iteration.
-              prev_cost += mode_costs->comp_ref1_cost[ctx][bit_type][j - 1][0];
+              prev_cost += mode_costs->comp_ref1_cost[ctx][bit_type][j][0];
             }
           }
         }
       }
       if (n_refs < 2) {
-        ref_costs_comp[0][0] = 0;
+        ref_costs_comp[0][0] = base_cost;
       }
 #ifndef NDEBUG
       for (int i = 0; i < n_refs - 1; i++) {
