@@ -403,6 +403,29 @@ enum {
   DCT_ADST_TX_MASK = 0x000F,             // Either DCT or ADST in each direction
 } UENUM1BYTE(TX_TYPE);
 
+#if CONFIG_CROSS_CHROMA_TX
+#define CCTX_NEG_ANGLES 1
+// Always signal C1 coefficients for some cctx (i.e., both C1 and C2 nonzero
+// or C1 nonzero and C2 zero). This requires CCTX_NEG_ANGLES to be on.
+#define CCTX_C1_NONZERO 1
+// Drop C2 channel for some cctx_types. This macro requires CCTX_C1_NONZERO to
+// be on.
+#define CCTX_C2_DROPPED 0
+enum {
+  CCTX_NONE,  // No cross chroma transform
+  CCTX_45,    // 45 degrees rotation (Haar transform)
+  CCTX_30,    // 30 degrees rotation
+  CCTX_60,    // 60 degrees rotation
+#if CCTX_NEG_ANGLES
+  CCTX_M45,  // -45 degrees rotation
+  CCTX_M30,  // -30 degrees rotation
+  CCTX_M60,  // -60 degrees rotation
+#endif       // CCTX_NEG_ANGLES
+  CCTX_TYPES,
+  CCTX_START = CCTX_45,
+} UENUM1BYTE(CctxType);
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 enum {
   REG_REG,
   REG_SMOOTH,

@@ -27,7 +27,7 @@ void av1_highbd_fwd_txfm(const int16_t *src_diff, tran_low_t *coeff,
 
 #if CONFIG_CROSS_CHROMA_TX
 void av1_fwd_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
-                                   TX_SIZE tx_size);
+                                   TX_SIZE tx_size, CctxType cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_IST

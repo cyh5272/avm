@@ -248,7 +248,20 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
   av1_predict_intra_block_facade(cm, xd, plane, col, row, tx_size);
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+    eob_info *eob_data_u =
+        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+#if CCTX_C1_NONZERO
+    if (eob_data->eob || (av1_get_cctx_type(xd, row, col) > CCTX_NONE &&
+                          plane == AOM_PLANE_V && eob_data_u->eob)) {
+#else
+    eob_info *eob_data_v =
+        dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
+    if (eob_data->eob || (plane && (eob_data_u->eob || eob_data_v->eob))) {
+#endif
+#else
     if (eob_data->eob) {
+#endif  // CONFIG_CROSS_CHROMA_TX
       const bool reduced_tx_set_used = cm->features.reduced_tx_set_used;
       // tx_type was read out in av1_read_coeffs_txb.
       const TX_TYPE tx_type = av1_get_tx_type(xd, plane_type, row, col, tx_size,
@@ -273,13 +286,13 @@ static AOM_INLINE void inverse_cross_chroma_transform_block(
   (void)cm;
   (void)r;
   (void)plane;
-  (void)blk_row;
-  (void)blk_col;
   tran_low_t *dqcoeff_u =
       dcb->dqcoeff_block[AOM_PLANE_U] + dcb->cb_offset[AOM_PLANE_U];
   tran_low_t *dqcoeff_v =
       dcb->dqcoeff_block[AOM_PLANE_V] + dcb->cb_offset[AOM_PLANE_V];
-  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size);
+  MACROBLOCKD *const xd = &dcb->xd;
+  const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+  av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -325,7 +338,7 @@ static AOM_INLINE void decode_reconstruct_tx(
     AV1_COMMON *cm, ThreadData *const td, aom_reader *r,
     MB_MODE_INFO *const mbmi, int plane, BLOCK_SIZE plane_bsize, int blk_row,
     int blk_col, int block, TX_SIZE tx_size, int *eob_total) {
-#if CONFIG_CROSS_CHROMA_TX
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
   if (plane == AOM_PLANE_U) return;
 #endif  // CONFIG_CROSS_CHROMA_TX
   DecoderCodingBlock *const dcb = &td->dcb;
@@ -345,48 +358,38 @@ static AOM_INLINE void decode_reconstruct_tx(
   if (blk_row >= max_blocks_high || blk_col >= max_blocks_wide) return;
 
   if (tx_size == plane_tx_size || plane) {
-#if CONFIG_CROSS_CHROMA_TX
-    switch (plane) {
-      case AOM_PLANE_Y:
-        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row,
-                                             blk_col, tx_size);
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
+    if (plane == AOM_PLANE_V) {
+      td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
+                                           blk_col, tx_size);
+      td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
+                                           blk_col, tx_size);
+      td->inverse_cctx_block_visit(cm, dcb, r, -1, blk_row, blk_col, tx_size);
+      td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
+                                       blk_col, tx_size);
+      td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
+                                       blk_col, tx_size);
+      eob_info *eob_data_u =
+          dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+      eob_info *eob_data_v =
+          dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
+      *eob_total += eob_data_u->eob + eob_data_v->eob;
+      set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
+      set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
+    } else {
+      assert(plane == AOM_PLANE_Y);
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
+      td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
+                                           tx_size);
 
-        td->inverse_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
-                                         tx_size);
-        eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-        *eob_total += eob_data->eob;
-        set_cb_buffer_offsets(dcb, tx_size, plane);
-        break;
-      case AOM_PLANE_V:
-        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
-                                             blk_col, tx_size);
-        td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
-                                             blk_col, tx_size);
-        td->inverse_cctx_block_visit(cm, dcb, r, -1, blk_row, blk_col, tx_size);
-        td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
-                                         blk_col, tx_size);
-        td->inverse_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
-                                         blk_col, tx_size);
-        eob_info *eob_data_u =
-            dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-        eob_info *eob_data_v =
-            dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
-        *eob_total += eob_data_u->eob + eob_data_v->eob;
-        set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
-        set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
-        break;
-      case AOM_PLANE_U: assert(0); break;
+      td->inverse_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
+                                       tx_size);
+      eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
+      *eob_total += eob_data->eob;
+      set_cb_buffer_offsets(dcb, tx_size, plane);
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
     }
-#else
-    td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
-                                         tx_size);
-
-    td->inverse_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
-                                     tx_size);
-    eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-    *eob_total += eob_data->eob;
-    set_cb_buffer_offsets(dcb, tx_size, plane);
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
   } else {
 #if CONFIG_NEW_TX_PARTITION
     TX_SIZE sub_txs[MAX_TX_PARTITIONS] = { 0 };
@@ -1258,6 +1261,9 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
     for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
       for (int plane = plane_start; plane < plane_end; ++plane) {
         if (plane && !xd->is_chroma_ref) break;
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+        if (!is_inter && plane == AOM_PLANE_U) continue;
+#endif  // CONFIG_CROSS_CHROMA_TX
         const struct macroblockd_plane *const pd = &xd->plane[plane];
         const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
         const int ss_x = pd->subsampling_x;
@@ -1281,30 +1287,31 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
           for (int blk_col = col >> ss_x; blk_col < unit_width;
                blk_col += stepc) {
             if (!is_inter) {
-              td->read_coeffs_tx_intra_block_visit(cm, dcb, r, plane, blk_row,
-                                                   blk_col, tx_size);
-#if CONFIG_CROSS_CHROMA_TX
-              switch (plane) {
-                case AOM_PLANE_Y:
-                  td->predict_and_recon_intra_block_visit(
-                      cm, dcb, r, AOM_PLANE_Y, blk_row, blk_col, tx_size);
-                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_Y);
-                  break;
-                case AOM_PLANE_U: break;
-                case AOM_PLANE_V:
-                  td->predict_and_recon_intra_block_visit(
-                      cm, dcb, r, AOM_PLANE_U, blk_row, blk_col, tx_size);
-                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
-                  td->predict_and_recon_intra_block_visit(
-                      cm, dcb, r, AOM_PLANE_V, blk_row, blk_col, tx_size);
-                  set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
-                  break;
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+              if (plane == AOM_PLANE_V) {
+                td->read_coeffs_tx_intra_block_visit(cm, dcb, r, AOM_PLANE_U,
+                                                     blk_row, blk_col, tx_size);
+                td->read_coeffs_tx_intra_block_visit(cm, dcb, r, AOM_PLANE_V,
+                                                     blk_row, blk_col, tx_size);
+                td->inverse_cctx_block_visit(cm, dcb, r, -1, blk_row, blk_col,
+                                             tx_size);
+                td->predict_and_recon_intra_block_visit(
+                    cm, dcb, r, AOM_PLANE_U, blk_row, blk_col, tx_size);
+                td->predict_and_recon_intra_block_visit(
+                    cm, dcb, r, AOM_PLANE_V, blk_row, blk_col, tx_size);
+                set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
+                set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
+              } else {
+                assert(plane == AOM_PLANE_Y);
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+                td->read_coeffs_tx_intra_block_visit(cm, dcb, r, plane, blk_row,
+                                                     blk_col, tx_size);
+                td->predict_and_recon_intra_block_visit(
+                    cm, dcb, r, plane, blk_row, blk_col, tx_size);
+                set_cb_buffer_offsets(dcb, tx_size, plane);
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
               }
-#else
-              td->predict_and_recon_intra_block_visit(
-                  cm, dcb, r, plane, blk_row, blk_col, tx_size);
-              set_cb_buffer_offsets(dcb, tx_size, plane);
-#endif  // CONFIG_CROSS_CHROMA_TX
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
             } else {
               // Reconstruction
               if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
@@ -1764,6 +1771,10 @@ static AOM_INLINE void set_offsets_for_pred_and_recon(AV1Decoder *const pbi,
   xd->mi = mi_params->mi_grid_base + offset;
   xd->tx_type_map =
       &mi_params->tx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#if CONFIG_CROSS_CHROMA_TX
+  xd->cctx_type_map =
+      &mi_params->cctx_type_map[mi_row * mi_params->mi_stride + mi_col];
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 
   set_plane_n4(xd, bw, bh, num_planes);
