@@ -2775,8 +2775,10 @@ static int64_t finer_tile_search_wienerns(
       copy_nsfilter_taps_for_class(&curr, &rui->wienerns_info, c_id);
     }
     // Re-establish dst.
-    if (curr.num_classes > 1 && rui->class_id_restrict != -1)
+    if (curr.num_classes > 1 && rui->class_id_restrict != -1) {
+      copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+    }
   }
   copy_nsfilter_taps(&rui->wienerns_info, &best);
 
@@ -3009,8 +3011,10 @@ static int64_t finer_tile_search_wienerns(
       }
     }
     // Re-establish dst.
-    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1)
+    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1) {
+      copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+    }
   }
   copy_nsfilter_taps(&rui->wienerns_info, &best);
   if (ext_search == 1) return best_err;
@@ -3081,8 +3085,10 @@ static int64_t finer_tile_search_wienerns(
       copy_nsfilter_taps_for_class(&curr, &rui->wienerns_info, c_id);
     }
     // Re-establish dst.
-    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1)
+    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1) {
+      copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
+    }
   }
 
   copy_nsfilter_taps(&rui->wienerns_info, &best);
@@ -3152,11 +3158,15 @@ static int compute_quantized_wienerns_filter(
         int dgd_id = i * dgd_stride + j;
         int src_id = i * src_stride + j;
 #if CONFIG_COMBINE_PC_NS_WIENER
-        const int full_class_id =
-            rui->class_id[(i >> MI_SIZE_LOG2) * rui->class_id_stride +
-                          (j >> MI_SIZE_LOG2)];
-        const int sub_class_id = pc_wiener_sub_classify[full_class_id];
-        if (c_id != sub_class_id) continue;
+        // TODO: This is redundant since rui->class_id is uint8 and for
+        // num_classes = 1 pc_wiener_sub_classify is always 0.
+        if (num_classes > 1) {
+          const int full_class_id =
+              rui->class_id[(i >> MI_SIZE_LOG2) * rui->class_id_stride +
+                            (j >> MI_SIZE_LOG2)];
+          const int sub_class_id = pc_wiener_sub_classify[full_class_id];
+          if (c_id != sub_class_id) continue;
+        }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
         int luma_id = i * rui->luma_stride + j;
@@ -3266,6 +3276,8 @@ static int compute_quantized_wienerns_filter(
         // int64_t real_errq =
         //     finer_tile_search_wienerns(rsc, limits, tile_rect, rui, wnsf, 0);
         // for better results at the expense of higger encoder complexity.
+
+        // Found filter is worse than no filtering.
         if (real_errq > real_sse) break;
 #if CONFIG_RST_MERGECOEFFS
         int64_t bits = count_wienerns_bits_set(
@@ -3404,22 +3416,15 @@ double set_cand_merge_sse_and_bits(
           &old_unit->ref_wienerns_bank, token_wienerns_info_cand,
           nsfilter_params->ncoeffs, class_id, equal_ref_for_class);
       assert(is_equal >= 0);  // Must exist in bank
-
-      // Begin: Debug.
-      WienerNonsepInfo tmp_filters = old_rusi->wienerns_info;
-      token_wienerns_info_cand->bank_ref_for_class[class_id] =
-          equal_ref_for_class[class_id];
-      copy_nsfilter_taps_for_class(&tmp_filters, token_wienerns_info_cand,
-                                   class_id);
-      // Using count_wienerns_bits_set just in case.
-      const int merge_bits = count_wienerns_bits_set(
-          is_uv, &x->mode_costs, &tmp_filters, &old_unit->ref_wienerns_bank,
-          nsfilter_params, ALL_WIENERNS_CLASSES);
+      const int merge_bits = count_wienerns_bits(
+          is_uv, &x->mode_costs, &old_rusi->wienerns_info,
+          &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
+      assert(merge_bits == count_wienerns_bits_set(
+                               is_uv, &x->mode_costs, &old_rusi->wienerns_info,
+                               &old_unit->ref_wienerns_bank, nsfilter_params,
+                               ALL_WIENERNS_CLASSES));
       old_unit->merge_bits_cand =
           x->mode_costs.wienerns_restore_cost[1] + merge_bits;
-      assert(old_unit->merge_bits_cand == old_unit->merge_bits);
-      // End: Debug.
-      // old_unit->merge_bits_cand = old_unit->merge_bits;
     } else {
       // This should be the last RU in the chain we are optimizing.
       // Old bank is not updated. Use the old value in token_wienerns_info_cand
@@ -3521,11 +3526,9 @@ static void search_wienerns(const RestorationTileLimits *limits,
   RestorationUnitInfo rui;
   memset(&rui, 0, sizeof(rui));
   rui.restoration_type = RESTORE_WIENER_NONSEP;
+  rui.class_id_restrict = -1;
 #if CONFIG_COMBINE_PC_NS_WIENER
   rui.compute_classification = 0;
-  rui.class_id_restrict = -1;
-  rui.class_id = rsc->cm->mi_params.class_id[rsc->plane];
-  rui.class_id_stride = rsc->cm->mi_params.class_id_stride[rsc->plane];
   if (rsc->plane == AOM_PLANE_Y || PC_WIENER_FILTER_CHROMA ||
       PC_WIENER_ONLY_CLASSIFY_CHROMA) {
     // Ensure search_pc_wiener was done and classification was computed.
@@ -3533,6 +3536,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
   } else {
     assert(rsc->is_buffered == false);
   }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+#if CONFIG_PC_WIENER
+  rui.class_id = rsc->cm->mi_params.class_id[rsc->plane];
+  rui.class_id_stride = rsc->cm->mi_params.class_id_stride[rsc->plane];
   // These are not needed since class_id is already computed. Add them to avoid
   // NULLs etc. during debug and other uses.
   rui.tskip = rsc->cm->mi_params.tx_skip[rsc->plane];
@@ -3544,7 +3551,7 @@ static void search_wienerns(const RestorationTileLimits *limits,
                             : rsc->cm->quant_params.v_dc_delta_q;
   else
     rui.qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
+#endif  // CONFIG_PC_WIENER
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   rui.luma = rsc->luma;
   rui.luma_stride = rsc->luma_stride;
@@ -3601,6 +3608,11 @@ static void search_wienerns(const RestorationTileLimits *limits,
   int ns_bank_ref_base[WIENERNS_MAX_CLASSES];
   memcpy(ns_bank_ref_base, rusi->wienerns_info.bank_ref_for_class,
          num_classes * sizeof(*ns_bank_ref_base));
+
+  // Copy the bank_refs to rui.
+  memcpy(rui.wienerns_info.bank_ref_for_class,
+         rusi->wienerns_info.bank_ref_for_class,
+         num_classes * sizeof(*ns_bank_ref_base));
   double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
       bit_depth);
@@ -3647,6 +3659,7 @@ static void search_wienerns(const RestorationTileLimits *limits,
                              nsfilter_params->ncoeffs, ALL_WIENERNS_CLASSES,
                              equal_ref_for_class) >= 0) {
     rsc->bits -= bits_nomerge_base;
+    // TODO: Why is this needed? We did set above.
     memcpy(rusi->wienerns_info.bank_ref_for_class, equal_ref_for_class,
            rusi->wienerns_info.num_classes * (*equal_ref_for_class));
     unit_snapshot.current_bits =
@@ -3667,9 +3680,12 @@ static void search_wienerns(const RestorationTileLimits *limits,
   double cost_nomerge = 0;
   int begin_idx[WIENERNS_MAX_CLASSES];
   int bank_ref[WIENERNS_MAX_CLASSES];
+
+  // Set rui_merge_best as the current best filters with the best refs.
   RestorationUnitInfo rui_merge_best = rui;
 
   // Trial start
+  int merged_class_count = 0;
   for (int c_id = 0; c_id < num_classes; ++c_id) {
     bank_ref[c_id] = -1;
     begin_idx[c_id] = -1;
@@ -3769,6 +3785,9 @@ static void search_wienerns(const RestorationTileLimits *limits,
           rsc, nsfilter_params, tile_rect, begin_idx_cand, current_unit_stack,
           &token_wienerns_info_cand, &rui_merge_cand, c_id);
 
+      // Find the candidate that brings the largest improvement over touched
+      // RUs. The best such candidate can still be worse than nomerge.
+      // TODO: Why not add && cost_merge_cand < cost_nomerge_cand?
       if (cost_merge_cand - cost_nomerge_cand < cost_merge - cost_nomerge) {
         begin_idx[c_id] = begin_idx_cand;
         bank_ref[c_id] = bank_ref_cand;
@@ -3791,32 +3810,34 @@ static void search_wienerns(const RestorationTileLimits *limits,
           old_unit->merge_bits = old_unit->merge_bits_cand;
         }
 
-        // Keep track of bank_ref_for_class as we will assign rui_merge_best to
-        // token_wienerns_info_cand which in turn will be used to calculate bits
-        // in set_cand_merge_sse_and_bits().
-        rui_merge_cand.wienerns_info.bank_ref_for_class[c_id] = bank_ref_cand;
-        copy_nsfilter_taps_for_class(&rui_merge_best.wienerns_info,
-                                     &rui_merge_cand.wienerns_info, c_id);
-      } else {
-        if (num_classes > 1) {
-          // Not merging. Reset rsc buffers.
-          rui_merge_best.class_id_restrict = c_id;
-          calc_finer_tile_search_error(rsc, NULL, tile_rect, &rui_merge_best);
+        if (cost_merge < cost_nomerge) {
+          // We found a better merge candidate that will be merged. Update best
+          // filters.
+          // Keep track of bank_ref_for_class as we will assign rui_merge_best
+          // to token_wienerns_info_cand which in turn will be used to calculate
+          // bits in set_cand_merge_sse_and_bits().
+          rui_merge_cand.wienerns_info.bank_ref_for_class[c_id] = bank_ref_cand;
+          copy_nsfilter_taps_for_class(&rui_merge_best.wienerns_info,
+                                       &rui_merge_cand.wienerns_info, c_id);
         }
+      }
+      // TODO: Only reset if this is the last trial or the next trial is for a
+      //  different c_id.
+      if (num_classes > 1 &&
+          (begin_idx[c_id] != begin_idx_cand || cost_merge >= cost_nomerge)) {
+        // We will not be merging this trial even if it is the best cand. Reset
+        // rsc buffers to the best solution so far. Re-establish dst.
+        rui_merge_best.class_id_restrict = c_id;
+        calc_finer_tile_search_error(rsc, NULL, tile_rect, &rui_merge_best);
       }
       aom_vector_clear(current_unit_indices);
     }
     // Trial end
-  }
 
-  if (cost_merge < cost_nomerge) {
-    for (int c_id = 0; c_id < num_classes; ++c_id) {
-      if (begin_idx[c_id] == -1) {
-        // We are merging some c_ids but not this one.
-        av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info,
-                                 c_id);
-        continue;
-      }
+    RstUnitSnapshot *last_unit = aom_vector_back(current_unit_stack);
+    RestUnitSearchInfo *last_rusi = &rsc->rusi[last_unit->rest_unit_idx];
+    if (cost_merge < cost_nomerge && begin_idx[c_id] != -1) {
+      ++merged_class_count;
       const WienerNonsepInfo *token_wienerns_info =
           av1_constref_from_wienerns_bank(&rsc->wienerns_bank, bank_ref[c_id],
                                           c_id);
@@ -3872,7 +3893,6 @@ static void search_wienerns(const RestorationTileLimits *limits,
         old_unit->current_bits = old_unit->merge_bits;
       }
       // Above we updated the entire stack. Here we update rsc->wienerns_bank.
-      RstUnitSnapshot *last_unit = aom_vector_back(current_unit_stack);
       // TODO: Is this needed? Why not just copy last_unit->ref_wienerns_bank?
       const int is_equal = check_wienerns_bank_eq(
           &last_unit->ref_wienerns_bank, &rui_merge_best.wienerns_info,
@@ -3882,21 +3902,26 @@ static void search_wienerns(const RestorationTileLimits *limits,
              equal_ref_for_class[c_id]);
       av1_upd_to_wienerns_bank(&rsc->wienerns_bank, equal_ref_for_class[c_id],
                                &rui_merge_best.wienerns_info, c_id);
+    } else {
+      assert(check_wienerns_eq(&last_rusi->wienerns_info,
+                               &rui_merge_best.wienerns_info,
+                               nsfilter_params->ncoeffs, c_id));
+      // Copy current unit from the top of the stack.
+      // memset(&unit_snapshot, 0, sizeof(unit_snapshot));
+      // unit_snapshot = *(RstUnitSnapshot
+      // *)aom_vector_back(current_unit_stack); RESTORE_WIENER_NONSEP units
+      // become start of new stack, and RESTORE_NONE units are discarded.
+      if (rtype == RESTORE_WIENER_NONSEP) {
+        // We may be merging some c_ids but not this one.
+        av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info,
+                                 c_id);
+        // aom_vector_clear(current_unit_stack);
+        // aom_vector_push_back(current_unit_stack, &unit_snapshot);
+      }
     }
-  } else {
-    // Copy current unit from the top of the stack.
-    // memset(&unit_snapshot, 0, sizeof(unit_snapshot));
-    // unit_snapshot = *(RstUnitSnapshot *)aom_vector_back(current_unit_stack);
-    // RESTORE_WIENER_NONSEP units become start of new stack, and
-    // RESTORE_NONE units are discarded.
-    if (rtype == RESTORE_WIENER_NONSEP) {
-      av1_add_to_wienerns_bank(&rsc->wienerns_bank, &rusi->wienerns_info,
-                               ALL_WIENERNS_CLASSES);
-      // aom_vector_clear(current_unit_stack);
-      // aom_vector_push_back(current_unit_stack, &unit_snapshot);
-    } else /*if (rusi->sse[RESTORE_WIENER_NONSEP] > rusi->sse[RESTORE_NONE])*/ {
-      aom_vector_pop_back(current_unit_stack);
-    }
+  }
+  if (merged_class_count == 0 && rtype != RESTORE_WIENER_NONSEP) {
+    aom_vector_pop_back(current_unit_stack);
   }
   /*
      printf("wienerns(%d) [merge %f < nomerge %f] : %d, bank_size %d\n",
@@ -4322,7 +4347,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
           continue;
 #endif  // CONFIG_LR_FLEX_SYNTAX
 #if CONFIG_PC_WIENER
-        if (plane > AOM_PLANE_Y && r == RESTORE_PC_WIENER) continue;
+        // TODO: Redundant search_pc_wiener will skip search for this case.
+        if (plane != AOM_PLANE_Y && r == RESTORE_PC_WIENER &&
+            !PC_WIENER_FILTER_CHROMA && !PC_WIENER_ONLY_CLASSIFY_CHROMA)
+          continue;
 #endif  // CONFIG_PC_WIENER
 
         double cost = search_rest_type(&rsc, r);
