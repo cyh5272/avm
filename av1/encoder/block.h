@@ -726,9 +726,9 @@ typedef struct {
   int single_ref_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1][2];
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
   //! comp_ref0_cost
-  int comp_ref0_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME - 1][2];
+  int comp_ref0_cost[REF_CONTEXTS][INTER_REFS_PER_FRAME][2];
   //! comp_ref1_cost
-  int comp_ref1_cost[REF_CONTEXTS][COMPREF_BIT_TYPES][INTER_REFS_PER_FRAME - 1]
+  int comp_ref1_cost[REF_CONTEXTS][COMPREF_BIT_TYPES][INTER_REFS_PER_FRAME]
                     [2];
 #else
   //! comp_ref0_cost
