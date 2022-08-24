@@ -1353,7 +1353,9 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                                   counts,
 #endif  // CONFIG_ENTROPY_STATS
                                   fc);
-          continue_motion_mode_signaling = false;
+          // The following line is commented out to remove a spurious
+          // static analysis warning. Uncomment when adding a new motion mode
+          // continue_motion_mode_signaling = false;
         }
       }
 #else

@@ -272,14 +272,30 @@ int av1_get_shear_params(WarpedMotionParams *wm) {
                         (1 << WARPEDMODEL_PREC_BITS),
                     INT16_MIN, INT16_MAX);
 
-  wm->alpha = ROUND_POWER_OF_TWO_SIGNED(wm->alpha, WARP_PARAM_REDUCE_BITS) *
-              (1 << WARP_PARAM_REDUCE_BITS);
-  wm->beta = ROUND_POWER_OF_TWO_SIGNED(wm->beta, WARP_PARAM_REDUCE_BITS) *
-             (1 << WARP_PARAM_REDUCE_BITS);
-  wm->gamma = ROUND_POWER_OF_TWO_SIGNED(wm->gamma, WARP_PARAM_REDUCE_BITS) *
-              (1 << WARP_PARAM_REDUCE_BITS);
-  wm->delta = ROUND_POWER_OF_TWO_SIGNED(wm->delta, WARP_PARAM_REDUCE_BITS) *
-              (1 << WARP_PARAM_REDUCE_BITS);
+  // Note(rachelbarker):
+  // In extreme cases, the `clamp` operations in the previous block can set
+  // parameters equal to to INT16_MAX == 32767.
+  //
+  // The following round-then-multiply, which is intended to reduce the bit
+  // storage requirement in hardware, then rounds to 32768, which is outside
+  // the range of an int16_t. But casting to int16_t is okay - it will cause
+  // this value to become -32768, and so the model will be rejected
+  // by is_affine_shear_allowed(), so the outcome is the same.
+  //
+  // However, we must make this cast explicit, because otherwise the integer
+  // sanitizer (correctly) complains about overflow during an implicit cast
+  wm->alpha =
+      (int16_t)(ROUND_POWER_OF_TWO_SIGNED(wm->alpha, WARP_PARAM_REDUCE_BITS) *
+                (1 << WARP_PARAM_REDUCE_BITS));
+  wm->beta =
+      (int16_t)(ROUND_POWER_OF_TWO_SIGNED(wm->beta, WARP_PARAM_REDUCE_BITS) *
+                (1 << WARP_PARAM_REDUCE_BITS));
+  wm->gamma =
+      (int16_t)(ROUND_POWER_OF_TWO_SIGNED(wm->gamma, WARP_PARAM_REDUCE_BITS) *
+                (1 << WARP_PARAM_REDUCE_BITS));
+  wm->delta =
+      (int16_t)(ROUND_POWER_OF_TWO_SIGNED(wm->delta, WARP_PARAM_REDUCE_BITS) *
+                (1 << WARP_PARAM_REDUCE_BITS));
 
   if (!is_affine_shear_allowed(wm->alpha, wm->beta, wm->gamma, wm->delta))
     return 0;
@@ -799,6 +815,9 @@ static int find_affine_int(int np, const int *pts1, const int *pts2,
   wm->wmmat[4] = get_mult_shift_ndiag(Py[0], iDet, shift);
   wm->wmmat[5] = get_mult_shift_diag(Py[1], iDet, shift);
 
+  // check compatibility with the fast warp filter
+  if (!av1_get_shear_params(wm)) return 1;
+
   av1_set_warp_translation(mi_row, mi_col, bsize, mv, wm);
   wm->wmmat[0] = clamp(wm->wmmat[0], -WARPEDMODEL_TRANS_CLAMP,
                        WARPEDMODEL_TRANS_CLAMP - 1);
@@ -816,9 +835,6 @@ int av1_find_projection(int np, const int *pts1, const int *pts2,
 
   if (find_affine_int(np, pts1, pts2, bsize, mv, wm_params, mi_row, mi_col))
     return 1;
-
-  // check compatibility with the fast warp filter
-  if (!av1_get_shear_params(wm_params)) return 1;
 
   return 0;
 }
@@ -915,11 +931,11 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
         ROUND_POWER_OF_TWO(proj_center_y - proj_left_y, half_width_log2);
   }
 
-  // Derive translational part from signaled MV
-  av1_set_warp_translation(mi_row, mi_col, bsize, *center_mv, wm_params);
-
   // check compatibility with the fast warp filter
   if (!av1_get_shear_params(wm_params)) return 1;
+
+  // Derive translational part from signaled MV
+  av1_set_warp_translation(mi_row, mi_col, bsize, *center_mv, wm_params);
 
   return 0;
 }

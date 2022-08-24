@@ -862,10 +862,10 @@ static INLINE void av1_get_neighbor_warp_model(const AV1_COMMON *cm,
     // a warp model. So we need to synthesize one
     *wm_params = default_warp_params;
     wm_params->wmtype = TRANSLATION;
-    wm_params->wmmat[0] = neighbor_mi->mv[0].as_mv.col
-                          << (WARPEDMODEL_PREC_BITS - 3);
-    wm_params->wmmat[1] = neighbor_mi->mv[0].as_mv.row
-                          << (WARPEDMODEL_PREC_BITS - 3);
+    wm_params->wmmat[0] =
+        neighbor_mi->mv[0].as_mv.col * (1 << (WARPEDMODEL_PREC_BITS - 3));
+    wm_params->wmmat[1] =
+        neighbor_mi->mv[0].as_mv.row * (1 << (WARPEDMODEL_PREC_BITS - 3));
   }
 }
 

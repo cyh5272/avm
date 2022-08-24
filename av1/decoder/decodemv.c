@@ -327,7 +327,6 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   params->wmmat[3] = base_params.wmmat[3] + read_warp_delta_param(xd, 3, r);
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
-  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
 
   int valid = av1_get_shear_params(params);
   params->invalid = !valid;
@@ -335,7 +334,10 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #if WARPED_MOTION_DEBUG
     printf("Warning: unexpected WARP_DELTA model from aomenc\n");
 #endif
+    return;
   }
+
+  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
 }
 
 static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,

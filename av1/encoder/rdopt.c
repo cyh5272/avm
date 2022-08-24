@@ -2577,7 +2577,9 @@ static int64_t motion_mode_rd(
       if (motion_mode == WARP_DELTA) {
         rd_stats->rate +=
             av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
-        continue_motion_mode_signaling = false;
+        // The following line is commented out to remove a spurious
+        // static analysis warning. Uncomment when adding a new motion mode
+        // continue_motion_mode_signaling = false;
       }
     }
 #else

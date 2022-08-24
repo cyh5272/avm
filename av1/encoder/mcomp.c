@@ -5352,13 +5352,14 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   params->wmmat[3] = base_params.wmmat[3];
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
-  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
   int valid = av1_get_shear_params(params);
   params->invalid = !valid;
   if (!valid) {
     // Don't try to refine from a broken starting point
     return 0;
   }
+
+  av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv, params);
 
   // Calculate initial error
   best_wm_params = *params;
@@ -5435,11 +5436,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
-                                 params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
+          av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
+                                   params);
           rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           inc_rd = sse + (int)ROUND_POWER_OF_TWO_64(
@@ -5461,11 +5462,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
-                                 params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
+          av1_set_warp_translation(mi_row, mi_col, bsize, center_mv.as_mv,
+                                   params);
           rate = av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
           sse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
           dec_rd = sse + (int)ROUND_POWER_OF_TWO_64(
