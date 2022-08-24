@@ -1067,7 +1067,7 @@ void av1_update_picked_ref_frames_mask(MACROBLOCK *const x, int ref_type,
   for (int i = mi_row_in_sb; i < mi_row_in_sb + mi_size; ++i) {
     for (int j = mi_col_in_sb; j < mi_col_in_sb + mi_size; ++j) {
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-      x->picked_ref_frames_mask[i * 32 + j] |= (uint64_t)1 << ref_type;
+      x->picked_ref_frames_mask[i * 32 + j] |= 1ULL << ref_type;
 #else
       x->picked_ref_frames_mask[i * 32 + j] |= 1 << ref_type;
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND

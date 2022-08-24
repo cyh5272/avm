@@ -406,7 +406,7 @@ typedef struct SequenceHeader {
   int explicit_ref_frame_map;  // Explicitly signal the reference frame mapping
   int max_reference_frames;    // Number of reference frames allowed
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
-  int num_same_ref_compound;  // NUmber of the allowed same reference frames for
+  int num_same_ref_compound;  // Number of the allowed same reference frames for
                               // the compound mode
 #endif                        // CONFIG_ALLOW_SAME_REF_COMPOUND
 #endif
