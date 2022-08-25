@@ -2990,7 +2990,7 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int allowed_motion_modes = (1 << SIMPLE_TRANSLATION);
 
-  if (mbmi->skip_mode) {
+  if (mbmi->skip_mode || mbmi->ref_frame[0] == INTRA_FRAME) {
     return allowed_motion_modes;
   }
 
