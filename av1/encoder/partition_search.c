@@ -350,7 +350,12 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   TxfmSearchParams *txfm_params = &x->txfm_search_params;
   set_tx_size_search_method(
       cm, &cpi->winner_mode_params, txfm_params,
-      cpi->sf.winner_mode_sf.enable_winner_mode_for_tx_size_srch, 1);
+      cpi->sf.winner_mode_sf.enable_winner_mode_for_tx_size_srch, 1
+#if CONFIG_EXT_RECUR_PARTITIONS
+      ,
+      x, cpi->sf.tx_sf.use_largest_tx_size_for_small_bsize
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+  );
 
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -1766,9 +1771,6 @@ static void update_partition_stats(MACROBLOCKD *const xd,
  *                          encoder to estimate the
  *                          partition type for chroma.
  * \param[in]     rate      Pointer to the total rate for the current block
- *
- * \return Nothing is returned. Instead, reconstructions (w/o in-loop filters)
- * will be updated in the pixel buffers in td->mb.e_mbd.
  */
 static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
                       TileDataEnc *tile_data, TokenExtra **tp, int mi_row,
