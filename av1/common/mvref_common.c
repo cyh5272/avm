@@ -1849,13 +1849,22 @@ static AOM_INLINE void setup_ref_mv_list(
       const int block_width = xd->width * MI_SIZE;
       const int block_height = xd->height * MI_SIZE;
 
-      for (int idx_bank = 0; idx_bank < count && *refmv_count < ref_mv_limit;
+      for (int idx_bank = 0; idx_bank < count && * refmv_count < ref_mv_limit;
            ++idx_bank) {
         const int idx = (start_idx + count - 1 - idx_bank) % REF_MV_BANK_SIZE;
         const CANDIDATE_MV cand_mv = queue[idx];
-        check_rmb_cand(cand_mv, ref_mv_stack, ref_mv_weight, refmv_count,
-                       is_comp, xd->mi_row, xd->mi_col, block_width,
-                       block_height, cm->width, cm->height);
+#if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+        bool rmb_candi_exist =
+#endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+            check_rmb_cand(cand_mv, ref_mv_stack, ref_mv_weight, refmv_count,
+                           is_comp, xd->mi_row, xd->mi_col, block_width,
+                           block_height, cm->width, cm->height);
+#if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+        if (xd->mi[0]->skip_mode && rmb_candi_exist) {
+          ref_frame_idx0[*refmv_count - 1] = rf[0];
+          ref_frame_idx1[*refmv_count - 1] = rf[1];
+        }
+#endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
       }
     }
   }
