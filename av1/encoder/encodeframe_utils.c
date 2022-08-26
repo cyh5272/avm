@@ -336,7 +336,7 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
     }
   }
 #endif  // CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
-  if (!frame_is_intra_only(cm)) {
+  if (mi_addr->ref_frame[0] != INTRA_FRAME) {
     if (is_inter_block(mi_addr, xd->tree_type)) {
       // TODO(sarahparker): global motion stats need to be handled per-tile
       // to be compatible with tile-based threading.

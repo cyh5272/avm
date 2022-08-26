@@ -994,7 +994,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   if (frame_is_intra_only(cm) || mbmi->skip_mode) return;
 
   FRAME_COUNTS *const counts = td->counts;
-  const int inter_block = is_inter_block(mbmi, xd->tree_type);
+  const int inter_block = mbmi->ref_frame[0] != INTRA_FRAME;
 
   if (!seg_ref_active) {
 #if CONFIG_ENTROPY_STATS && !CONFIG_CONTEXT_DERIVATION
