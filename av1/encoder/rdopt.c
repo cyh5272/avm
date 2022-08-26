@@ -5339,9 +5339,10 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 
   const ModeCosts *mode_costs = &x->mode_costs;
   // Account for non-skip mode rate in total rd stats
-  if (best_rd_cost->rate != -INT_MAX)
+  if (best_rd_cost->rate != INT_MAX) {
     best_rd_cost->rate += mode_costs->skip_mode_cost[skip_mode_ctx][0];
-  av1_rd_cost_update(x->rdmult, best_rd_cost);
+    av1_rd_cost_update(x->rdmult, best_rd_cost);
+  }
   search_state->best_rd = best_rd_cost->rdcost;
 
 #if CONFIG_NEW_REF_SIGNALING
