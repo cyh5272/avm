@@ -773,10 +773,6 @@ static const aom_cdf_prob default_drl2_cdf[DRL_MODE_CONTEXTS][CDF_SIZE(2)] = {
   { AOM_CDF2(16777) }, { AOM_CDF2(16998) }, { AOM_CDF2(14311) },
   { AOM_CDF2(16618) }, { AOM_CDF2(14980) }, { AOM_CDF2(15963) }
 };
-#if IMPROVED_AMVD
-static const aom_cdf_prob default_adaptive_mvd_cdf[CDF_SIZE(2)] = { AOM_CDF2(
-    25384) };
-#endif  // IMPROVED_AMVD
 
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
 static const aom_cdf_prob default_skip_drl_cdf[3][CDF_SIZE(2)] = {
