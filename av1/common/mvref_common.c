@@ -1849,7 +1849,7 @@ static AOM_INLINE void setup_ref_mv_list(
       const int block_width = xd->width * MI_SIZE;
       const int block_height = xd->height * MI_SIZE;
 
-      for (int idx_bank = 0; idx_bank < count && * refmv_count < ref_mv_limit;
+      for (int idx_bank = 0; idx_bank < count && *refmv_count < ref_mv_limit;
            ++idx_bank) {
         const int idx = (start_idx + count - 1 - idx_bank) % REF_MV_BANK_SIZE;
         const CANDIDATE_MV cand_mv = queue[idx];
@@ -2181,7 +2181,8 @@ void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   if (mi->skip_mode) {
-    SKIP_MODE_MVP_LIST *const skip_list = &(xd->skip_mvp_candidate_list);
+    SKIP_MODE_MVP_LIST *skip_list =
+        (SKIP_MODE_MVP_LIST *)&(xd->skip_mvp_candidate_list);
     setup_ref_mv_list(cm, xd, ref_frame, &(skip_list->ref_mv_count),
                       skip_list->ref_mv_stack, skip_list->weight,
                       skip_list->ref_frame0, skip_list->ref_frame1,
