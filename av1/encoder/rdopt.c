@@ -4116,9 +4116,9 @@ static int64_t handle_inter_mode(
 #endif
 #endif
 
+#if !CONFIG_FLEX_MVRES
       mbmi->motion_mode = SIMPLE_TRANSLATION;
 
-#if !CONFIG_FLEX_MVRES
       mode_info[ref_mv_idx].full_search_mv.as_int = INVALID_MV;
       mode_info[ref_mv_idx].mv.as_int = INVALID_MV;
       mode_info[ref_mv_idx].rd = INT64_MAX;
