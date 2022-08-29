@@ -1900,10 +1900,11 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 }
 
 #if CONFIG_WIENER_NONSEP && CONFIG_RST_MERGECOEFFS
-static int64_t reset_unit_stack_errors(const RestSearchCtxt *rsc,
-                                       const RestorationTileLimits *limits,
-                                       const AV1PixelRect *tile,
-                                       RestorationUnitInfo *rui) {
+// This function resets the dst buffers using the correct filters.
+static int64_t reset_unit_stack_dst_buffers(const RestSearchCtxt *rsc,
+                                            const RestorationTileLimits *limits,
+                                            const AV1PixelRect *tile,
+                                            RestorationUnitInfo *rui) {
   int64_t err = 0;
   if (limits != NULL) {
     err = try_restoration_unit(rsc, limits, tile, rui);
@@ -1935,13 +1936,14 @@ static int64_t reset_unit_stack_errors(const RestSearchCtxt *rsc,
         idx = *(int *)aom_vector_const_get(current_unit_indices, n);
       }
     }
+#ifndef NDEBUG
     {
-      // TODO: Not needed, debug.
       const WienernsFilterParameters *nsfilter_params = get_wienerns_parameters(
           rsc->cm->quant_params.base_qindex, rsc->plane != AOM_PLANE_Y);
       assert(check_wienerns_eq(&rui->wienerns_info, &last_unit_filters,
                                nsfilter_params->ncoeffs, ALL_WIENERNS_CLASSES));
     }
+#endif  // NDEBUG
   }
   return err;
 }
@@ -3878,9 +3880,9 @@ static void search_wienerns(const RestorationTileLimits *limits,
         // rsc buffers to the best solution so far. Re-establish dst.
         rui_merge_best.class_id_restrict = c_id;
 
-        // TODO: Potentially change restoration to apply zero filter to
-        //  non-matching classes.
-        reset_unit_stack_errors(rsc, NULL, tile_rect, &rui_merge_best);
+        // TODO(oguleryuz): Potentially change restoration to apply zero filter
+        //  to non-matching classes.
+        reset_unit_stack_dst_buffers(rsc, NULL, tile_rect, &rui_merge_best);
       }
       aom_vector_clear(current_unit_indices);
     }
