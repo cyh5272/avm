@@ -1066,7 +1066,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
                            counts, mbmi, mbmi_ext);
 #endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   }
-#endif // CONFIG_SKIP_MODE_ENHANCEMENT
+#endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   if (frame_is_intra_only(cm) || mbmi->skip_mode) return;
 
@@ -1727,7 +1727,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       if (cm->current_frame.reference_mode == REFERENCE_MODE_SELECT) {
 #if !CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
         assert(has_second_ref(mbmi));
-#endif // !CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+#endif  // !CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
         rdc->compound_ref_used_flag = 1;
       }
       set_ref_ptrs(cm, xd, mbmi->ref_frame[0], mbmi->ref_frame[1]);
@@ -1827,16 +1827,16 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       // mbmi_ext->weight[ref_frame][4] inside av1_find_mv_refs.
       av1_copy_usable_ref_mv_stack_and_weight(xd, x->mbmi_ext, ref_frame_type);
     }
-#endif //CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+#endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
     av1_copy_mbmi_ext_to_mbmi_ext_frame(
         x->mbmi_ext_frame, x->mbmi_ext,
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
         mbmi->skip_mode,
-#endif //CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+#endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
         av1_ref_frame_type(xd->mi[0]->ref_frame));
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   }
-#endif //CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
+#endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   x->rdmult = origin_mult;
 }
 
