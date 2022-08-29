@@ -1945,7 +1945,7 @@ static int64_t reset_unit_stack_errors(const RestSearchCtxt *rsc,
   }
   return err;
 }
-#endif
+#endif  // CONFIG_WIENER_NONSEP && CONFIG_RST_MERGECOEFFS
 
 #endif  // CONFIG_WIENER_NONSEP
 
