@@ -2476,7 +2476,7 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
     const int exact_match =
         aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
     int ref;
-    for (ref = 0; ref < AOMMAX(0, bank->bank_size_for_class[c_id] - 1); ++ref) {
+    for (ref = 0; ref < bank->bank_size_for_class[c_id] - 1; ++ref) {
       if (aom_read_literal(rb, 1, ACCT_STR)) break;
     }
     if (exact_match) {

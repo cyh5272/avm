@@ -2758,13 +2758,12 @@ static int check_and_write_merge_info(
 
   assert(ref < AOMMAX(1, bank->bank_size_for_class[class_id]));
   int match = 0;
-  for (int k = 0; k < AOMMAX(0, bank->bank_size_for_class[class_id] - 1); ++k) {
+  for (int k = 0; k < bank->bank_size_for_class[class_id] - 1; ++k) {
     match = (k == ref);
     aom_write_literal(wb, match, 1);
     if (match) break;
   }
-  assert(IMPLIES(!match,
-                 ref == AOMMAX(0, bank->bank_size_for_class[class_id] - 1)));
+  assert(IMPLIES(!match, ref == bank->bank_size_for_class[class_id] - 1));
   return exact_match;
 }
 #endif  // CONFIG_RST_MERGECOEFFS
