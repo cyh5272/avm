@@ -1898,6 +1898,57 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 #endif  // CONFIG_RST_MERGECOEFFS || CONFIG_RST_MERGECOEFFS
   return err;
 }
+
+#if CONFIG_WIENER_NONSEP && CONFIG_RST_MERGECOEFFS
+// This function resets the dst buffers using the correct filters.
+static int64_t reset_unit_stack_dst_buffers(const RestSearchCtxt *rsc,
+                                            const RestorationTileLimits *limits,
+                                            const AV1PixelRect *tile,
+                                            RestorationUnitInfo *rui) {
+  int64_t err = 0;
+  if (limits != NULL) {
+    err = try_restoration_unit(rsc, limits, tile, rui);
+  } else {
+    Vector *current_unit_stack = rsc->unit_stack;
+    Vector *current_unit_indices = rsc->unit_indices;
+    const int last_idx =
+        ((RstUnitSnapshot *)aom_vector_back(current_unit_stack))->rest_unit_idx;
+
+    // Will update filters in rui as we go along. Buffer the rui filters here.
+    WienerNonsepInfo last_unit_filters = rui->wienerns_info;
+    int n = 0;
+    int idx = *(int *)aom_vector_const_get(current_unit_indices, n);
+    VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
+      RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
+      RestUnitSearchInfo *old_rusi = &rsc->rusi[old_unit->rest_unit_idx];
+
+      if (old_unit->rest_unit_idx == idx) {
+        if (idx == last_idx) {
+          // Use the input filters on the last unit.
+          copy_nsfilter_taps(&rui->wienerns_info, &last_unit_filters);
+        } else {
+          // Revert to old unit's filters.
+          copy_nsfilter_taps(&rui->wienerns_info, &old_rusi->wienerns_info);
+        }
+        err += try_restoration_unit(rsc, &old_unit->limits, tile, rui);
+        n++;
+        if (n >= (int)current_unit_indices->size) break;
+        idx = *(int *)aom_vector_const_get(current_unit_indices, n);
+      }
+    }
+#ifndef NDEBUG
+    {
+      const WienernsFilterParameters *nsfilter_params = get_wienerns_parameters(
+          rsc->cm->quant_params.base_qindex, rsc->plane != AOM_PLANE_Y);
+      assert(check_wienerns_eq(&rui->wienerns_info, &last_unit_filters,
+                               nsfilter_params->ncoeffs, ALL_WIENERNS_CLASSES));
+    }
+#endif  // NDEBUG
+  }
+  return err;
+}
+#endif  // CONFIG_WIENER_NONSEP && CONFIG_RST_MERGECOEFFS
+
 #endif  // CONFIG_WIENER_NONSEP
 
 #define USE_WIENER_REFINEMENT_SEARCH 1
@@ -2542,7 +2593,7 @@ static int64_t count_wienerns_bits(
         av1_constref_from_wienerns_bank(bank, ref, c_id);
     const int equal_ref = check_wienerns_eq(wienerns_info, ref_wienerns_info,
                                             nsfilter_params->ncoeffs, c_id);
-    for (int k = 0; k < AOMMAX(0, bank->bank_size_for_class[c_id] - 1); ++k) {
+    for (int k = 0; k < bank->bank_size_for_class[c_id] - 1; ++k) {
       const int match = (k == ref);
       bits += (1 << AV1_PROB_COST_SHIFT);
       if (match) break;
@@ -3828,7 +3879,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
         // We will not be merging this trial even if it is the best cand. Reset
         // rsc buffers to the best solution so far. Re-establish dst.
         rui_merge_best.class_id_restrict = c_id;
-        calc_finer_tile_search_error(rsc, NULL, tile_rect, &rui_merge_best);
+
+        // TODO(oguleryuz): Potentially change restoration to apply zero filter
+        //  to non-matching classes.
+        reset_unit_stack_dst_buffers(rsc, NULL, tile_rect, &rui_merge_best);
       }
       aom_vector_clear(current_unit_indices);
     }
