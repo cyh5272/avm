@@ -5163,16 +5163,10 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                   const int *pts_inref0, int total_samples) {
   MB_MODE_INFO *mbmi = xd->mi[0];
 
-#if CONFIG_EXTENDED_WARP_PREDICTION
   static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 },   { -1, 0 },
                                    { 1, -1 }, { 1, 1 }, { -1, -1 }, { -1, 1 } };
   static const int num_iterations = 8;
   static const int num_neighbors = 8;
-#else
-  static const MV neighbors[4] = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
-  static const int num_iterations = 2;
-  static const int num_neighbors = 4;
-#endif
 
   MV *best_mv = &mbmi->mv[0].as_mv;
 
