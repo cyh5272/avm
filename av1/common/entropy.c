@@ -45,9 +45,11 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
   av1_copy(cm->fc->v_dc_sign_cdf, av1_default_v_dc_sign_cdfs[index]);
   av1_copy(cm->fc->v_ac_sign_cdf, av1_default_v_ac_sign_cdfs[index]);
 #endif  // CONFIG_CONTEXT_DERIVATION
-#if CONFIG_ATC_COEFCODING 
-  av1_copy(cm->fc->coeff_base_lf_cdf, av1_default_coeff_base_lf_multi_cdfs[index]);
-  av1_copy(cm->fc->coeff_base_lf_eob_cdf, av1_default_coeff_base_lf_eob_multi_cdfs[index]);
+#if CONFIG_ATC_COEFCODING
+  av1_copy(cm->fc->coeff_base_lf_cdf,
+           av1_default_coeff_base_lf_multi_cdfs[index]);
+  av1_copy(cm->fc->coeff_base_lf_eob_cdf,
+           av1_default_coeff_base_lf_eob_multi_cdfs[index]);
   av1_copy(cm->fc->coeff_br_lf_cdf, av1_default_coeff_lps_lf_multi_cdfs[index]);
 #endif
   av1_copy(cm->fc->coeff_br_cdf, av1_default_coeff_lps_multi_cdfs[index]);

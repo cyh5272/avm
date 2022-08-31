@@ -162,7 +162,8 @@ typedef struct {
   //! Cost for encoding the base level of a low-frequency coefficient
   int base_lf_cost[LF_SIG_COEF_CONTEXTS][LF_BASE_SYMBOLS * 2];
   //! Cost for encoding an increment to the low-frequency coefficient
-  int lps_lf_cost[LF_LEVEL_CONTEXTS][COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
+  int lps_lf_cost[LF_LEVEL_CONTEXTS]
+                 [COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
 #endif
   /*! \brief Cost for encoding the base_eob of a level.
    *

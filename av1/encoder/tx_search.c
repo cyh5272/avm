@@ -1248,9 +1248,10 @@ static uint32_t get_intra_txb_hash(MACROBLOCK *x, int plane, int blk_row,
                                    int blk_col, BLOCK_SIZE plane_bsize,
                                    TX_SIZE tx_size
 #if CONFIG_ATC_NEWTXSETS
-                                   , PREDICTION_MODE intra_dir
+                                   ,
+                                   PREDICTION_MODE intra_dir
 #endif
-                                   ) {
+) {
   int16_t tmp_data[64 * 64];
   const int diff_stride = block_size_wide[plane_bsize];
   const int16_t *diff = x->plane[plane].src_diff;
@@ -1297,10 +1298,12 @@ static INLINE int is_intra_hash_match(const AV1_COMP *cpi, MACROBLOCK *x,
   MB_MODE_INFO *mbmi = xd->mi[0];
   PREDICTION_MODE intra_dir;
   if (mbmi->filter_intra_mode_info.use_filter_intra)
-     intra_dir = fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
+    intra_dir =
+        fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
   else
-     intra_dir = mbmi->mode;
-  const uint32_t intra_hash = get_intra_txb_hash(x, plane, blk_row, blk_col, plane_bsize, tx_size, intra_dir);
+    intra_dir = mbmi->mode;
+  const uint32_t intra_hash = get_intra_txb_hash(
+      x, plane, blk_row, blk_col, plane_bsize, tx_size, intra_dir);
 #else
   const uint32_t intra_hash =
       get_intra_txb_hash(x, plane, blk_row, blk_col, plane_bsize, tx_size);
@@ -1992,9 +1995,10 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
 #if CONFIG_ATC_NEWTXSETS
   PREDICTION_MODE intra_dir;
   if (mbmi->filter_intra_mode_info.use_filter_intra)
-     intra_dir = fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
+    intra_dir =
+        fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
   else
-     intra_dir = mbmi->mode;
+    intra_dir = mbmi->mode;
 #endif
   const TxfmSearchParams *txfm_params = &x->txfm_search_params;
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
@@ -2041,7 +2045,9 @@ get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
 
 #if CONFIG_ATC_NEWTXSETS
   if (!is_inter) {
-    uint16_t mdtx_mask = av1_md_trfm_used_flag[av1_size_class[tx_size]][is_inter ? 0 : av1_md_class[intra_dir]];
+    uint16_t mdtx_mask =
+        av1_md_trfm_used_flag[av1_size_class[tx_size]]
+                             [is_inter ? 0 : av1_md_class[intra_dir]];
     ext_tx_used_flag &= mdtx_mask;
   }
 #endif

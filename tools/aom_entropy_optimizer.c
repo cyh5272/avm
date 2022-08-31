@@ -363,7 +363,7 @@ int main(int argc, const char **argv) {
   cts_each_dim[3] = TX_TYPES;
 #if CONFIG_FORWARDSKIP
 #if CONFIG_ATC_NEWTXSETS
-  int intra_ext_tx_types_each_ctx[EXT_TX_SETS_INTRA] = { 0, INTRA_TX_SET1};
+  int intra_ext_tx_types_each_ctx[EXT_TX_SETS_INTRA] = { 0, INTRA_TX_SET1 };
   optimize_cdf_table_var_modes_4d(
       &fc.intra_ext_tx[0][0][0][0], probsfile, 4, cts_each_dim,
       intra_ext_tx_types_each_ctx,
@@ -944,7 +944,7 @@ int main(int argc, const char **argv) {
       "static const aom_cdf_prob av1_default_coeff_base_lf_multi_cdfs"
       "[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES][LF_SIG_COEF_CONTEXTS]"
       "[CDF_SIZE(LF_BASE_SYMBOLS)]");
-  
+
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = TX_SIZES;
   cts_each_dim[2] = PLANE_TYPES;
@@ -955,7 +955,7 @@ int main(int argc, const char **argv) {
       "static const aom_cdf_prob av1_default_coeff_base_lf_eob_multi_cdfs"
       "[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES][SIG_COEF_CONTEXTS_EOB]"
       "[CDF_SIZE(LF_BASE_SYMBOLS - 1)]");
-  
+
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = PLANE_TYPES;
   cts_each_dim[2] = LF_LEVEL_CONTEXTS;

@@ -1230,11 +1230,12 @@ typedef struct FRAME_COUNTS {
   unsigned int coeff_base_lf_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]
                                   [LF_SIG_COEF_CONTEXTS][LF_BASE_SYMBOLS];
   unsigned int coeff_base_lf_eob_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]
-                                      [SIG_COEF_CONTEXTS_EOB][LF_BASE_SYMBOLS - 1];
+                                      [SIG_COEF_CONTEXTS_EOB]
+                                      [LF_BASE_SYMBOLS - 1];
   unsigned int coeff_lps_lf_multi[TOKEN_CDF_Q_CTXS][PLANE_TYPES]
                                  [LF_LEVEL_CONTEXTS][BR_CDF_SIZE];
-  unsigned int coeff_lps_multi[TOKEN_CDF_Q_CTXS][PLANE_TYPES]
-                              [LEVEL_CONTEXTS][BR_CDF_SIZE];
+  unsigned int coeff_lps_multi[TOKEN_CDF_Q_CTXS][PLANE_TYPES][LEVEL_CONTEXTS]
+                              [BR_CDF_SIZE];
 #else
   unsigned int coeff_lps_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]
                               [LEVEL_CONTEXTS][BR_CDF_SIZE];

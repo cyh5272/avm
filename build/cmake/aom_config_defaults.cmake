@@ -139,8 +139,7 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
 # AV2 experiment flags.
 set_aom_config_var(CONFIG_ATC_COEFCODING 1
                    "AV2 enable coefficient coding improvement.")
-set_aom_config_var(CONFIG_ATC_NEWTXSETS 1
-                   "AV2 enable new transform sets.")
+set_aom_config_var(CONFIG_ATC_NEWTXSETS 1 "AV2 enable new transform sets.")
 set_aom_config_var(CONFIG_C043_MVP_IMPROVEMENTS 1
                    "AV2 enable MVP list improvements.")
 set_aom_config_var(CONFIG_FORWARDSKIP 1

@@ -159,7 +159,8 @@ static INLINE int get_br_lf_ctx_2d(const uint8_t *const levels,
 
 static AOM_FORCE_INLINE int get_br_lf_ctx(const uint8_t *const levels,
                                           const int c,  // raster order
-                                          const int bwl, const TX_CLASS tx_class) {
+                                          const int bwl,
+                                          const TX_CLASS tx_class) {
   const int row = c >> bwl;
   const int col = c - (row << bwl);
   const int stride = (1 << bwl) + TX_PAD_HOR;
@@ -315,7 +316,8 @@ static INLINE int get_sign_ctx_skip(const int8_t *const signs,
 
 #if CONFIG_ATC_COEFCODING
 static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
-                                          const int bwl, const TX_CLASS tx_class) {
+                                          const int bwl,
+                                          const TX_CLASS tx_class) {
   int mag;
   // Note: AOMMIN(level, 5) is useless for decoder since level < 5.
   mag = clip_max5[levels[1]];                         // { 0, 1 }
@@ -392,8 +394,7 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_skip(const int stats,
 static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_lf(
     const int stats,
     const int coeff_idx,  // raster order
-    const int bwl,
-    const TX_CLASS tx_class) {
+    const int bwl, const TX_CLASS tx_class) {
   int ctx = (stats + 1) >> 1;
   switch (tx_class) {
     case TX_CLASS_2D: {
@@ -416,7 +417,7 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_lf(
       if (col == 0) {
         ctx = AOMMIN(ctx, 6);
         ctx += LF_SIG_COEF_CONTEXTS_2D;
-      } else { // col == 1
+      } else {  // col == 1
         ctx = AOMMIN(ctx, 4);
         ctx += LF_SIG_COEF_CONTEXTS_2D + 7;
       }
@@ -427,7 +428,7 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_lf(
       if (row == 0) {
         ctx = AOMMIN(ctx, 6);
         ctx += LF_SIG_COEF_CONTEXTS_2D;
-      } else { // row == 1
+      } else {  // row == 1
         ctx = AOMMIN(ctx, 4);
         ctx += LF_SIG_COEF_CONTEXTS_2D + 7;
       }
@@ -454,11 +455,11 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats(
   switch (tx_class) {
     case TX_CLASS_2D: {
 #if CONFIG_ATC_COEFCODING
-         const int row = coeff_idx >> bwl;
-         const int col = coeff_idx - (row << bwl);
-         if (row + col < 6) return ctx;
-         if (row + col < 8) return 5 + ctx;
-         return 10 + ctx;
+      const int row = coeff_idx >> bwl;
+      const int col = coeff_idx - (row << bwl);
+      if (row + col < 6) return ctx;
+      if (row + col < 8) return 5 + ctx;
+      return 10 + ctx;
 #else
       // This is the algorithm to generate av1_nz_map_ctx_offset[][]
       //   const int width = tx_size_wide[tx_size];
@@ -471,7 +472,7 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats(
       //   if (row + col < 2) return ctx + 1;
       //   if (row + col < 4) return 5 + ctx + 1;
       //   return 21 + ctx;
-         return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
+      return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
 #endif
     }
     case TX_CLASS_HORIZ: {
@@ -560,12 +561,13 @@ static AOM_FORCE_INLINE int get_lower_levels_lf_ctx(const uint8_t *levels,
 }
 #endif
 
-static INLINE int get_lower_levels_ctx_2d(const uint8_t *levels,
-                                          int coeff_idx, int bwl
+static INLINE int get_lower_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
+                                          int bwl
 #if !CONFIG_ATC_COEFCODING
-                                          , TX_SIZE tx_size
+                                          ,
+                                          TX_SIZE tx_size
 #endif
-                                          ) {
+) {
   assert(coeff_idx > 0);
   int mag;
   // Note: AOMMIN(level, 3) is useless for decoder since level < 3.
@@ -580,28 +582,25 @@ static INLINE int get_lower_levels_ctx_2d(const uint8_t *levels,
 #if CONFIG_ATC_COEFCODING
   const int row = coeff_idx >> bwl;
   const int col = coeff_idx - (row << bwl);
-   if (row + col < 6) return ctx;
-   if (row + col < 8) return ctx + 5;
-   return ctx + 10;
+  if (row + col < 6) return ctx;
+  if (row + col < 8) return ctx + 5;
+  return ctx + 10;
 #else
-   return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
+  return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
 #endif
 }
 
 #if CONFIG_ATC_COEFCODING
-static INLINE int get_lf_limits(int row, int col,
-                                TX_CLASS tx_class,
+static INLINE int get_lf_limits(int row, int col, TX_CLASS tx_class,
                                 int plane) {
   int limits = 0;
-  if (tx_class== TX_CLASS_2D) {
-    limits = plane == 0 ? ( (row + col) < LF_2D_LIM ) :
-       ((row + col) < LF_2D_LIM_UV);
+  if (tx_class == TX_CLASS_2D) {
+    limits =
+        plane == 0 ? ((row + col) < LF_2D_LIM) : ((row + col) < LF_2D_LIM_UV);
   } else if (tx_class == TX_CLASS_HORIZ) {
-    limits = plane == 0 ?
-        (col < LF_RC_LIM) : (col < LF_RC_LIM_UV);
+    limits = plane == 0 ? (col < LF_RC_LIM) : (col < LF_RC_LIM_UV);
   } else {
-    limits = plane == 0 ?
-        (row < LF_RC_LIM) : (row < LF_RC_LIM_UV);
+    limits = plane == 0 ? (row < LF_RC_LIM) : (row < LF_RC_LIM_UV);
   }
   return limits;
 }
@@ -631,9 +630,10 @@ static INLINE int get_lower_levels_ctx_general(int is_last, int scan_idx,
 #endif
                                                TX_CLASS tx_class
 #if CONFIG_ATC_COEFCODING
-                                               , int plane
+                                               ,
+                                               int plane
 #endif
-                                               ) {
+) {
   if (is_last) {
     if (scan_idx == 0) return 0;
     if (scan_idx <= (height << bwl) >> 3) return 1;

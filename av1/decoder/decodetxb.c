@@ -63,20 +63,16 @@ static INLINE int get_dqv(const int32_t *dequant, int coeff_idx,
   return dqv;
 }
 
-static INLINE void read_coeffs_reverse_2d(aom_reader *r,
+static INLINE void read_coeffs_reverse_2d(
+    aom_reader *r,
 #if !CONFIG_ATC_COEFCODING
-                                          TX_SIZE tx_size,
+    TX_SIZE tx_size,
 #endif
-                                          int start_si, int end_si,
-                                          const int16_t *scan, int bwl,
-                                          uint8_t *levels,
+    int start_si, int end_si, const int16_t *scan, int bwl, uint8_t *levels,
 #if CONFIG_ATC_COEFCODING
-                                          base_lf_cdf_arr base_lf_cdf,
-                                          br_cdf_arr br_lf_cdf,
-                                          int plane,
+    base_lf_cdf_arr base_lf_cdf, br_cdf_arr br_lf_cdf, int plane,
 #endif
-                                          base_cdf_arr base_cdf,
-                                          br_cdf_arr br_cdf) {
+    base_cdf_arr base_cdf, br_cdf_arr br_cdf) {
   for (int c = end_si; c >= start_si; --c) {
     const int pos = scan[c];
 #if CONFIG_ATC_COEFCODING
@@ -86,7 +82,8 @@ static INLINE void read_coeffs_reverse_2d(aom_reader *r,
     int limits = get_lf_limits(row, col, 0, plane);
     if (limits) {
       const int coeff_ctx = get_lower_levels_ctx_lf_2d(levels, pos, bwl);
-      level += aom_read_symbol(r, base_lf_cdf[coeff_ctx], LF_BASE_SYMBOLS, ACCT_STR);
+      level +=
+          aom_read_symbol(r, base_lf_cdf[coeff_ctx], LF_BASE_SYMBOLS, ACCT_STR);
       if (level > LF_NUM_BASE_LEVELS) {
         const int br_ctx = get_br_lf_ctx_2d(levels, pos, bwl);
         aom_cdf_prob *cdf = br_lf_cdf[br_ctx];
@@ -136,8 +133,7 @@ static INLINE void read_coeffs_reverse(aom_reader *r,
                                        uint8_t *levels,
 #if CONFIG_ATC_COEFCODING
                                        base_lf_cdf_arr base_lf_cdf,
-                                       br_cdf_arr br_lf_cdf,
-                                       int plane,
+                                       br_cdf_arr br_lf_cdf, int plane,
 #endif
                                        base_cdf_arr base_cdf,
                                        br_cdf_arr br_cdf) {
@@ -149,9 +145,9 @@ static INLINE void read_coeffs_reverse(aom_reader *r,
     const int col = pos - (row << bwl);
     int limits = get_lf_limits(row, col, tx_class, plane);
     if (limits) {
-      const int coeff_ctx =
-          get_lower_levels_lf_ctx(levels, pos, bwl, tx_class);
-      level += aom_read_symbol(r, base_lf_cdf[coeff_ctx], LF_BASE_SYMBOLS, ACCT_STR);
+      const int coeff_ctx = get_lower_levels_lf_ctx(levels, pos, bwl, tx_class);
+      level +=
+          aom_read_symbol(r, base_lf_cdf[coeff_ctx], LF_BASE_SYMBOLS, ACCT_STR);
       if (level > LF_NUM_BASE_LEVELS) {
         const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
         aom_cdf_prob *cdf = br_lf_cdf[br_ctx];
@@ -162,8 +158,7 @@ static INLINE void read_coeffs_reverse(aom_reader *r,
         }
       }
     } else {
-      const int coeff_ctx =
-          get_lower_levels_ctx(levels, pos, bwl, tx_class);
+      const int coeff_ctx = get_lower_levels_ctx(levels, pos, bwl, tx_class);
       level += aom_read_symbol(r, base_cdf[coeff_ctx], 4, ACCT_STR);
       if (level > NUM_BASE_LEVELS) {
         const int br_ctx = get_br_ctx(levels, pos, bwl, tx_class);
@@ -620,7 +615,8 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   }
   if (*eob > 1) {
 #if CONFIG_ATC_COEFCODING
-    base_lf_cdf_arr base_lf_cdf = ec_ctx->coeff_base_lf_cdf[txs_ctx][plane_type];
+    base_lf_cdf_arr base_lf_cdf =
+        ec_ctx->coeff_base_lf_cdf[txs_ctx][plane_type];
     br_cdf_arr br_lf_cdf = ec_ctx->coeff_br_lf_cdf[plane_type];
 #endif
     base_cdf_arr base_cdf = ec_ctx->coeff_base_cdf[txs_ctx][plane_type];
@@ -632,40 +628,23 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif
     if (tx_class == TX_CLASS_2D) {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse_2d(r, 1, *eob - 1 - 1, scan, bwl, levels,
-                             base_lf_cdf,
-                             br_lf_cdf,
-                             plane,
-                             base_cdf,
-                             br_cdf);
-      read_coeffs_reverse(r, tx_class, 0, 0, scan, bwl, levels,
-                          base_lf_cdf,
-                          br_lf_cdf,
-                          plane,
-                          base_cdf,
-                          br_cdf);
+      read_coeffs_reverse_2d(r, 1, *eob - 1 - 1, scan, bwl, levels, base_lf_cdf,
+                             br_lf_cdf, plane, base_cdf, br_cdf);
+      read_coeffs_reverse(r, tx_class, 0, 0, scan, bwl, levels, base_lf_cdf,
+                          br_lf_cdf, plane, base_cdf, br_cdf);
 #else
       read_coeffs_reverse_2d(r, tx_size, 1, *eob - 1 - 1, scan, bwl, levels,
-                             base_cdf,
-                             br_cdf);
+                             base_cdf, br_cdf);
       read_coeffs_reverse(r, tx_size, tx_class, 0, 0, scan, bwl, levels,
-                          base_cdf,
-                          br_cdf);
+                          base_cdf, br_cdf);
 #endif
     } else {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse(r, tx_class, 0, *eob - 1 - 1, scan, bwl,
-                          levels,
-                          base_lf_cdf,
-                          br_lf_cdf,
-                          plane,
-                          base_cdf,
-                          br_cdf);
+      read_coeffs_reverse(r, tx_class, 0, *eob - 1 - 1, scan, bwl, levels,
+                          base_lf_cdf, br_lf_cdf, plane, base_cdf, br_cdf);
 #else
       read_coeffs_reverse(r, tx_size, tx_class, 0, *eob - 1 - 1, scan, bwl,
-                          levels,
-                          base_cdf,
-                          br_cdf);
+                          levels, base_cdf, br_cdf);
 #endif
     }
   }
@@ -732,7 +711,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       }
 #endif
       if (c == 0) dc_val = sign ? -level : level;
-	  
+
       // Bitmasking to clamp level to valid range:
       //   The valid range for 8/10/12 bit vdieo is at most 14/16/18 bit
       level &= 0xfffff;

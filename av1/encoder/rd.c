@@ -282,7 +282,9 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 #if CONFIG_ATC_NEWTXSETS
               mode_costs->intra_tx_type_costs[s][i][j],
               fc->intra_ext_tx_cdf[s][i][j],
-              tx_set_type == EXT_NEW_TX_SET ? av1_md_idx2type[av1_size_class[i]][av1_md_class[j]] : av1_ext_tx_inv[tx_set_type] );
+              tx_set_type == EXT_NEW_TX_SET
+                  ? av1_md_idx2type[av1_size_class[i]][av1_md_class[j]]
+                  : av1_ext_tx_inv[tx_set_type]);
 #else
               mode_costs->intra_tx_type_costs[s][i][j],
               fc->intra_ext_tx_cdf[s][i][j],
@@ -776,7 +778,8 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
                                  NULL);
       for (int ctx = 0; ctx < LF_SIG_COEF_CONTEXTS; ++ctx) {
         av1_cost_tokens_from_cdf(pcost->base_lf_cost[ctx],
-                                 fc->coeff_base_lf_cdf[tx_size][plane][ctx], NULL);
+                                 fc->coeff_base_lf_cdf[tx_size][plane][ctx],
+                                 NULL);
       }
       for (int ctx = 0; ctx < SIG_COEF_CONTEXTS; ++ctx) {
         av1_cost_tokens_from_cdf(pcost->base_cost[ctx],
@@ -822,9 +825,8 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
         int br_lf_rate[BR_CDF_SIZE];
         int prev_cost_lf = 0;
         int i, j;
-        av1_cost_tokens_from_cdf(
-            br_lf_rate, fc->coeff_br_lf_cdf[plane][ctx],
-            NULL);
+        av1_cost_tokens_from_cdf(br_lf_rate, fc->coeff_br_lf_cdf[plane][ctx],
+                                 NULL);
         for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
           for (j = 0; j < BR_CDF_SIZE - 1; j++) {
             pcost->lps_lf_cost[ctx][i + j] = prev_cost_lf + br_lf_rate[j];
