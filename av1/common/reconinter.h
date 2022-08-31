@@ -470,6 +470,10 @@ void av1_opfl_rebuild_inter_predictor(
     ,
     int use_4x4
 #endif  // CONFIG_OPTFLOW_ON_TIP
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+    ,
+    int qindex
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
 );
 
 // Integer division based on lookup table.
