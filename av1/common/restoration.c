@@ -1896,10 +1896,20 @@ void apply_wienerns_class_id_highbd(
     const int16_t *filter = const_nsfilter_taps(wienerns_info, 0);
     const int16_t *filter_ = filter;
 
-    // TODO: This branch needs a classified dual filtering.
-    av1_convolve_nonsep_dual_highbd(dgd8, width, height, stride, luma8,
-                                    luma_stride, nsfilter_config, filter_, dst8,
-                                    dst_stride, bit_depth);
+    const int block_size = 4;
+    for (int r = 0; r < height; r += block_size) {
+      const int h = AOMMIN(block_size, height - r);
+      const uint8_t *dgd8_row = dgd8 + r * stride;
+      const uint8_t *luma8_row = luma8 + r * luma_stride;
+      uint8_t *dst8_row = dst8 + r * dst_stride;
+
+      for (int c = 0; c < width; c += block_size) {
+        const int w = AOMMIN(block_size, width - c);
+        av1_convolve_nonsep_dual_highbd(
+            dgd8_row + c, w, h, stride, luma8_row + c, luma_stride,
+            nsfilter_config, filter_, dst8_row + c, dst_stride, bit_depth);
+      }
+    }
     return;
   }
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
