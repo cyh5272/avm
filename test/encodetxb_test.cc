@@ -75,7 +75,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
           const int real_width = tx_size_wide[tx_size];
           const int real_height = tx_size_high[tx_size];
           const int16_t *const scan = av1_scan_orders[tx_size][tx_type].scan;
-
+#if !CONFIG_ATC_COEFCODING
           levels_ = set_levels(levels_buf_, width);
           for (int i = 0; i < kNumTests && !result; ++i) {
             for (int eob = 1; eob <= width * height && !result; ++eob) {
@@ -93,6 +93,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
                   << " height " << real_height << " eob " << eob;
             }
           }
+#endif
         }
       }
     }
@@ -120,6 +121,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
       InitDataWithEob(scan, bwl, eob);
 
       aom_usec_timer_start(&timer_ref);
+#if !CONFIG_ATC_COEFCODING
       for (int i = 0; i < numTests; ++i) {
         av1_get_nz_map_contexts_c(levels_, scan, eob, (TX_SIZE)tx_size,
                                   tx_class, coeff_contexts_ref_);
@@ -134,6 +136,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
         get_nz_map_contexts_func_(levels_, scan, eob, (TX_SIZE)tx_size,
                                   tx_class, coeff_contexts_);
       }
+#endif
       aom_usec_timer_mark(&timer);
 
       const int elapsed_time_ref =
