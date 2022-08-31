@@ -1222,8 +1222,8 @@ static int add_tpl_ref_mv(const AV1_COMMON *cm, const MACROBLOCKD *xd,
         ref_mv_stack[idx].comp_mv.as_int = comp_refmv.as_int;
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-      ref_mv_stack[idx].row_offset = OFFSET_NONSPATIAL;
-      ref_mv_stack[idx].col_offset = OFFSET_NONSPATIAL;
+        ref_mv_stack[idx].row_offset = OFFSET_NONSPATIAL;
+        ref_mv_stack[idx].col_offset = OFFSET_NONSPATIAL;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
         ref_mv_weight[idx] = 2 * weight_unit;
         ++(*refmv_count);
