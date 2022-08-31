@@ -96,26 +96,6 @@ void resample_vert(const int16_t *x, int inwidth, int inheight, int instride,
                    RationalResampleFilter *rfv, ClipProfile *clip, int16_t *y,
                    int outheight, int outstride);
 
-// 8-bit versions of high-level resampling functions
-
-// Assume no extension of the input x buffer
-void resample_1d_8b(const uint8_t *x, int inlen, RationalResampleFilter *rf,
-                    int downshift, ClipProfile *clip, uint8_t *y, int outlen);
-
-void av1_resample_2d_8b(const uint8_t *x, int inwidth, int inheight,
-                        int instride, RationalResampleFilter *rfh,
-                        RationalResampleFilter *rfv, int int_extra_bits,
-                        ClipProfile *clip, uint8_t *y, int outwidth,
-                        int outheight, int outstride);
-
-void resample_horz_8b(const uint8_t *x, int inwidth, int inheight, int instride,
-                      RationalResampleFilter *rfh, ClipProfile *clip,
-                      uint8_t *y, int outwidth, int outstride);
-
-void resample_vert_8b(const uint8_t *x, int inwidth, int inheight, int instride,
-                      RationalResampleFilter *rfv, ClipProfile *clip,
-                      uint8_t *y, int outheight, int outstride);
-
 void show_resample_filter(RationalResampleFilter *rf);
 
 int get_resampled_output_length(int inlen, int p, int q, int force_even);

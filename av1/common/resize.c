@@ -993,8 +993,8 @@ Error:
 void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
                                    int width, int in_stride, uint8_t *output,
                                    int height2, int width2, int out_stride,
-                                   int subx, int suby, int is_hbd, int bd,
-                                   int denom, int num) {
+                                   int subx, int suby, int bd, int denom,
+                                   int num) {
   int coeff_prec_bits = 14;
   int extra_prec_bits = 2;
   WIN_TYPE win = WIN_LANCZOS;
@@ -1019,17 +1019,11 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
     exit(1);
   }
 
-  if (is_hbd) {
-    const int16_t *input16 = (int16_t *)CONVERT_TO_SHORTPTR(input);
-    int16_t *output16 = (int16_t *)CONVERT_TO_SHORTPTR(output);
-    av1_resample_2d(input16, width, height, in_stride, &horz_rf, &vert_rf,
-                    extra_prec_bits, &clip, output16, width2, height2,
-                    out_stride);
-  } else {
-    av1_resample_2d_8b(input, width, height, in_stride, &horz_rf, &vert_rf,
-                       extra_prec_bits, &clip, output, width2, height2,
-                       out_stride);
-  }
+  const int16_t *input16 = (int16_t *)CONVERT_TO_SHORTPTR(input);
+  int16_t *output16 = (int16_t *)CONVERT_TO_SHORTPTR(output);
+  av1_resample_2d(input16, width, height, in_stride, &horz_rf, &vert_rf,
+                  extra_prec_bits, &clip, output16, width2, height2,
+                  out_stride);
 }
 
 void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
@@ -1037,14 +1031,13 @@ void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
                                          const int num_planes, const int subx,
                                          const int suby, const int denom,
                                          const int num) {
-  const int is_hbd = src->flags & YV12_FLAG_HIGHBITDEPTH;
   for (int i = 0; i < AOMMIN(num_planes, MAX_MB_PLANE); ++i) {
     const int is_uv = i > 0;
     av1_resample_plane_2d_lanczos(
         src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
         src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
         dst->crop_widths[is_uv], dst->strides[is_uv], is_uv ? subx : 0,
-        is_uv ? suby : 0, is_hbd, bd, denom, num);
+        is_uv ? suby : 0, bd, denom, num);
   }
   aom_extend_frame_borders(dst, num_planes);
 }
@@ -1311,7 +1304,6 @@ void av1_upscale_2d_lanczos_and_extend_frame(const AV1_COMMON *cm,
                                              const int suby, const int sr_denom,
                                              const int sr_num) {
   const int num_planes = av1_num_planes(cm);
-  const int is_hbd = src->flags & YV12_FLAG_HIGHBITDEPTH;
   for (int i = 0; i < num_planes; ++i) {
     const int is_uv = (i > 0);
     // The resampler takes sr_num as the scaling denominator and sr_demon as the
@@ -1320,7 +1312,7 @@ void av1_upscale_2d_lanczos_and_extend_frame(const AV1_COMMON *cm,
         src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
         src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
         dst->crop_widths[is_uv], dst->strides[is_uv], is_uv ? subx : 0,
-        is_uv ? suby : 0, is_hbd, bd, sr_num, sr_denom);
+        is_uv ? suby : 0, bd, sr_num, sr_denom);
   }
 
   aom_extend_frame_borders(dst, num_planes);
@@ -1482,8 +1474,7 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 #if CONFIG_EXT_SUPERRES
   if (aom_alloc_frame_buffer(
           &copy_buffer, cm->width, cm->height, seq_params->subsampling_x,
-          seq_params->subsampling_y, seq_params->use_highbitdepth,
-          AOM_BORDER_IN_PIXELS, byte_alignment))
+          seq_params->subsampling_y, AOM_BORDER_IN_PIXELS, byte_alignment))
 #else   // CONFIG_EXT_SUPERRES
   const int aligned_width = ALIGN_POWER_OF_TWO(cm->width, 3);
   if (aom_alloc_frame_buffer(
