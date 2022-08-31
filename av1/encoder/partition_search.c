@@ -1635,14 +1635,16 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
  *                         data/contexts/models for the tile during encoding
  * \param[in]    td        Pointer to thread data
  * \param[in]    tp        Pointer to the starting token
- * \param[in]    mi_row    Row coordinate of the block in a step size of
- * MI_SIZE \param[in]    mi_col    Column coordinate of the block in a step
- * size of MI_SIZE \param[in]    dry_run   A code indicating whether it is
- * part of the final pass for reconstructing the superblock \param[in] bsize
- * Current block size \param[in]    partition Partition mode of the parent
- * block \param[in]    ctx       Pointer to structure holding coding contexts
- * and the chosen modes for the current block \param[in]    rate      Pointer
- * to the total rate for the current block
+ * \param[in]    mi_row    Row coordinate of the block in a step size of MI_SIZE
+ * \param[in]    mi_col    Column coordinate of the block in a step size of
+ *                         MI_SIZE
+ * \param[in]    dry_run   A code indicating whether it is part of the final
+ *                         pass for reconstructing the superblock
+ * \param[in]    bsize     Current block size
+ * \param[in]    partition Partition mode of the parent block
+ * \param[in]    ctx       Pointer to structure holding coding contexts and the
+ *                         chosen modes for the current block
+ * \param[in]    rate      Pointer to the total rate for the current block
  *
  * Nothing is returned. Instead, reconstructions (w/o in-loop filters)
  * will be updated in the pixel buffers in td->mb.e_mbd. Also, the chosen
@@ -1854,13 +1856,14 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
  * \param[in]    tile_data Pointer to struct holding adaptive
  *                         data/contexts/models for the tile during encoding
  * \param[in]    tp        Pointer to the starting token
- * \param[in]    mi_row    Row coordinate of the block in a step size of
- * MI_SIZE \param[in]    mi_col    Column coordinate of the block in a step
- * size of MI_SIZE \param[in]    dry_run   A code indicating whether it is
- * part of the final pass for reconstructing the superblock \param[in] bsize
- * Current block size \param[in]    pc_tree   Pointer to the PC_TREE node
- * storing the picked partitions and mode info for the current block
- * \param[in]    rate      Pointer to the total rate for the current block
+ * \param[in]    mi_row    Row coordinate of the block in a step size of MI_SIZE
+ * \param[in]    mi_col    Column coordinate of the block in a step size of
+ *                         MI_SIZE
+ * \param[in]    dry_run   A code indicating whether it is part of the final
+ *                         pass for reconstructing the superblock
+ * \param[in]    bsize     Current block size
+ * \param[in]    pc_tree   Pointer to the PC_TREE node storing the picked
+ *                         partitions and mode info for the current block
  *
  * Nothing is returned. Instead, reconstructions (w/o in-loop filters)
  * will be updated in the pixel buffers in td->mb.e_mbd.
@@ -2008,8 +2011,7 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
   update_ext_partition_context(xd, mi_row, mi_col, subsize, bsize, partition);
 }
 
-/*!\brief AV1 block partition search (partition estimation and partial
-search).
+/*!\brief AV1 block partition search (partition estimation and partial search).
 *
 * \ingroup partition_search
 * Encode the block by applying pre-calculated partition patterns that are
@@ -2025,8 +2027,7 @@ data/contexts/models for the tile during encoding
 blocks starting from the first pixel of the current
 block
 * \param[in]    tp        Pointer to the starting token
-* \param[in]    mi_row    Row coordinate of the block in a step size of
-MI_SIZE
+* \param[in]    mi_row    Row coordinate of the block in a step size of MI_SIZE
 * \param[in]    mi_col    Column coordinate of the block in a step size of
 MI_SIZE
 * \param[in]    bsize     Current block size
@@ -3068,8 +3069,7 @@ static void prune_4_way_partition_search(
                              part_search_state->ss_x,
                              part_search_state->ss_y) != BLOCK_INVALID;
   }
-  // Pruning: pruning out 4-way partitions based on the current best
-  // partition.
+  // Pruning: pruning out 4-way partitions based on the current best partition.
   if (cpi->sf.part_sf.prune_ext_partition_types_search_level == 2) {
     part4_search_allowed[HORZ4] &= (pc_tree->partitioning == PARTITION_HORZ ||
                                     pc_tree->partitioning == PARTITION_HORZ_A ||
@@ -3095,8 +3095,8 @@ static void prune_4_way_partition_search(
         pb_source_variance, mi_row, mi_col);
   }
 
-  // Pruning: pruning out 4-way partitions based on the number of horz/vert
-  // wins in the current block and sub-blocks in PARTITION_SPLIT.
+  // Pruning: pruning out 4-way partitions based on the number of horz/vert wins
+  // in the current block and sub-blocks in PARTITION_SPLIT.
   prune_4_partition_using_split_info(cpi, x, part_search_state,
                                      part4_search_allowed);
 }
@@ -3628,8 +3628,8 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
       partition_vert_allowed, &part_search_state.do_rectangular_split,
       &part_search_state.do_square_split, prune_horz, prune_vert);
 
-  // Pruning: eliminating partition types leading to coding block sizes
-  // outside the min and max bsize limitations set from the encoder.
+  // Pruning: eliminating partition types leading to coding block sizes outside
+  // the min and max bsize limitations set from the encoder.
   av1_prune_partitions_by_max_min_bsize(
       &x->sb_enc, bsize, blk_params.has_rows && blk_params.has_cols,
       &part_search_state.partition_none_allowed, partition_horz_allowed,
@@ -3650,9 +3650,9 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 
   // Partition search
 BEGIN_PARTITION_SEARCH:
-  // If a valid partition is required, usually when the first round cannot
-  // find a valid one under the cost limit after pruning, reset the
-  // limitations on partition types.
+  // If a valid partition is required, usually when the first round cannot find
+  // a valid one under the cost limit after pruning, reset the limitations on
+  // partition types.
   if (x->must_find_valid_partition)
     reset_part_limitations(cpi, &part_search_state);
 
@@ -3739,8 +3739,8 @@ BEGIN_PARTITION_SEARCH:
   // 4-way partitions search stage.
   int part4_search_allowed[NUM_PART4_TYPES] = { 1, 1 };
 
-  // Disable 4-way partition search flags for width less than twice the
-  // minimum width.
+  // Disable 4-way partition search flags for width less than twice the minimum
+  // width.
   if (blk_params.width < (blk_params.min_partition_size_1d << 2) ||
       (xd->tree_type == CHROMA_PART && bsize <= BLOCK_16X16) ||
       (luma_split_flag > 3)) {
@@ -3843,9 +3843,8 @@ BEGIN_PARTITION_SEARCH:
 #endif
 
 #if CONFIG_COLLECT_PARTITION_STATS == 2
-  // If CONFIG_COLLECTION_PARTITION_STATS is 2, then we print out the stats
-  // for the whole clip. So we need to pass the information upstream to the
-  // encoder.
+  // If CONFIG_COLLECTION_PARTITION_STATS is 2, then we print out the stats for
+  // the whole clip. So we need to pass the information upstream to the encoder.
   const int bsize_idx = av1_get_bsize_idx_for_part_stats(bsize);
   int *agg_attempts = part_stats->partition_attempts[bsize_idx];
   int *agg_decisions = part_stats->partition_decisions[bsize_idx];

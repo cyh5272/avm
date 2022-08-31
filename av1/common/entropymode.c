@@ -1555,6 +1555,7 @@ static const aom_cdf_prob default_skip_txfm_cdfs[SKIP_CONTEXTS][CDF_SIZE(2)] = {
 static const aom_cdf_prob default_skip_mode_cdfs[SKIP_MODE_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(26621) }, { AOM_CDF2(15708) }, { AOM_CDF2(4127) } };
 #else
+static const aom_cdf_prob default_skip_mode_cdfs[SKIP_MODE_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(32621) }, { AOM_CDF2(20708) }, { AOM_CDF2(8127) } };
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
@@ -1655,20 +1656,21 @@ static const aom_cdf_prob default_intra_2way_txfm_partition_cdf[CDF_SIZE(2)] = {
   AOM_CDF2(30531)
 };
 #else   // CONFIG_NEW_TX_PARTITION
-    static const aom_cdf_prob
-        default_tx_size_cdf[MAX_TX_CATS][TX_SIZE_CONTEXTS][CDF_SIZE(
-            MAX_TX_DEPTH + 1)] = {
-          { { AOM_CDF2(19968) }, { AOM_CDF2(19968) }, { AOM_CDF2(24320) } },
-          { { AOM_CDF3(12272, 30172) },
-            { AOM_CDF3(12272, 30172) },
-            { AOM_CDF3(18677, 30848) } },
-          { { AOM_CDF3(12986, 15180) },
-            { AOM_CDF3(12986, 15180) },
-            { AOM_CDF3(24302, 25602) } },
-          { { AOM_CDF3(5782, 11475) },
-            { AOM_CDF3(5782, 11475) },
-            { AOM_CDF3(16803, 22759) } },
-        };
+static const aom_cdf_prob default_tx_size_cdf[MAX_TX_CATS][TX_SIZE_CONTEXTS]
+                                             [CDF_SIZE(MAX_TX_DEPTH + 1)] = {
+                                               { { AOM_CDF2(19968) },
+                                                 { AOM_CDF2(19968) },
+                                                 { AOM_CDF2(24320) } },
+                                               { { AOM_CDF3(12272, 30172) },
+                                                 { AOM_CDF3(12272, 30172) },
+                                                 { AOM_CDF3(18677, 30848) } },
+                                               { { AOM_CDF3(12986, 15180) },
+                                                 { AOM_CDF3(12986, 15180) },
+                                                 { AOM_CDF3(24302, 25602) } },
+                                               { { AOM_CDF3(5782, 11475) },
+                                                 { AOM_CDF3(5782, 11475) },
+                                                 { AOM_CDF3(16803, 22759) } },
+                                             };
 #endif  // CONFIG_NEW_TX_PARTITION
 
 #if CONFIG_IST
@@ -1938,10 +1940,10 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->comp_ref0_cdf, default_comp_ref0_cdf);
   av1_copy(fc->comp_ref1_cdf, default_comp_ref1_cdf);
 #else
-      av1_copy(fc->comp_ref_cdf, default_comp_ref_cdf);
-      av1_copy(fc->comp_ref_type_cdf, default_comp_ref_type_cdf);
-      av1_copy(fc->uni_comp_ref_cdf, default_uni_comp_ref_cdf);
-      av1_copy(fc->comp_bwdref_cdf, default_comp_bwdref_cdf);
+  av1_copy(fc->comp_ref_cdf, default_comp_ref_cdf);
+  av1_copy(fc->comp_ref_type_cdf, default_comp_ref_type_cdf);
+  av1_copy(fc->uni_comp_ref_cdf, default_uni_comp_ref_cdf);
+  av1_copy(fc->comp_bwdref_cdf, default_comp_bwdref_cdf);
 #endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_NEW_TX_PARTITION
   av1_copy(fc->inter_4way_txfm_partition_cdf,
@@ -1949,7 +1951,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->inter_2way_txfm_partition_cdf,
            default_inter_2way_txfm_partition_cdf);
 #else
-      av1_copy(fc->txfm_partition_cdf, default_txfm_partition_cdf);
+  av1_copy(fc->txfm_partition_cdf, default_txfm_partition_cdf);
 #endif  // CONFIG_NEW_TX_PARTITION
   av1_copy(fc->comp_group_idx_cdf, default_comp_group_idx_cdfs);
   av1_copy(fc->inter_single_mode_cdf, default_inter_single_mode_cdf);
@@ -1964,9 +1966,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
     av1_copy(fc->drl_cdf[2], default_drl2_cdf);
   }
 #else
-      av1_copy(fc->drl_cdf[0], default_drl0_cdf);
-      av1_copy(fc->drl_cdf[1], default_drl1_cdf);
-      av1_copy(fc->drl_cdf[2], default_drl2_cdf);
+  av1_copy(fc->drl_cdf[0], default_drl0_cdf);
+  av1_copy(fc->drl_cdf[1], default_drl1_cdf);
+  av1_copy(fc->drl_cdf[2], default_drl2_cdf);
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_EXTENDED_WARP_PREDICTION
   av1_copy(fc->obmc_cdf, default_obmc_cdf);
@@ -1975,8 +1977,8 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warp_delta_param_cdf, default_warp_delta_param_cdf);
   av1_copy(fc->warp_extend_cdf, default_warp_extend_cdf);
 #else
-      av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
-      av1_copy(fc->obmc_cdf, default_obmc_cdf);
+  av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
+  av1_copy(fc->obmc_cdf, default_obmc_cdf);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   av1_copy(fc->skip_drl_cdf, default_skip_drl_cdf);
@@ -2007,7 +2009,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->y_mode_idx_cdf_0, default_y_first_mode_cdf);
   av1_copy(fc->y_mode_idx_cdf_1, default_y_second_mode_cdf);
 #else
-      av1_copy(fc->y_mode_cdf, default_if_y_mode_cdf);
+  av1_copy(fc->y_mode_cdf, default_if_y_mode_cdf);
 #endif  // CONFIG_AIMC
   av1_copy(fc->uv_mode_cdf, default_uv_mode_cdf);
   av1_copy(fc->mrl_index_cdf, default_mrl_index_cdf);
@@ -2027,7 +2029,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->intra_inter_cdf[0], default_intra_inter_cdf[0]);
   av1_copy(fc->intra_inter_cdf[1], default_intra_inter_cdf[1]);
 #else
-      av1_copy(fc->intra_inter_cdf, default_intra_inter_cdf);
+  av1_copy(fc->intra_inter_cdf, default_intra_inter_cdf);
 #endif  // CONFIG_CONTEXT_DERIVATION
   for (int i = 0; i < SPATIAL_PREDICTION_PROBS; i++)
     av1_copy(fc->seg.spatial_pred_seg_cdf[i],
@@ -2038,7 +2040,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->intra_2way_txfm_partition_cdf,
            default_intra_2way_txfm_partition_cdf);
 #else
-      av1_copy(fc->tx_size_cdf, default_tx_size_cdf);
+  av1_copy(fc->tx_size_cdf, default_tx_size_cdf);
 #endif  // CONFIG_NEW_TX_PARTITION
   av1_copy(fc->delta_q_cdf, default_delta_q_cdf);
   av1_copy(fc->delta_lf_cdf, default_delta_lf_cdf);
@@ -2072,14 +2074,14 @@ void av1_set_default_ref_deltas(int8_t *ref_deltas) {
   ref_deltas[6] = 0;
   ref_deltas[INTRA_FRAME_INDEX] = 1;
 #else
-      ref_deltas[INTRA_FRAME] = 1;
-      ref_deltas[LAST_FRAME] = 0;
-      ref_deltas[LAST2_FRAME] = ref_deltas[LAST_FRAME];
-      ref_deltas[LAST3_FRAME] = ref_deltas[LAST_FRAME];
-      ref_deltas[BWDREF_FRAME] = ref_deltas[LAST_FRAME];
-      ref_deltas[GOLDEN_FRAME] = -1;
-      ref_deltas[ALTREF2_FRAME] = -1;
-      ref_deltas[ALTREF_FRAME] = -1;
+  ref_deltas[INTRA_FRAME] = 1;
+  ref_deltas[LAST_FRAME] = 0;
+  ref_deltas[LAST2_FRAME] = ref_deltas[LAST_FRAME];
+  ref_deltas[LAST3_FRAME] = ref_deltas[LAST_FRAME];
+  ref_deltas[BWDREF_FRAME] = ref_deltas[LAST_FRAME];
+  ref_deltas[GOLDEN_FRAME] = -1;
+  ref_deltas[ALTREF2_FRAME] = -1;
+  ref_deltas[ALTREF_FRAME] = -1;
 #endif  // CONFIG_NEW_REF_SIGNALING
 #if CONFIG_TIP
   ref_deltas[TIP_FRAME_INDEX] = 0;
@@ -2101,8 +2103,8 @@ static void set_default_lf_deltas(struct loopfilter *lf) {
   av1_set_default_ref_deltas(lf->ref_deltas);
   av1_set_default_mode_deltas(lf->mode_deltas);
 #else
-      lf->mode_ref_delta_enabled = 0;
-      lf->mode_ref_delta_update = 0;
+  lf->mode_ref_delta_enabled = 0;
+  lf->mode_ref_delta_update = 0;
 #endif
 }
 
@@ -2119,7 +2121,7 @@ void av1_setup_frame_contexts(AV1_COMMON *cm) {
 #if CONFIG_NEW_REF_SIGNALING
     for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
 #else
-        for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
+    for (int i = LAST_FRAME; i <= ALTREF_FRAME; ++i) {
 #endif  // CONFIG_NEW_REF_SIGNALING
       RefCntBuffer *const buf = get_ref_frame_buf(cm, i);
       if (buf != NULL) buf->frame_context = *cm->fc;
