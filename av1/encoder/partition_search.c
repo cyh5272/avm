@@ -1647,8 +1647,8 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
  * \param[in]    rate      Pointer to the total rate for the current block
  *
  * Nothing is returned. Instead, reconstructions (w/o in-loop filters)
- * will be updated in the pixel buffers in td->mb.e_mbd. Also, the chosen
- * modes will be stored in the MB_MODE_INFO buffer td->mb.e_mbd.mi[0].
+ * will be updated in the pixel buffers in td->mb.e_mbd. Also, the chosen modes
+ * will be stored in the MB_MODE_INFO buffer td->mb.e_mbd.mi[0].
  */
 static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                      ThreadData *td, TokenExtra **tp, int mi_row, int mi_col,
@@ -1864,6 +1864,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
  * \param[in]    bsize     Current block size
  * \param[in]    pc_tree   Pointer to the PC_TREE node storing the picked
  *                         partitions and mode info for the current block
+ * \param[in]    rate      Pointer to the total rate for the current block
  *
  * Nothing is returned. Instead, reconstructions (w/o in-loop filters)
  * will be updated in the pixel buffers in td->mb.e_mbd.
