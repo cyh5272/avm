@@ -1315,9 +1315,7 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
 
-#if CCTX_C1_NONZERO
   assert(p_u->eobs[block] > 0);
-#endif
   assert(cpi != NULL);
   assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
 
@@ -3103,7 +3101,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
             &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
       }
     }
-#if CCTX_C1_NONZERO
     // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
     // dqcoeffs
     uint64_t sse_dqcoeff_u =
@@ -3121,7 +3118,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       }
       continue;
     }
-#endif
 
     // If rd cost based on coeff rate alone is already more than best_rd,
     // terminate early.
@@ -3177,9 +3173,7 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   p_u->eobs[block] = best_eob_u;
   p_v->eobs[block] = best_eob_v;
 
-#if CCTX_C1_NONZERO
   assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
-#endif
 #if CCTX_C2_DROPPED
   assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_v == 0));
 #endif

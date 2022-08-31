@@ -564,7 +564,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
                    blk_row * bw + blk_col) &&
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
 #if CCTX_C2_DROPPED
       (plane < AOM_PLANE_V ||
        ((cctx_type == CCTX_NONE || x->plane[AOM_PLANE_U].eobs[block]) &&
@@ -573,7 +573,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       (plane < AOM_PLANE_V || cctx_type == CCTX_NONE ||
        x->plane[AOM_PLANE_U].eobs[block]) &&
 #endif
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
 #if CONFIG_SKIP_MODE_ENHANCEMENT
       !(mbmi->skip_mode == 1)) {
 #else
@@ -647,13 +647,13 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,
                          cm->quant_params.base_qindex);
     }
-#if CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
+#if CONFIG_CROSS_CHROMA_TX
     // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
     // when eob of U is 0.
     // TODO(kslu) why cctx_type can be > CCTX_NONE when eob_u is 0?
     if (plane == AOM_PLANE_U && p->eobs[block] == 0)
       update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
+#endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
     // Reset coeffs and dqcoeffs
@@ -1283,7 +1283,6 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                             INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
 
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
-#if CCTX_C1_NONZERO
 #if CCTX_C2_DROPPED
     if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
                                  (*eob_u == 0 && cctx_type > CCTX_NONE))) {
@@ -1298,7 +1297,6 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                         p_v->coeff + BLOCK_OFFSET(block), dqcoeff_v, eob_v);
       break;
     }
-#endif
     av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
                       &quant_param);
     av1_xform_quant(

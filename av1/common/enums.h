@@ -406,11 +406,6 @@ enum {
 #if CONFIG_CROSS_CHROMA_TX
 #define CCTX_NEG_ANGLES 1
 #define CCTX_POS_ANGLES 1
-// Always signal C1 coefficients for some cctx (i.e., both C1 and C2 nonzero
-// or C1 nonzero and C2 zero). This requires CCTX_NEG_ANGLES to be on.
-#define CCTX_C1_NONZERO 1
-// Drop C2 channel for some cctx_types. This macro requires CCTX_C1_NONZERO to
-// be on.
 #define CCTX_C2_DROPPED 0
 // Configuration for the set of rotation angles
 // 0: { 45, 30, 60 }
