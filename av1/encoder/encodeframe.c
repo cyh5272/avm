@@ -1454,6 +1454,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
       cpi->optimize_seg_arr[i] = cpi->sf.rd_sf.optimize_coefficients;
     }
   }
+  xd->current_base_qindex = cm->quant_params.base_qindex;
   features->coded_lossless = is_coded_lossless(cm, xd);
   features->all_lossless = features->coded_lossless && !av1_superres_scaled(cm);
 

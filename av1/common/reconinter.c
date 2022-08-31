@@ -1230,6 +1230,85 @@ int av1_get_optflow_based_mv_highbd(
   return target_prec;
 }
 
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+static void deblock_sub_predictions1(int bit_depth, int T1, int T2,
+                                     uint16_t *a2, uint16_t *a1, uint16_t *a0,
+                                     uint16_t *b0, uint16_t *b1, uint16_t *b2) {
+  const int adiff = abs(*a0 - *a1) >> (bit_depth - 8);
+  const int bdiff = abs(*b0 - *b1) >> (bit_depth - 8);
+  const int abdiff = abs(*a0 - *b0) >> (bit_depth - 8);
+  if (adiff < T1 && bdiff < T1 && abdiff > T1 && abdiff < T2) {
+    const uint16_t b0_new =
+        ((*b0 * 8) + (*b1 + *a0) * 3 + (*b2 + *a1) * 1 + 8) >> 4;
+    const uint16_t a0_new =
+        ((*a0 * 8) + (*b0 + *a1) * 3 + (*b1 + *a2) * 1 + 8) >> 4;
+    *b0 = b0_new;
+    *a0 = a0_new;
+  }
+}
+
+static void deblock_sub_predictions_thresholds(int qindex, int *T) {
+  // TOD)(any): adjust these based on q
+  if (qindex < 100) {
+    T[0] = 3;
+    T[1] = 4;
+    T[2] = 16;
+  } else if (qindex < 200) {
+    T[0] = 3;
+    T[1] = 4;
+    T[2] = 16;
+  } else {
+    T[0] = 3;
+    T[1] = 4;
+    T[2] = 16;
+  }
+}
+
+static void deblock_sub_predictions_vert(int bit_depth, int qindex,
+                                         uint16_t *dst, int dst_stride, int n) {
+  int T[3];
+  deblock_sub_predictions_thresholds(qindex, T);
+  if (T[0] <= 0 || T[1] <= 0 || T[2] <= 0) return;
+  uint16_t *x = dst;
+  int strength = 0;
+  for (int k = 0; k < n; ++k) {
+    strength += (x[-2] + x[-1]) - (x[0] + x[1]);
+    x += dst_stride;
+  }
+  strength = abs(strength) >> (bit_depth - 8);
+  if (strength < T[0] * 2 * n) return;
+  x = dst;
+  for (int k = 0; k < n; ++k) {
+    deblock_sub_predictions1(bit_depth, T[1], T[2], x - 3, x - 2, x - 1, x,
+                             x + 1, x + 2);
+    x += dst_stride;
+  }
+}
+
+static void deblock_sub_predictions_horz(int bit_depth, int qindex,
+                                         uint16_t *dst, int dst_stride, int n) {
+  int T[3];
+  deblock_sub_predictions_thresholds(qindex, T);
+  if (T[0] <= 0 || T[1] <= 0 || T[2] <= 0) return;
+  uint16_t *x = dst;
+  int strength = 0;
+  for (int k = 0; k < n; ++k) {
+    strength +=
+        (x[-2 * dst_stride] + x[-1 * dst_stride]) - (x[0] + x[1 * dst_stride]);
+    x++;
+  }
+  strength = abs(strength) >> (bit_depth - 8);
+  if (strength < T[0] * 2 * n) return;
+  x = dst;
+  for (int k = 0; k < n; ++k) {
+    deblock_sub_predictions1(bit_depth, T[1], T[2], x - 3 * dst_stride,
+                             x - 2 * dst_stride, x - 1 * dst_stride, x,
+                             x + 1 * dst_stride, x + 2 * dst_stride);
+    x++;
+  }
+}
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
+
 // Makes the interpredictor for the region by dividing it up into nxn blocks
 // and running the interpredictor code on each one.
 void make_inter_pred_of_nxn(uint16_t *dst, int dst_stride,
@@ -1237,6 +1316,9 @@ void make_inter_pred_of_nxn(uint16_t *dst, int dst_stride,
                             InterPredParams *inter_pred_params, MACROBLOCKD *xd,
                             int mi_x, int mi_y, int ref, uint16_t **mc_buf,
                             CalcSubpelParamsFunc calc_subpel_params_func, int n,
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+                            int qindex,
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
                             SubpelParams *subpel_params) {
   int n_blocks = 0;
   int w = inter_pred_params->orig_block_width;
@@ -1249,15 +1331,29 @@ void make_inter_pred_of_nxn(uint16_t *dst, int dst_stride,
 
   uint16_t *pre;
   int src_stride = 0;
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+  const int wn = w / n;
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
 
   // Process whole nxn blocks.
   for (int j = 0; j <= h - n; j += n) {
     for (int i = 0; i <= w - n; i += n) {
-      calc_subpel_params_func(&(mv_refined[n_blocks * 2 + ref].as_mv),
-                              inter_pred_params, xd, mi_x + i, mi_y + j, ref, 1,
-                              mc_buf, &pre, subpel_params, &src_stride);
+      const int_mv *cur_mv_refined = &mv_refined[n_blocks * 2 + ref];
+      calc_subpel_params_func(&cur_mv_refined->as_mv, inter_pred_params, xd,
+                              mi_x + i, mi_y + j, ref, 1, mc_buf, &pre,
+                              subpel_params, &src_stride);
       av1_make_inter_predictor(pre, src_stride, dst, dst_stride,
                                inter_pred_params, subpel_params);
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+      if (i > 0 && cur_mv_refined[0].as_int != cur_mv_refined[-2].as_int) {
+        deblock_sub_predictions_vert(xd->bd, qindex, CONVERT_TO_SHORTPTR(dst),
+                                     dst_stride, n);
+      }
+      if (j > 0 && cur_mv_refined[0].as_int != cur_mv_refined[-wn].as_int) {
+        deblock_sub_predictions_horz(xd->bd, qindex, CONVERT_TO_SHORTPTR(dst),
+                                     dst_stride, n);
+      }
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
       n_blocks++;
       dst += n;
       inter_pred_params->conv_params.dst += n;
@@ -1266,7 +1362,6 @@ void make_inter_pred_of_nxn(uint16_t *dst, int dst_stride,
     dst -= w;
     inter_pred_params->conv_params.dst -= w;
     inter_pred_params->pix_col -= w;
-
     dst += n * dst_stride;
     inter_pred_params->conv_params.dst +=
         n * inter_pred_params->conv_params.dst_stride;
@@ -1285,6 +1380,10 @@ void av1_opfl_rebuild_inter_predictor(
     ,
     int use_4x4
 #endif  // CONFIG_OPTFLOW_ON_TIP
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+    ,
+    int qindex
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
 ) {
   SubpelParams subpel_params;
   int w = inter_pred_params->block_width;
@@ -1297,6 +1396,9 @@ void av1_opfl_rebuild_inter_predictor(
   );
   make_inter_pred_of_nxn(dst, dst_stride, mv_refined, inter_pred_params, xd,
                          mi_x, mi_y, ref, mc_buf, calc_subpel_params_func, n,
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+                         qindex,
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
                          &subpel_params);
 }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -1634,6 +1736,10 @@ static void build_inter_predictors_8x8_and_bigger(
                                        ,
                                        1
 #endif  // CONFIG_OPTFLOW_ON_TIP
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+                                       ,
+                                       cm->quant_params.base_qindex
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
       );
       continue;
     }
