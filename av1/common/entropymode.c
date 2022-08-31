@@ -1975,8 +1975,8 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warp_delta_param_cdf, default_warp_delta_param_cdf);
   av1_copy(fc->warp_extend_cdf, default_warp_extend_cdf);
 #else
-  av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
-  av1_copy(fc->obmc_cdf, default_obmc_cdf);
+      av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
+      av1_copy(fc->obmc_cdf, default_obmc_cdf);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   av1_copy(fc->skip_drl_cdf, default_skip_drl_cdf);
