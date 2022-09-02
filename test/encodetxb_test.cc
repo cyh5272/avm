@@ -60,7 +60,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
     aom_free(coeff_contexts_);
     libaom_test::ClearSystemState();
   }
-
+#if !CONFIG_ATC_COEFCODING
   void GetNzMapContextsRun() {
     const int kNumTests = 10;
     int result = 0;
@@ -75,7 +75,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
           const int real_width = tx_size_wide[tx_size];
           const int real_height = tx_size_high[tx_size];
           const int16_t *const scan = av1_scan_orders[tx_size][tx_type].scan;
-#if !CONFIG_ATC_COEFCODING
+
           levels_ = set_levels(levels_buf_, width);
           for (int i = 0; i < kNumTests && !result; ++i) {
             for (int eob = 1; eob <= width * height && !result; ++eob) {
@@ -93,7 +93,6 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
                   << " height " << real_height << " eob " << eob;
             }
           }
-#endif
         }
       }
     }
@@ -121,7 +120,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
       InitDataWithEob(scan, bwl, eob);
 
       aom_usec_timer_start(&timer_ref);
-#if !CONFIG_ATC_COEFCODING
+
       for (int i = 0; i < numTests; ++i) {
         av1_get_nz_map_contexts_c(levels_, scan, eob, (TX_SIZE)tx_size,
                                   tx_class, coeff_contexts_ref_);
@@ -136,7 +135,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
         get_nz_map_contexts_func_(levels_, scan, eob, (TX_SIZE)tx_size,
                                   tx_class, coeff_contexts_);
       }
-#endif
+
       aom_usec_timer_mark(&timer);
 
       const int elapsed_time_ref =
@@ -149,7 +148,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
              (elapsed_time_ref * 1.0) / (elapsed_time * 1.0));
     }
   }
-
+#endif
  private:
   void InitDataWithEob(const int16_t *const scan, const int bwl,
                        const int eob) {
@@ -191,7 +190,7 @@ class EncodeTxbTest : public ::testing::TestWithParam<GetNzMapContextsFunc> {
   int8_t *coeff_contexts_;
 };
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(EncodeTxbTest);
-
+#if !CONFIG_ATC_COEFCODING
 TEST_P(EncodeTxbTest, GetNzMapContexts) { GetNzMapContextsRun(); }
 
 TEST_P(EncodeTxbTest, DISABLED_SpeedTestGetNzMapContexts) {
@@ -207,7 +206,7 @@ INSTANTIATE_TEST_SUITE_P(SSE2, EncodeTxbTest,
 INSTANTIATE_TEST_SUITE_P(NEON, EncodeTxbTest,
                          ::testing::Values(av1_get_nz_map_contexts_neon));
 #endif
-
+#endif
 typedef void (*av1_txb_init_levels_func)(const tran_low_t *const coeff,
                                          const int width, const int height,
                                          uint8_t *const levels);
