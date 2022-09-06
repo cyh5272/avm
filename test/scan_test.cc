@@ -120,7 +120,7 @@ TEST(Av1ScanTest, Dependency) {
         } else {
           scan_mode = SCAN_MODE_COL_DIAG;
         }
-#endif
+#endif  // CONFIG_ATC_COEFCODING
       } else if (tx_class == TX_CLASS_VERT) {
         scan_mode = SCAN_MODE_ROW_1D;
       } else {

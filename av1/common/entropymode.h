@@ -158,7 +158,7 @@ typedef struct frame_contexts {
 #else
   aom_cdf_prob coeff_br_cdf[TX_SIZES][PLANE_TYPES][LEVEL_CONTEXTS]
                            [CDF_SIZE(BR_CDF_SIZE)];
-#endif
+#endif  // CONFIG_ATC_COEFCODING
 
   aom_cdf_prob inter_single_mode_cdf[INTER_SINGLE_MODE_CONTEXTS]
                                     [CDF_SIZE(INTER_SINGLE_MODES)];
@@ -515,7 +515,7 @@ static INLINE int av1_tx_idx_to_type(int tx_idx, int tx_set_type,
              ? av1_md_idx2type[size_idx][av1_md_class[intra_mode]][tx_idx]
              : av1_ext_tx_inv[tx_set_type][tx_idx];
 }
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 
 void av1_set_default_ref_deltas(int8_t *ref_deltas);
 void av1_set_default_mode_deltas(int8_t *mode_deltas);

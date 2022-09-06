@@ -1239,7 +1239,7 @@ typedef struct FRAME_COUNTS {
 #else
   unsigned int coeff_lps_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]
                               [LEVEL_CONTEXTS][BR_CDF_SIZE];
-#endif
+#endif  // CONFIG_ATC_COEFCODING
   unsigned int coeff_base_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]
                                [SIG_COEF_CONTEXTS][NUM_BASE_LEVELS + 2];
   unsigned int coeff_base_eob_multi[TOKEN_CDF_Q_CTXS][TX_SIZES][PLANE_TYPES]

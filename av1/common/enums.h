@@ -418,7 +418,7 @@ enum {
   EXT_TX_SET_ALL16,
 #if CONFIG_ATC_NEWTXSETS
   EXT_NEW_TX_SET,
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
   EXT_TX_SET_TYPES
 } UENUM1BYTE(TxSetType);
 
@@ -428,7 +428,7 @@ enum {
 #define EXT_TX_SETS_INTRA 2  // Sets of transform selections for INTRA
 #else
 #define EXT_TX_SETS_INTRA 3  // Sets of transform selections for INTRA
-#endif
+#endif                       // CONFIG_ATC_NEWTXSETS
 
 #if CONFIG_FORWARDSKIP
 #if CONFIG_ATC_NEWTXSETS
@@ -436,7 +436,7 @@ enum {
 #else
 #define INTRA_TX_SET1 6
 #define INTRA_TX_SET2 4
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 #else
 #define INTRA_TX_SET1 7
 #define INTRA_TX_SET2 5

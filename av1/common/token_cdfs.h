@@ -1985,7 +1985,7 @@ static const aom_cdf_prob av1_default_coeff_lps_multi_cdfs
             { AOM_CDF4(8192, 16384, 24576) }, { AOM_CDF4(8192, 16384, 24576) },
             { AOM_CDF4(8192, 16384, 24576) } } } }
     };
-#endif
+#endif  // CONFIG_ATC_COEFCODING
 
 #if CONFIG_FORWARDSKIP
 static const aom_cdf_prob av1_default_coeff_base_multi_cdfs_idtx
@@ -6547,6 +6547,6 @@ static const aom_cdf_prob av1_default_coeff_base_eob_multi_cdfs
                                         { AOM_CDF3(10923, 21845) },
                                         { AOM_CDF3(10923, 21845) },
                                         { AOM_CDF3(10923, 21845) } } } } };
-#endif
+#endif  // CONFIG_ATC_COEFCODING
 
 #endif  // AOM_AV1_COMMON_TOKEN_CDFS_H_

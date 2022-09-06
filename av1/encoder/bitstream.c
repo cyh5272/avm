@@ -1193,7 +1193,7 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
         fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
   else
     intra_dir = mbmi->mode;
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
   const FeatureFlags *const features = &cm->features;
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
   if (get_ext_tx_types(tx_size, is_inter, features->reduced_tx_set_used) > 1 &&
@@ -1223,7 +1223,7 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
     }
 #else
     assert(av1_ext_tx_used[tx_set_type][get_primary_tx_type(tx_type)]);
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 #else
     assert(av1_ext_tx_used[tx_set_type][tx_type]);
 #endif
@@ -1244,7 +1244,7 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
             fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
       else
         intra_dir = mbmi->mode;
-#endif
+#endif  // !CONFIG_ATC_NEWTXSETS
 #if CONFIG_IST
       aom_write_symbol(
 #if CONFIG_FORWARDSKIP
@@ -1258,7 +1258,7 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
           w, av1_ext_tx_ind_intra[tx_set_type][get_primary_tx_type(tx_type)],
           ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_dir],
           av1_num_ext_tx_set_intra[tx_set_type]);
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 #else
           w, av1_ext_tx_ind[tx_set_type][get_primary_tx_type(tx_type)],
           ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_dir],

@@ -66,7 +66,7 @@ static const int use_intra_ext_tx_for_txsize[EXT_TX_SETS_INTRA]
 #else
                                               { 1, 1, 0, 0 },
                                               { 0, 0, 1, 0 },
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
                                             };
 
 static const int use_inter_ext_tx_for_txsize[EXT_TX_SETS_INTER]
@@ -87,7 +87,7 @@ static const int av1_ext_tx_set_idx_to_type[2][AOMMAX(EXT_TX_SETS_INTRA,
 #else
       EXT_TX_SET_DTT4_IDTX_1DDCT,
       EXT_TX_SET_DTT4_IDTX,
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
   },
   {
       // Inter
@@ -275,7 +275,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
     for (s = 1; s < EXT_TX_SETS_INTRA; ++s) {
 #if CONFIG_ATC_NEWTXSETS
       int tx_set_type = av1_ext_tx_set_idx_to_type[0][s];
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
       if (use_intra_ext_tx_for_txsize[s][i]) {
         for (j = 0; j < INTRA_MODES; ++j) {
           av1_cost_tokens_from_cdf(
@@ -293,7 +293,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 #else
               av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[0][s]]);
 #endif  // CONFIG_FORWARDSKIP
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
         }
       }
     }
@@ -800,7 +800,7 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
         pcost->base_cost[ctx][7] =
             pcost->base_cost[ctx][3] - pcost->base_cost[ctx][2];
       }
-#endif
+#endif  // CONFIG_ATC_COEFCODING
       for (int ctx = 0; ctx < EOB_COEF_CONTEXTS; ++ctx)
         av1_cost_tokens_from_cdf(pcost->eob_extra_cost[ctx],
                                  fc->eob_extra_cdf[tx_size][plane][ctx], NULL);
@@ -843,7 +843,7 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
               pcost->lps_lf_cost[ctx][i] - pcost->lps_lf_cost[ctx][i - 1];
         }
       }
-#endif
+#endif  // CONFIG_ATC_COEFCODING
       for (int ctx = 0; ctx < LEVEL_CONTEXTS; ++ctx) {
         int br_rate[BR_CDF_SIZE];
         int prev_cost = 0;
@@ -853,7 +853,7 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
             br_rate, fc->coeff_br_cdf[plane][ctx],
 #else
             br_rate, fc->coeff_br_cdf[AOMMIN(tx_size, TX_32X32)][plane][ctx],
-#endif
+#endif  // CONFIG_ATC_COEFCODING
             NULL);
         // printf("br_rate: ");
         // for(j = 0; j < BR_CDF_SIZE; j++)

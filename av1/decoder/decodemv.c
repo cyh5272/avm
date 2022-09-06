@@ -995,7 +995,7 @@ void av1_read_tx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd, int blk_row,
       *tx_type = av1_ext_tx_inv_intra[tx_set_type][aom_read_symbol(
           r, ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_mode],
           av1_num_ext_tx_set_intra[tx_set_type], ACCT_STR)];
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 #else
       *tx_type = av1_ext_tx_inv[tx_set_type][aom_read_symbol(
           r, ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_mode],

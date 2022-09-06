@@ -483,7 +483,7 @@ static const int av1_md_class[INTRA_MODES] = {
 static const int av1_size_class[19] = {
   0, 1, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2,
 };
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 
 #if CONFIG_IST
 // Mapping of intra modes to IST kernel set

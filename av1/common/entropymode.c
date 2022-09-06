@@ -684,7 +684,7 @@ static const aom_cdf_prob default_intra_ext_tx_cdf
           },
       },
 #endif  // CONFIG_FORWARDSKIP
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
     };
 
 static const aom_cdf_prob

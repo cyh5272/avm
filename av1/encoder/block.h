@@ -164,7 +164,7 @@ typedef struct {
   //! Cost for encoding an increment to the low-frequency coefficient
   int lps_lf_cost[LF_LEVEL_CONTEXTS]
                  [COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
-#endif
+#endif  // CONFIG_ATC_COEFCODING
   /*! \brief Cost for encoding the base_eob of a level.
    *
    * Decoder uses base_eob to derive the base_level as base_eob := base_eob+1.

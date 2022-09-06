@@ -1406,7 +1406,7 @@ static const int av1_num_ext_tx_set_intra[EXT_TX_SET_TYPES] = { 1, 1,  4,
                                                                 6, 11, 15,
 #if CONFIG_ATC_NEWTXSETS
                                                                 7
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 };
 #endif  // CONFIG_FORWARDSKIP
 
@@ -1424,7 +1424,7 @@ static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
 #if CONFIG_ATC_NEWTXSETS
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 };
 
 #if CONFIG_ATC_NEWTXSETS
@@ -1490,7 +1490,7 @@ static const int av1_mdtx_used_flag[4][13][TX_TYPES] = {
       { 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   },  // size_class: 3
 };
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 
 static const uint16_t av1_reduced_intra_tx_used_flag[INTRA_MODES] = {
   0x080F,  // DC_PRED:       0000 1000 0000 1111
@@ -1517,7 +1517,7 @@ static const uint16_t av1_ext_tx_used_flag[EXT_TX_SET_TYPES] = {
   0xFFFF,  // 1111 1111 1111 1111
 #if CONFIG_ATC_NEWTXSETS
   0xFFFF,
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 };
 
 #if CONFIG_ATC_NEWTXSETS
@@ -1583,7 +1583,7 @@ static const uint16_t av1_md_trfm_used_flag[4][13] = {
       0x0000,
   },  // size_class: 3
 };
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 
 static const TxSetType av1_ext_tx_set_lookup[2][2] = {
   { EXT_TX_SET_DTT4_IDTX_1DDCT, EXT_TX_SET_DTT4_IDTX },
@@ -1608,7 +1608,7 @@ static INLINE TxSetType av1_get_ext_tx_set_type(TX_SIZE tx_size, int is_inter,
 #else
   const TX_SIZE tx_size_sqr = txsize_sqr_map[tx_size];
   return av1_ext_tx_set_lookup[is_inter][tx_size_sqr == TX_16X16];
-#endif
+#endif  // CONFIG_ATC_NEWTXSETS
 }
 
 // Maps tx set types to the indices.
@@ -1618,8 +1618,8 @@ static const int ext_tx_set_index[2][EXT_TX_SET_TYPES] = {
     0, -1, -1, -1, -1, -1, 1 },
 #else
     0, -1, 2, 1, -1, -1 },
-#endif
-  { // Inter
+#endif  // CONFIG_ATC_NEWTXSETS
+  {     // Inter
     0, 3, -1, -1, 2, 1 },
 };
 
