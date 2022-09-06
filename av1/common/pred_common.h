@@ -358,6 +358,67 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_ADAPT_REDUCED_SET
+// The closest nonzero neighboring cctx type of the current cctx type
+static const CctxType closest_nonzero_cctx[CCTX_TYPES] = {
+#if 1
+  CCTX_30, CCTX_30, CCTX_45, CCTX_30, CCTX_M30, CCTX_M45, CCTX_M30
+#else
+  CCTX_30, CCTX_30, CCTX_45, CCTX_45, CCTX_M30, CCTX_M45, CCTX_M45
+#endif
+};
+
+// Return the set of 3 allowed cctx types given the above and left cctx types.
+// Since CCTX_NONE will always be allowed, so we add the above and left
+// to the allowed list only when they are valid (not -1) and not CCTX_NONE.
+// Then we add their closest cctx types if there is any available slot.
+static INLINE uint8_t get_allowed_cctx_mask(int above, int left) {
+  if (above <= CCTX_NONE && left <= CCTX_NONE)
+    return (1 << CCTX_NONE) + (1 << CCTX_30) + (1 << CCTX_M30);
+  else if (above <= CCTX_NONE)
+    return (1 << CCTX_NONE) + (1 << left) + (1 << closest_nonzero_cctx[left]);
+  else if (left <= CCTX_NONE || above == left)
+    return (1 << CCTX_NONE) + (1 << above) + (1 << closest_nonzero_cctx[above]);
+  else
+    return (1 << CCTX_NONE) + (1 << above) + (1 << left);
+}
+
+static INLINE void get_allowed_cctx_arr(const int above, const int left,
+                                        CctxType *cctxarr) {
+  cctxarr[0] = CCTX_NONE;
+  if (above <= CCTX_NONE && left <= CCTX_NONE) {
+    cctxarr[1] = CCTX_30;
+    cctxarr[2] = CCTX_M30;
+  } else if (above <= CCTX_NONE) {
+    cctxarr[1] = left;
+    cctxarr[2] = closest_nonzero_cctx[left];
+  } else if (left <= CCTX_NONE || above == left) {
+    cctxarr[1] = above;
+    cctxarr[2] = closest_nonzero_cctx[above];
+  } else {
+    cctxarr[1] = above;
+    cctxarr[2] = left;
+  }
+}
+
+static INLINE CctxType cctx_idx_to_type(const int cctx_idx, const int above,
+                                        const int left) {
+  CctxType cctx_arr[CCTX_TYPES_ALLOWED] = { 0 };
+  get_allowed_cctx_arr(above, left, cctx_arr);
+  return cctx_arr[cctx_idx];
+}
+
+static INLINE uint8_t cctx_type_to_idx(const CctxType ctype, const int above,
+                                       const int left) {
+  CctxType cctx_arr[CCTX_TYPES_ALLOWED] = { 0 };
+  get_allowed_cctx_arr(above, left, cctx_arr);
+  if (ctype == cctx_arr[0]) return 0;
+  if (ctype == cctx_arr[1]) return 1;
+  if (ctype == cctx_arr[2]) return 2;
+  assert(0);
+  return 0;
+}
+#endif
 // TODO(kslu) remove it
 // static INLINE void get_above_and_left_cctx_type(const MACROBLOCKD *xd,
 //                                                int blk_row, int blk_col,

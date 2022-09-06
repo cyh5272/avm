@@ -406,6 +406,7 @@ enum {
 #if CONFIG_CROSS_CHROMA_TX
 #define CCTX_CONTEXTS 3
 #define CCTX_C2_DROPPED 0
+#define CCTX_ADAPT_REDUCED_SET 0
 // Configuration for the set of rotation angles
 // 0: { 45, 30, 60 }
 // 1: { 45, 22.5, 67.5 }
@@ -432,6 +433,13 @@ enum {
   CCTX_TYPES,
   CCTX_START = CCTX_NONE + 1,
 } UENUM1BYTE(CctxType);
+
+#if CCTX_ADAPT_REDUCED_SET
+#define CCTX_TYPES_ALLOWED 3
+#else
+#define CCTX_TYPES_ALLOWED CCTX_TYPES
+#endif
+
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 enum {

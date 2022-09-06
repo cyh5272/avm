@@ -561,6 +561,21 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
                                     tx_size, cm->features.reduced_tx_set_used);
 #if CONFIG_CROSS_CHROMA_TX
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#if CCTX_ADAPT_REDUCED_SET
+  if (plane) {
+    // TODO(kslu) change this workaround
+    // Since contexts can be changed during the dry run tx search, check if the
+    // cctx type is valid here. If not, just use CCTX_NONE.
+    int above_cctx, left_cctx;
+    get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                                 &left_cctx);
+    uint8_t allowed_cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+    if (!(allowed_cctx_mask & (1 << cctx_type))) {
+      cctx_type = CCTX_NONE;
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
+    }
+  }
+#endif
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
@@ -1246,6 +1261,19 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   TX_TYPE tx_type = av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col,
                                     tx_size, cm->features.reduced_tx_set_used);
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#if CCTX_ADAPT_REDUCED_SET
+  // TODO(kslu) change this workaround
+  // Since contexts can be changed during the dry run tx search, check if the
+  // cctx type is valid here. If not, just use CCTX_NONE.
+  int above_cctx, left_cctx;
+  get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                               &left_cctx);
+  uint8_t allowed_cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+  if (!(allowed_cctx_mask & (1 << cctx_type))) {
+    cctx_type = CCTX_NONE;
+    update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
+  }
+#endif
 
   av1_subtract_txb(x, AOM_PLANE_U, plane_bsize, blk_col, blk_row, tx_size);
   av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);

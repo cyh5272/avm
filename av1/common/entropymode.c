@@ -684,8 +684,9 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 #endif  // CONFIG_DDT_INTER
 
 #if CONFIG_CROSS_CHROMA_TX
-static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
-                                               [CDF_SIZE(CCTX_TYPES)] = {
+static const aom_cdf_prob
+    default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
+                         [CDF_SIZE(CCTX_TYPES_ALLOWED)] = {
 #if CCTX_ANGLE_CONFIG == 4
                            { { AOM_CDF3(10923, 21845) },
                              { AOM_CDF3(10923, 21845) },
@@ -713,6 +714,20 @@ static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
                              { AOM_CDF5(6554, 13107, 19661, 26214) },
                              { AOM_CDF5(6554, 13107, 19661, 26214) } },
 #else
+#if CCTX_ADAPT_REDUCED_SET
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+#else
                            { { AOM_CDF7(4681, 9362, 14043, 18725, 23406,
                                         28087) },
                              { AOM_CDF7(4681, 9362, 14043, 18725, 23406,
@@ -737,6 +752,7 @@ static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
                                         28087) },
                              { AOM_CDF7(4681, 9362, 14043, 18725, 23406,
                                         28087) } },
+#endif
 #endif
                          };
 #endif  // CONFIG_CROSS_CHROMA_TX

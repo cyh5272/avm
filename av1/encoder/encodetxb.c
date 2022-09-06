@@ -867,7 +867,12 @@ int get_cctx_type_cost(const AV1_COMMON *cm, const MACROBLOCK *x,
     get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
                                  &left_cctx);
     const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
+#if CCTX_ADAPT_REDUCED_SET
+    const int cctx_idx = cctx_type_to_idx(cctx_type, above_cctx, left_cctx);
+    return x->mode_costs.cctx_type_cost[square_tx_size][cctx_ctx][cctx_idx];
+#else
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_ctx][cctx_type];
+#endif
   } else {
     return 0;
   }
@@ -2209,10 +2214,21 @@ static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                  &left_cctx);
     const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
     if (allow_update_cdf)
+#if CCTX_ADAPT_REDUCED_SET
       update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]][cctx_ctx],
-                 cctx_type, CCTX_TYPES);
+                 cctx_type_to_idx(cctx_type, above_cctx, left_cctx),
+                 CCTX_TYPES_ALLOWED);
+#else
+      update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]][cctx_ctx],
+                 cctx_type, CCTX_TYPES_ALLOWED);
+#endif
 #if CONFIG_ENTROPY_STATS
+#if CCTX_ADAPT_REDUCED_SET
+    ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_ctx]
+                       [cctx_type_to_idx(cctx_type, above_cctx, left_cctx)];
+#else
     ++counts->cctx_type[txsize_sqr_map[tx_size]][cctx_ctx][cctx_type];
+#endif
 #endif  // CONFIG_ENTROPY_STATS
   }
 }

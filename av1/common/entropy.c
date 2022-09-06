@@ -296,6 +296,6 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER_STRIDE(fc->stx_cdf, STX_TYPES, CDF_SIZE(STX_TYPES));
 #endif
 #if CONFIG_CROSS_CHROMA_TX
-  RESET_CDF_COUNTER(fc->cctx_type_cdf, CCTX_TYPES);
+  RESET_CDF_COUNTER(fc->cctx_type_cdf, CCTX_TYPES_ALLOWED);
 #endif  // CONFIG_CROSS_CHROMA_TX
 }

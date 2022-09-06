@@ -1176,9 +1176,15 @@ void av1_write_cctx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
     get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
                                  &left_cctx);
     const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
+#if CCTX_ADAPT_REDUCED_SET
+    aom_write_symbol(w, cctx_type_to_idx(cctx_type, above_cctx, left_cctx),
+                     ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+                     CCTX_TYPES_ALLOWED);
+#else
     aom_write_symbol(w, cctx_type,
                      ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
-                     CCTX_TYPES);
+                     CCTX_TYPES_ALLOWED);
+#endif
   }
 }
 #endif  // CONFIG_CROSS_CHROMA_TX

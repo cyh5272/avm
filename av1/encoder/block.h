@@ -855,7 +855,7 @@ typedef struct {
 #endif  // CONFIG_DDT_INTER
 #if CONFIG_CROSS_CHROMA_TX
   //! cctx_type_cost
-  int cctx_type_cost[EXT_TX_SIZES][CCTX_CONTEXTS][CCTX_TYPES];
+  int cctx_type_cost[EXT_TX_SIZES][CCTX_CONTEXTS][CCTX_TYPES_ALLOWED];
 #endif  // CONFIG_CROSS_CHROMA_TX
   /**@}*/
 

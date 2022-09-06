@@ -1373,7 +1373,8 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                  CDF_SIZE(STX_TYPES));
 #endif
 #if CONFIG_CROSS_CHROMA_TX
-  AVERAGE_CDF(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf, CCTX_TYPES);
+  AVERAGE_CDF(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf,
+              CCTX_TYPES_ALLOWED);
 #endif  // CONFIG_CROSS_CHROMA_TX
 }
 

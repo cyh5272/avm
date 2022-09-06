@@ -3053,8 +3053,19 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
 
+#if CCTX_ADAPT_REDUCED_SET
+  int above_cctx, left_cctx;
+  get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                               &left_cctx);
+  uint8_t cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+#endif
+
   // Iterate through all transform type candidates.
   for (CctxType cctx_type = CCTX_START; cctx_type < CCTX_TYPES; ++cctx_type) {
+#if CCTX_ADAPT_REDUCED_SET
+    if (!(cctx_mask & (1 << cctx_type))) continue;
+#endif
+
     RD_STATS this_rd_stats;
     av1_invalid_rd_stats(&this_rd_stats);
 
