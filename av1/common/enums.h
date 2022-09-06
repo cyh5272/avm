@@ -405,8 +405,6 @@ enum {
 
 #if CONFIG_CROSS_CHROMA_TX
 #define CCTX_CONTEXTS 3
-#define CCTX_NEG_ANGLES 1
-#define CCTX_POS_ANGLES 1
 #define CCTX_C2_DROPPED 0
 // Configuration for the set of rotation angles
 // 0: { 45, 30, 60 }
@@ -417,7 +415,6 @@ enum {
 #define CCTX_ANGLE_CONFIG 0
 enum {
   CCTX_NONE,  // No cross chroma transform
-#if CCTX_POS_ANGLES
 #if CCTX_ANGLE_CONFIG != 3
   CCTX_45,  // 45 degrees rotation (Haar transform)
 #endif
@@ -425,8 +422,6 @@ enum {
   CCTX_30,  // 30 degrees rotation
   CCTX_60,  // 60 degrees rotation
 #endif
-#endif  // CCTX_POS_ANGLES
-#if CCTX_NEG_ANGLES
 #if CCTX_ANGLE_CONFIG != 3
   CCTX_M45,  // -45 degrees rotation
 #endif
@@ -434,7 +429,6 @@ enum {
   CCTX_M30,  // -30 degrees rotation
   CCTX_M60,  // -60 degrees rotation
 #endif
-#endif  // CCTX_NEG_ANGLES
   CCTX_TYPES,
   CCTX_START = CCTX_NONE + 1,
 } UENUM1BYTE(CctxType);
