@@ -367,18 +367,18 @@ static INLINE void get_above_and_left_cctx_type(const MACROBLOCKD *xd,
   const int ss_y = xd->plane[AOM_PLANE_U].subsampling_y;
   const int txh = tx_size_high_unit[tx_size];
   const int txw = tx_size_wide_unit[tx_size];
-  // Offsets are needed for sub 8x8 blocks to reach the actual above and left
-  // neighbors
+
+  // Offsets are needed for sub 8x8 blocks to reach the top left corner of the
+  // current block where the current cctx_type is applied
   const int mi_row_offset = (xd->mi_row & 0x01) && (txh & 0x01) && ss_y;
   const int mi_col_offset = (xd->mi_col & 0x01) && (txw & 0x01) && ss_x;
-  *above_cctx = xd->chroma_up_available
-                    ? av1_get_cctx_type(xd, blk_row - mi_row_offset - 1,
-                                        blk_col - mi_col_offset)
-                    : -1;
-  *left_cctx = xd->chroma_left_available
-                   ? av1_get_cctx_type(xd, blk_row - mi_row_offset,
-                                       blk_col - mi_col_offset - 1)
-                   : -1;
+  const int stride = xd->tx_type_map_stride;
+  CctxType *cur_cctx_ptr =
+      &xd->cctx_type_map[((blk_row << ss_y) - mi_row_offset) * stride +
+                         (blk_col << ss_x) - mi_col_offset];
+
+  *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
+  *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
   assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
   assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
 }

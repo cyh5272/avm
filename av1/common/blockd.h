@@ -1613,6 +1613,14 @@ static INLINE void update_cctx_array(MACROBLOCKD *const xd, int blk_row,
     memset(&xd->cctx_type_map[(br + idy) * stride + bc], cctx_type,
            txw * sizeof(xd->cctx_type_map[0]));
 }
+
+static INLINE CctxType av1_get_cctx_type(const MACROBLOCKD *xd, int blk_row,
+                                         int blk_col) {
+  const struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_U];
+  const int br = blk_row << pd->subsampling_y;
+  const int bc = blk_col << pd->subsampling_x;
+  return xd->cctx_type_map[br * xd->tx_type_map_stride + bc];
+}
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_IST
@@ -1792,13 +1800,6 @@ static INLINE TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
 #endif  // CONFIG_IST
   return tx_type;
 }
-
-#if CONFIG_CROSS_CHROMA_TX
-static INLINE CctxType av1_get_cctx_type(const MACROBLOCKD *xd, int blk_row,
-                                         int blk_col) {
-  return xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
-}
-#endif  // CONFIG_CROSS_CHROMA_TX
 
 void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
                             const int num_planes);
