@@ -4143,9 +4143,9 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       if (av1_is_subpelmv_in_range(mv_limits, cur_mv)) {
         // fprintf(stdout, "has happened\n");
         get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
-#if IMPROVED_JMVD
+#if CONFIG_IMPROVED_JMVD
         scale_other_mvd(&other_mvd, mbmi->jmvd_scale_mode, mbmi->mode);
-#endif  // IMPROVED_JMVD
+#endif  // CONFIG_IMPROVED_JMVD
 #if CONFIG_FLEX_MVRES
         lower_mv_precision(&other_mvd, cm->features.fr_mv_precision);
 #else
@@ -4222,9 +4222,9 @@ int joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                              candidate_mv[0].col - ref_mv.col };
 
       get_mv_projection(&other_mvd, final_mvd, other_ref_dist, cur_ref_dist);
-#if IMPROVED_JMVD
+#if CONFIG_IMPROVED_JMVD
       scale_other_mvd(&other_mvd, mbmi->jmvd_scale_mode, mbmi->mode);
-#endif  // IMPROVED_JMVD
+#endif  // CONFIG_IMPROVED_JMVD
 
 #if CONFIG_FLEX_MVRES
       lower_mv_precision(&other_mvd, cm->features.fr_mv_precision);
@@ -4325,9 +4325,9 @@ int low_precision_joint_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
       if (av1_is_subpelmv_in_range(mv_limits, cur_mv)) {
         get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
-#if IMPROVED_JMVD
+#if CONFIG_IMPROVED_JMVD
         scale_other_mvd(&other_mvd, mbmi->jmvd_scale_mode, mbmi->mode);
-#endif  // IMPROVED_JMVD
+#endif  // CONFIG_IMPROVED_JMVD
         lower_mv_precision(&other_mvd, cm->features.fr_mv_precision);
 
         other_cand_mv.row = (int)(other_mv->row + other_mvd.row);
@@ -4561,9 +4561,9 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       candidate_mv[0].col = iter_center_mv.col + cur_mvd.col;
 
       get_mv_projection(&other_mvd, cur_mvd, other_ref_dist, cur_ref_dist);
-#if IMPROVED_JMVD
+#if CONFIG_IMPROVED_JMVD
       scale_other_mvd(&other_mvd, mbmi->jmvd_scale_mode, mbmi->mode);
-#endif  // IMPROVED_JMVD
+#endif  // CONFIG_IMPROVED_JMVD
 #if CONFIG_FLEX_MVRES
       lower_mv_precision(&other_mvd,
 #if BUGFIX_AMVD_AMVR

@@ -329,7 +329,7 @@ static void set_good_speed_features_framesize_independent(
   }
 #endif
 
-#if IMPROVED_JMVD
+#if CONFIG_IMPROVED_JMVD
   sf->inter_sf.early_terminate_jmvd_scale_factor = 1;
 #endif
 
