@@ -250,22 +250,22 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   if (xd->tree_type != LUMA_PART && xd->is_chroma_ref) {
     xd->cctx_type_map = ctx->cctx_type_map;
     xd->tx_type_map_stride = mi_size_wide[bsize];
+    // If this block is sub 8x8 in luma, derive the parent >= 8x8 block area,
+    // then update its corresponding chroma area in cctx_type_map to the
+    // current cctx type
+    const int ss_x = pd[AOM_PLANE_U].subsampling_x;
+    const int ss_y = pd[AOM_PLANE_U].subsampling_y;
+    const int mi_row_offset = (mi_row & 0x01) && (bh & 0x01) && ss_y;
+    const int mi_col_offset = (mi_col & 0x01) && (bw & 0x01) && ss_x;
+    const int grid_idx = get_mi_grid_idx(mi_params, mi_row - mi_row_offset,
+                                         mi_col - mi_col_offset);
+    CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
+    const int mi_stride = mi_params->mi_stride;
+    for (int blk_row = 0; blk_row < (mi_row_offset ? 2 : bh); ++blk_row) {
+      memset(&cctx_type_map[blk_row * mi_stride], xd->cctx_type_map[0],
+             (mi_col_offset ? 2 : bw) * sizeof(cctx_type_map[0]));
+    }
     if (!dry_run) {
-      // If this block is sub 8x8 in luma, derive the parent >= 8x8 block area,
-      // then update its corresponding chroma area in cctx_type_map to the
-      // current cctx type
-      const int ss_x = pd[AOM_PLANE_U].subsampling_x;
-      const int ss_y = pd[AOM_PLANE_U].subsampling_y;
-      const int mi_row_offset = (mi_row & 0x01) && (bh & 0x01) && ss_y;
-      const int mi_col_offset = (mi_col & 0x01) && (bw & 0x01) && ss_x;
-      const int grid_idx = get_mi_grid_idx(mi_params, mi_row - mi_row_offset,
-                                           mi_col - mi_col_offset);
-      CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
-      const int mi_stride = mi_params->mi_stride;
-      for (int blk_row = 0; blk_row < (mi_row_offset ? 2 : bh); ++blk_row) {
-        memset(&cctx_type_map[blk_row * mi_stride], xd->cctx_type_map[0],
-               (mi_col_offset ? 2 : bw) * sizeof(cctx_type_map[0]));
-      }
       xd->cctx_type_map = cctx_type_map;
       xd->tx_type_map_stride = mi_stride;
     }
