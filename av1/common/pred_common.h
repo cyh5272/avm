@@ -384,11 +384,9 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
 //  assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
 //}
 
-static INLINE void get_above_and_left_cctx_type(const AV1_COMMON *cm,
-                                                const MACROBLOCKD *xd,
-                                                TX_SIZE tx_size,
-                                                int *above_cctx,
-                                                int *left_cctx) {
+static INLINE void get_above_and_left_cctx_type(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, int blk_row, int blk_col,
+    TX_SIZE tx_size, int *above_cctx, int *left_cctx) {
   const int ss_x = xd->plane[AOM_PLANE_U].subsampling_x;
   const int ss_y = xd->plane[AOM_PLANE_U].subsampling_y;
   const int txh = tx_size_high_unit[tx_size];
@@ -405,8 +403,18 @@ static INLINE void get_above_and_left_cctx_type(const AV1_COMMON *cm,
                                           xd->mi_col - mi_col_offset);
   CctxType *const cur_cctx_ptr = mi_params->cctx_type_map + mi_grid_idx;
 
-  *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
-  *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
+  if (blk_row && 0)
+    *above_cctx = (int)xd->cctx_type_map[((blk_row << ss_y) - 1) * stride +
+                                         (blk_col << ss_x)];
+  else
+    *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
+
+  if (blk_col && 0)
+    *left_cctx =
+        (int)xd
+            ->cctx_type_map[(blk_row << ss_y) * stride + (blk_col << ss_x) - 1];
+  else
+    *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
   assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
   assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
 }

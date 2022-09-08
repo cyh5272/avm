@@ -78,7 +78,7 @@ void av1_subtract_plane(MACROBLOCK *x, BLOCK_SIZE plane_bsize, int plane) {
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                   CctxType cctx_type,
+                   CctxType cctx_type, int blk_row, int blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                    const TXB_CTX *const txb_ctx, int *rate_cost) {
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -95,15 +95,15 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_CONTEXT_DERIVATION
     );
 #if CONFIG_CROSS_CHROMA_TX
-    *rate_cost += get_cctx_type_cost(&cpi->common, x, xd, plane, tx_size, block,
-                                     cctx_type);
+    *rate_cost += get_cctx_type_cost(&cpi->common, x, xd, plane, tx_size,
+                                     blk_row, blk_col, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
     return eob;
   }
 
   return av1_optimize_txb_new(cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                              cctx_type,
+                              cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                               txb_ctx, rate_cost, cpi->oxcf.algo_cfg.sharpness);
 }
@@ -636,7 +636,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                     cctx_type,
+                     cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                      &txb_ctx, &dummy_rate_cost);
     }
@@ -1146,7 +1146,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                     CCTX_NONE,
+                     CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                      &txb_ctx, &dummy_rate_cost);
     }
@@ -1318,7 +1318,7 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
 #endif  // CONFIG_FORWARDSKIP
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, cctx_type,
-                     &txb_ctx, &dummy_rate_cost);
+                     blk_row, blk_col, &txb_ctx, &dummy_rate_cost);
     }
     if (do_dropout) {
       av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,

@@ -897,7 +897,8 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
     int above_cctx, left_cctx;
-    get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
+    get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                                 &left_cctx);
     const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
     cctx_type =
         aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],

@@ -1152,7 +1152,7 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       if (quant_param_intra.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, best_tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                       cctx_type,
+                       cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                        txb_ctx, rate_cost);
       }
@@ -1549,7 +1549,7 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
 
@@ -1590,7 +1590,7 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
 
@@ -1710,7 +1710,7 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
     // tx domain dist
@@ -2337,7 +2337,7 @@ static INLINE int cost_coeffs(
 #endif  // CONFIG_FORWARDSKIP
     MACROBLOCK *x, int plane, int block, TX_SIZE tx_size, const TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-    const CctxType cctx_type,
+    const CctxType cctx_type, int blk_row, int blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
     const TXB_CTX *const txb_ctx, int reduced_tx_set_used) {
 #if TXCOEFF_COST_TIMER
@@ -2350,7 +2350,7 @@ static INLINE int cost_coeffs(
 #endif  // CONFIG_FORWARDSKIP
       x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-      cctx_type,
+      cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
       txb_ctx, reduced_tx_set_used);
 #if TXCOEFF_COST_TIMER
@@ -2798,7 +2798,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       if (quant_param.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                       CCTX_NONE,
+                       CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                        txb_ctx, &rate_cost);
       } else {
@@ -2808,7 +2808,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
             x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-            CCTX_NONE,
+            CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
             txb_ctx, cm->features.reduced_tx_set_used);
       }
@@ -3090,14 +3090,14 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       // Calculate rate cost of quantized coefficients.
       if (quant_param.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, cctx_type,
-                       &txb_ctx_uv[plane - AOM_PLANE_U],
+                       blk_row, blk_col, &txb_ctx_uv[plane - AOM_PLANE_U],
                        &rate_cost[plane - AOM_PLANE_U]);
       } else {
         rate_cost[plane - AOM_PLANE_U] = cost_coeffs(
 #if CONFIG_FORWARDSKIP
             cm,
 #endif  // CONFIG_FORWARDSKIP
-            x, plane, block, tx_size, tx_type, cctx_type,
+            x, plane, block, tx_size, tx_type, cctx_type, blk_row, blk_col,
             &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
       }
     }
