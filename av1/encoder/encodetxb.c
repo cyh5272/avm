@@ -854,16 +854,20 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
-int get_cctx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd, int plane,
-                       TX_SIZE tx_size, int block, CctxType cctx_type) {
+int get_cctx_type_cost(const AV1_COMMON *cm, const MACROBLOCK *x,
+                       const MACROBLOCKD *xd, int plane, TX_SIZE tx_size,
+                       int block, CctxType cctx_type) {
   const int is_inter = is_inter_block(xd->mi[0], xd->tree_type);
-  const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-  const int cctx_ctx = get_cctx_context(xd, tx_size);
   if (plane == AOM_PLANE_U && x->plane[plane].eobs[block] &&
-      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)))
+      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA))) {
+    const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+    int above_cctx, left_cctx;
+    get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
+    const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_ctx][cctx_type];
-  else
+  } else {
     return 0;
+  }
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -993,6 +997,9 @@ static INLINE void update_coeff_eob_fast(int *eob, int shift,
 
 #if CONFIG_FORWARDSKIP
 static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
+#if CONFIG_CROSS_CHROMA_TX
+    const AV1_COMMON *cm,
+#endif  // CONFIG_CROSS_CHROMA_TX
     const MACROBLOCK *x, const int plane, const int block,
     const TX_SIZE tx_size, const TXB_CTX *const txb_ctx,
     const struct macroblock_plane *p, const int eob,
@@ -1022,7 +1029,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
 #endif  // CONFIG_IST
   );
 #if CONFIG_CROSS_CHROMA_TX
-  cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+  cost += get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
   DECLARE_ALIGNED(16, int8_t, coeff_contexts[MAX_TX_SQUARE]);
   av1_get_nz_map_contexts_skip(levels, scan, eob, tx_size, coeff_contexts);
@@ -1057,6 +1064,9 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
 #endif  // CONFIG_FORWARDSKIP
 
 static AOM_FORCE_INLINE int warehouse_efficients_txb(
+#if CONFIG_CROSS_CHROMA_TX
+    const AV1_COMMON *cm,
+#endif  // CONFIG_CROSS_CHROMA_TX
     const MACROBLOCK *x, const int plane, const int block,
     const TX_SIZE tx_size, const TXB_CTX *const txb_ctx,
     const struct macroblock_plane *p, const int eob,
@@ -1107,7 +1117,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
 #endif
   );
 #if CONFIG_CROSS_CHROMA_TX
-  cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+  cost += get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   cost += get_eob_cost(eob, eob_costs, coeff_costs, tx_class);
@@ -1218,9 +1228,9 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
 }
 
 static AOM_FORCE_INLINE int warehouse_efficients_txb_laplacian(
-#if CONFIG_FORWARDSKIP
+#if CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
     const AV1_COMMON *cm,
-#endif  // CONFIG_FORWARDSKIP
+#endif  // CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
     const MACROBLOCK *x, const int plane, const int block,
     const TX_SIZE tx_size, const TXB_CTX *const txb_ctx, const int eob,
     const PLANE_TYPE plane_type, const LV_MAP_COEFF_COST *const coeff_costs,
@@ -1260,7 +1270,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_laplacian(
 #endif  // CONFIG_IST
   );
 #if CONFIG_CROSS_CHROMA_TX
-  cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+  cost += get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 #if !CONFIG_FORWARDSKIP
@@ -1356,7 +1366,7 @@ int av1_cost_coeffs_txb_skip_estimate(const MACROBLOCK *x, const int plane,
 }
 #endif  // CONFIG_FORWARDSKIP
 
-#if CONFIG_FORWARDSKIP
+#if CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
 int av1_cost_coeffs_txb(const AV1_COMMON *cm, const MACROBLOCK *x,
                         const int plane, const int block,
 #else
@@ -1392,7 +1402,8 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
     skip_cost += coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif  // CONFIG_CONTEXT_DERIVATION
 #if CONFIG_CROSS_CHROMA_TX
-    skip_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+    skip_cost +=
+        get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
     return skip_cost;
   }
@@ -1412,32 +1423,43 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
        tx_type == IDTX && plane == PLANE_TYPE_Y) ||
 #endif  // CONFIG_IST
       use_inter_fsc(cm, plane, tx_type, is_inter_block(mbmi, xd->tree_type))) {
-    return warehouse_efficients_txb_skip(x, plane, block, tx_size, txb_ctx, p,
-                                         eob, coeff_costs, xd, tx_type,
+    return warehouse_efficients_txb_skip(
 #if CONFIG_CROSS_CHROMA_TX
-                                         cctx_type,
+        cm,
 #endif  // CONFIG_CROSS_CHROMA_TX
-                                         reduced_tx_set_used);
+        x, plane, block, tx_size, txb_ctx, p, eob, coeff_costs, xd, tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+        cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+        reduced_tx_set_used);
   } else {
-    return warehouse_efficients_txb(x, plane, block, tx_size, txb_ctx, p, eob,
-                                    plane_type, coeff_costs, xd, tx_type,
+    return warehouse_efficients_txb(
 #if CONFIG_CROSS_CHROMA_TX
-                                    cctx_type,
+        cm,
 #endif  // CONFIG_CROSS_CHROMA_TX
-                                    tx_class, reduced_tx_set_used);
+        x, plane, block, tx_size, txb_ctx, p, eob, plane_type, coeff_costs, xd,
+        tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+        cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+        tx_class, reduced_tx_set_used);
   }
 #else
-  return warehouse_efficients_txb(x, plane, block, tx_size, txb_ctx, p, eob,
-                                  plane_type, coeff_costs, xd, tx_type,
+  return warehouse_efficients_txb(
 #if CONFIG_CROSS_CHROMA_TX
-                                  cctx_type,
+      cm,
 #endif  // CONFIG_CROSS_CHROMA_TX
-                                  tx_class, reduced_tx_set_used);
+      x, plane, block, tx_size, txb_ctx, p, eob, plane_type, coeff_costs, xd,
+      tx_type,
+#if CONFIG_CROSS_CHROMA_TX
+      cctx_type,
+#endif  // CONFIG_CROSS_CHROMA_TX
+      tx_class, reduced_tx_set_used);
 #endif  // CONFIG_FORWARDSKIP
 }
 
 int av1_cost_coeffs_txb_laplacian(
-#if CONFIG_FORWARDSKIP
+#if CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
     const AV1_COMMON *cm,
 #endif  // CONFIG_FORWARDSKIP
     const MACROBLOCK *x, const int plane, const int block,
@@ -1481,7 +1503,8 @@ int av1_cost_coeffs_txb_laplacian(
     skip_cost += coeff_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
 #endif  // CONFIG_CONTEXT_DERIVATION
 #if CONFIG_CROSS_CHROMA_TX
-    skip_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+    skip_cost +=
+        get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
     return skip_cost;
   }
@@ -1493,9 +1516,9 @@ int av1_cost_coeffs_txb_laplacian(
 #endif
 
   return warehouse_efficients_txb_laplacian(
-#if CONFIG_FORWARDSKIP
+#if CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
       cm,
-#endif  // CONFIG_FORWARDSKIP
+#endif  // CONFIG_FORWARDSKIP || CONFIG_CROSS_CHROMA_TX
       x, plane, block, tx_size, txb_ctx, eob, plane_type, coeff_costs, xd,
       tx_type,
 #if CONFIG_CROSS_CHROMA_TX
@@ -2133,7 +2156,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
       av1_get_txb_entropy_context(qcoeff, scan_order, p->eobs[block]);
 
 #if CONFIG_CROSS_CHROMA_TX
-  accu_rate += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+  accu_rate += get_cctx_type_cost(cm, x, xd, plane, tx_size, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   *rate_cost = accu_rate;
@@ -2174,7 +2197,9 @@ static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
       !mbmi->skip_txfm[xd->tree_type == CHROMA_PART] &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
-    const int cctx_ctx = get_cctx_context(xd, tx_size);
+    int above_cctx, left_cctx;
+    get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
+    const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
     if (allow_update_cdf)
       update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]][cctx_ctx],
                  cctx_type, CCTX_TYPES);

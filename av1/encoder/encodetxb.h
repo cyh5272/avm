@@ -575,9 +575,28 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
  */
 CB_COEFF_BUFFER *av1_get_cb_coeff_buffer(const struct AV1_COMP *cpi, int mi_row,
                                          int mi_col);
+
 #if CONFIG_CROSS_CHROMA_TX
-int get_cctx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd, int plane,
-                       TX_SIZE tx_size, int block, CctxType cctx_type);
+/*!\brief Return the entropy cost associated with the cross chroma transform
+ *
+ * \ingroup coefficient_coding
+ *
+ * \param[in]    cm             Top-level structure shared by encoder and
+ decoder
+ * \param[in]    x              Pointer to structure holding the data for the
+                                current encoding macroblock
+ * \param[in]    xd             Pointer to structure holding the data for the
+                                current macroblockd
+ * \param[in]    plane          The index of the current plane
+ * \param[in]    tx_size        The transform size
+ * \param[in]    block          The index of the current transform block
+ * \param[in]    cctx_type      The cross chroma transform type
+ *
+ * \return       int            Entropy cost for cctx type
+ */
+int get_cctx_type_cost(const AV1_COMMON *cm, const MACROBLOCK *x,
+                       const MACROBLOCKD *xd, int plane, TX_SIZE tx_size,
+                       int block, CctxType cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_CONTEXT_DERIVATION

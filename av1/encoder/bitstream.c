@@ -1171,7 +1171,9 @@ void av1_write_cctx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    const int cctx_ctx = get_cctx_context(xd, tx_size);
+    int above_cctx, left_cctx;
+    get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
+    const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
     aom_write_symbol(w, cctx_type,
                      ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
                      CCTX_TYPES);

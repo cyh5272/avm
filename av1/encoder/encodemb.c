@@ -95,7 +95,8 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_CONTEXT_DERIVATION
     );
 #if CONFIG_CROSS_CHROMA_TX
-    *rate_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+    *rate_cost += get_cctx_type_cost(&cpi->common, x, xd, plane, tx_size, block,
+                                     cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
     return eob;
   }
