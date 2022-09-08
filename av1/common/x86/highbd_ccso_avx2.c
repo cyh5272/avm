@@ -27,12 +27,14 @@ void ccso_filter_block_hbd_wo_buf_avx2(const uint16_t* src_y, uint16_t* dts_yuv,
   __m256i cmp_idxc = _mm256_set1_epi16(1); // -quant_step_size <= d <= quant_step_size
 
   __m128i tmp = _mm_loadu_si128((const __m128i*)offset_buf);
-  __m256i ccso_lut = _mm256_setr_m128i(tmp, tmp);
+  //__m256i ccso_lut = _mm256_setr_m128i(tmp, tmp);
+  __m256i ccso_lut = _mm256_insertf128_si256(_mm256_castsi128_si256(tmp), (tmp), 0x1);
   __m256i all0 = _mm256_set1_epi16(0);
   __m256i all1 = _mm256_set1_epi16(-1);
   __m256i allmax = _mm256_set1_epi16(max_val);
   __m128i shufsub = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 13, 12, 9, 8, 5, 4, 1, 0);
-  __m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  //__m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  __m256i masksub1 = _mm256_insertf128_si256(_mm256_castsi128_si256(shufsub), (shufsub), 0x1);
   __m256i masksub2 = _mm256_set_epi32(0, 0, 0, 0, 5, 4, 1, 0);
   __m256i d1, d2;
 
@@ -79,21 +81,24 @@ void ccso_filter_block_hbd_wo_buf_avx2(const uint16_t* src_y, uint16_t* dts_yuv,
         rec_curhi = _mm256_shuffle_epi8(rec_curhi, masksub1);
         rec_curlo = _mm256_permutevar8x32_epi32(rec_curlo, masksub2);
         rec_curhi = _mm256_permutevar8x32_epi32(rec_curhi, masksub2);
-        __m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo), _mm256_castsi256_si128(rec_curhi));
+        //__m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo), _mm256_castsi256_si128(rec_curhi));
+        __m256i rec_cur = _mm256_insertf128_si256(rec_curlo, _mm256_castsi256_si128(rec_curhi), 0x1);
 
         __m256i rec_tap1hi = _mm256_loadu_si256((const __m256i*)(src_rec2 + (xOff << y_uv_hscale) + tap1_pos + 16));
         rec_tap1lo = _mm256_shuffle_epi8(rec_tap1lo, masksub1);
         rec_tap1hi = _mm256_shuffle_epi8(rec_tap1hi, masksub1);
         rec_tap1lo = _mm256_permutevar8x32_epi32(rec_tap1lo, masksub2);
         rec_tap1hi = _mm256_permutevar8x32_epi32(rec_tap1hi, masksub2);
-        __m256i rec_tap1 = _mm256_setr_m128i(_mm256_castsi256_si128(rec_tap1lo), _mm256_castsi256_si128(rec_tap1hi));
+        //__m256i rec_tap1 = _mm256_setr_m128i(_mm256_castsi256_si128(rec_tap1lo), _mm256_castsi256_si128(rec_tap1hi));
+        __m256i rec_tap1 = _mm256_insertf128_si256(rec_tap1lo, _mm256_castsi256_si128(rec_tap1hi), 0x1);
 
         __m256i rec_tap2hi = _mm256_loadu_si256((const __m256i*)(src_rec2 + (xOff << y_uv_hscale) + tap2_pos + 16));
         rec_tap2lo = _mm256_shuffle_epi8(rec_tap2lo, masksub1);
         rec_tap2hi = _mm256_shuffle_epi8(rec_tap2hi, masksub1);
         rec_tap2lo = _mm256_permutevar8x32_epi32(rec_tap2lo, masksub2);
         rec_tap2hi = _mm256_permutevar8x32_epi32(rec_tap2hi, masksub2);
-        __m256i rec_tap2 = _mm256_setr_m128i(_mm256_castsi256_si128(rec_tap2lo), _mm256_castsi256_si128(rec_tap2hi));
+        //__m256i rec_tap2 = _mm256_setr_m128i(_mm256_castsi256_si128(rec_tap2lo), _mm256_castsi256_si128(rec_tap2hi));
+        __m256i rec_tap2 = _mm256_insertf128_si256(rec_tap2lo, _mm256_castsi256_si128(rec_tap2hi), 0x1);
 
         //int d1 = rec_tmp[tap1_pos] - rec_tmp[0];
         //int d2 = rec_tmp[tap2_pos] - rec_tmp[0];
@@ -201,7 +206,8 @@ void ccso_derive_src_block_avx2(const uint16_t *src_y, uint8_t *const src_cls0,
   //__m256i allmax = _mm256_set1_epi16(max_val);
   __m128i shufsub =
       _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 13, 12, 9, 8, 5, 4, 1, 0);
-  __m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  //__m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  __m256i masksub1 = _mm256_insertf128_si256(_mm256_castsi128_si256(shufsub), (shufsub), 0x1);
   __m256i masksub2 = _mm256_set_epi32(0, 0, 0, 0, 5, 4, 1, 0);
   __m256i d1, d2;
 
@@ -246,8 +252,9 @@ void ccso_derive_src_block_avx2(const uint16_t *src_y, uint8_t *const src_cls0,
         rec_curhi = _mm256_shuffle_epi8(rec_curhi, masksub1);
         rec_curlo = _mm256_permutevar8x32_epi32(rec_curlo, masksub2);
         rec_curhi = _mm256_permutevar8x32_epi32(rec_curhi, masksub2);
-        __m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo),
-                                            _mm256_castsi256_si128(rec_curhi));
+        //__m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo),
+        //                                    _mm256_castsi256_si128(rec_curhi));
+        __m256i rec_cur = _mm256_insertf128_si256(rec_curlo, _mm256_castsi256_si128(rec_curhi), 0x1);
 
         __m256i rec_tap1hi = _mm256_loadu_si256((
             const __m256i *)(src_rec2 + (xOff << y_uv_hscale) + tap1_pos + 16));
@@ -255,8 +262,9 @@ void ccso_derive_src_block_avx2(const uint16_t *src_y, uint8_t *const src_cls0,
         rec_tap1hi = _mm256_shuffle_epi8(rec_tap1hi, masksub1);
         rec_tap1lo = _mm256_permutevar8x32_epi32(rec_tap1lo, masksub2);
         rec_tap1hi = _mm256_permutevar8x32_epi32(rec_tap1hi, masksub2);
-        __m256i rec_tap1 =_mm256_setr_m128i(_mm256_castsi256_si128(rec_tap1lo),
-                                            _mm256_castsi256_si128(rec_tap1hi));
+        //__m256i rec_tap1 =_mm256_setr_m128i(_mm256_castsi256_si128(rec_tap1lo),
+        //                                    _mm256_castsi256_si128(rec_tap1hi));
+        __m256i rec_tap1 = _mm256_insertf128_si256(rec_tap1lo, _mm256_castsi256_si128(rec_tap1hi), 0x1);
 
         __m256i rec_tap2hi = _mm256_loadu_si256((
             const __m256i *)(src_rec2 + (xOff << y_uv_hscale) + tap2_pos + 16));
@@ -264,8 +272,9 @@ void ccso_derive_src_block_avx2(const uint16_t *src_y, uint8_t *const src_cls0,
         rec_tap2hi = _mm256_shuffle_epi8(rec_tap2hi, masksub1);
         rec_tap2lo = _mm256_permutevar8x32_epi32(rec_tap2lo, masksub2);
         rec_tap2hi = _mm256_permutevar8x32_epi32(rec_tap2hi, masksub2);
-        __m256i rec_tap2 =_mm256_setr_m128i(_mm256_castsi256_si128(rec_tap2lo),
-                                            _mm256_castsi256_si128(rec_tap2hi));
+        //__m256i rec_tap2 =_mm256_setr_m128i(_mm256_castsi256_si128(rec_tap2lo),
+        //                                    _mm256_castsi256_si128(rec_tap2hi));
+        __m256i rec_tap2 = _mm256_insertf128_si256(rec_tap2lo, _mm256_castsi256_si128(rec_tap2hi), 0x1);
 
         // int d1 = rec_tmp[tap1_pos] - rec_tmp[0];
         // int d2 = rec_tmp[tap2_pos] - rec_tmp[0];
@@ -350,7 +359,8 @@ void ccso_filter_block_hbd_with_buf_avx2(
   __m256i allmax = _mm256_set1_epi16(max_val);
   __m128i shufsub =
       _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 13, 12, 9, 8, 5, 4, 1, 0);
-  __m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  //__m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
+  __m256i masksub1 = _mm256_insertf128_si256(_mm256_castsi128_si256(shufsub), (shufsub), 0x1);
   __m256i masksub2 = _mm256_set_epi32(0, 0, 0, 0, 5, 4, 1, 0);
   // because src_cls has a type of uint8_t, selected directly using 8bit elements
   __m128i mask_cls_sub1 = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 14, 12, 10, 8, 6, 4, 2, 0);
@@ -394,13 +404,17 @@ void ccso_filter_block_hbd_with_buf_avx2(
         rec_curhi = _mm256_shuffle_epi8(rec_curhi, masksub1);
         rec_curlo = _mm256_permutevar8x32_epi32(rec_curlo, masksub2);
         rec_curhi = _mm256_permutevar8x32_epi32(rec_curhi, masksub2);
-        __m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo),
-                                            _mm256_castsi256_si128(rec_curhi));
+        //__m256i rec_cur = _mm256_setr_m128i(_mm256_castsi256_si128(rec_curlo),
+        //                                    _mm256_castsi256_si128(rec_curhi));
+        __m256i rec_cur = _mm256_insertf128_si256(rec_curlo, _mm256_castsi256_si128(rec_curhi), 0x1);
 
         __m128i cur_src_cls0hi =  _mm_lddqu_si128((const __m128i *)(src_cls0_2 + (xOff << y_uv_hscale) + 16));
         cur_src_cls0lo = _mm_shuffle_epi8(cur_src_cls0lo, mask_cls_sub1);
         cur_src_cls0hi = _mm_shuffle_epi8(cur_src_cls0hi, mask_cls_sub1);
-        __m256i cur_scr_cls0_256   = _mm256_setr_m128i(cur_src_cls0lo, cur_src_cls0hi);
+        __m256i cur_scr_cls0_256 =
+            //_mm256_setr_m128i(cur_src_cls0lo, cur_src_cls0hi);
+            _mm256_insertf128_si256(_mm256_castsi128_si256(cur_src_cls0lo), (cur_src_cls0hi), 0x1);
+
         cur_scr_cls0_256 = _mm256_permutevar8x32_epi32(cur_scr_cls0_256, masksub2);
         __m128i cur_scr_cls0_128 = _mm256_castsi256_si128(cur_scr_cls0_256);
         cur_scr_cls0_256 = _mm256_cvtepi8_epi16(cur_scr_cls0_128);
@@ -408,7 +422,10 @@ void ccso_filter_block_hbd_with_buf_avx2(
         __m128i cur_src_cls1hi =  _mm_lddqu_si128((const __m128i *)(src_cls1_2 + (xOff << y_uv_hscale) + 16));
         cur_src_cls1lo = _mm_shuffle_epi8(cur_src_cls1lo, mask_cls_sub1);
         cur_src_cls1hi = _mm_shuffle_epi8(cur_src_cls1hi, mask_cls_sub1);
-        __m256i cur_scr_cls1_256   = _mm256_setr_m128i(cur_src_cls1lo, cur_src_cls1hi);
+        __m256i cur_scr_cls1_256   = 
+            //_mm256_setr_m128i(cur_src_cls1lo, cur_src_cls1hi);
+            _mm256_insertf128_si256(_mm256_castsi128_si256(cur_src_cls1lo), (cur_src_cls1hi), 0x1);
+
         cur_scr_cls1_256 = _mm256_permutevar8x32_epi32(cur_scr_cls1_256, masksub2);
         __m128i cur_scr_cls1_128 = _mm256_castsi256_si128(cur_scr_cls1_256);
         cur_scr_cls1_256 = _mm256_cvtepi8_epi16(cur_scr_cls1_128);
