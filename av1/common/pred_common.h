@@ -403,18 +403,20 @@ static INLINE void get_above_and_left_cctx_type(
                                           xd->mi_col - mi_col_offset);
   CctxType *const cur_cctx_ptr = mi_params->cctx_type_map + mi_grid_idx;
 
-  if (blk_row && 0)
-    *above_cctx = (int)xd->cctx_type_map[((blk_row << ss_y) - 1) * stride +
-                                         (blk_col << ss_x)];
+  // TODO(kslu) change this workaround for shifts
+  const int cctx_stride = xd->tx_type_map_stride;
+  const int br = (txw == (cctx_stride >> ss_x)) ? blk_row : (blk_row << ss_y);
+  const int bc = (txw == (cctx_stride >> ss_x)) ? blk_col : (blk_col << ss_x);
+  if (blk_row)
+    *above_cctx = (int)xd->cctx_type_map[(br - 1) * cctx_stride + bc];
   else
     *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
 
-  if (blk_col && 0)
-    *left_cctx =
-        (int)xd
-            ->cctx_type_map[(blk_row << ss_y) * stride + (blk_col << ss_x) - 1];
+  if (blk_col)
+    *left_cctx = (int)xd->cctx_type_map[br * stride + bc - 1];
   else
     *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
+
   assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
   assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
 }
