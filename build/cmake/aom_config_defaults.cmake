@@ -139,6 +139,8 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
 # AV2 experiment flags.
 set_aom_config_var(CONFIG_DEBLOCK_SUB_PREDICTIONS 0
                    "AV2 deblocking sub-predictions experiment.")
+set_aom_config_var(CONFIG_ACROSS_SCALE_TPL_MVS 0
+                   "AV2 enable across-scale temporal MV propagation.")
 set_aom_config_var(CONFIG_C043_MVP_IMPROVEMENTS 1
                    "AV2 enable MVP list improvements.")
 set_aom_config_var(CONFIG_FORWARDSKIP 1
