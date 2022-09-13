@@ -404,14 +404,9 @@ enum {
 } UENUM1BYTE(TX_TYPE);
 
 #if CONFIG_CROSS_CHROMA_TX
-#define CCTX_NEG_ANGLES 1
-#define CCTX_POS_ANGLES 1
-// Always signal C1 coefficients for some cctx (i.e., both C1 and C2 nonzero
-// or C1 nonzero and C2 zero). This requires CCTX_NEG_ANGLES to be on.
-#define CCTX_C1_NONZERO 1
-// Drop C2 channel for some cctx_types. This macro requires CCTX_C1_NONZERO to
-// be on.
+#define CCTX_CONTEXTS 3
 #define CCTX_C2_DROPPED 0
+#define CCTX_ADAPT_REDUCED_SET 0
 // Configuration for the set of rotation angles
 // 0: { 45, 30, 60 }
 // 1: { 45, 22.5, 67.5 }
@@ -421,7 +416,6 @@ enum {
 #define CCTX_ANGLE_CONFIG 0
 enum {
   CCTX_NONE,  // No cross chroma transform
-#if CCTX_POS_ANGLES
 #if CCTX_ANGLE_CONFIG != 3
   CCTX_45,  // 45 degrees rotation (Haar transform)
 #endif
@@ -429,8 +423,6 @@ enum {
   CCTX_30,  // 30 degrees rotation
   CCTX_60,  // 60 degrees rotation
 #endif
-#endif  // CCTX_POS_ANGLES
-#if CCTX_NEG_ANGLES
 #if CCTX_ANGLE_CONFIG != 3
   CCTX_M45,  // -45 degrees rotation
 #endif
@@ -438,10 +430,16 @@ enum {
   CCTX_M30,  // -30 degrees rotation
   CCTX_M60,  // -60 degrees rotation
 #endif
-#endif  // CCTX_NEG_ANGLES
   CCTX_TYPES,
   CCTX_START = CCTX_NONE + 1,
 } UENUM1BYTE(CctxType);
+
+#if CCTX_ADAPT_REDUCED_SET
+#define CCTX_TYPES_ALLOWED 3
+#else
+#define CCTX_TYPES_ALLOWED CCTX_TYPES
+#endif
+
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 enum {

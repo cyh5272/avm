@@ -1626,7 +1626,7 @@ static int64_t motion_mode_rd(
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
 #if CONFIG_CROSS_CHROMA_TX
-  TX_TYPE best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+  CctxType best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
 #endif  // CONFIG_CROSS_CHROMA_TX
   const int rate_mv0 = *rate_mv;
   const int interintra_allowed =
@@ -3569,7 +3569,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
 #if CONFIG_CROSS_CHROMA_TX
-  TX_TYPE best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+  CctxType best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   av1_copy_array(best_cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
 #endif  // CONFIG_CROSS_CHROMA_TX
 

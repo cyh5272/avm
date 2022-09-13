@@ -14,6 +14,7 @@
 
 #include "aom_ports/mem.h"
 #include "av1/common/idct.h"
+#include "av1/common/pred_common.h"
 #include "av1/common/scan.h"
 #include "av1/common/txb_common.h"
 #if CONFIG_FORWARDSKIP
@@ -192,23 +193,16 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-#if CCTX_C1_NONZERO
   if (plane == AOM_PLANE_U) {
-    if (!all_zero)
+    if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-    else
-      xd->cctx_type_map[blk_row * xd->tx_type_map_stride + blk_col] = CCTX_NONE;
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                        CCTX_NONE);
+    }
   }
-#else
-  if (plane == AOM_PLANE_V) {
-    // cctx_type will be read either eob_v > 0 or eob_u > 0
-    eob_info *eob_data_u =
-        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-    const uint16_t eob_u = eob_data_u->eob;
-    if (!all_zero || eob_u > 0)
-      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-  }
-#endif  // CCTX_C1_NONZERO
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (all_zero) {
@@ -363,19 +357,16 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-#if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U && !all_zero) {
-    av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
-  }
-#else
-  if (plane == AOM_PLANE_V) {
-    eob_info *eob_data_u =
-        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-    uint16_t eob_u = eob_data_u->eob;
-    if (!all_zero || eob_u > 0)
+  if (plane == AOM_PLANE_U) {
+    if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                        CCTX_NONE);
+    }
   }
-#endif  // CCTX_C1_NONZERO
 #endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
@@ -722,9 +713,6 @@ void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
         for (int idy = 0; idy < txh; idy += tx_unit) {
           for (int idx = 0; idx < txw; idx += tx_unit) {
             xd->tx_type_map[(row + idy) * stride + col + idx] = tx_type;
-#if CONFIG_CROSS_CHROMA_TX
-            xd->cctx_type_map[(row + idy) * stride + col + idx] = CCTX_NONE;
-#endif  // CONFIG_CROSS_CHROMA_TX
           }
         }
       }

@@ -279,7 +279,7 @@ typedef struct {
   TX_TYPE tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
 #if CONFIG_CROSS_CHROMA_TX
   //! Map showing the cctx types for each block.
-  TX_TYPE cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+  CctxType cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
 #endif  // CONFIG_CROSS_CHROMA_TX
   //! Rd_stats for the whole partition block.
   RD_STATS rd_stats;
@@ -855,7 +855,7 @@ typedef struct {
 #endif  // CONFIG_DDT_INTER
 #if CONFIG_CROSS_CHROMA_TX
   //! cctx_type_cost
-  int cctx_type_cost[EXT_TX_SIZES][CCTX_TYPES];
+  int cctx_type_cost[EXT_TX_SIZES][CCTX_CONTEXTS][CCTX_TYPES_ALLOWED];
 #endif  // CONFIG_CROSS_CHROMA_TX
   /**@}*/
 

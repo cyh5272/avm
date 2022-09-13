@@ -322,8 +322,10 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
 
 #if CONFIG_CROSS_CHROMA_TX
   for (i = 0; i < EXT_TX_SIZES; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->cctx_type_cost[i],
-                             fc->cctx_type_cdf[i], NULL);
+    for (j = 0; j < CCTX_CONTEXTS; ++j) {
+      av1_cost_tokens_from_cdf(mode_costs->cctx_type_cost[i][j],
+                               fc->cctx_type_cdf[i][j], NULL);
+    }
   }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

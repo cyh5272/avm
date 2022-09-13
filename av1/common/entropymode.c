@@ -684,62 +684,77 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 #endif  // CONFIG_DDT_INTER
 
 #if CONFIG_CROSS_CHROMA_TX
-static const aom_cdf_prob default_cctx_type_cdf[EXT_TX_SIZES]
-                                               [CDF_SIZE(CCTX_TYPES)] = {
+static const aom_cdf_prob
+    default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
+                         [CDF_SIZE(CCTX_TYPES_ALLOWED)] = {
 #if CCTX_ANGLE_CONFIG == 4
-#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-#else
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-                                                 { AOM_CDF2(16384) },
-#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
+                           { { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) },
+                             { AOM_CDF3(10923, 21845) } },
 #elif CCTX_ANGLE_CONFIG == 3
-#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
-                                                 { AOM_CDF5(6554, 13107, 19661,
-                                                            26214) },
-                                                 { AOM_CDF5(6554, 13107, 19661,
-                                                            26214) },
-                                                 { AOM_CDF5(6554, 13107, 19661,
-                                                            26214) },
-                                                 { AOM_CDF5(6554, 13107, 19661,
-                                                            26214) },
+                           { { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) } },
+                           { { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) } },
+                           { { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) } },
+                           { { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) },
+                             { AOM_CDF5(6554, 13107, 19661, 26214) } },
 #else
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-                                                 { AOM_CDF3(10923, 21845) },
-#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+#if CCTX_ADAPT_REDUCED_SET
+                           { { AOM_CDF3(21092, 22824) },
+                             { AOM_CDF3(23150, 29387) },
+                             { AOM_CDF3(12029, 25649) } },
+                           { { AOM_CDF3(17069, 19010) },
+                             { AOM_CDF3(22591, 27810) },
+                             { AOM_CDF3(10803, 24548) } },
+                           { { AOM_CDF3(16209, 18900) },
+                             { AOM_CDF3(21703, 27555) },
+                             { AOM_CDF3(8605, 23810) } },
+                           { { AOM_CDF3(15354, 17963) },
+                             { AOM_CDF3(22686, 27727) },
+                             { AOM_CDF3(9173, 22932) } }
 #else
-#if CCTX_POS_ANGLES && CCTX_NEG_ANGLES
-                                                 { AOM_CDF7(4681, 9362, 14043,
-                                                            18725, 23406,
-                                                            28087) },
-                                                 { AOM_CDF7(4681, 9362, 14043,
-                                                            18725, 23406,
-                                                            28087) },
-                                                 { AOM_CDF7(4681, 9362, 14043,
-                                                            18725, 23406,
-                                                            28087) },
-                                                 { AOM_CDF7(4681, 9362, 14043,
-                                                            18725, 23406,
-                                                            28087) },
-#else
-                                                 { AOM_CDF4(8192, 16384,
-                                                            24576) },
-                                                 { AOM_CDF4(8192, 16384,
-                                                            24576) },
-                                                 { AOM_CDF4(8192, 16384,
-                                                            24576) },
-                                                 { AOM_CDF4(8192, 16384,
-                                                            24576) },
-#endif  // CCTX_POS_ANGLES && CCTX_NEG_ANGLES
+                           { { AOM_CDF7(19143, 19642, 20876, 21362, 23684,
+                                        30645) },
+                             { AOM_CDF7(15852, 17519, 22430, 24276, 26473,
+                                        30362) },
+                             { AOM_CDF7(9981, 10351, 11021, 11340, 16893,
+                                        28901) } },
+                           { { AOM_CDF7(13312, 14068, 15345, 16249, 20082,
+                                        29648) },
+                             { AOM_CDF7(11802, 14635, 17918, 20493, 23927,
+                                        29206) },
+                             { AOM_CDF7(8348, 8915, 9727, 10347, 16584,
+                                        27923) } },
+                           { { AOM_CDF7(10604, 11887, 13486, 14485, 19798,
+                                        28529) },
+                             { AOM_CDF7(10790, 13346, 16867, 18854, 23398,
+                                        29133) },
+                             { AOM_CDF7(6538, 7104, 7997, 8723, 15658,
+                                        26864) } },
+                           { { AOM_CDF7(13226, 13959, 14918, 15707, 21009,
+                                        29328) },
+                             { AOM_CDF7(10336, 13195, 15614, 17813, 21992,
+                                        29469) },
+                             { AOM_CDF7(7769, 8772, 9617, 10150, 16729,
+                                        28132) } }
 #endif
-                                               };
+#endif
+                         };
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 static const aom_cdf_prob default_cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)] = {

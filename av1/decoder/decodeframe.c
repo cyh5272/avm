@@ -251,14 +251,8 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
 #if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-#if CCTX_C1_NONZERO
-    if (eob_data->eob || (av1_get_cctx_type(xd, row, col) > CCTX_NONE &&
-                          plane == AOM_PLANE_V && eob_data_u->eob)) {
-#else
-    eob_info *eob_data_v =
-        dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
-    if (eob_data->eob || (plane && (eob_data_u->eob || eob_data_v->eob))) {
-#endif
+    if (eob_data->eob || (plane == AOM_PLANE_V && eob_data_u->eob &&
+                          av1_get_cctx_type(xd, row, col) > CCTX_NONE)) {
 #else
     if (eob_data->eob) {
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -1319,6 +1313,15 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
                                       blk_row, blk_col, block, max_tx_size,
                                       &eobtotal);
                 block += stepr * stepc;
+#if CONFIG_CROSS_CHROMA_TX
+              } else if (plane == AOM_PLANE_U) {
+                // fill cctx_type_map with CCTX_NONE for skip blocks so their
+                // neighbors can derive cctx contexts
+                int row_offset, col_offset;
+                get_offsets_to_8x8(xd, max_tx_size, &row_offset, &col_offset);
+                update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset,
+                                  max_tx_size, CCTX_NONE);
+#endif
               }
             }
           }

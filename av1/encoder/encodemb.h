@@ -124,7 +124,7 @@ void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *mb, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                   CctxType cctx_type,
+                   CctxType cctx_type, int blk_row, int blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                    const TXB_CTX *const txb_ctx, int *rate_cost);
 

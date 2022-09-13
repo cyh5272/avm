@@ -1152,7 +1152,7 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       if (quant_param_intra.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, best_tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                       cctx_type,
+                       cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                        txb_ctx, rate_cost);
       }
@@ -1315,9 +1315,7 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
 
-#if CCTX_C1_NONZERO
   assert(p_u->eobs[block] > 0);
-#endif
   assert(cpi != NULL);
   assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
 
@@ -1551,7 +1549,7 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
 
@@ -1592,7 +1590,7 @@ uint16_t prune_txk_type_separ(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
 
@@ -1712,7 +1710,7 @@ uint16_t prune_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
         x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-        CCTX_NONE,
+        CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
         txb_ctx, reduced_tx_set_used, 0);
     // tx domain dist
@@ -2339,7 +2337,7 @@ static INLINE int cost_coeffs(
 #endif  // CONFIG_FORWARDSKIP
     MACROBLOCK *x, int plane, int block, TX_SIZE tx_size, const TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-    const CctxType cctx_type,
+    const CctxType cctx_type, int blk_row, int blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
     const TXB_CTX *const txb_ctx, int reduced_tx_set_used) {
 #if TXCOEFF_COST_TIMER
@@ -2352,7 +2350,7 @@ static INLINE int cost_coeffs(
 #endif  // CONFIG_FORWARDSKIP
       x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-      cctx_type,
+      cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
       txb_ctx, reduced_tx_set_used);
 #if TXCOEFF_COST_TIMER
@@ -2800,7 +2798,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       if (quant_param.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                       CCTX_NONE,
+                       CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                        txb_ctx, &rate_cost);
       } else {
@@ -2810,7 +2808,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_FORWARDSKIP
             x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-            CCTX_NONE,
+            CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
             txb_ctx, cm->features.reduced_tx_set_used);
       }
@@ -3055,12 +3053,23 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
 
+#if CCTX_ADAPT_REDUCED_SET
+  int above_cctx, left_cctx;
+  get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                               &left_cctx);
+  uint8_t cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+#endif
+
   // Iterate through all transform type candidates.
   for (CctxType cctx_type = CCTX_START; cctx_type < CCTX_TYPES; ++cctx_type) {
+#if CCTX_ADAPT_REDUCED_SET
+    if (!(cctx_mask & (1 << cctx_type))) continue;
+#endif
+
     RD_STATS this_rd_stats;
     av1_invalid_rd_stats(&this_rd_stats);
 
-    update_cctx_array(xd, blk_row, blk_col, tx_size, cctx_type);
+    update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, cctx_type);
     forward_cross_chroma_transform(x, block, tx_size, cctx_type);
 
     for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
@@ -3092,18 +3101,17 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       // Calculate rate cost of quantized coefficients.
       if (quant_param.use_optimize_b) {
         av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, cctx_type,
-                       &txb_ctx_uv[plane - AOM_PLANE_U],
+                       blk_row, blk_col, &txb_ctx_uv[plane - AOM_PLANE_U],
                        &rate_cost[plane - AOM_PLANE_U]);
       } else {
         rate_cost[plane - AOM_PLANE_U] = cost_coeffs(
 #if CONFIG_FORWARDSKIP
             cm,
 #endif  // CONFIG_FORWARDSKIP
-            x, plane, block, tx_size, tx_type, cctx_type,
+            x, plane, block, tx_size, tx_type, cctx_type, blk_row, blk_col,
             &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
       }
     }
-#if CCTX_C1_NONZERO
     // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
     // dqcoeffs
     uint64_t sse_dqcoeff_u =
@@ -3121,7 +3129,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       }
       continue;
     }
-#endif
 
     // If rd cost based on coeff rate alone is already more than best_rd,
     // terminate early.
@@ -3171,15 +3178,13 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   assert(best_rd != INT64_MAX);
 
   best_rd_stats->skip_txfm = (best_eob_u == 0 && best_eob_v == 0);
-  update_cctx_array(xd, blk_row, blk_col, tx_size, best_cctx_type);
+  update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, best_cctx_type);
   p_u->txb_entropy_ctx[block] = best_txb_ctx_u;
   p_v->txb_entropy_ctx[block] = best_txb_ctx_v;
   p_u->eobs[block] = best_eob_u;
   p_v->eobs[block] = best_eob_v;
 
-#if CCTX_C1_NONZERO
   assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
-#endif
 #if CCTX_C2_DROPPED
   assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_v == 0));
 #endif
@@ -4284,7 +4289,7 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
   const AV1_COMMON *cm = &cpi->common;
   RD_STATS rd_stats_joint_uv;
   av1_init_rd_stats(&rd_stats_joint_uv);
-  update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
+  update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 
   // Obtain RD cost for CCTX_NONE
   RD_STATS rd_stats_uv[2];

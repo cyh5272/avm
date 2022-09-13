@@ -78,7 +78,7 @@ void av1_subtract_plane(MACROBLOCK *x, BLOCK_SIZE plane_bsize, int plane) {
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                   CctxType cctx_type,
+                   CctxType cctx_type, int blk_row, int blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                    const TXB_CTX *const txb_ctx, int *rate_cost) {
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -95,14 +95,15 @@ int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif  // CONFIG_CONTEXT_DERIVATION
     );
 #if CONFIG_CROSS_CHROMA_TX
-    *rate_cost += get_cctx_type_cost(x, xd, plane, tx_size, block, cctx_type);
+    *rate_cost += get_cctx_type_cost(&cpi->common, x, xd, plane, tx_size,
+                                     blk_row, blk_col, block, cctx_type);
 #endif  // CONFIG_CROSS_CHROMA_TX
     return eob;
   }
 
   return av1_optimize_txb_new(cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                              cctx_type,
+                              cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                               txb_ctx, rate_cost, cpi->oxcf.algo_cfg.sharpness);
 }
@@ -560,11 +561,26 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
                                     tx_size, cm->features.reduced_tx_set_used);
 #if CONFIG_CROSS_CHROMA_TX
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#if CCTX_ADAPT_REDUCED_SET
+  if (plane) {
+    // TODO(kslu) change this workaround
+    // Since contexts can be changed during the dry run tx search, check if the
+    // cctx type is valid here. If not, just use CCTX_NONE.
+    int above_cctx, left_cctx;
+    get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                                 &left_cctx);
+    uint8_t allowed_cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+    if (!(allowed_cctx_mask & (1 << cctx_type))) {
+      cctx_type = CCTX_NONE;
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
+    }
+  }
+#endif
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
                    blk_row * bw + blk_col) &&
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
 #if CCTX_C2_DROPPED
       (plane < AOM_PLANE_V ||
        ((cctx_type == CCTX_NONE || x->plane[AOM_PLANE_U].eobs[block]) &&
@@ -573,7 +589,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       (plane < AOM_PLANE_V || cctx_type == CCTX_NONE ||
        x->plane[AOM_PLANE_U].eobs[block]) &&
 #endif
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER && CCTX_C1_NONZERO
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
 #if CONFIG_SKIP_MODE_ENHANCEMENT
       !(mbmi->skip_mode == 1)) {
 #else
@@ -635,7 +651,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                     cctx_type,
+                     cctx_type, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                      &txb_ctx, &dummy_rate_cost);
     }
@@ -647,13 +663,12 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,
                          cm->quant_params.base_qindex);
     }
-#if CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
+#if CONFIG_CROSS_CHROMA_TX
     // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
     // when eob of U is 0.
-    // TODO(kslu) why cctx_type can be > CCTX_NONE when eob_u is 0?
     if (plane == AOM_PLANE_U && p->eobs[block] == 0)
-      update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C1_NONZERO
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
+#endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
     // Reset coeffs and dqcoeffs
@@ -1146,7 +1161,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type,
 #if CONFIG_CROSS_CHROMA_TX
-                     CCTX_NONE,
+                     CCTX_NONE, blk_row, blk_col,
 #endif  // CONFIG_CROSS_CHROMA_TX
                      &txb_ctx, &dummy_rate_cost);
     }
@@ -1246,6 +1261,19 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   TX_TYPE tx_type = av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col,
                                     tx_size, cm->features.reduced_tx_set_used);
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#if CCTX_ADAPT_REDUCED_SET
+  // TODO(kslu) change this workaround
+  // Since contexts can be changed during the dry run tx search, check if the
+  // cctx type is valid here. If not, just use CCTX_NONE.
+  int above_cctx, left_cctx;
+  get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                               &left_cctx);
+  uint8_t allowed_cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
+  if (!(allowed_cctx_mask & (1 << cctx_type))) {
+    cctx_type = CCTX_NONE;
+    update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
+  }
+#endif
 
   av1_subtract_txb(x, AOM_PLANE_U, plane_bsize, blk_col, blk_row, tx_size);
   av1_subtract_txb(x, AOM_PLANE_V, plane_bsize, blk_col, blk_row, tx_size);
@@ -1283,22 +1311,20 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                             INTRA_BLOCK_OPT_TYPE == TRELLIS_DROPOUT_OPT));
 
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
-#if CCTX_C1_NONZERO
+    // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
+    // when eob of U is 0.
+    if (plane == AOM_PLANE_V && *eob_u == 0)
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 #if CCTX_C2_DROPPED
     if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
                                  (*eob_u == 0 && cctx_type > CCTX_NONE))) {
 #else
     if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
 #endif
-      // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
-      // when eob of U is 0.
-      if (*eob_u == 0 && cctx_type > CCTX_NONE)
-        update_cctx_array(xd, blk_row, blk_col, tx_size, CCTX_NONE);
       av1_quantize_skip(av1_get_max_eob(tx_size),
                         p_v->coeff + BLOCK_OFFSET(block), dqcoeff_v, eob_v);
       break;
     }
-#endif
     av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
                       &quant_param);
     av1_xform_quant(
@@ -1320,7 +1346,7 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
 #endif  // CONFIG_FORWARDSKIP
       );
       av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, cctx_type,
-                     &txb_ctx, &dummy_rate_cost);
+                     blk_row, blk_col, &txb_ctx, &dummy_rate_cost);
     }
     if (do_dropout) {
       av1_dropout_qcoeff(x, plane, block, tx_size, tx_type,
