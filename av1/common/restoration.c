@@ -1292,7 +1292,11 @@ static void fill_directional_feature_buffers_highbd(
   buffer_col = 0;
 #pragma GCC ivdep
   for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
-    const int dgd_id = row * dgd_stride + col;
+    // Fix an issue with odd-sized rows/columns. (If the right/lower extension
+    // of the frame is extended by 4 pixels instead of the current 3 AOMMIN can
+    // be discarded.
+    const int dgd_col = AOMMIN(col, width + 3 - 2);
+    const int dgd_id = row * dgd_stride + dgd_col;
     const int prev_row = dgd_id - dgd_stride;
     const int next_row = dgd_id + dgd_stride;
 
@@ -1699,6 +1703,8 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
                           tskip_lead, tskip_lag, tskip_strict);
   }
   for (int i = 0; i < height; ++i) {
+    // Ensure window is three pixels or a potential issue with odd-sized frames.
+    const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
     fill_directional_feature_buffers_highbd(i + feature_lag, feature_length - 1,
                                             dgd, stride, width, feature_lead,
                                             feature_lag, dir_strict);
