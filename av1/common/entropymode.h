@@ -376,7 +376,7 @@ static const int av1_ext_tx_inv[EXT_TX_SET_TYPES][TX_TYPES] = {
 };
 
 #if CONFIG_ATC_NEWTXSETS
-static const int av1_md_type2idx[4][13][TX_TYPES] = {
+static const int av1_md_type2idx[EXT_TX_SIZES][INTRA_MODES][TX_TYPES] = {
   {
       { 0, 2, 3, 1, 0, 0, 0, 4, 5, 0, 0, 0, 0, 6, 0, 0 },  // mode_class: 0
       { 0, 2, 3, 1, 0, 0, 0, 4, 0, 0, 5, 0, 6, 0, 0, 0 },  // mode_class: 1

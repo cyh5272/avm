@@ -252,6 +252,8 @@ static INLINE int get_golomb_cost(int abs_qc) {
 }
 
 #if CONFIG_ATC_COEFCODING
+// Golomb cost of coding bypass coded level values in the
+// low-frequency region.
 static INLINE int get_golomb_cost_lf(int abs_qc) {
   if (abs_qc >= 1 + LF_NUM_BASE_LEVELS + COEFF_BASE_RANGE) {
     const int r = abs_qc - COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS;
@@ -261,12 +263,16 @@ static INLINE int get_golomb_cost_lf(int abs_qc) {
   return 0;
 }
 
+// Base range cost of coding level values in the
+// low-frequency region, includes the bypass cost.
 static INLINE int get_br_lf_cost(tran_low_t level, const int *coeff_lps) {
   const int base_range =
       AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   return coeff_lps[base_range] + get_golomb_cost_lf(level);
 }
 
+// Calculates differential cost for base range coding in the low-frequency
+// region for encoder coefficient level optimization.
 static INLINE int get_br_lf_cost_with_diff(tran_low_t level,
                                            const int *coeff_lps, int *diff) {
   const int base_range =

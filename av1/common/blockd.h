@@ -1428,7 +1428,7 @@ static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
 };
 
 #if CONFIG_ATC_NEWTXSETS
-static const int av1_mdtx_used_flag[4][13][TX_TYPES] = {
+static const int av1_mdtx_used_flag[EXT_TX_SIZES][INTRA_MODES][TX_TYPES] = {
   {
       { 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0 },
       { 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0 },
@@ -1521,7 +1521,7 @@ static const uint16_t av1_ext_tx_used_flag[EXT_TX_SET_TYPES] = {
 };
 
 #if CONFIG_ATC_NEWTXSETS
-static const uint16_t av1_md_trfm_used_flag[4][13] = {
+static const uint16_t av1_md_trfm_used_flag[EXT_TX_SIZES][INTRA_MODES] = {
   {
       0x218F,
       0x148F,

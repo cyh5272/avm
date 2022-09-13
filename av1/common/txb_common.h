@@ -121,6 +121,8 @@ static INLINE int get_br_ctx_2d(const uint8_t *const levels,
 }
 
 #if CONFIG_ATC_COEFCODING
+// This function returns the low range context index for
+// the low-frequency region for the EOB coefficient.
 static AOM_FORCE_INLINE int get_br_ctx_lf_eob(const int c,  // raster order
                                               const TX_CLASS tx_class) {
   if (tx_class == TX_CLASS_2D && c == 0) return 0;
@@ -142,6 +144,9 @@ static AOM_FORCE_INLINE int get_br_ctx_eob(const int c,  // raster order
 #endif  // CONFIG_ATC_COEFCODING
 
 #if CONFIG_ATC_COEFCODING
+// This function returns the low range context index/increment for the
+// coefficients residing in the low-frequency region for 2D transforms.
+// Not used for the DC term.
 static INLINE int get_br_lf_ctx_2d(const uint8_t *const levels,
                                    const int c,  // raster order
                                    const int bwl) {
@@ -157,6 +162,9 @@ static INLINE int get_br_lf_ctx_2d(const uint8_t *const levels,
   return mag + 7;
 }
 
+// This function returns the low range context index/increment for the
+// coefficients residing in the low-frequency region for 1D and 2D
+// transforms and covers the 1D and 2D TX DC terms.
 static AOM_FORCE_INLINE int get_br_lf_ctx(const uint8_t *const levels,
                                           const int c,  // raster order
                                           const int bwl,
@@ -189,6 +197,9 @@ static AOM_FORCE_INLINE int get_br_lf_ctx(const uint8_t *const levels,
   return mag + 7;
 }
 
+// This function returns the low range context index/increment for the
+// coefficients residing in the higher-frequency default region
+// for 1D and 2D transforms.
 static AOM_FORCE_INLINE int get_br_ctx(const uint8_t *const levels,
                                        const int c,  // raster order
                                        const int bwl, const TX_CLASS tx_class) {
@@ -315,6 +326,8 @@ static INLINE int get_sign_ctx_skip(const int8_t *const signs,
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_ATC_COEFCODING
+// This function returns the template sum of absolute values
+// for coefficient coding for the low-frequency region.
 static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
                                           const int bwl,
                                           const TX_CLASS tx_class) {
@@ -339,6 +352,8 @@ static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
 }
 #endif  // CONFIG_ATC_COEFCODING
 
+// This function returns the template sum of absolute values
+// for coefficient coding for the higher-frequency default region.
 static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
                                        const int bwl, const TX_CLASS tx_class) {
   int mag;
@@ -391,6 +406,8 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_skip(const int stats,
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_ATC_COEFCODING
+// This function returns the base range context index/increment for the
+// coefficients residing in the low-frequency region for 1D/2D transforms.
 static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_lf(
     const int stats,
     const int coeff_idx,  // raster order
@@ -440,6 +457,8 @@ static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats_lf(
 }
 #endif  // CONFIG_ATC_COEFCODING
 
+// This function returns the base range context index/increment for the
+// coefficients residing in the higher-frequency region for 1D/2D transforms.
 static AOM_FORCE_INLINE int get_nz_map_ctx_from_stats(
     const int stats,
     const int coeff_idx,  // raster order
@@ -526,6 +545,8 @@ static INLINE int get_upper_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_ATC_COEFCODING
+// This function returns the base range context index/increment for the
+// coefficients residing in the low-frequency region for 2D transforms.
 static INLINE int get_lower_levels_ctx_lf_2d(const uint8_t *levels,
                                              int coeff_idx, int bwl) {
   assert(coeff_idx > 0);
@@ -591,6 +612,10 @@ static INLINE int get_lower_levels_ctx_2d(const uint8_t *levels, int coeff_idx,
 }
 
 #if CONFIG_ATC_COEFCODING
+// This function determines the limits to separate the low-frequency
+// coefficient coding region from the higher-frequency default
+// region. It is based on the diagonal sum (row+col) or row, columns
+// of the given coefficient in a scan order.
 static INLINE int get_lf_limits(int row, int col, TX_CLASS tx_class,
                                 int plane) {
   int limits = 0;
