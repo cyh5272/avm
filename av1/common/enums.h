@@ -132,6 +132,7 @@ extern "C" {
 #endif  // CONFIG_IST
 
 #if CONFIG_ATC_NEWTXSETS
+// TX sizes used for mode dependent TX sets
 #define MODE_DEPTX_TXSIZES 19
 #endif  // CONFIG_ATC_NEWTXSETS
 

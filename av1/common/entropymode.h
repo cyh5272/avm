@@ -439,7 +439,7 @@ static const int av1_md_type2idx[EXT_TX_SIZES][INTRA_MODES][TX_TYPES] = {
   },                                                       // size_class: 3
 };
 
-static const int av1_md_idx2type[4][13][TX_TYPES] = {
+static const int av1_md_idx2type[EXT_TX_SIZES][INTRA_MODES][TX_TYPES] = {
   {
       { 0, 3, 1, 2, 7, 8, 13 },     // mode_class: 0
       { 0, 3, 1, 2, 7, 10, 12 },    // mode_class: 1
