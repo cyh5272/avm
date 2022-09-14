@@ -142,7 +142,7 @@ set_aom_config_var(
   "AV2 enable adaptive transform coefficient coding improvement.")
 set_aom_config_var(CONFIG_ATC_NEWTXSETS 1
                    "AV2 enable adaptive transform coding and new TX sets.")
-set_aom_config_var(CONFIG_C043_MVP_IMPROVEMENTS 1
+set_aom_config_var(CONFIG_C043_MVP_IMPROVEMENTS 0
                    "AV2 enable MVP list improvements.")
 set_aom_config_var(CONFIG_FORWARDSKIP 1
                    "AV2 enable forward skip residual coding.")
