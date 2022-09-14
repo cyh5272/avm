@@ -1705,7 +1705,7 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   for (int i = 0; i < height; ++i) {
     // Ensure window is three pixels or a potential issue with odd-sized frames.
     const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
-    fill_directional_feature_buffers_highbd(i + feature_lag, feature_length - 1,
+    fill_directional_feature_buffers_highbd(row_to_process, feature_length - 1,
                                             dgd, stride, width, feature_lead,
                                             feature_lag, dir_strict);
     fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride, width, height,
