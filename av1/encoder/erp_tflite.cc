@@ -147,9 +147,10 @@ static inline void normalize(float *features_dst, const float *features_src,
 #undef EPSILON
 }
 
-extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
+extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd, int qindex,
                                   const float *features, bool *prune_horz,
                                   bool *prune_vert) {
+  (void)qindex;
   std::unique_ptr<tflite::Interpreter> interpreter =
       get_tflite_interpreter(bsize, is_hd);
 
@@ -212,11 +213,29 @@ extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
       thresh = 0.0f;
   }
 
-  if (probs[1] < thresh) {
-    *prune_horz = true;
+  if (is_hd) {
+    if (qindex > 224)
+      thresh *= 0.50;
+    else if (qindex > 192)
+      thresh *= 0.75;
+    else if (qindex < 96)
+      thresh *= 1.50;
+    else if (qindex < 128)
+      thresh *= 1.25;
   }
-  if (probs[2] < thresh) {
+
+  const int nt = 3;
+  if (probs[1] < nt * thresh && probs[2] < nt * thresh &&
+      probs[1] + probs[2] < thresh * (nt + 1)) {
+    *prune_horz = true;
     *prune_vert = true;
+  } else {
+    if (probs[1] < thresh) {
+      *prune_horz = true;
+    }
+    if (probs[2] < thresh) {
+      *prune_vert = true;
+    }
   }
 
   interpreter.reset();
