@@ -773,9 +773,14 @@ static AOM_INLINE void tip_build_inter_predictors_8x8(
         get_conv_params_no_round(ref, plane, tmp_conv_dst, MAX_SB_SIZE, 1, bd);
 
     if (do_opfl) {
-      av1_opfl_rebuild_inter_predictor(
-          dst, dst_stride, plane, mv_refined, &inter_pred_params, xd, mi_x,
-          mi_y, ref, mc_buf, calc_subpel_params_func, use_4x4);
+      av1_opfl_rebuild_inter_predictor(dst, dst_stride, plane, mv_refined,
+                                       &inter_pred_params, xd, mi_x, mi_y, ref,
+                                       mc_buf, calc_subpel_params_func, use_4x4
+#if CONFIG_DEBLOCK_SUB_PREDICTIONS
+                                       ,
+                                       cm->quant_params.base_qindex
+#endif  // CONFIG_DEBLOCK_SUB_PREDICTIONS
+      );
     } else {
       tip_build_one_inter_predictor(dst, dst_stride, &mv[ref],
                                     &inter_pred_params, xd, mi_x, mi_y, ref,
