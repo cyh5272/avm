@@ -58,10 +58,10 @@ void ccso_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm, MACROBLOCKD *xd,
 
 typedef void (*ccso_filter_block_func)(
     const uint16_t *src_y, uint16_t *dst_yuv, const int x, const int y,
-    const int pic_width, const int pic_height,
-    int *src_cls, const int8_t *offset_buf, const int scaled_ext_stride,
-    const int dst_stride, const int y_uv_hscale, const int y_uv_vscale,
-    const int thr, const int neg_thr, const int *src_loc, const int max_val,
+    const int pic_width, const int pic_height, int *src_cls,
+    const int8_t *offset_buf, const int scaled_ext_stride, const int dst_stride,
+    const int y_uv_hscale, const int y_uv_vscale, const int thr,
+    const int neg_thr, const int *src_loc, const int max_val,
     const int blk_size);
 
 #ifdef __cplusplus

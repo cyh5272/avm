@@ -96,12 +96,12 @@ void derive_ccso_sample_pos(int *rec_idx, const int ccso_stride,
 #if CONFIG_CCSO_EXT
 
 void ccso_filter_block_hbd_wo_buf_c(
-  const uint16_t *src_y, uint16_t *dst_yuv, const int x, const int y, const int pic_width, const int pic_height,
-  int *src_cls, const int8_t *offset_buf, const int src_y_stride,
-  const int dst_stride, const int y_uv_hscale, const int y_uv_vscale,
-  const int thr, const int neg_thr, const int *src_loc, const int max_val,
-  const int blk_size, const bool isSingleBand, const uint8_t shift_bits) {
-
+    const uint16_t *src_y, uint16_t *dst_yuv, const int x, const int y,
+    const int pic_width, const int pic_height, int *src_cls,
+    const int8_t *offset_buf, const int src_y_stride, const int dst_stride,
+    const int y_uv_hscale, const int y_uv_vscale, const int thr,
+    const int neg_thr, const int *src_loc, const int max_val,
+    const int blk_size, const bool isSingleBand, const uint8_t shift_bits) {
   const int y_end = AOMMIN(pic_height - y, blk_size);
   const int x_end = AOMMIN(pic_width - x, blk_size);
   for (int y_start = 0; y_start < y_end; y_start++) {
@@ -112,11 +112,15 @@ void ccso_filter_block_hbd_wo_buf_c(
                          &src_y[(y_pos << y_uv_vscale) * src_y_stride +
                                 (x_pos << y_uv_hscale)],
                          thr, neg_thr, src_loc);
-      const int band_num = isSingleBand? 0: src_y[(y_pos << y_uv_vscale) * src_y_stride +
-                                 (x_pos << y_uv_hscale)] >> shift_bits;
+      const int band_num = isSingleBand
+                               ? 0
+                               : src_y[(y_pos << y_uv_vscale) * src_y_stride +
+                                       (x_pos << y_uv_hscale)] >>
+                                     shift_bits;
       const int lut_idx_ext = (band_num << 4) + (src_cls[0] << 2) + src_cls[1];
       const int offset_val = offset_buf[lut_idx_ext];
-      dst_yuv[y_pos * dst_stride + x_pos] = clamp(offset_val + dst_yuv[y_pos * dst_stride + x_pos], 0, max_val);
+      dst_yuv[y_pos * dst_stride + x_pos] =
+          clamp(offset_val + dst_yuv[y_pos * dst_stride + x_pos], 0, max_val);
     }
   }
 }
@@ -151,8 +155,8 @@ void ccso_apply_luma_mb_filter(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
       if (!use_ccso) continue;
       ccso_filter_block_hbd_wo_buf(
           src_y, dst_yuv, x, y, pic_width, pic_height, src_cls,
-          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride, 0,
-                            0, thr, neg_thr, src_loc, max_val, blk_size, false, shift_bits);
+          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride, 0, 0,
+          thr, neg_thr, src_loc, max_val, blk_size, false, shift_bits);
     }
     dst_yuv += (dst_stride << blk_log2);
     src_y += (ccso_ext_stride << blk_log2);
@@ -190,8 +194,8 @@ void ccso_apply_luma_sb_filter(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
       if (!use_ccso) continue;
       ccso_filter_block_hbd_wo_buf(
           src_y, dst_yuv, x, y, pic_width, pic_height, src_cls,
-          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride, 0,
-                            0, thr, neg_thr, src_loc, max_val, blk_size, true, shift_bits);
+          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride, 0, 0,
+          thr, neg_thr, src_loc, max_val, blk_size, true, shift_bits);
     }
     dst_yuv += (dst_stride << blk_log2);
     src_y += (ccso_ext_stride << blk_log2);
@@ -230,10 +234,11 @@ void ccso_apply_chroma_mb_filter(AV1_COMMON *cm, MACROBLOCKD *xd,
           (plane == 1) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
                        : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
       if (!use_ccso) continue;
-      ccso_filter_block_hbd_wo_buf(
-          src_y, dst_yuv, x, y, pic_width, pic_height, src_cls,
-          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride, y_uv_hscale,
-                            y_uv_vscale, thr, neg_thr, src_loc, max_val, blk_size, false, shift_bits);
+      ccso_filter_block_hbd_wo_buf(src_y, dst_yuv, x, y, pic_width, pic_height,
+                                   src_cls, cm->ccso_info.filter_offset[plane],
+                                   ccso_ext_stride, dst_stride, y_uv_hscale,
+                                   y_uv_vscale, thr, neg_thr, src_loc, max_val,
+                                   blk_size, false, shift_bits);
     }
     dst_yuv += (dst_stride << blk_log2);
     src_y += (ccso_ext_stride << (blk_log2 + y_uv_vscale));
@@ -273,10 +278,11 @@ void ccso_apply_chroma_sb_filter(AV1_COMMON *cm, MACROBLOCKD *xd,
           (plane == 1) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
                        : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
       if (!use_ccso) continue;
-      ccso_filter_block_hbd_wo_buf(
-          src_y, dst_yuv, x, y, pic_width, pic_height, src_cls,
-          cm->ccso_info.filter_offset[plane], ccso_ext_stride, dst_stride,
-          y_uv_hscale, y_uv_vscale, thr, neg_thr, src_loc, max_val, blk_size, true, shift_bits);
+      ccso_filter_block_hbd_wo_buf(src_y, dst_yuv, x, y, pic_width, pic_height,
+                                   src_cls, cm->ccso_info.filter_offset[plane],
+                                   ccso_ext_stride, dst_stride, y_uv_hscale,
+                                   y_uv_vscale, thr, neg_thr, src_loc, max_val,
+                                   blk_size, true, shift_bits);
     }
     dst_yuv += (dst_stride << blk_log2);
     src_y += (ccso_ext_stride << (blk_log2 + y_uv_vscale));
@@ -390,12 +396,14 @@ void apply_ccso_filter_hbd(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
                 (x >> log2_filter_unit_size);
 
         const bool use_ccso =
-            (plane == 1) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
+            (plane == 1)
+                ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
 #if CONFIG_CCSO_EXT
-            : (plane == 0) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_y
-                           : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
+                : (plane == 0)
+                      ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_y
+                      : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
 #else
-                         : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
+                : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
 #endif
         if (!use_ccso) continue;
       }
