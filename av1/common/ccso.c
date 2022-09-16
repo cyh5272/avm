@@ -396,14 +396,12 @@ void apply_ccso_filter_hbd(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
                 (x >> log2_filter_unit_size);
 
         const bool use_ccso =
-            (plane == 1)
-                ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
+            (plane == 1) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_u
 #if CONFIG_CCSO_EXT
-                : (plane == 0)
-                      ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_y
-                      : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
+            : (plane == 0) ? mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_y
+                           : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
 #else
-                : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
+                         : mi_params->mi_grid_base[ccso_blk_idx]->ccso_blk_v;
 #endif
         if (!use_ccso) continue;
       }
