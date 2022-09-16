@@ -2056,10 +2056,9 @@ static bool cnn_dataset_init(int width, int height) {
 /*!\brief Save frame pixels as floats normalized in [0, 1] range.
  */
 static bool cnn_dataset_save_frame(const uint8_t *frame, int width, int height,
-                                   int stride, bool use_highbd, int bitdepth) {
+                                   int stride, int bitdepth) {
   assert(cnn_dataset_info.is_initialized);
 
-  const uint8_t *frame_8bit = (uint8_t *)frame;
   const uint16_t *frame_16bit = CONVERT_TO_SHORTPTR(frame);
   const float normalizer = (1 << bitdepth) - 1;
 
@@ -2067,9 +2066,7 @@ static bool cnn_dataset_save_frame(const uint8_t *frame, int width, int height,
   if (out == NULL) return false;
   for (int r = 0; r < height; ++r) {
     for (int c = 0; c < width; ++c) {
-      const float pixel_value =
-          (float)(use_highbd ? frame_16bit[r * stride + c]
-                             : frame_8bit[r * stride + c]);
+      const float pixel_value = (float)(frame_16bit[r * stride + c]);
       const float pixel_value_normalized = pixel_value / normalizer;
       fwrite(&pixel_value_normalized, sizeof(pixel_value_normalized), 1, out);
     }
@@ -2242,7 +2239,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
     // Save source frame.
     cnn_dataset_save_frame(src->buffers[AOM_PLANE_Y], src->y_crop_width,
                            src->y_crop_height, src->y_stride,
-                           cm->seq_params.use_highbitdepth,
                            cm->seq_params.bit_depth);
     // Save frame before CNN/LR.
     const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
@@ -2250,7 +2246,6 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
     assert(src->y_crop_height == dgd->y_crop_height);
     cnn_dataset_save_frame(dgd->buffers[AOM_PLANE_Y], dgd->y_crop_width,
                            dgd->y_crop_height, dgd->y_stride,
-                           cm->seq_params.use_highbitdepth,
                            cm->seq_params.bit_depth);
     // Save qindex used by this frame.
     cnn_dataset_save_qindex(cm->quant_params.base_qindex, dgd->y_crop_width,
