@@ -357,6 +357,145 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+#if CCTX_ADAPT_REDUCED_SET
+// The closest nonzero neighboring cctx type of the current cctx type
+static const CctxType closest_nonzero_cctx[CCTX_TYPES] = {
+#if 1
+  CCTX_30, CCTX_30, CCTX_45, CCTX_30, CCTX_M30, CCTX_M45, CCTX_M30
+#else
+  CCTX_30, CCTX_30, CCTX_45, CCTX_45, CCTX_M30, CCTX_M45, CCTX_M45
+#endif
+};
+
+// Return the set of 3 allowed cctx types given the above and left cctx types.
+// Since CCTX_NONE will always be allowed, so we add the above and left
+// to the allowed list only when they are valid (not -1) and not CCTX_NONE.
+// Then we add their closest cctx types if there is any available slot.
+static INLINE uint8_t get_allowed_cctx_mask(int above, int left) {
+  if (above <= CCTX_NONE && left <= CCTX_NONE)
+    return (1 << CCTX_NONE) + (1 << CCTX_30) + (1 << CCTX_M30);
+  else if (above <= CCTX_NONE)
+    return (1 << CCTX_NONE) + (1 << left) + (1 << closest_nonzero_cctx[left]);
+  else if (left <= CCTX_NONE || above == left)
+    return (1 << CCTX_NONE) + (1 << above) + (1 << closest_nonzero_cctx[above]);
+  else
+    return (1 << CCTX_NONE) + (1 << above) + (1 << left);
+}
+
+static INLINE void get_allowed_cctx_arr(const int above, const int left,
+                                        CctxType *cctxarr) {
+  cctxarr[0] = CCTX_NONE;
+  if (above <= CCTX_NONE && left <= CCTX_NONE) {
+    cctxarr[1] = CCTX_30;
+    cctxarr[2] = CCTX_M30;
+  } else if (above <= CCTX_NONE) {
+    cctxarr[1] = left;
+    cctxarr[2] = closest_nonzero_cctx[left];
+  } else if (left <= CCTX_NONE || above == left) {
+    cctxarr[1] = above;
+    cctxarr[2] = closest_nonzero_cctx[above];
+  } else {
+    cctxarr[1] = above;
+    cctxarr[2] = left;
+  }
+}
+
+static INLINE CctxType cctx_idx_to_type(const int cctx_idx, const int above,
+                                        const int left) {
+  CctxType cctx_arr[CCTX_TYPES_ALLOWED] = { 0 };
+  get_allowed_cctx_arr(above, left, cctx_arr);
+  return cctx_arr[cctx_idx];
+}
+
+static INLINE uint8_t cctx_type_to_idx(const CctxType ctype, const int above,
+                                       const int left) {
+  CctxType cctx_arr[CCTX_TYPES_ALLOWED] = { 0 };
+  get_allowed_cctx_arr(above, left, cctx_arr);
+  if (ctype == cctx_arr[0]) return 0;
+  if (ctype == cctx_arr[1]) return 1;
+  if (ctype == cctx_arr[2]) return 2;
+  assert(0);
+  return 0;
+}
+#endif
+// TODO(kslu) remove it
+// static INLINE void get_above_and_left_cctx_type(const MACROBLOCKD *xd,
+//                                                int blk_row, int blk_col,
+//                                                TX_SIZE tx_size,
+//                                                int *above_cctx,
+//                                                int *left_cctx) {
+//  const int ss_x = xd->plane[AOM_PLANE_U].subsampling_x;
+//  const int ss_y = xd->plane[AOM_PLANE_U].subsampling_y;
+//  const int txh = tx_size_high_unit[tx_size];
+//  const int txw = tx_size_wide_unit[tx_size];
+//
+//  // Offsets are needed for sub 8x8 blocks to reach the top left corner of the
+//  // current block where the current cctx_type is applied
+//  const int mi_row_offset = (xd->mi_row & 0x01) && (txh & 0x01) && ss_y;
+//  const int mi_col_offset = (xd->mi_col & 0x01) && (txw & 0x01) && ss_x;
+//  const int stride = xd->tx_type_map_stride;
+//  CctxType *cur_cctx_ptr =
+//      &xd->cctx_type_map[((blk_row << ss_y) - mi_row_offset) * stride +
+//                         (blk_col << ss_x) - mi_col_offset];
+//
+//  *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
+//  *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
+//  assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
+//  assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
+//}
+
+static INLINE void get_above_and_left_cctx_type(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, int blk_row, int blk_col,
+    TX_SIZE tx_size, int *above_cctx, int *left_cctx) {
+  const int ss_x = xd->plane[AOM_PLANE_U].subsampling_x;
+  const int ss_y = xd->plane[AOM_PLANE_U].subsampling_y;
+  const int txh = tx_size_high_unit[tx_size];
+  const int txw = tx_size_wide_unit[tx_size];
+
+  const CommonModeInfoParams *const mi_params = &cm->mi_params;
+  const int stride = mi_params->mi_stride;
+
+  // Offsets are needed for sub 8x8 blocks to reach the top left corner of the
+  // current block where the current cctx_type is applied
+  const int mi_row_offset = (xd->mi_row & 0x01) && (txh & 0x01) && ss_y;
+  const int mi_col_offset = (xd->mi_col & 0x01) && (txw & 0x01) && ss_x;
+  const int mi_grid_idx = get_mi_grid_idx(mi_params, xd->mi_row - mi_row_offset,
+                                          xd->mi_col - mi_col_offset);
+  CctxType *const cur_cctx_ptr = mi_params->cctx_type_map + mi_grid_idx;
+
+  // TODO(kslu) change this workaround for shifts
+  const int cctx_stride = xd->tx_type_map_stride;
+  const int br = (txw == (cctx_stride >> ss_x)) ? blk_row : (blk_row << ss_y);
+  const int bc = (txw == (cctx_stride >> ss_x)) ? blk_col : (blk_col << ss_x);
+  if (blk_row)
+    *above_cctx = (int)xd->cctx_type_map[(br - 1) * cctx_stride + bc];
+  else
+    *above_cctx = xd->chroma_up_available ? (int)cur_cctx_ptr[-stride] : -1;
+
+  if (blk_col)
+    *left_cctx = (int)xd->cctx_type_map[br * stride + bc - 1];
+  else
+    *left_cctx = xd->chroma_left_available ? (int)cur_cctx_ptr[-1] : -1;
+
+  assert(*above_cctx >= -1 && *above_cctx < CCTX_TYPES);
+  assert(*left_cctx >= -1 && *left_cctx < CCTX_TYPES);
+}
+
+// 0: CCTX_NONE, unequal top and left context, or unavailable context
+// 1: positive angle cctx
+// 2: negative angle cctx
+static INLINE int get_cctx_context(const MACROBLOCKD *xd, const int above,
+                                   const int left) {
+  int above_ctx =
+      xd->chroma_up_available ? ((above > CCTX_60) + (above > CCTX_NONE)) : 0;
+  int left_ctx =
+      xd->chroma_left_available ? ((left > CCTX_60) + (left > CCTX_NONE)) : 0;
+  if (above_ctx == 0 || left_ctx == 0) return AOMMAX(above_ctx, left_ctx);
+  return (above_ctx == left_ctx) ? above_ctx : 0;
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 int av1_get_pred_context_switchable_interp(const MACROBLOCKD *xd, int dir);
 
 // Get a list of palette base colors that are used in the above and left blocks,

@@ -247,18 +247,32 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   }
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (xd->tree_type != LUMA_PART) {
+  if (xd->tree_type != LUMA_PART && xd->is_chroma_ref) {
     xd->cctx_type_map = ctx->cctx_type_map;
     xd->tx_type_map_stride = mi_size_wide[bsize];
+    // If this block is sub 8x8 in luma, derive the parent >= 8x8 block area,
+    // then update its corresponding chroma area in cctx_type_map to the
+    // current cctx type
+    const int ss_x = pd[AOM_PLANE_U].subsampling_x;
+    const int ss_y = pd[AOM_PLANE_U].subsampling_y;
+    const int mi_row_offset = (mi_row & 0x01) && (bh & 0x01) && ss_y;
+    const int mi_col_offset = (mi_col & 0x01) && (bw & 0x01) && ss_x;
+    const int grid_idx = get_mi_grid_idx(mi_params, mi_row - mi_row_offset,
+                                         mi_col - mi_col_offset);
+    CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
+    const int mi_stride = mi_params->mi_stride;
+    const int is_inter = is_inter_block(mi_addr, xd->tree_type);
+    const int allow_cctx =
+        (is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA);
+    // Set cctx_type to CCTX_NONE when not allowed or for skip blocks
+    CctxType cur_cctx_type = (txfm_info->skip_txfm || !allow_cctx)
+                                 ? CCTX_NONE
+                                 : xd->cctx_type_map[0];
+    for (int blk_row = 0; blk_row < (mi_row_offset ? 2 : bh); ++blk_row) {
+      memset(&cctx_type_map[blk_row * mi_stride], cur_cctx_type,
+             (mi_col_offset ? 2 : bw) * sizeof(cctx_type_map[0]));
+    }
     if (!dry_run) {
-      const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
-      CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
-      const int mi_stride = mi_params->mi_stride;
-      for (int blk_row = 0; blk_row < bh; ++blk_row) {
-        av1_copy_array(cctx_type_map + blk_row * mi_stride,
-                       xd->cctx_type_map + blk_row * xd->tx_type_map_stride,
-                       bw);
-      }
       xd->cctx_type_map = cctx_type_map;
       xd->tx_type_map_stride = mi_stride;
     }
@@ -1359,8 +1373,8 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                  CDF_SIZE(STX_TYPES));
 #endif
 #if CONFIG_CROSS_CHROMA_TX
-  AVG_CDF_STRIDE(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf, CCTX_TYPES,
-                 CDF_SIZE(CCTX_TYPES));
+  AVERAGE_CDF(ctx_left->cctx_type_cdf, ctx_tr->cctx_type_cdf,
+              CCTX_TYPES_ALLOWED);
 #endif  // CONFIG_CROSS_CHROMA_TX
 }
 

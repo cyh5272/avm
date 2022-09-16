@@ -2230,10 +2230,12 @@ static INLINE void set_mi_offsets(const CommonModeInfoParams *const mi_params,
   // 'xd->tx_type_map' should point to an offset in 'mi_params->tx_type_map'.
   if (xd->tree_type != CHROMA_PART) {
     xd->tx_type_map = mi_params->tx_type_map + mi_grid_idx;
-#if CONFIG_CROSS_CHROMA_TX
-    xd->cctx_type_map = mi_params->cctx_type_map + mi_grid_idx;
-#endif  // CONFIG_CROSS_CHROMA_TX
   }
+#if CONFIG_CROSS_CHROMA_TX
+  if (xd->tree_type != LUMA_PART) {
+    xd->cctx_type_map = mi_params->cctx_type_map + mi_grid_idx;
+  }
+#endif  // CONFIG_CROSS_CHROMA_TX
   xd->tx_type_map_stride = mi_params->mi_stride;
 }
 
