@@ -564,7 +564,7 @@ void ccso_filter_block_hbd_with_buf_avx2(
   }
 }
 
-inline int SquareDifference(__m256i a, __m256i b) {
+static INLINE int SquareDifference(__m256i a, __m256i b) {
   const __m256i Z = _mm256_setzero_si256();
 
   const __m256i alo = _mm256_unpacklo_epi16(a, Z);
