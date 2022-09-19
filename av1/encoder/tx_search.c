@@ -3060,66 +3060,129 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   uint8_t cctx_mask = get_allowed_cctx_mask(above_cctx, left_cctx);
 #endif
 
-  // Iterate through all transform type candidates.
-  for (CctxType cctx_type = CCTX_START; cctx_type < CCTX_TYPES; ++cctx_type) {
-#if CCTX_ADAPT_REDUCED_SET
-    if (!(cctx_mask & (1 << cctx_type))) continue;
+#if CCTX_SIZE_RESTRICT
+  bool multiTu = false;
+  const int bw = block_size_wide[plane_bsize];
+  const int bh = block_size_high[plane_bsize];
+  multiTu = (bw > 32 || bh > 32);
+  if (!multiTu) {
+#endif // CCTX_SIZE_RESTRICT
+    // Iterate through all transform type candidates.
+    for (CctxType cctx_type = CCTX_START; cctx_type < CCTX_TYPES; ++cctx_type) {
+  #if CCTX_ADAPT_REDUCED_SET
+      if (!(cctx_mask & (1 << cctx_type))) continue;
+  #endif
+
+#if CCTX_INTRA_M45
+      const int is_inter = is_inter_block(mbmi, xd->tree_type);
+      if (!is_inter && (cctx_type != CCTX_M45))
+        continue;
 #endif
 
-    RD_STATS this_rd_stats;
-    av1_invalid_rd_stats(&this_rd_stats);
+      RD_STATS this_rd_stats;
+      av1_invalid_rd_stats(&this_rd_stats);
 
-    update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, cctx_type);
-    forward_cross_chroma_transform(x, block, tx_size, cctx_type);
+      update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, cctx_type);
+      forward_cross_chroma_transform(x, block, tx_size, cctx_type);
 
-    for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
-#if CCTX_C2_DROPPED
+      for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
+#if CCTX_C2_DROPPED || CCTX_INTRA_M45
+#if CCTX_INTRA_M45
+      if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type) && !is_inter) {
+#else
       if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type)) {
+#endif
         memset(p_v->dqcoeff + BLOCK_OFFSET(block), 0,
-               max_eob * sizeof(p_v->dqcoeff));
+                max_eob * sizeof(p_v->dqcoeff));
         eobs_ptr_v[block] = 0;
         rate_cost[1] = 0;
         break;
       }
 #endif
 
-      QUANT_PARAM quant_param;
-      // TODO(kslu): need to search skip trellis?
-      int xform_quant_idx = skip_trellis
-                                ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
-                                                          : AV1_XFORM_QUANT_FP)
-                                : AV1_XFORM_QUANT_FP;
-      av1_setup_quant(tx_size, !skip_trellis, xform_quant_idx,
-                      cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
+        QUANT_PARAM quant_param;
+        // TODO(kslu): need to search skip trellis?
+        int xform_quant_idx = skip_trellis
+                                  ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
+                                                            : AV1_XFORM_QUANT_FP)
+                                  : AV1_XFORM_QUANT_FP;
+        av1_setup_quant(tx_size, !skip_trellis, xform_quant_idx,
+                        cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
 
-      if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
-        av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
-                          &quant_param);
+        if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
+          av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
+                            &quant_param);
 
-      av1_quant(x, plane, block, &txfm_param, &quant_param);
+        av1_quant(x, plane, block, &txfm_param, &quant_param);
 
-      // Calculate rate cost of quantized coefficients.
-      if (quant_param.use_optimize_b) {
-        av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, cctx_type,
-                       blk_row, blk_col, &txb_ctx_uv[plane - AOM_PLANE_U],
-                       &rate_cost[plane - AOM_PLANE_U]);
-      } else {
-        rate_cost[plane - AOM_PLANE_U] = cost_coeffs(
-#if CONFIG_FORWARDSKIP
-            cm,
-#endif  // CONFIG_FORWARDSKIP
-            x, plane, block, tx_size, tx_type, cctx_type, blk_row, blk_col,
-            &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
+        // Calculate rate cost of quantized coefficients.
+        if (quant_param.use_optimize_b) {
+          av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, cctx_type,
+                         blk_row, blk_col, &txb_ctx_uv[plane - AOM_PLANE_U],
+                         &rate_cost[plane - AOM_PLANE_U]);
+        } else {
+          rate_cost[plane - AOM_PLANE_U] = cost_coeffs(
+  #if CONFIG_FORWARDSKIP
+              cm,
+  #endif  // CONFIG_FORWARDSKIP
+              x, plane, block, tx_size, tx_type, cctx_type, blk_row, blk_col,
+              &txb_ctx_uv[plane - AOM_PLANE_U], cm->features.reduced_tx_set_used);
+        }
       }
-    }
-    // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
-    // dqcoeffs
-    uint64_t sse_dqcoeff_u =
-        aom_sum_squares_i16((int16_t *)p_u->dqcoeff, (uint32_t)max_eob);
-    uint64_t sse_dqcoeff_v =
-        aom_sum_squares_i16((int16_t *)p_v->dqcoeff, (uint32_t)max_eob);
-    // Disallow the case where C1 eob is zero in cctx
-    if (eobs_ptr_u[block] == 0 || sse_dqcoeff_v > sse_dqcoeff_u) {
+      // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
+      // dqcoeffs
+      uint64_t sse_dqcoeff_u =
+          aom_sum_squares_i16((int16_t *)p_u->dqcoeff, (uint32_t)max_eob);
+      uint64_t sse_dqcoeff_v =
+          aom_sum_squares_i16((int16_t *)p_v->dqcoeff, (uint32_t)max_eob);
+      // Disallow the case where C1 eob is zero in cctx
+      if (eobs_ptr_u[block] == 0 || sse_dqcoeff_v > sse_dqcoeff_u) {
+        // Recover the original transform coefficients
+        if (cctx_type < CCTX_TYPES - 1) {
+          memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
+                 sizeof(tran_low_t) * max_eob);
+          memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
+                 sizeof(tran_low_t) * max_eob);
+        }
+        continue;
+      }
+
+      // If rd cost based on coeff rate alone is already more than best_rd,
+      // terminate early.
+      if (RDCOST(x->rdmult, rate_cost[0] + rate_cost[1], 0) > best_rd) continue;
+
+      // Calculate distortion.
+      if (eobs_ptr_u[block] == 0 && eobs_ptr_v[block] == 0) {
+        // When eob is 0, pixel domain distortion is more efficient and accurate.
+        this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
+      } else {
+        this_rd_stats.dist = joint_uv_dist_block_px_domain(
+            cpi, x, plane_bsize, block, blk_row, blk_col, tx_size);
+        this_rd_stats.sse = best_rd_stats->sse;
+      }
+
+      this_rd_stats.rate = rate_cost[0] + rate_cost[1];
+
+      const int64_t rd =
+          RDCOST(x->rdmult, this_rd_stats.rate, this_rd_stats.dist);
+
+      if (rd < best_rd) {
+        best_rd = rd;
+        *best_rd_stats = this_rd_stats;
+        best_cctx_type = cctx_type;
+        best_txb_ctx_u = p_u->txb_entropy_ctx[block];
+        best_txb_ctx_v = p_v->txb_entropy_ctx[block];
+        best_eob_u = p_u->eobs[block];
+        best_eob_v = p_v->eobs[block];
+        // Swap dqcoeff buffers
+        tran_low_t *const tmp_dqcoeff_u = best_dqcoeff_u;
+        tran_low_t *const tmp_dqcoeff_v = best_dqcoeff_v;
+        best_dqcoeff_u = p_u->dqcoeff;
+        best_dqcoeff_v = p_v->dqcoeff;
+        p_u->dqcoeff = tmp_dqcoeff_u;
+        p_v->dqcoeff = tmp_dqcoeff_v;
+      }
+
       // Recover the original transform coefficients
       if (cctx_type < CCTX_TYPES - 1) {
         memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
@@ -3127,54 +3190,10 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
         memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
                sizeof(tran_low_t) * max_eob);
       }
-      continue;
     }
-
-    // If rd cost based on coeff rate alone is already more than best_rd,
-    // terminate early.
-    if (RDCOST(x->rdmult, rate_cost[0] + rate_cost[1], 0) > best_rd) continue;
-
-    // Calculate distortion.
-    if (eobs_ptr_u[block] == 0 && eobs_ptr_v[block] == 0) {
-      // When eob is 0, pixel domain distortion is more efficient and accurate.
-      this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
-    } else {
-      this_rd_stats.dist = joint_uv_dist_block_px_domain(
-          cpi, x, plane_bsize, block, blk_row, blk_col, tx_size);
-      this_rd_stats.sse = best_rd_stats->sse;
-    }
-
-    this_rd_stats.rate = rate_cost[0] + rate_cost[1];
-
-    const int64_t rd =
-        RDCOST(x->rdmult, this_rd_stats.rate, this_rd_stats.dist);
-
-    if (rd < best_rd) {
-      best_rd = rd;
-      *best_rd_stats = this_rd_stats;
-      best_cctx_type = cctx_type;
-      best_txb_ctx_u = p_u->txb_entropy_ctx[block];
-      best_txb_ctx_v = p_v->txb_entropy_ctx[block];
-      best_eob_u = p_u->eobs[block];
-      best_eob_v = p_v->eobs[block];
-      // Swap dqcoeff buffers
-      tran_low_t *const tmp_dqcoeff_u = best_dqcoeff_u;
-      tran_low_t *const tmp_dqcoeff_v = best_dqcoeff_v;
-      best_dqcoeff_u = p_u->dqcoeff;
-      best_dqcoeff_v = p_v->dqcoeff;
-      p_u->dqcoeff = tmp_dqcoeff_u;
-      p_v->dqcoeff = tmp_dqcoeff_v;
-    }
-
-    // Recover the original transform coefficients
-    if (cctx_type < CCTX_TYPES - 1) {
-      memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
-             sizeof(tran_low_t) * max_eob);
-      memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
-             sizeof(tran_low_t) * max_eob);
-    }
+#if CCTX_SIZE_RESTRICT
   }
-
+#endif
   assert(best_rd != INT64_MAX);
 
   best_rd_stats->skip_txfm = (best_eob_u == 0 && best_eob_v == 0);
@@ -3185,8 +3204,12 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   p_v->eobs[block] = best_eob_v;
 
   assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
-#if CCTX_C2_DROPPED
+#if CCTX_C2_DROPPED || CCTX_INTRA_M45
+#if CCTX_INTRA_M45
+  assert(IMPLIES(!keep_chroma_c2(best_cctx_type) && !is_inter_block(xd->mi[0], xd->tree_type), best_eob_v == 0));
+#else
   assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_v == 0));
+#endif
 #endif
 
 #if CCTX_INTRA

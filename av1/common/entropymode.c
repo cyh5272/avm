@@ -684,6 +684,25 @@ static const aom_cdf_prob default_use_ddtx_inter_cdf[EXT_TX_SIZES]
 #endif  // CONFIG_DDT_INTER
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_INTRA_M45
+static const aom_cdf_prob
+default_cctx_type_intra_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
+[CDF_SIZE(2)] = {
+                           { { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) } },
+                           { { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) } },
+                           { { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) } },
+                           { { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) },
+                             { AOM_CDF2(16384) } },
+};
+#endif // CCTX_INTRA_M45
+
 static const aom_cdf_prob
     default_cctx_type_cdf[EXT_TX_SIZES][CCTX_CONTEXTS]
                          [CDF_SIZE(CCTX_TYPES_ALLOWED)] = {
@@ -2018,6 +2037,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->stx_cdf, default_stx_cdf);
 #endif
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_INTRA_M45
+  av1_copy(fc->cctx_type_cdf, default_cctx_type_intra_cdf);
+#endif
   av1_copy(fc->cctx_type_cdf, default_cctx_type_cdf);
 #endif  // CONFIG_CROSS_CHROMA_TX
 }

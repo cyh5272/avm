@@ -906,9 +906,20 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
                         CCTX_TYPES_ALLOWED, ACCT_STR);
     cctx_type = cctx_idx_to_type(cctx_idx, above_cctx, left_cctx);
 #else
+#if CCTX_INTRA_M45
+    if (!is_inter) {
+      cctx_type = aom_read_symbol(r, ec_ctx->cctx_type_intra_cdf[square_tx_size][cctx_ctx], 2, ACCT_STR) ? CCTX_NONE : CCTX_M45;
+    }
+    else {
+      cctx_type =
+        aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+          CCTX_TYPES_ALLOWED, ACCT_STR);
+    }
+#else
     cctx_type =
         aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
                         CCTX_TYPES_ALLOWED, ACCT_STR);
+#endif
 #endif
     update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
                       cctx_type);
