@@ -42,17 +42,17 @@ static int unscaled_value(int val, const struct scale_factors *sf) {
 }
 
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-static INLINE int invscaled_x(int val, const struct scale_factors *sf) {
-  const int64_t tval = (int64_t)val * sf->x_invscale_fp;
+static INLINE int scaled_x_gen(int val, const struct scale_factors *sf) {
+  const int64_t tval = (int64_t)val * sf->x_scale_fp;
   return (int)ROUND_POWER_OF_TWO_SIGNED_64(tval, REF_SCALE_SHIFT);
 }
 
-static INLINE int invscaled_y(int val, const struct scale_factors *sf) {
-  const int64_t tval = (int64_t)val * sf->y_invscale_fp;
+static INLINE int scaled_y_gen(int val, const struct scale_factors *sf) {
+  const int64_t tval = (int64_t)val * sf->y_scale_fp;
   return (int)ROUND_POWER_OF_TWO_SIGNED_64(tval, REF_SCALE_SHIFT);
 }
 
-static int invunscaled_value(int val, const struct scale_factors *sf) {
+static int unscaled_value_gen(int val, const struct scale_factors *sf) {
   (void)sf;
   return val;
 }
@@ -97,23 +97,19 @@ void av1_setup_scale_factors_for_frame(struct scale_factors *sf, int other_w,
   sf->x_step_q4 = fixed_point_scale_to_coarse_point_scale(sf->x_scale_fp);
   sf->y_step_q4 = fixed_point_scale_to_coarse_point_scale(sf->y_scale_fp);
 
-#if CONFIG_ACROSS_SCALE_TPL_MVS
-  sf->x_invscale_fp = get_fixed_point_scale_factor(this_w, other_w);
-  sf->y_invscale_fp = get_fixed_point_scale_factor(this_h, other_h);
-#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   if (av1_is_scaled(sf)) {
     sf->scale_value_x = scaled_x;
     sf->scale_value_y = scaled_y;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-    sf->invscale_value_x = invscaled_x;
-    sf->invscale_value_x = invscaled_y;
+    sf->scale_value_x_gen = scaled_x_gen;
+    sf->scale_value_x_gen = scaled_y_gen;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   } else {
     sf->scale_value_x = unscaled_value;
     sf->scale_value_y = unscaled_value;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-    sf->invscale_value_x = invunscaled_value;
-    sf->invscale_value_x = invunscaled_value;
+    sf->scale_value_x_gen = unscaled_value_gen;
+    sf->scale_value_x_gen = unscaled_value_gen;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   }
 }

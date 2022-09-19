@@ -2207,8 +2207,14 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
   int ref_abs_offset[REF_FRAMES] = { 0 };
   int has_bwd_ref = 0;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-  const struct scale_factors *sf = get_ref_scale_factors_const(cm, start_frame);
-  const int is_scaled = av1_is_scaled(sf);
+  const int is_scaled = (start_frame_buf->width != cm->width ||
+                         start_frame_buf->height != cm->height);
+  struct scale_factors sf_;
+  // Inverse scale factor
+  av1_setup_scale_factors_for_frame(&sf_, cm->width, cm->height,
+                                    start_frame_buf->width,
+                                    start_frame_buf->height);
+  const struct scale_factors *sf = &sf_;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 #if CONFIG_NEW_REF_SIGNALING
   const int *const ref_order_hints = &start_frame_buf->ref_order_hints[0];
@@ -2250,11 +2256,11 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
   uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
-        (uint32_t)sf->x_invscale_fp * 4;  // center of first block
-    scaled_blk_col_hr_step = (uint32_t)sf->x_invscale_fp * 8;  // step
+        (uint32_t)sf->x_scale_fp * 4;  // center of first block
+    scaled_blk_col_hr_step = (uint32_t)sf->x_scale_fp * 8;  // step
     scaled_blk_row_hr_0 =
-        (uint32_t)sf->y_invscale_fp * 4;  // center of first block
-    scaled_blk_row_hr_step = (uint32_t)sf->y_invscale_fp * 8;  // step
+        (uint32_t)sf->y_scale_fp * 4;  // center of first block
+    scaled_blk_row_hr_step = (uint32_t)sf->y_scale_fp * 8;  // step
     scaled_blk_row_hr = scaled_blk_row_hr_0;
   }
 #else
@@ -2289,8 +2295,8 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
             if (is_scaled) {
               scaled_blk_col =
                   ROUND_POWER_OF_TWO(scaled_blk_col_hr, REF_SCALE_SHIFT + 3);
-              ref_mv.row = sf->invscale_value_y(ref_mv.row, sf);
-              ref_mv.col = sf->invscale_value_x(ref_mv.col, sf);
+              ref_mv.row = sf->scale_value_y_gen(ref_mv.row, sf);
+              ref_mv.col = sf->scale_value_x_gen(ref_mv.col, sf);
             }
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
             int_mv this_mv;
@@ -2366,8 +2372,14 @@ static int motion_field_projection(AV1_COMMON *cm,
   int temporal_scale_factor[REF_FRAMES] = { 0 };
   int ref_abs_offset[REF_FRAMES] = { 0 };
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-  const struct scale_factors *sf = get_ref_scale_factors_const(cm, start_frame);
-  const int is_scaled = av1_is_scaled(sf);
+  const int is_scaled = (start_frame_buf->width != cm->width ||
+                         start_frame_buf->height != cm->height);
+  struct scale_factors sf_;
+  // Inverse scale factor
+  av1_setup_scale_factors_for_frame(&sf_, cm->width, cm->height,
+                                    start_frame_buf->width,
+                                    start_frame_buf->height);
+  const struct scale_factors *sf = &sf_;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 #if CONFIG_NEW_REF_SIGNALING
   const int *const ref_order_hints = &start_frame_buf->ref_order_hints[0];
@@ -2406,11 +2418,11 @@ static int motion_field_projection(AV1_COMMON *cm,
   uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
-        (uint32_t)sf->x_invscale_fp * 4;  // center of first block
-    scaled_blk_col_hr_step = (uint32_t)sf->x_invscale_fp * 8;  // step
+        (uint32_t)sf->x_scale_fp * 4;  // center of first block
+    scaled_blk_col_hr_step = (uint32_t)sf->x_scale_fp * 8;  // step
     scaled_blk_row_hr_0 =
-        (uint32_t)sf->y_invscale_fp * 4;  // center of first block
-    scaled_blk_row_hr_step = (uint32_t)sf->y_invscale_fp * 8;  // step
+        (uint32_t)sf->y_scale_fp * 4;  // center of first block
+    scaled_blk_row_hr_step = (uint32_t)sf->y_scale_fp * 8;  // step
     scaled_blk_row_hr = scaled_blk_row_hr_0;
   }
 #else
@@ -2445,8 +2457,8 @@ static int motion_field_projection(AV1_COMMON *cm,
             if (is_scaled) {
               scaled_blk_col =
                   ROUND_POWER_OF_TWO(scaled_blk_col_hr, REF_SCALE_SHIFT + 3);
-              ref_mv.row = sf->invscale_value_y(ref_mv.row, sf);
-              ref_mv.col = sf->invscale_value_x(ref_mv.col, sf);
+              ref_mv.row = sf->scale_value_y_gen(ref_mv.row, sf);
+              ref_mv.col = sf->scale_value_x_gen(ref_mv.col, sf);
             }
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
             int_mv this_mv;
@@ -2531,19 +2543,25 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
 
   MV_REF *mv_ref_base = start_frame_buf->mvs;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-  const struct scale_factors *sf = get_ref_scale_factors_const(cm, start_frame);
-  const int is_scaled = av1_is_scaled(sf);
+  const int is_scaled = (start_frame_buf->width != cm->width ||
+                         start_frame_buf->height != cm->height);
+  struct scale_factors sf_;
+  // Inverse scale factor
+  av1_setup_scale_factors_for_frame(&sf_, cm->width, cm->height,
+                                    start_frame_buf->width,
+                                    start_frame_buf->height);
+  const struct scale_factors *sf = &sf_;
   const int mvs_rows = (start_frame_buf->mi_rows + 1) >> 1;
   const int mvs_cols = (start_frame_buf->mi_cols + 1) >> 1;
   uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
   uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
-        (uint32_t)sf->x_invscale_fp * 4;  // center of first block
-    scaled_blk_col_hr_step = (uint32_t)sf->x_invscale_fp * 8;  // step
+        (uint32_t)sf->x_scale_fp * 4;  // center of first block
+    scaled_blk_col_hr_step = (uint32_t)sf->x_scale_fp * 8;  // step
     scaled_blk_row_hr_0 =
-        (uint32_t)sf->y_invscale_fp * 4;  // center of first block
-    scaled_blk_row_hr_step = (uint32_t)sf->y_invscale_fp * 8;  // step
+        (uint32_t)sf->y_scale_fp * 4;  // center of first block
+    scaled_blk_row_hr_step = (uint32_t)sf->y_scale_fp * 8;  // step
     scaled_blk_row_hr = scaled_blk_row_hr_0;
   }
 #else
@@ -2567,8 +2585,8 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
       int scaled_blk_col = blk_col;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
       if (is_scaled) {
-        fwd_mv.row = sf->invscale_value_y(fwd_mv.row, sf);
-        fwd_mv.col = sf->invscale_value_x(fwd_mv.col, sf);
+        fwd_mv.row = sf->scale_value_y_gen(fwd_mv.row, sf);
+        fwd_mv.col = sf->scale_value_x_gen(fwd_mv.col, sf);
         scaled_blk_col =
             ROUND_POWER_OF_TWO(scaled_blk_col_hr, REF_SCALE_SHIFT + 3);
       }
@@ -2658,19 +2676,25 @@ static int motion_field_projection(AV1_COMMON *cm,
 
   MV_REF *mv_ref_base = start_frame_buf->mvs;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
-  const struct scale_factors *sf = get_ref_scale_factors_const(cm, start_frame);
-  const int is_scaled = av1_is_scaled(sf);
+  const int is_scaled = (start_frame_buf->width != cm->width ||
+                         start_frame_buf->height != cm->height);
+  struct scale_factors sf_;
+  // Inverse scale factor
+  av1_setup_scale_factors_for_frame(&sf_, cm->width, cm->height,
+                                    start_frame_buf->width,
+                                    start_frame_buf->height);
+  const struct scale_factors *sf = &sf_;
   const int mvs_rows = (start_frame_buf->mi_rows + 1) >> 1;
   const int mvs_cols = (start_frame_buf->mi_cols + 1) >> 1;
   uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
   uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
-        (uint32_t)sf->x_invscale_fp * 4;  // center of first block
-    scaled_blk_col_hr_step = (uint32_t)sf->x_invscale_fp * 8;  // step
+        (uint32_t)sf->x_scale_fp * 4;  // center of first block
+    scaled_blk_col_hr_step = (uint32_t)sf->x_scale_fp * 8;  // step
     scaled_blk_row_hr_0 =
-        (uint32_t)sf->y_invscale_fp * 4;  // center of first block
-    scaled_blk_row_hr_step = (uint32_t)sf->y_invscale_fp * 8;  // step
+        (uint32_t)sf->y_scale_fp * 4;  // center of first block
+    scaled_blk_row_hr_step = (uint32_t)sf->y_scale_fp * 8;  // step
     scaled_blk_row_hr = scaled_blk_row_hr_0;
   }
 #else
@@ -2693,8 +2717,8 @@ static int motion_field_projection(AV1_COMMON *cm,
       int scaled_blk_col = blk_row;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
       if (is_scaled) {
-        fwd_mv.row = sf->invscale_value_y(fwd_mv.row, sf);
-        fwd_mv.col = sf->invscale_value_x(fwd_mv.col, sf);
+        fwd_mv.row = sf->scale_value_y_gen(fwd_mv.row, sf);
+        fwd_mv.col = sf->scale_value_x_gen(fwd_mv.col, sf);
         scaled_blk_col =
             ROUND_POWER_OF_TWO(scaled_blk_col_hr, REF_SCALE_SHIFT + 3);
       }
