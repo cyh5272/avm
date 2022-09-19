@@ -1335,6 +1335,10 @@ int_mv av1_simple_motion_search(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
   set_mv_precision(mbmi, mbmi->max_mv_precision);
   set_default_precision_set(cm, mbmi, bsize);
   set_most_probable_mv_precision(cm, mbmi, bsize);
+  // This function is used only during the pruning process and is not used
+  // during the actual motion search based on the prediction mode. Initialize to
+  // mbmi->mode to NEWMV mode so that is_adaptive_mvd (in the function
+  // av1_make_default_fullpel_ms_params) is disabled during pruning process
   mbmi->mode = NEWMV;
 #endif
   const YV12_BUFFER_CONFIG *yv12 = get_ref_frame_yv12_buf(cm, ref);
