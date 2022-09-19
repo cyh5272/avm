@@ -1181,9 +1181,21 @@ void av1_write_cctx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
                      ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
                      CCTX_TYPES_ALLOWED);
 #else
+#if CCTX_INTRA_M45
+    if (!is_inter) {
+      aom_write_symbol(w, cctx_type == CCTX_NONE,
+        ec_ctx->cctx_type_intra_cdf[square_tx_size][cctx_ctx], 2);
+    }
+    else {
+      aom_write_symbol(w, cctx_type,
+        ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+        CCTX_TYPES_ALLOWED);
+    }
+#else
     aom_write_symbol(w, cctx_type,
                      ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
                      CCTX_TYPES_ALLOWED);
+#endif // CCTX_INTRA_M45
 #endif
   }
 }

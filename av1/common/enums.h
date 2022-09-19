@@ -439,7 +439,8 @@ enum {
 #else
 #define CCTX_TYPES_ALLOWED CCTX_TYPES
 #endif
-
+#define CCTX_SIZE_RESTRICT 1 //disable CCTX for implicit TU split
+#define CCTX_INTRA_M45 1 // // allow only -45 degrees rotation & V channel is dropped for intra blocks
 #endif  // CONFIG_CROSS_CHROMA_TX
 
 enum {

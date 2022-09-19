@@ -1562,7 +1562,7 @@ static INLINE void update_txk_array(MACROBLOCKD *const xd, int blk_row,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
-#if CCTX_C2_DROPPED
+#if CCTX_C2_DROPPED || CCTX_INTRA_M45
 static INLINE int keep_chroma_c2(CctxType cctx_type) {
   return cctx_type == CCTX_M30 || cctx_type == CCTX_M60 ||
          cctx_type == CCTX_30 || cctx_type == CCTX_60 || cctx_type == CCTX_NONE;

@@ -1315,7 +1315,7 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
     // when eob of U is 0.
     if (plane == AOM_PLANE_V && *eob_u == 0)
       update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
-#if CCTX_C2_DROPPED
+#if CCTX_C2_DROPPED || CCTX_INTRA_M45
     if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
                                  (*eob_u == 0 && cctx_type > CCTX_NONE))) {
 #else

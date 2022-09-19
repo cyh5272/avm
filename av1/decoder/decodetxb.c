@@ -151,10 +151,16 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   *max_scan_line = 0;
   *eob = 0;
 
-#if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
+#if CONFIG_CROSS_CHROMA_TX && (CCTX_C2_DROPPED || CCTX_INTRA_M45)
   if (plane == AOM_PLANE_V) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+#if CCTX_INTRA_M45
+    MB_MODE_INFO* const mbmi = xd->mi[0];
+    const int is_inter = is_inter_block(mbmi, xd->tree_type);
+    if (!keep_chroma_c2(cctx_type) && !is_inter) return 0;
+#else
     if (!keep_chroma_c2(cctx_type)) return 0;
+#endif
   }
 #endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
 
@@ -193,6 +199,28 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_SIZE_RESTRICT
+  MB_MODE_INFO* const mbmi = xd->mi[0];
+  struct macroblockd_plane* const pd = &xd->plane[plane];
+  const BLOCK_SIZE bsize = mbmi->sb_type[plane > 0];
+  assert(bsize < BLOCK_SIZES_ALL);
+  const BLOCK_SIZE plane_bsize =
+    get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+  bool multiTu = false;
+  const int bw = block_size_wide[plane_bsize];
+  const int bh = block_size_high[plane_bsize];
+  multiTu = (bw > 32 || bh > 32);
+  if (plane == AOM_PLANE_U) {
+    if (!all_zero && !multiTu) {
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+        CCTX_NONE);
+    }
+  }
+#else
   if (plane == AOM_PLANE_U) {
     if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
@@ -203,6 +231,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
                         CCTX_NONE);
     }
   }
+#endif // CCTX_SIZE_RESTRICT
 #endif  // CONFIG_CROSS_CHROMA_TX
 
   if (all_zero) {
@@ -357,6 +386,28 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
+#if CCTX_SIZE_RESTRICT
+  MB_MODE_INFO* const mbmi = xd->mi[0];
+  struct macroblockd_plane* const pd = &xd->plane[plane];
+  const BLOCK_SIZE bsize = mbmi->sb_type[plane > 0];
+  assert(bsize < BLOCK_SIZES_ALL);
+  const BLOCK_SIZE plane_bsize =
+    get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+  bool multiTu = false;
+  const int bw = block_size_wide[plane_bsize];
+  const int bh = block_size_high[plane_bsize];
+  multiTu = (bw > 32 || bh > 32);
+  if (plane == AOM_PLANE_U) {
+    if (!all_zero && !multiTu) {
+      av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
+    } else {
+      int row_offset, col_offset;
+      get_offsets_to_8x8(xd, tx_size, &row_offset, &col_offset);
+      update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+        CCTX_NONE);
+    }
+  }
+#else
   if (plane == AOM_PLANE_U) {
     if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
@@ -367,6 +418,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
                         CCTX_NONE);
     }
   }
+#endif // CCTX_SIZE_RESTRICT
 #endif  // CONFIG_CROSS_CHROMA_TX
 #endif  // CONFIG_FORWARDSKIP
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
