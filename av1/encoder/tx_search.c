@@ -4667,8 +4667,7 @@ int av1_txfm_uvrd(const AV1_COMP *const cpi, MACROBLOCK *x, RD_STATS *rd_stats,
   const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
   int is_cost_valid = 1;
 #if CONFIG_CROSS_CHROMA_TX
-  if (cpi->common.seq_params.enable_cctx &&
-      ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA))) {
+  if (is_cctx_allowed(&cpi->common, xd, uv_tx_size)) {
     RD_STATS this_rd_stats;
     int64_t chroma_ref_best_rd = ref_best_rd;
     if (cpi->sf.inter_sf.perform_best_rd_based_gating_for_chroma && is_inter &&

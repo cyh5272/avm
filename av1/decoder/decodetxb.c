@@ -230,7 +230,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   *eob = 0;
 
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
-  if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     if (!keep_chroma_c2(cctx_type)) return 0;
   }
@@ -272,7 +272,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd, tx_size)) {
     if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
     } else {
@@ -283,7 +283,7 @@ uint8_t av1_read_sig_txtype(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     }
   }
 #else
-  if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
     // cctx_type will be read either eob_v > 0 or eob_u > 0
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
@@ -430,7 +430,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   uint8_t *const levels = set_levels(levels_buf, width);
 #if !CONFIG_FORWARDSKIP
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
-  if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     if (!keep_chroma_c2(cctx_type)) return 0;
   }
@@ -453,7 +453,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C1_NONZERO
-  if (plane == AOM_PLANE_U && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd, tx_size)) {
     if (!all_zero) {
       av1_read_cctx_type(cm, xd, blk_row, blk_col, tx_size, r);
     } else {
@@ -464,7 +464,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     }
   }
 #else
-  if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
     uint16_t eob_u = eob_data_u->eob;

@@ -247,17 +247,17 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
   av1_predict_intra_block_facade(cm, xd, plane, col, row, tx_size);
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+#if CONFIG_CROSS_CHROMA_TX
     eob_info *eob_data_u =
         dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
 #if CCTX_C1_NONZERO
-    if (eob_data->eob || !cm->seq_params.enable_cctx ||
+    if (eob_data->eob || !is_cctx_allowed(cm, xd, tx_size) ||
         (plane == AOM_PLANE_V && eob_data_u->eob &&
          av1_get_cctx_type(xd, row, col) > CCTX_NONE)) {
 #else
     eob_info *eob_data_v =
         dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
-    if (eob_data->eob || !cm->seq_params.enable_cctx ||
+    if (eob_data->eob || !is_cctx_allowed(cm, xd, tx_size) ||
         (plane && (eob_data_u->eob || eob_data_v->eob))) {
 #endif
 #else
@@ -339,11 +339,11 @@ static AOM_INLINE void decode_reconstruct_tx(
     AV1_COMMON *cm, ThreadData *const td, aom_reader *r,
     MB_MODE_INFO *const mbmi, int plane, BLOCK_SIZE plane_bsize, int blk_row,
     int blk_col, int block, TX_SIZE tx_size, int *eob_total) {
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
-  if (plane == AOM_PLANE_U && cm->seq_params.enable_cctx) return;
-#endif  // CONFIG_CROSS_CHROMA_TX
   DecoderCodingBlock *const dcb = &td->dcb;
   MACROBLOCKD *const xd = &dcb->xd;
+#if CONFIG_CROSS_CHROMA_TX
+  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd, tx_size)) return;
+#endif  // CONFIG_CROSS_CHROMA_TX
   const struct macroblockd_plane *const pd = &xd->plane[plane];
   if (xd->tree_type == SHARED_PART)
     assert(mbmi->sb_type[PLANE_TYPE_Y] == mbmi->sb_type[PLANE_TYPE_UV]);
@@ -359,8 +359,8 @@ static AOM_INLINE void decode_reconstruct_tx(
   if (blk_row >= max_blocks_high || blk_col >= max_blocks_wide) return;
 
   if (tx_size == plane_tx_size || plane) {
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
-    if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+#if CONFIG_CROSS_CHROMA_TX
+    if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
       td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_U, blk_row,
                                            blk_col, tx_size);
       td->read_coeffs_tx_inter_block_visit(cm, dcb, r, AOM_PLANE_V, blk_row,
@@ -378,8 +378,8 @@ static AOM_INLINE void decode_reconstruct_tx(
       set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
       set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
     } else {
-      assert(plane == AOM_PLANE_Y || !cm->seq_params.enable_cctx);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
+      assert(plane == AOM_PLANE_Y || !is_cctx_allowed(cm, xd, tx_size));
+#endif  // CONFIG_CROSS_CHROMA_TX
       td->read_coeffs_tx_inter_block_visit(cm, dcb, r, plane, blk_row, blk_col,
                                            tx_size);
 
@@ -388,9 +388,9 @@ static AOM_INLINE void decode_reconstruct_tx(
       eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
       *eob_total += eob_data->eob;
       set_cb_buffer_offsets(dcb, tx_size, plane);
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTER
+#if CONFIG_CROSS_CHROMA_TX
     }
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTER
+#endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_NEW_TX_PARTITION
     TX_SIZE sub_txs[MAX_TX_PARTITIONS] = { 0 };
@@ -1292,12 +1292,13 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
     for (col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
       for (int plane = plane_start; plane < plane_end; ++plane) {
         if (plane && !xd->is_chroma_ref) break;
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-        if (!is_inter && plane == AOM_PLANE_U && cm->seq_params.enable_cctx)
-          continue;
-#endif  // CONFIG_CROSS_CHROMA_TX
         const struct macroblockd_plane *const pd = &xd->plane[plane];
         const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
+#if CONFIG_CROSS_CHROMA_TX
+        if (!is_inter && plane == AOM_PLANE_U &&
+            is_cctx_allowed(cm, xd, tx_size))
+          continue;
+#endif  // CONFIG_CROSS_CHROMA_TX
         const int ss_x = pd->subsampling_x;
         const int ss_y = pd->subsampling_y;
         const int unit_height = ROUND_POWER_OF_TWO(
@@ -1319,8 +1320,8 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
           for (int blk_col = col >> ss_x; blk_col < unit_width;
                blk_col += stepc) {
             if (!is_inter) {
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-              if (plane == AOM_PLANE_V && cm->seq_params.enable_cctx) {
+#if CONFIG_CROSS_CHROMA_TX
+              if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
                 td->read_coeffs_tx_intra_block_visit(cm, dcb, r, AOM_PLANE_U,
                                                      blk_row, blk_col, tx_size);
                 td->read_coeffs_tx_intra_block_visit(cm, dcb, r, AOM_PLANE_V,
@@ -1334,16 +1335,17 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
                 set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_U);
                 set_cb_buffer_offsets(dcb, tx_size, AOM_PLANE_V);
               } else {
-                assert(plane == AOM_PLANE_Y || !cm->seq_params.enable_cctx);
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+                assert(plane == AOM_PLANE_Y ||
+                       !is_cctx_allowed(cm, xd, tx_size));
+#endif  // CONFIG_CROSS_CHROMA_TX
                 td->read_coeffs_tx_intra_block_visit(cm, dcb, r, plane, blk_row,
                                                      blk_col, tx_size);
                 td->predict_and_recon_intra_block_visit(
                     cm, dcb, r, plane, blk_row, blk_col, tx_size);
                 set_cb_buffer_offsets(dcb, tx_size, plane);
-#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+#if CONFIG_CROSS_CHROMA_TX
               }
-#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+#endif  // CONFIG_CROSS_CHROMA_TX
             } else {
               // Reconstruction
               if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
@@ -1352,7 +1354,8 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
                                       &eobtotal);
                 block += stepr * stepc;
 #if CONFIG_CROSS_CHROMA_TX
-              } else if (plane == AOM_PLANE_U && cm->seq_params.enable_cctx) {
+              } else if (plane == AOM_PLANE_U &&
+                         is_cctx_allowed(cm, xd, max_tx_size)) {
                 // fill cctx_type_map with CCTX_NONE for skip blocks so their
                 // neighbors can derive cctx contexts
                 int row_offset, col_offset;

@@ -1027,28 +1027,25 @@ void av1_read_cctx_type(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const int qindex = xd->qindex[mbmi->segment_id];
   if (qindex == 0) return;
 
-  const int is_inter = is_inter_block(mbmi, xd->tree_type);
   CctxType cctx_type = CCTX_NONE;
-  if ((is_inter && CCTX_INTER) || (!is_inter && CCTX_INTRA)) {
-    FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
-    const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    int above_cctx, left_cctx;
-    get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
-                                 &left_cctx);
-    const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
+  FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+  const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
+  int above_cctx, left_cctx;
+  get_above_and_left_cctx_type(cm, xd, blk_row, blk_col, tx_size, &above_cctx,
+                               &left_cctx);
+  const int cctx_ctx = get_cctx_context(xd, above_cctx, left_cctx);
 #if CCTX_ADAPT_REDUCED_SET
-    const int cctx_idx =
-        aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
-                        CCTX_TYPES_ALLOWED, ACCT_STR);
-    cctx_type = cctx_idx_to_type(cctx_idx, above_cctx, left_cctx);
+  const int cctx_idx =
+      aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+                      CCTX_TYPES_ALLOWED, ACCT_STR);
+  cctx_type = cctx_idx_to_type(cctx_idx, above_cctx, left_cctx);
 #else
-    cctx_type =
-        aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
-                        CCTX_TYPES_ALLOWED, ACCT_STR);
+  cctx_type =
+      aom_read_symbol(r, ec_ctx->cctx_type_cdf[square_tx_size][cctx_ctx],
+                      CCTX_TYPES_ALLOWED, ACCT_STR);
 #endif
-    update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
-                      cctx_type);
-  }
+  update_cctx_array(xd, blk_row, blk_col, row_offset, col_offset, tx_size,
+                    cctx_type);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

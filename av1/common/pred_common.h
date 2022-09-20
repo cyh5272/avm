@@ -419,6 +419,20 @@ static INLINE uint8_t cctx_type_to_idx(const CctxType ctype, const int above,
   return 0;
 }
 #endif
+static INLINE int is_cctx_allowed(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                                  TX_SIZE tx_size) {
+  (void)xd;
+  (void)tx_size;
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  if (!cm->seq_params.enable_cctx || xd->lossless[mbmi->segment_id]) return 0;
+#if !CCTX_INTER
+  if (is_inter_block(xd->mi[0], xd->tree_type)) return 0;
+#endif  // !CCTX_INTER
+#if !CCTX_INTRA
+  if (!is_inter_block(xd->mi[0], xd->tree_type)) return 0;
+#endif  // !CCTX_INTRA
+  return 1;
+}
 
 static INLINE void get_above_and_left_cctx_type(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, int blk_row, int blk_col,
