@@ -2632,6 +2632,51 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
   return *rcol0 < *rcol1 && *rrow0 < *rrow1;
 }
 
+void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
+                               int tile_col, int *ru_row_start, int *ru_row_end,
+                               int *ru_col_start, int *ru_col_end) {
+  TileInfo tile_info;
+  av1_tile_set_row(&tile_info, cm, tile_row);
+  av1_tile_set_col(&tile_info, cm, tile_col);
+
+  int rrow0, rrow1, rcol0, rcol1;
+  // Scan SBs row by row, left to right to find first SB that has RU info in it.
+  int found = 0;
+  for (int mi_row = tile_info.mi_row_start;
+       mi_row < tile_info.mi_row_end && !found;
+       mi_row += cm->seq_params.mib_size) {
+    for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
+         mi_col += cm->seq_params.mib_size) {
+      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
+                                             cm->seq_params.sb_size, &rcol0,
+                                             &rcol1, &rrow0, &rrow1)) {
+        *ru_row_start = rrow0;  // this is the RU row start limit in RU terms
+        *ru_col_start = rcol0;  // this is the RU col start limit in RU terms
+        found = 1;
+        break;
+      }
+    }
+  }
+  found = 0;
+  // Scan SBs in reverse row by row, right to left to find first SB that has RU
+  // info in it.
+  for (int mi_row = tile_info.mi_row_end - 1;
+       mi_row >= tile_info.mi_row_start && !found;
+       mi_row -= cm->seq_params.mib_size) {
+    for (int mi_col = tile_info.mi_col_end - 1;
+         mi_col >= tile_info.mi_col_start; mi_col -= cm->seq_params.mib_size) {
+      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
+                                             cm->seq_params.sb_size, &rcol0,
+                                             &rcol1, &rrow0, &rrow1)) {
+        *ru_row_end = rrow1;  // this is the RU row end limit in RU terms
+        *ru_col_end = rcol1;  // this is the RU col end limit in RU terms
+        found = 1;
+        break;
+      }
+    }
+  }
+}
+
 // Extend to left and right
 static void extend_lines(uint8_t *buf, int width, int height, int stride,
                          int extend) {

@@ -678,6 +678,12 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
                                        int *rcol0, int *rcol1, int *rrow0,
                                        int *rrow1);
 
+// Utility to get RU limits for tile with index { tile_w, tile_h }
+void av1_get_ru_limits_in_tile(const struct AV1Common *cm, int plane,
+                               int tile_row, int tile_col, int *ru_row_start,
+                               int *ru_row_end, int *ru_col_start,
+                               int *ru_col_end);
+
 void av1_loop_restoration_save_boundary_lines(const YV12_BUFFER_CONFIG *frame,
                                               struct AV1Common *cm,
                                               int after_cdef);
