@@ -191,9 +191,6 @@ typedef struct frame_contexts {
   aom_cdf_prob warped_causal_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
   aom_cdf_prob warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
 #if CONFIG_WARP_REF_LIST
-  aom_cdf_prob warp_delta_zero_cdf[2][CDF_SIZE(2)];
-  aom_cdf_prob warp_delta_sign_cdf[2][CDF_SIZE(2)];
-  aom_cdf_prob warp_delta_mag_cdf[2][2][CDF_SIZE(WARP_DELTA_CODED_MAX)];
   aom_cdf_prob warp_ref_idx_cdf[3][WARP_REF_CONTEXTS][CDF_SIZE(2)];
 #endif
   aom_cdf_prob warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)];

@@ -1219,10 +1219,6 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->warp_delta_param_cdf, ctx_tr->warp_delta_param_cdf,
               WARP_DELTA_NUM_SYMBOLS);
 #if CONFIG_WARP_REF_LIST
-  AVERAGE_CDF(ctx_left->warp_delta_zero_cdf, ctx_tr->warp_delta_zero_cdf, 2);
-  AVERAGE_CDF(ctx_left->warp_delta_sign_cdf, ctx_tr->warp_delta_sign_cdf, 2);
-  AVERAGE_CDF(ctx_left->warp_delta_mag_cdf, ctx_tr->warp_delta_mag_cdf,
-              WARP_DELTA_CODED_MAX);
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[0], ctx_tr->warp_ref_idx_cdf[0], 2);
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[1], ctx_tr->warp_ref_idx_cdf[1], 2);
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[2], ctx_tr->warp_ref_idx_cdf[2], 2);

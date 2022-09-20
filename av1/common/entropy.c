@@ -174,10 +174,6 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->warped_causal_cdf, 2);
   RESET_CDF_COUNTER(fc->warp_delta_cdf, 2);
 #if CONFIG_WARP_REF_LIST
-  RESET_CDF_COUNTER(fc->warp_delta_zero_cdf, 2);
-  RESET_CDF_COUNTER(fc->warp_delta_sign_cdf, 2);
-  RESET_CDF_COUNTER(fc->warp_delta_mag_cdf, WARP_DELTA_CODED_MAX);
-
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[0], 2);
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[1], 2);
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[2], 2);

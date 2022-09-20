@@ -1032,26 +1032,12 @@ static const aom_cdf_prob default_warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(
             { AOM_CDF2(25105) } };
 
 #if CONFIG_WARP_REF_LIST
-static const aom_cdf_prob default_warp_delta_zero_cdf[2][CDF_SIZE(2)] = {
-  { AOM_CDF2(16384) }, { AOM_CDF2(16384) }
-};
-
-static const aom_cdf_prob default_warp_delta_sign_cdf[2][CDF_SIZE(2)] = {
-  { AOM_CDF2(16384) }, { AOM_CDF2(16384) }
-};
 static const aom_cdf_prob default_warp_ref_idx0_cdf[WARP_REF_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(15906) } };
 static const aom_cdf_prob default_warp_ref_idx1_cdf[WARP_REF_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(15903) } };
 static const aom_cdf_prob default_warp_ref_idx2_cdf[WARP_REF_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(18242) } };
-static const aom_cdf_prob
-    default_warp_delta_mag_cdf[2][2][CDF_SIZE(WARP_DELTA_CODED_MAX)] = {
-      { { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
-        { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) } },
-      { { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) },
-        { AOM_CDF7(4681, 9362, 14043, 18725, 23406, 28087) } }
-    };
 #endif
 static const aom_cdf_prob
     default_warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)] = {
@@ -2068,10 +2054,6 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warped_causal_cdf, default_warped_causal_cdf);
   av1_copy(fc->warp_delta_cdf, default_warp_delta_cdf);
 #if CONFIG_WARP_REF_LIST
-  av1_copy(fc->warp_delta_zero_cdf, default_warp_delta_zero_cdf);
-  av1_copy(fc->warp_delta_sign_cdf, default_warp_delta_sign_cdf);
-  av1_copy(fc->warp_delta_mag_cdf, default_warp_delta_mag_cdf);
-
   av1_copy(fc->warp_ref_idx_cdf[0], default_warp_ref_idx0_cdf);
   av1_copy(fc->warp_ref_idx_cdf[1], default_warp_ref_idx1_cdf);
   av1_copy(fc->warp_ref_idx_cdf[2], default_warp_ref_idx2_cdf);
