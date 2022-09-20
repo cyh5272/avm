@@ -28,12 +28,6 @@ extern "C" {
 /*!\cond */
 
 #undef MAX_SB_SIZE
-#if CONFIG_WARP_REF_LIST
-#define SEARCH_LOW_PRECISION_WARP_CAUSAL 0
-#define SEARCH_LOW_PRECISION_WARP_DELTA 0
-#define SEARCH_LOW_PRECISION_WARP_EXTEND 0
-#define RESET_WARP_BANK_AT_SB_ROW 1
-#endif
 
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO

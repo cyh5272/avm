@@ -2365,7 +2365,7 @@ static int64_t motion_mode_rd(
 
           assert(!is_comp_pred);
           if (this_mode == NEWMV
-#if CONFIG_FLEX_MVRES && !SEARCH_LOW_PRECISION_WARP_CAUSAL
+#if CONFIG_FLEX_MVRES
               && (mbmi->pb_mv_precision >= MV_PRECISION_ONE_PEL)
 #endif
           ) {
@@ -2426,7 +2426,7 @@ static int64_t motion_mode_rd(
         if (ret < 0) continue;
 #if CONFIG_EXTENDED_WARP_PREDICTION
       } else if (mbmi->motion_mode == WARP_DELTA) {
-#if CONFIG_FLEX_MVRES && !SEARCH_LOW_PRECISION_WARP_DELTA
+#if CONFIG_FLEX_MVRES
         if (mbmi->mode == NEWMV &&
             mbmi->pb_mv_precision < MV_PRECISION_ONE_PEL) {
           // Don't bother with warp modes for MV precisions >1px
@@ -2498,7 +2498,7 @@ static int64_t motion_mode_rd(
         av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
                                       av1_num_planes(cm) - 1);
       } else if (mbmi->motion_mode == WARP_EXTEND) {
-#if CONFIG_FLEX_MVRES && !SEARCH_LOW_PRECISION_WARP_EXTEND
+#if CONFIG_FLEX_MVRES
         if (mbmi->mode == NEWMV &&
             mbmi->pb_mv_precision < MV_PRECISION_ONE_PEL) {
           // Don't bother with warp modes for MV precisions >1px
