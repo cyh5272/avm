@@ -1308,8 +1308,10 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   const uint8_t *dst_v = &pd_v->dst.buf[dst_idx_v];
   // p_u->dqcoeff and p_v->dqcoeff must remain unchanged here because the best
   // dqcoeff in the CCTX domain may be used in the search later.
-  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_u[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, tmp_dqcoeff_v[MAX_TX_SQUARE]);
+  tran_low_t *tmp_dqcoeff_u =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
+  tran_low_t *tmp_dqcoeff_v =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
   memcpy(tmp_dqcoeff_u, p_u->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
   memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
@@ -1322,8 +1324,8 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
   assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
 
   uint8_t *recon_u, *recon_v;
-  DECLARE_ALIGNED(16, uint16_t, recon16_u[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, uint16_t, recon16_v[MAX_TX_SQUARE]);
+  uint16_t *recon16_u = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
+  uint16_t *recon16_v = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
 
   recon_u = CONVERT_TO_BYTEPTR(recon16_u);
   recon_v = CONVERT_TO_BYTEPTR(recon16_v);
@@ -2983,8 +2985,10 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
 
   // The buffer used to swap dqcoeff in macroblockd_plane so we can keep dqcoeff
   // of the best tx_type.
-  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_u[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, this_dqcoeff_v[MAX_TX_SQUARE]);
+  tran_low_t *this_dqcoeff_u =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
+  tran_low_t *this_dqcoeff_v =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
   tran_low_t *orig_dqcoeff_u = p_u->dqcoeff;
   tran_low_t *orig_dqcoeff_v = p_v->dqcoeff;
   tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
@@ -3005,8 +3009,10 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   // CCTX is performed in-place, so these buffers are needed to store original
   // transform coefficients.
   const int max_eob = av1_get_max_eob(tx_size);
-  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_u[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(32, tran_low_t, orig_coeff_v[MAX_TX_SQUARE]);
+  tran_low_t *orig_coeff_u =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
+  tran_low_t *orig_coeff_v =
+      aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
   memcpy(orig_coeff_u, p_u->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
   memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),

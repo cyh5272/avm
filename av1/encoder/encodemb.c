@@ -561,7 +561,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   TX_TYPE tx_type = av1_get_tx_type(xd, pd->plane_type, blk_row, blk_col,
                                     tx_size, cm->features.reduced_tx_set_used);
 #if CONFIG_CROSS_CHROMA_TX
-  CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
+  CctxType cctx_type =
+      plane ? av1_get_cctx_type(xd, blk_row, blk_col) : CCTX_NONE;
 #if CCTX_ADAPT_REDUCED_SET
   if (plane) {
     // TODO(kslu) change this workaround
