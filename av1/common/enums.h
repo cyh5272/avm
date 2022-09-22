@@ -398,6 +398,7 @@ enum {
 
 #if CONFIG_CROSS_CHROMA_TX
 #define CCTX_CONTEXTS 3
+#define CCTX_SUB32_ONLY 0
 #define CCTX_C1_LARGER_ENERGY 1
 // Always signal C1 coefficients for some cctx (i.e., both C1 and C2 nonzero
 // or C1 nonzero and C2 zero). This requires CCTX_NEG_ANGLES to be on.

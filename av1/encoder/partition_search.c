@@ -317,7 +317,8 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     mbmi->skip_txfm[xd->tree_type == CHROMA_PART] = 1;
     for (int plane = plane_start; plane < plane_end; ++plane) {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
-      if (plane == AOM_PLANE_Y || !cm->seq_params.enable_cctx)
+      TX_SIZE tx_size = av1_get_tx_size(plane, xd);
+      if (plane == AOM_PLANE_Y || !is_cctx_allowed(cm, xd, tx_size))
         av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
                                      cpi->optimize_seg_arr[mbmi->segment_id]);
       else if (plane == AOM_PLANE_U)
