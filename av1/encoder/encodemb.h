@@ -115,6 +115,11 @@ void av1_quant(MACROBLOCK *x, int plane, int block, TxfmParam *txfm_param,
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *mb, int plane,
                    int block, TX_SIZE tx_size, TX_TYPE tx_type,
                    const TXB_CTX *const txb_ctx, int *rate_cost);
+#if CONFIG_PAR_HIDING
+int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
+                       const int plane_type, int block, TX_SIZE tx_size,
+                       TX_TYPE tx_type);
+#endif  // CONFIG_PAR_HIDING
 
 // This function can be used as (i) a further optimization to reduce the
 // redundancy of quantized coefficients (a.k.a., `qcoeff`) after trellis

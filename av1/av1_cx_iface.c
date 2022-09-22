@@ -117,34 +117,34 @@ struct av1_extracfg {
   int enable_mrls;  // enable multiple reference line selection
 #if CONFIG_TIP
   int enable_tip;  // enable temporal interpolated prediction
-#endif             // CONFIG_TIP
+#endif  // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
   int enable_fsc;  // enable forward skip coding
-#endif             // CONFIG_FORWARDSKIP
+#endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
   int enable_orip;  // enable ORIP
-#endif              // CONFIG_ORIP
+#endif  // CONFIG_ORIP
 #if CONFIG_IST
   int enable_ist;  // enable intra secondary transform
-#endif             // CONFIG_IST
+#endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
   int enable_ibp;  // enable intra bi-prediction
-#endif             // CONFIG_IBP_DC or CONFIG_IBP_DIR
+#endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
   int enable_adaptive_mvd;  // enable adaptive MVD resolution
-#endif                      // CONFIG_ADAPTIVE_MVD
+#endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
   int enable_flex_mvres;  // enable flexible MV resolution
-#endif                    // CONFIG_FLEX_MVRES
+#endif  // CONFIG_FLEX_MVRES
 
 #if CONFIG_ADAPTIVE_DS_FILTER
   int enable_cfl_ds_filter;  // enable adaptive downsample filter
-#endif                       // CONFIG_ADAPTIVE_DS_FILTER
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 
 #if CONFIG_JOINT_MVD
-  int enable_joint_mvd;          // enable joint MVD coding
-#endif                           // CONFIG_ADAPTIVE_MVD
+  int enable_joint_mvd;  // enable joint MVD coding
+#endif  // CONFIG_ADAPTIVE_MVD
   int min_partition_size;        // min partition size [4,8,16,32,64,128]
   int max_partition_size;        // max partition size [4,8,16,32,64,128]
   int enable_intra_edge_filter;  // enable intra-edge filter for sequence
@@ -154,8 +154,8 @@ struct av1_extracfg {
   int max_reference_frames;      // maximum number of references per frame
   int enable_reduced_reference_set;  // enable reduced set of references
 #if CONFIG_NEW_REF_SIGNALING
-  int explicit_ref_frame_map;    // explicitly signal reference frame mapping
-#endif                           // CONFIG_NEW_REF_SIGNALING
+  int explicit_ref_frame_map;  // explicitly signal reference frame mapping
+#endif  // CONFIG_NEW_REF_SIGNALING
   int enable_ref_frame_mvs;      // sequence level
   int allow_ref_frame_mvs;       // frame level
   int enable_masked_comp;        // enable masked compound for sequence
@@ -178,12 +178,12 @@ struct av1_extracfg {
   int enable_intrabc;
 #if CONFIG_IBC_SR_EXT
   int enable_intrabc_ext;  // enable search range extension for intrabc
-#endif                     // CONFIG_IBC_SR_EXT
+#endif  // CONFIG_IBC_SR_EXT
   int enable_angle_delta;
 #if CONFIG_OPTFLOW_REFINEMENT
   aom_opfl_refine_type enable_opfl_refine;  // optical flow refinement type
                                             // for sequence
-#endif                                      // CONFIG_OPTFLOW_REFINEMENT
+#endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_DENOISE
   float noise_level;
   int noise_block_size;
@@ -213,6 +213,9 @@ struct av1_extracfg {
 #if CONFIG_REF_MV_BANK
   int enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+  int enable_ph;
+#endif  // CONFIG_PAR_HIDING
 };
 
 // Example subgop configs. Currently not used by default.
@@ -418,32 +421,32 @@ static struct av1_extracfg default_extra_cfg = {
   1,                            // enable semi-decoupled partitioning
   1,                            // enable multiple reference line selection
 #if CONFIG_TIP
-  1,    // enable temporal interpolated prediction (TIP)
+  1,  // enable temporal interpolated prediction (TIP)
 #endif  // CONFIG_TIP
 #if CONFIG_FORWARDSKIP
-  1,    // enable forward skip coding
+  1,  // enable forward skip coding
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_ORIP
-  1,    // enable ORIP
+  1,  // enable ORIP
 #endif  // CONFIG_ORIP
 #if CONFIG_IST
-  1,    // enable intra secondary transform
+  1,  // enable intra secondary transform
 #endif  // CONFIG_IST
 #if CONFIG_IBP_DC || CONFIG_IBP_DIR
-  1,    // enable intra bi-prediction
+  1,  // enable intra bi-prediction
 #endif  // CONFIG_IBP_DC or CONFIG_IBP_DIR
 
 #if CONFIG_ADAPTIVE_MVD
-  1,    // enable adaptive mvd resolution
+  1,  // enable adaptive mvd resolution
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
-  1,    // enable flexible MV precision
+  1,  // enable flexible MV precision
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_ADAPTIVE_DS_FILTER
-  1,    // enable adaptive downsample filter
+  1,  // enable adaptive downsample filter
 #endif  // CONFIG_ADAPTIVE_DS_FILTER
 #if CONFIG_JOINT_MVD
-  1,    // enable joint mvd coding
+  1,  // enable joint mvd coding
 #endif  // CONFIG_JOINT_MVD
   4,    // min_partition_size
   128,  // max_partition_size
@@ -455,8 +458,8 @@ static struct av1_extracfg default_extra_cfg = {
   7,  // max_reference_frames
   0,  // enable_reduced_reference_set
 #if CONFIG_NEW_REF_SIGNALING
-  0,                       // explicit_ref_frame_map
-#endif                     // CONFIG_NEW_REF_SIGNALING
+  0,  // explicit_ref_frame_map
+#endif  // CONFIG_NEW_REF_SIGNALING
   1,                       // enable_ref_frame_mvs sequence level
   1,                       // allow ref_frame_mvs frame level
   1,                       // enable masked compound at sequence level
@@ -478,9 +481,9 @@ static struct av1_extracfg default_extra_cfg = {
   1,                       // enable palette
   !CONFIG_SHARP_SETTINGS,  // enable intrabc
 #if CONFIG_IBC_SR_EXT
-  1,    // enable search range extension for intrabc
+  1,  // enable search range extension for intrabc
 #endif  // CONFIG_IBC_SR_EXT
-  1,    // enable angle delta
+  1,  // enable angle delta
 #if CONFIG_OPTFLOW_REFINEMENT
   1,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -515,8 +518,11 @@ static struct av1_extracfg default_extra_cfg = {
   0,            // enable_subgop_stats
   0,            // max_drl_refmvs
 #if CONFIG_REF_MV_BANK
-  1,    // enable_refmvbank
+  1,  // enable_refmvbank
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+  1,  // enable_ph
+#endif  // CONFIG_PAR_HIDING
 };
 
 struct aom_codec_alg_priv {
@@ -952,6 +958,9 @@ static void update_encoder_config(cfg_options_t *cfg,
 #if CONFIG_REF_MV_BANK
   cfg->enable_refmvbank = extra_cfg->enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+  cfg->enable_ph = extra_cfg->enable_ph;
+#endif  // CONFIG_PAR_HIDING
 }
 
 static void update_default_encoder_config(const cfg_options_t *cfg,
@@ -1043,6 +1052,9 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #if CONFIG_REF_MV_BANK
   extra_cfg->enable_refmvbank = cfg->enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+  extra_cfg->enable_ph = cfg->enable_ph;
+#endif  // CONFIG_PAR_HIDING
 }
 
 static double convert_qp_offset(int qp, int qp_offset, int bit_depth) {
@@ -1286,7 +1298,9 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
                                      ? extra_cfg->enable_opfl_refine
                                      : AOM_OPFL_REFINE_NONE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
-
+#if CONFIG_PAR_HIDING
+  tool_cfg->enable_ph = extra_cfg->enable_ph;
+#endif  // CONFIG_PAR_HIDING
   // Set Quantization related configuration.
   q_cfg->using_qm = extra_cfg->enable_qm;
   q_cfg->qm_minlevel = extra_cfg->qm_min;
@@ -3821,6 +3835,11 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                               argv, err_string)) {
     extra_cfg.enable_refmvbank = arg_parse_int_helper(&arg, err_string);
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_ph, argv,
+                              err_string)) {
+    extra_cfg.enable_ph = arg_parse_uint_helper(&arg, err_string);
+#endif  // CONFIG_PAR_HIDING
   } else {
     match = 0;
     snprintf(err_string, ARG_ERR_MSG_MAX_LEN, "Cannot find aom option %s",
@@ -4105,6 +4124,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #if CONFIG_REF_MV_BANK
         1,
 #endif  // CONFIG_REF_MV_BANK
+#if CONFIG_PAR_HIDING
+        1,
+#endif  // CONFIG_PAR_HIDING
     },  // cfg
 } };
 

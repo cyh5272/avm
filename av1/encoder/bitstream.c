@@ -3901,6 +3901,10 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #if CONFIG_ADAPTIVE_DS_FILTER
   aom_wb_write_literal(wb, seq_params->enable_cfl_ds_filter, 2);
 #endif  // CONFIG_ADAPTIVE_DS_FILTER
+
+#if CONFIG_PAR_HIDING
+  aom_wb_write_bit(wb, seq_params->enable_ph);
+#endif  // CONFIG_PAR_HIDING
 }
 
 static AOM_INLINE void write_global_motion_params(
@@ -4068,7 +4072,7 @@ static int check_frame_refs_short_signaling(AV1_COMMON *const cm) {
     }
   }
 
-#if 0   // For debug
+#if 0  // For debug
   printf("\nFrame=%d: \n", cm->current_frame.frame_number);
   printf("***frame_refs_short_signaling=%d\n", frame_refs_short_signaling);
   for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {
@@ -4491,6 +4495,13 @@ static AOM_INLINE void write_uncompressed_header_obu(
     }
 #endif
   }
+
+#if CONFIG_PAR_HIDING
+  if (features->coded_lossless)
+    assert(features->allow_ph == false);
+  else
+    aom_wb_write_bit(wb, features->allow_ph);
+#endif  // CONFIG_PAR_HIDING
 
   // Write TX mode
   if (features->coded_lossless)

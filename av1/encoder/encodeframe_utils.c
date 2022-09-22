@@ -1270,7 +1270,7 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
               ctx_tr->inter_4way_txfm_partition_cdf[1], 4);
   AVERAGE_CDF(ctx_left->inter_2way_txfm_partition_cdf,
               ctx_tr->inter_2way_txfm_partition_cdf, 2);
-#else   // CONFIG_NEW_TX_PARTITION
+#else  // CONFIG_NEW_TX_PARTITION
   AVERAGE_CDF(ctx_left->txfm_partition_cdf, ctx_tr->txfm_partition_cdf, 2);
 #endif  // CONFIG_NEW_TX_PARTITION
   AVERAGE_CDF(ctx_left->comp_group_idx_cdf, ctx_tr->comp_group_idx_cdf, 2);
@@ -1414,6 +1414,10 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   }
 
 #endif  // CONFIG_FLEX_MVRES
+#if CONFIG_PAR_HIDING
+  AVERAGE_CDF(ctx_left->coeff_base_ph_cdf, ctx_tr->coeff_base_ph_cdf, 4);
+  AVERAGE_CDF(ctx_left->coeff_br_ph_cdf, ctx_tr->coeff_br_ph_cdf, 4);
+#endif  // CONFIG_PAR_HIDING
 }
 
 // Memset the mbmis at the current superblock to 0
