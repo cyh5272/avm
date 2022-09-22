@@ -232,6 +232,8 @@ set_aom_config_var(CONFIG_FIX_CDEF_SYNTAX 1
                    "AV2 experiment flag to fix CDEF syntax.")
 set_aom_config_var(CONFIG_IMPROVED_CFL 1
                    "Enable improved CfL mode from CWG-C044")
+set_aom_config_var(CONFIG_CROSS_CHROMA_TX 1
+                   "AV2 cross chroma component transform experiment flag.")
 #
 # Variables in this section control optional features of the build system.
 #

@@ -2112,6 +2112,9 @@ static int64_t motion_mode_rd(
   RD_STATS best_rd_stats, best_rd_stats_y, best_rd_stats_uv;
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#if CONFIG_CROSS_CHROMA_TX
+  CctxType best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#endif  // CONFIG_CROSS_CHROMA_TX
   const int rate_mv0 = *rate_mv;
 #if !CONFIG_EXTENDED_WARP_PREDICTION
   const int interintra_allowed =
@@ -2728,6 +2731,10 @@ static int64_t motion_mode_rd(
       memcpy(best_blk_skip, txfm_info->blk_skip,
              sizeof(txfm_info->blk_skip[0]) * xd->height * xd->width);
       av1_copy_array(best_tx_type_map, xd->tx_type_map, xd->height * xd->width);
+#if CONFIG_CROSS_CHROMA_TX
+      av1_copy_array(best_cctx_type_map, xd->cctx_type_map,
+                     xd->height * xd->width);
+#endif  // CONFIG_CROSS_CHROMA_TX
       best_xskip_txfm = mbmi->skip_txfm[xd->tree_type == CHROMA_PART];
     }
   }
@@ -2746,6 +2753,9 @@ static int64_t motion_mode_rd(
   memcpy(txfm_info->blk_skip, best_blk_skip,
          sizeof(txfm_info->blk_skip[0]) * xd->height * xd->width);
   av1_copy_array(xd->tx_type_map, best_tx_type_map, xd->height * xd->width);
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy_array(xd->cctx_type_map, best_cctx_type_map, xd->height * xd->width);
+#endif  // CONFIG_CROSS_CHROMA_TX
   txfm_info->skip_txfm = best_xskip_txfm;
 
   restore_dst_buf(xd, *orig_dst, num_planes);
@@ -4038,6 +4048,9 @@ static int64_t handle_inter_mode(
   int64_t best_rd = INT64_MAX;
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#if CONFIG_CROSS_CHROMA_TX
+  CctxType best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+#endif  // CONFIG_CROSS_CHROMA_TX
   MB_MODE_INFO best_mbmi = *mbmi;
   int best_xskip_txfm = 0;
   int64_t newmv_ret_val = INT64_MAX;
@@ -4552,6 +4565,10 @@ static int64_t handle_inter_mode(
                    sizeof(best_blk_skip[0]) * xd->height * xd->width);
             av1_copy_array(best_tx_type_map, xd->tx_type_map,
                            xd->height * xd->width);
+#if CONFIG_CROSS_CHROMA_TX
+            av1_copy_array(best_cctx_type_map, xd->cctx_type_map,
+                           xd->height * xd->width);
+#endif  // CONFIG_CROSS_CHROMA_TX
             motion_mode_cand->rate_mv = rate_mv;
             motion_mode_cand->rate2_nocoeff = rate2_nocoeff;
           }
@@ -4586,6 +4603,9 @@ static int64_t handle_inter_mode(
   memcpy(txfm_info->blk_skip, best_blk_skip,
          sizeof(best_blk_skip[0]) * xd->height * xd->width);
   av1_copy_array(xd->tx_type_map, best_tx_type_map, xd->height * xd->width);
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy_array(xd->cctx_type_map, best_cctx_type_map, xd->height * xd->width);
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   rd_stats->rdcost = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
   assert(av1_check_newmv_joint_nonzero(cm, x));
@@ -4817,6 +4837,10 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   uint8_t best_blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE] = { 0 };
   TX_TYPE best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+  CctxType best_cctx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
+  av1_copy_array(best_cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
 
   FULLPEL_MOTION_SEARCH_PARAMS fullms_params;
   const search_site_config *lookahead_search_sites =
@@ -5157,6 +5181,10 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
       memcpy(best_blk_skip, txfm_info->blk_skip,
              sizeof(txfm_info->blk_skip[0]) * xd->height * xd->width);
       av1_copy_array(best_tx_type_map, xd->tx_type_map, xd->height * xd->width);
+#if CONFIG_CROSS_CHROMA_TX
+      av1_copy_array(best_cctx_type_map, xd->cctx_type_map,
+                     xd->height * xd->width);
+#endif  // CONFIG_CROSS_CHROMA_TX
     }
   }
   *mbmi = best_mbmi;
@@ -5172,6 +5200,9 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
   memcpy(txfm_info->blk_skip, best_blk_skip,
          sizeof(txfm_info->blk_skip[0]) * xd->height * xd->width);
   av1_copy_array(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy_array(xd->cctx_type_map, best_cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
 #if CONFIG_RD_DEBUG
   mbmi->rd_stats = *rd_stats;
 #endif
@@ -5226,8 +5257,12 @@ void av1_rd_pick_intra_mode_sb(const struct AV1_COMP *cpi, struct macroblock *x,
       }
       const TX_SIZE max_uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
       av1_rd_pick_intra_sbuv_mode(cpi, x, &rate_uv, &rate_uv_tokenonly,
-                                  &dist_uv, &uv_skip_txfm, bsize,
-                                  max_uv_tx_size);
+                                  &dist_uv, &uv_skip_txfm,
+
+#if CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+                                  ctx,
+#endif  // CONFIG_CROSS_CHROMA_TX && CCTX_INTRA
+                                  bsize, max_uv_tx_size);
     }
 
     // Intra block is always coded as non-skip
@@ -5585,6 +5620,9 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
         memcpy(ctx->blk_skip, txfm_info->blk_skip,
                sizeof(txfm_info->blk_skip[0]) * ctx->num_4x4_blk);
         av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+        av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
         search_state->best_mode_skippable = 0;
         search_state->best_skip2 = 0;
         search_state->best_rate_y =
@@ -5967,6 +6005,9 @@ static AOM_INLINE void refine_winner_mode_tx(
         *best_mbmode = *mbmi;
         av1_copy_array(ctx->blk_skip, txfm_info->blk_skip, ctx->num_4x4_blk);
         av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+        av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
         rd_cost->rate = this_rate;
         rd_cost->dist = rd_stats_y.dist + rd_stats_uv.dist;
         rd_cost->sse = rd_stats_y.sse + rd_stats_uv.sse;
@@ -7215,6 +7256,9 @@ static INLINE void update_search_state(
   memcpy(ctx->blk_skip, txfm_info->blk_skip,
          sizeof(txfm_info->blk_skip[0]) * ctx->num_4x4_blk);
   av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+  av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
 }
 
 // Find the best RD for a reference frame (among single reference modes)
@@ -8436,6 +8480,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       memcpy(ctx->blk_skip, txfm_info->blk_skip,
              sizeof(txfm_info->blk_skip[0]) * ctx->num_4x4_blk);
       av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+      av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
     }
   }
 
@@ -8496,6 +8543,9 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         memcpy(ctx->blk_skip, txfm_info->blk_skip,
                sizeof(txfm_info->blk_skip[0]) * ctx->num_4x4_blk);
         av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+#if CONFIG_CROSS_CHROMA_TX
+        av1_copy_array(ctx->cctx_type_map, xd->cctx_type_map, ctx->num_4x4_blk);
+#endif  // CONFIG_CROSS_CHROMA_TX
         ctx->rd_stats.skip_txfm = mbmi->skip_txfm[xd->tree_type == CHROMA_PART];
       }
     }

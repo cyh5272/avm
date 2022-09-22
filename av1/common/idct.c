@@ -320,6 +320,27 @@ void av1_highbd_inv_txfm_add_c(const tran_low_t *input, uint8_t *dest,
   }
 }
 
+#if CONFIG_CROSS_CHROMA_TX
+void av1_inv_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
+                                   TX_SIZE tx_size, CctxType cctx_type) {
+  if (cctx_type == CCTX_NONE) return;
+  const int ncoeffs = av1_get_max_eob(tx_size);
+  int32_t *src_u = (int32_t *)dqcoeff_u;
+  int32_t *src_v = (int32_t *)dqcoeff_v;
+  int32_t tmp[2] = { 0, 0 };
+
+  const int angle_idx = cctx_type - CCTX_START;
+  for (int i = 0; i < ncoeffs; i++) {
+    tmp[0] =
+        cctx_mtx[angle_idx][0] * src_u[i] - cctx_mtx[angle_idx][1] * src_v[i];
+    tmp[1] =
+        cctx_mtx[angle_idx][1] * src_u[i] + cctx_mtx[angle_idx][0] * src_v[i];
+    src_u[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[0], CCTX_PREC_BITS);
+    src_v[i] = ROUND_POWER_OF_TWO_SIGNED(tmp[1], CCTX_PREC_BITS);
+  }
+}
+#endif  // CONFIG_CROSS_CHROMA_TX
+
 void av1_inverse_transform_block(const MACROBLOCKD *xd,
 #if CONFIG_IST
                                  tran_low_t *dqcoeff,
