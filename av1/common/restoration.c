@@ -2658,11 +2658,11 @@ void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
 int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
                                        int mi_row, int mi_col, BLOCK_SIZE bsize,
                                        int *rcol0, int *rcol1, int *rrow0,
-                                       int *rrow1, int skip_restore_none) {
+                                       int *rrow1, int ru_size_cheat) {
   assert(rcol0 && rcol1 && rrow0 && rrow1);
 
   if (bsize != cm->seq_params.sb_size) return 0;
-  if (skip_restore_none &&
+  if (!ru_size_cheat &&
       cm->rst_info[plane].frame_restoration_type == RESTORE_NONE)
     return 0;
 
@@ -2685,7 +2685,9 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
   const int mi_rel_col1 = mi_rel_col0 + mi_size_wide[bsize];
 
   const RestorationInfo *rsi = &cm->rst_info[plane];
-  const int size = rsi->restoration_unit_size;
+  const int size = cm->rst_info[plane].frame_restoration_type == RESTORE_NONE
+                       ? ru_size_cheat
+                       : rsi->restoration_unit_size;
 
   // Calculate the number of restoration units in this tile (which might be
   // strictly less than rsi->horz_units_per_tile and rsi->vert_units_per_tile)
@@ -2738,7 +2740,16 @@ void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
   TileInfo tile_info;
   av1_tile_set_row(&tile_info, cm, tile_row);
   av1_tile_set_col(&tile_info, cm, tile_col);
+  assert(tile_info.mi_row_start < tile_info.mi_row_end);
+  assert(tile_info.mi_col_start < tile_info.mi_col_end);
 
+  // TODO(debargha): Please fix this with the actual RU size.
+  //  rsi->restoration_unit_size is zero if the RU mode is RESTORE_NONE.
+  int ru_size_cheat = 256;
+  *ru_row_start = 0;
+  *ru_col_start = 0;
+  *ru_row_end = 0;
+  *ru_col_end = 0;
   int rrow0, rrow1, rcol0, rcol1;
   // Scan SBs row by row, left to right to find first SB that has RU info in it.
   int found = 0;
@@ -2747,9 +2758,9 @@ void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
        mi_row += cm->seq_params.mib_size) {
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
          mi_col += cm->seq_params.mib_size) {
-      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
-                                             cm->seq_params.sb_size, &rcol0,
-                                             &rcol1, &rrow0, &rrow1, false)) {
+      if (av1_loop_restoration_corners_in_sb(
+              cm, plane, mi_row, mi_col, cm->seq_params.sb_size, &rcol0, &rcol1,
+              &rrow0, &rrow1, ru_size_cheat)) {
         *ru_row_start = rrow0;  // this is the RU row start limit in RU terms.
         *ru_col_start = rcol0;  // this is the RU col start limit in RU terms.
         found = 1;
@@ -2765,9 +2776,9 @@ void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
        mi_row -= cm->seq_params.mib_size) {
     for (int mi_col = tile_info.mi_col_end - 1;
          mi_col >= tile_info.mi_col_start; mi_col -= cm->seq_params.mib_size) {
-      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
-                                             cm->seq_params.sb_size, &rcol0,
-                                             &rcol1, &rrow0, &rrow1, false)) {
+      if (av1_loop_restoration_corners_in_sb(
+              cm, plane, mi_row, mi_col, cm->seq_params.sb_size, &rcol0, &rcol1,
+              &rrow0, &rrow1, ru_size_cheat)) {
         *ru_row_end = rrow1;  // this is the RU row end limit in RU terms.
         *ru_col_end = rcol1;  // this is the RU col end limit in RU terms.
         found = 1;

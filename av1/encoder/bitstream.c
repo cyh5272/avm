@@ -2311,8 +2311,7 @@ static AOM_INLINE void write_modes_sb(
 #endif  // CONFIG_CNN_RESTORATION
     int rcol0, rcol1, rrow0, rrow1;
     if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                           &rcol0, &rcol1, &rrow0, &rrow1,
-                                           true)) {
+                                           &rcol0, &rcol1, &rrow0, &rrow1, 0)) {
       const int rstride = cm->rst_info[plane].horz_units_per_tile;
       for (int rrow = rrow0; rrow < rrow1; ++rrow) {
         for (int rcol = rcol0; rcol < rcol1; ++rcol) {

@@ -699,7 +699,7 @@ void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
 int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
                                        int mi_row, int mi_col, BLOCK_SIZE bsize,
                                        int *rcol0, int *rcol1, int *rrow0,
-                                       int *rrow1, int skip_restore_none);
+                                       int *rrow1, int ru_size_cheat);
 
 // Utility to get RU limits for tile with index { tile_w, tile_h }
 void av1_get_ru_limits_in_tile(const struct AV1Common *cm, int plane,
