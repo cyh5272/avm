@@ -2252,8 +2252,12 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
       ROUND_POWER_OF_TWO(start_frame_buf->mi_cols, TMVP_SHIFT_BITS);
   const int mvs_stride =
       ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
-  uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
-  uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
+  uint32_t scaled_blk_col_hr_0 = 0;
+  uint32_t scaled_blk_col_hr_step = 0;
+  uint32_t scaled_blk_col_hr = 0;
+  uint32_t scaled_blk_row_hr_0 = 0;
+  uint32_t scaled_blk_row_hr_step = 0;
+  uint32_t scaled_blk_row_hr = 0;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
         (uint32_t)sf->x_scale_fp * 4;  // center of first block
@@ -2414,8 +2418,12 @@ static int motion_field_projection(AV1_COMMON *cm,
       ROUND_POWER_OF_TWO(start_frame_buf->mi_cols, TMVP_SHIFT_BITS);
   const int mvs_stride =
       ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
-  uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
-  uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
+  uint32_t scaled_blk_col_hr_0 = 0;
+  uint32_t scaled_blk_col_hr_step = 0;
+  uint32_t scaled_blk_col_hr = 0;
+  uint32_t scaled_blk_row_hr_0 = 0;
+  uint32_t scaled_blk_row_hr_step = 0;
+  uint32_t scaled_blk_row_hr = 0;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
         (uint32_t)sf->x_scale_fp * 4;  // center of first block
@@ -2553,8 +2561,12 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
   const struct scale_factors *sf = &sf_;
   const int mvs_rows = (start_frame_buf->mi_rows + 1) >> 1;
   const int mvs_cols = (start_frame_buf->mi_cols + 1) >> 1;
-  uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
-  uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
+  uint32_t scaled_blk_col_hr_0 = 0;
+  uint32_t scaled_blk_col_hr_step = 0;
+  uint32_t scaled_blk_col_hr = 0;
+  uint32_t scaled_blk_row_hr_0 = 0;
+  uint32_t scaled_blk_row_hr_step = 0;
+  uint32_t scaled_blk_row_hr = 0;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
         (uint32_t)sf->x_scale_fp * 4;  // center of first block
@@ -2686,8 +2698,12 @@ static int motion_field_projection(AV1_COMMON *cm,
   const struct scale_factors *sf = &sf_;
   const int mvs_rows = (start_frame_buf->mi_rows + 1) >> 1;
   const int mvs_cols = (start_frame_buf->mi_cols + 1) >> 1;
-  uint32_t scaled_blk_col_hr_0, scaled_blk_col_hr_step, scaled_blk_col_hr;
-  uint32_t scaled_blk_row_hr_0, scaled_blk_row_hr_step, scaled_blk_row_hr;
+  uint32_t scaled_blk_col_hr_0 = 0;
+  uint32_t scaled_blk_col_hr_step = 0;
+  uint32_t scaled_blk_col_hr = 0;
+  uint32_t scaled_blk_row_hr_0 = 0;
+  uint32_t scaled_blk_row_hr_step = 0;
+  uint32_t scaled_blk_row_hr = 0;
   if (is_scaled) {
     scaled_blk_col_hr_0 =
         (uint32_t)sf->x_scale_fp * 4;  // center of first block
