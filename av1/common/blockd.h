@@ -541,7 +541,7 @@ typedef struct MB_MODE_INFO {
   /*! \brief Maximum number of warp reference indices to use for warp base
    * parameter. */
   uint8_t max_num_warp_candidates;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   /*! \brief Indicates if masked compound is used(1) or not (0). */
   uint8_t comp_group_idx : 1;
@@ -699,15 +699,6 @@ static INLINE int is_global_mv_block(const MB_MODE_INFO *const mbmi,
   return (mode == GLOBALMV || mode == GLOBAL_GLOBALMV) && type > TRANSLATION &&
          block_size_allowed;
 }
-
-#if CONFIG_WARP_REF_LIST
-// Get the context model for coding of warp_ref_idx
-// Currently always return 0
-static INLINE int get_warp_index_context(const MB_MODE_INFO *const mbmi) {
-  (void)mbmi;
-  return 0;
-}
-#endif
 
 #if CONFIG_MISMATCH_DEBUG
 static INLINE void mi_to_pixel_loc(int *pixel_c, int *pixel_r, int mi_col,
@@ -881,7 +872,7 @@ typedef struct {
 #endif  // CONFIG_REF_MV_BANK
 
 #if CONFIG_WARP_REF_LIST
-#define WARP_PARAM_BANK_SIZE (4)
+#define WARP_PARAM_BANK_SIZE 4
 
 /*! \brief Variables related to reference warp parameters bank. */
 typedef struct {
@@ -970,7 +961,7 @@ typedef struct macroblockd {
   WARP_PARAM_BANK warp_param_bank; /*!< Ref warp parameters bank to update */
   WARP_PARAM_BANK *warp_param_bank_pt; /*!< Pointer to bank to refer to */
   /**@}*/
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   /*!
    * True if current block transmits chroma information.
@@ -1210,7 +1201,7 @@ typedef struct macroblockd {
    * valid number of candidates in the warp_param_stack.
    */
   uint8_t valid_num_warp_candidates[SINGLE_REF_FRAMES];
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   /*!
    * True if this is the last vertical rectangular block in a VERTICAL or

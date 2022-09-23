@@ -396,7 +396,7 @@ static INLINE void av1_copy_mbmi_ext_to_mbmi_ext_frame(
            mbmi_ext->warp_param_stack[ref_frame_type],
            sizeof(mbmi_ext->warp_param_stack[MAX_WARP_REF_CANDIDATES]));
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 }
 
 #ifdef __cplusplus

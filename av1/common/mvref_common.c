@@ -717,7 +717,7 @@ void check_this_warp_candidate(
     }
   }
 }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 // both CONFIG_SMVP_IMPROVEMENT and CONFIG_C043_MVP_IMPROVEMENTS are ture case,
 // scan_row_mbmi does not called
 #if !(CONFIG_SMVP_IMPROVEMENT && CONFIG_C043_MVP_IMPROVEMENTS)
@@ -742,7 +742,7 @@ static AOM_INLINE void scan_row_mbmi(
     WARP_CANDIDATE warp_param_stack[MAX_WARP_REF_CANDIDATES],
     int max_num_of_warp_candidates, uint8_t *valid_num_warp_candidates,
     MV_REFERENCE_FRAME ref_frame,
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     int *processed_rows) {
   int end_mi = AOMMIN(xd->width, cm->mi_params.mi_cols - mi_col);
@@ -800,7 +800,7 @@ static AOM_INLINE void scan_row_mbmi(
                                 max_num_of_warp_candidates,
                                 valid_num_warp_candidates, PROJ_SPATIAL);
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     add_ref_mv_candidate(
 #if CONFIG_TIP
@@ -882,7 +882,7 @@ static AOM_INLINE void scan_col_mbmi(
     WARP_CANDIDATE warp_param_stack[MAX_WARP_REF_CANDIDATES],
     int max_num_of_warp_candidates, uint8_t *valid_num_warp_candidates,
     MV_REFERENCE_FRAME ref_frame,
-#endif
+#endif  // CONFIG_WARP_REF_LIST
     int *processed_cols) {
   int end_mi = AOMMIN(xd->height, cm->mi_params.mi_rows - mi_row);
   end_mi = AOMMIN(end_mi, mi_size_high[BLOCK_64X64]);
@@ -940,7 +940,7 @@ static AOM_INLINE void scan_col_mbmi(
                                 max_num_of_warp_candidates,
                                 valid_num_warp_candidates, PROJ_SPATIAL);
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     add_ref_mv_candidate(
 #if CONFIG_TIP
@@ -991,7 +991,7 @@ static AOM_INLINE void scan_blk_mbmi(
     WARP_CANDIDATE warp_param_stack[MAX_WARP_REF_CANDIDATES],
     int max_num_of_warp_candidates, uint8_t *valid_num_warp_candidates,
     MV_REFERENCE_FRAME ref_frame,
-#endif
+#endif  // CONFIG_WARP_REF_LIST
     uint8_t *refmv_count) {
   const TileInfo *const tile = &xd->tile;
   POSITION mi_pos;
@@ -1024,7 +1024,7 @@ static AOM_INLINE void scan_blk_mbmi(
                                 max_num_of_warp_candidates,
                                 valid_num_warp_candidates, PROJ_SPATIAL);
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     add_ref_mv_candidate(
 #if CONFIG_TIP
@@ -1503,7 +1503,7 @@ static AOM_INLINE void setup_ref_mv_list(
     ,
     WARP_CANDIDATE warp_param_stack[MAX_WARP_REF_CANDIDATES],
     int max_num_of_warp_candidates, uint8_t *valid_num_warp_candidates
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 ) {
   const int bs = AOMMAX(xd->width, xd->height);
@@ -1949,7 +1949,7 @@ static AOM_INLINE void setup_ref_mv_list(
 #if CONFIG_WARP_REF_LIST
                     warp_param_stack, max_num_of_warp_candidates,
                     valid_num_warp_candidates, ref_frame,
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
                     &processed_rows);
 
@@ -2367,7 +2367,7 @@ static AOM_INLINE void setup_ref_mv_list(
     }
   }
 
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if CONFIG_BVP_IMPROVEMENT
   // If there are open slots in reference BV candidate list
@@ -2409,7 +2409,7 @@ void av1_initialize_warp_wrl_list(
     valid_num_warp_candidates[ref_frame] = 0;
   }
 }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 void av1_find_mv_refs(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, MB_MODE_INFO *mi,
@@ -2423,7 +2423,7 @@ void av1_find_mv_refs(
     WARP_CANDIDATE warp_param_stack[][MAX_WARP_REF_CANDIDATES],
     int max_num_of_warp_candidates,
     uint8_t valid_num_warp_candidates[SINGLE_REF_FRAMES]
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 ) {
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
@@ -2491,7 +2491,7 @@ void av1_find_mv_refs(
     valid_num_warp_candidates[ref_frame] =
         0;  // initialize the number of valid candidates to 0 at the beginning
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   if (mi->skip_mode) {
@@ -2505,7 +2505,7 @@ void av1_find_mv_refs(
 #if CONFIG_WARP_REF_LIST
                       ,
                       NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
     );
   } else {
     setup_ref_mv_list(cm, xd, ref_frame, &ref_mv_count[ref_frame],
@@ -2517,7 +2517,7 @@ void av1_find_mv_refs(
                       derive_wrl ? warp_param_stack[ref_frame] : NULL,
                       derive_wrl ? max_num_of_warp_candidates : 0,
                       derive_wrl ? &valid_num_warp_candidates[ref_frame] : NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     );
   }
@@ -2531,7 +2531,7 @@ void av1_find_mv_refs(
                     derive_wrl ? warp_param_stack[ref_frame] : NULL,
                     derive_wrl ? max_num_of_warp_candidates : 0,
                     derive_wrl ? &valid_num_warp_candidates[ref_frame] : NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 #endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
 }
@@ -3994,6 +3994,10 @@ void av1_update_ref_mv_bank(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
 #if CONFIG_WARP_REF_LIST
 
 #define MAX_WARP_SB_HITS 64
+// Update the warp parameter bank
+//  If the warp parameters are already exist in the bank, then bank is
+//  rearranged If the warp parameters are not in the bank, insert it to the
+//  bank.
 static INLINE void update_warp_param_bank(const MB_MODE_INFO *const mbmi,
                                           WARP_PARAM_BANK *warp_param_bank) {
   const MV_REFERENCE_FRAME ref_frame = av1_ref_frame_type(mbmi->ref_frame);
@@ -4092,4 +4096,4 @@ void av1_find_warp_delta_base_candidates(
   }
 }
 
-#endif
+#endif  // CONFIG_WARP_REF_LIST

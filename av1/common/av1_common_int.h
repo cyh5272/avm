@@ -3118,7 +3118,7 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
       warp_delta_allowed = false;
     }
 #endif
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   }
 
   if (warp_delta_allowed) {

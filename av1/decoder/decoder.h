@@ -134,7 +134,7 @@ typedef struct ThreadData {
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_WARP_REF_LIST
   WARP_PARAM_BANK warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 } ThreadData;
 
 typedef struct AV1DecRowMTJobInfo {

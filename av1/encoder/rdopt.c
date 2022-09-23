@@ -1377,7 +1377,7 @@ static AOM_INLINE void setup_buffer_ref_mvs_inter(
                    xd->warp_param_stack,
                    ref_frame < SINGLE_REF_FRAMES ? MAX_WARP_REF_CANDIDATES : 0,
                    xd->valid_num_warp_candidates
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   );
 
@@ -1968,10 +1968,10 @@ int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                         const ModeCosts *mode_costs) {
 #if CONFIG_WARP_REF_LIST
   (void)xd;
-  if (!allow_warp_parameter_signaling(cm, mbmi)) {
+  if (!allow_warp_parameter_signaling(mbmi)) {
     return 0;
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   const WarpedMotionParams *params = &mbmi->wm_params[0];
   WarpedMotionParams base_params;
@@ -1980,16 +1980,16 @@ int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
       cm,
 #if !CONFIG_WARP_REF_LIST
       xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
       mbmi,
 #if !CONFIG_WARP_REF_LIST
       mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
       &base_params, NULL
 #if CONFIG_WARP_REF_LIST
       ,
       mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 
   // The RDO stage should not give us a model which is not warpable.
@@ -2066,7 +2066,7 @@ static INLINE int get_warp_ref_idx_cost(const MB_MODE_INFO *mbmi,
   const ModeCosts *mode_costs = &x->mode_costs;
   int max_idx_bits = mbmi->max_num_warp_candidates - 1;
   for (int bit_idx = 0; bit_idx < max_idx_bits; ++bit_idx) {
-    int warp_ctx = get_warp_index_context(mbmi);
+    int warp_ctx = 0;
     int bit_ctx = bit_idx < 2 ? bit_idx : 2;
     int codec_bit = (mbmi->warp_ref_idx != bit_idx);
     cost += mode_costs->warp_ref_idx_cost[bit_ctx][warp_ctx][codec_bit];
@@ -2074,7 +2074,7 @@ static INLINE int get_warp_ref_idx_cost(const MB_MODE_INFO *mbmi,
   }
   return cost;
 }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 /*!\brief AV1 motion mode search
  *
@@ -2180,7 +2180,7 @@ static int64_t motion_mode_rd(
 #if CONFIG_WARP_REF_LIST
   mbmi->warp_ref_idx = 0;
   mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 #if CONFIG_EXTENDED_WARP_PREDICTION
   int allowed_motion_modes = motion_mode_allowed(
       cm, xd, mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);
@@ -2269,7 +2269,7 @@ static int64_t motion_mode_rd(
          warp_ref_idx++) {
       if (mode_index == WARP_DELTA && warp_ref_idx >= valid_num_candidates)
         continue;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
       int tmp_rate2 = rate2_nocoeff;
       int tmp_rate_mv = rate_mv0;
@@ -2281,7 +2281,7 @@ static int64_t motion_mode_rd(
           (mode_index == WARP_DELTA) ? max_warp_ref_idx : 0;
       assert(valid_num_candidates <= mbmi->max_num_warp_candidates);
 
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 #if CONFIG_EXTENDED_WARP_PREDICTION
       mbmi->motion_mode = (MOTION_MODE)mode_index;
       if (mbmi->motion_mode != INTERINTRA) {
@@ -2445,7 +2445,7 @@ static int64_t motion_mode_rd(
                                           NULL);
         int valid = 0;
 #if CONFIG_WARP_REF_LIST
-        if (!allow_warp_parameter_signaling(cm, mbmi)) {
+        if (!allow_warp_parameter_signaling(mbmi)) {
           // Default parameters are not searched if the delta is not signalled
           if (mbmi_ext
                   ->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
@@ -2455,20 +2455,20 @@ static int64_t motion_mode_rd(
           valid = av1_refine_mv_for_base_param_warp_model(cm, xd, mbmi,
                                                           mbmi_ext, &ms_params);
         } else {
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
           valid = av1_pick_warp_delta(
               cm, xd, mbmi, mbmi_ext, &ms_params, &x->mode_costs
 #if CONFIG_WARP_REF_LIST
               ,
               mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
           );
 
 #if CONFIG_WARP_REF_LIST
         }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
         if (!valid) {
           continue;
@@ -2699,7 +2699,7 @@ static int64_t motion_mode_rd(
         if (motion_mode == WARP_DELTA) {
 #if CONFIG_WARP_REF_LIST
           rd_stats->rate += get_warp_ref_idx_cost(mbmi, x);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
           rd_stats->rate +=
               av1_cost_warp_delta(cm, xd, mbmi, mbmi_ext, mode_costs);
@@ -2855,7 +2855,7 @@ static int64_t motion_mode_rd(
       }
 #if CONFIG_WARP_REF_LIST
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   }
   // Update RD and mbmi stats for selected motion mode
   mbmi->ref_frame[1] = ref_frame_1;
@@ -4901,7 +4901,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_WARP_REF_LIST
                    ,
                    NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 #if CONFIG_IBC_SR_EXT
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
@@ -4996,7 +4996,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_WARP_REF_LIST
   mbmi->warp_ref_idx = 0;
   mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   for (enum IntrabcMotionDirection dir = IBC_MOTION_ABOVE;
        dir < IBC_MOTION_DIRECTIONS; ++dir) {
 #if CONFIG_IBC_SR_EXT
@@ -5240,7 +5240,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_WARP_REF_LIST
     mbmi->warp_ref_idx = 0;
     mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
     av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
                                   av1_num_planes(cm) - 1);
 
@@ -5476,7 +5476,7 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 #if CONFIG_WARP_REF_LIST
   mbmi->warp_ref_idx = 0;
   mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if !CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   const uint8_t ref_frame_type = av1_ref_frame_type(mbmi->ref_frame);
@@ -5492,7 +5492,7 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 #if CONFIG_WARP_REF_LIST
                      ,
                      NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     );
     // TODO(Ravi): Populate mbmi_ext->ref_mv_stack[ref_frame][4] and
@@ -5540,7 +5540,7 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 #if CONFIG_WARP_REF_LIST
   mbmi->warp_ref_idx = 0;
   mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   set_default_interp_filters(mbmi,
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -5581,7 +5581,7 @@ static AOM_INLINE void rd_pick_motion_copy_mode(
 #if CONFIG_WARP_REF_LIST
                    ,
                    NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   );
   // TODO(Ravi): Populate mbmi_ext->ref_mv_stack[ref_frame][4] and
@@ -5851,7 +5851,7 @@ static AOM_INLINE void rd_pick_skip_mode(
 #if CONFIG_WARP_REF_LIST
                      ,
                      NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     );
     // TODO(Ravi): Populate mbmi_ext->ref_mv_stack[ref_frame][4] and
@@ -6602,7 +6602,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
           xd->warp_param_stack,
           ref_frame < SINGLE_REF_FRAMES ? MAX_WARP_REF_CANDIDATES : 0,
           xd->valid_num_warp_candidates
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
       );
 
@@ -6997,7 +6997,7 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
 #if CONFIG_WARP_REF_LIST
   mbmi->warp_ref_idx = 0;
   mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 }
 
 static AOM_INLINE void collect_single_states(const AV1_COMMON *const cm,
@@ -7936,7 +7936,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_WARP_REF_LIST
   av1_initialize_warp_wrl_list(xd->warp_param_stack,
                                xd->valid_num_warp_candidates);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   // Ref frames that are selected by square partition blocks.
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -8282,7 +8282,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_WARP_REF_LIST
         mbmi->warp_ref_idx = 0;
         mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
         const int64_t ref_best_rd = search_state.best_rd;
         RD_STATS rd_stats, rd_stats_y, rd_stats_uv;
         av1_init_rd_stats(&rd_stats);
@@ -8669,7 +8669,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_WARP_REF_LIST
       mbmi->warp_ref_idx = 0;
       mbmi->max_num_warp_candidates = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
       rd_pick_intrabc_mode_sb(cpi, x, ctx, &this_rd_cost, bsize, INT64_MAX);
 
       if (this_rd_cost.rdcost < search_state.best_rd) {
@@ -8771,7 +8771,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
         xd->valid_num_warp_candidates[av1_ref_frame_type(mbmi->ref_frame)],
         NULL);
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if CONFIG_INTERNAL_STATS && !CONFIG_NEW_REF_SIGNALING
   const THR_MODES best_mode_enum = get_prediction_mode_idx(

@@ -774,7 +774,7 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
 
 #if CONFIG_WARP_REF_LIST
     xd->warp_param_bank.wpb_sb_hits = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     // Get segment id and skip flag
     const struct segmentation *const seg = &cm->seg;
@@ -947,7 +947,7 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
 #if CONFIG_WARP_REF_LIST
     av1_zero(td->mb.e_mbd.warp_param_bank);
     td->mb.e_mbd.warp_param_bank_pt = &td->mb.e_mbd.warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     av1_encode_sb_row(cpi, td, tile_row, tile_col, mi_row);
   }

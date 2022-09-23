@@ -5295,7 +5295,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 #define MAX_WARP_DELTA_ITERS 8
 #else
 #define MAX_WARP_DELTA_ITERS 3
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 // Returns 1 if able to select a good model, 0 if not
 int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
@@ -5305,7 +5305,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 #if CONFIG_WARP_REF_LIST
                         ,
                         WARP_CANDIDATE *warp_param_stack
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 ) {
   WarpedMotionParams *params = &mbmi->wm_params[0];
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
@@ -5337,17 +5337,17 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   av1_get_warp_base_params(cm,
 #if !CONFIG_WARP_REF_LIST
                            xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
 
                            mbmi,
 #if !CONFIG_WARP_REF_LIST
                            mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
                            &base_params, &center_mv
 #if CONFIG_WARP_REF_LIST
                            ,
                            warp_param_stack
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 
   MV *best_mv = &mbmi->mv[0].as_mv;
@@ -5407,7 +5407,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   // as the maximum value of any single parameter is between 1/8 and 1/4.
 #if CONFIG_WARP_REF_LIST
   const int step_size = (1 << WARP_DELTA_STEP_BITS);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   for (int iter = 0; iter < MAX_WARP_DELTA_ITERS; iter++) {
 #if CONFIG_WARP_REF_LIST
@@ -5416,7 +5416,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 
     int step_size =
         1 << (WARP_DELTA_STEP_BITS + (MAX_WARP_DELTA_ITERS - 1) - iter);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     if (can_refine_mv) {
       int best_idx = -1;
@@ -5524,14 +5524,14 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
           best_rd = dec_rd;
 #if CONFIG_WARP_REF_LIST
           center_best_so_far = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
         } else {
           // Increasing is best
           best_wm_params = inc_params;
           best_rd = inc_rd;
 #if CONFIG_WARP_REF_LIST
           center_best_so_far = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
         }
       } else if (dec_rd < best_rd) {
         // Decreasing is best
@@ -5539,7 +5539,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
         best_rd = dec_rd;
 #if CONFIG_WARP_REF_LIST
         center_best_so_far = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
       } else {
         // Current is best
         // No need to change anything
@@ -5550,7 +5550,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     if (center_best_so_far) {
       break;
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   }
 
   mbmi->wm_params[0] = best_wm_params;
@@ -5579,16 +5579,16 @@ int av1_refine_mv_for_base_param_warp_model(
       cm,
 #if !CONFIG_WARP_REF_LIST
       xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
       mbmi,
 #if !CONFIG_WARP_REF_LIST
       mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
       &base_params, &center_mv
 #if CONFIG_WARP_REF_LIST
       ,
       mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 
   *params = base_params;
@@ -5664,7 +5664,7 @@ int av1_refine_mv_for_base_param_warp_model(
 
   return 1;
 }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 // Try to improve the motion vector over the one determined by NEWMV search,
 // by running the full WARP_EXTEND prediction pipeline.

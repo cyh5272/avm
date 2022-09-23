@@ -177,7 +177,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[0], 2);
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[1], 2);
   RESET_CDF_COUNTER(fc->warp_ref_idx_cdf[2], 2);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   RESET_CDF_COUNTER(fc->warp_delta_param_cdf, WARP_DELTA_NUM_SYMBOLS);
   RESET_CDF_COUNTER(fc->warp_extend_cdf, 2);
 #else

@@ -530,11 +530,13 @@ typedef struct candidate_mv {
 } CANDIDATE_MV;
 
 #if CONFIG_WARP_REF_LIST
+// structure of the warp-reference-list (WRL)
+// Each entry of the WRL contain warp parameter and projection type.
 typedef struct warp_candidate {
   WarpedMotionParams wm_params;
   WarpProjectionType proj_type;
 } WARP_CANDIDATE;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 static INLINE int is_zero_mv(const MV *mv) {
   return *((const uint32_t *)mv) == 0;

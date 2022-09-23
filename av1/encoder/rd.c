@@ -500,7 +500,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
                                  fc->warp_ref_idx_cdf[i][j], NULL);
       }
     }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     for (i = BLOCK_8X8; i < BLOCK_SIZES_ALL; i++) {
       av1_cost_tokens_from_cdf(mode_costs->warp_delta_cost[i],

@@ -463,7 +463,7 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #if CONFIG_WARP_REF_LIST
     if (cm->features.allow_warped_motion && is_inter)
       av1_update_warp_param_bank(cm, xd, mbmi);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   }
   if (txfm_params->tx_mode_search_type == TX_MODE_SELECT &&
       block_signals_txsize(mbmi->sb_type[xd->tree_type == CHROMA_PART]) &&
@@ -882,7 +882,7 @@ static void update_warp_delta_param_stats(int index, int value,
 static void update_warp_delta_stats(const AV1_COMMON *cm,
 #if !CONFIG_WARP_REF_LIST
                                     const MACROBLOCKD *xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
                                     const MB_MODE_INFO *mbmi,
                                     const MB_MODE_INFO_EXT *mbmi_ext,
 #if CONFIG_ENTROPY_STATS
@@ -895,30 +895,29 @@ static void update_warp_delta_stats(const AV1_COMMON *cm,
     assert(mbmi->warp_ref_idx < mbmi->max_num_warp_candidates);
     int max_idx_bits = mbmi->max_num_warp_candidates - 1;
     for (int bit_idx = 0; bit_idx < max_idx_bits; ++bit_idx) {
-      aom_cdf_prob *warp_ref_idx_cdf =
-          av1_get_warp_ref_idx_cdf(fc, mbmi, bit_idx);
+      aom_cdf_prob *warp_ref_idx_cdf = av1_get_warp_ref_idx_cdf(fc, bit_idx);
       update_cdf(warp_ref_idx_cdf, mbmi->warp_ref_idx != bit_idx, 2);
       if (mbmi->warp_ref_idx == bit_idx) break;
     }
   }
-  if (allow_warp_parameter_signaling(cm, mbmi)) {
-#endif
+  if (allow_warp_parameter_signaling(mbmi)) {
+#endif  // CONFIG_WARP_REF_LIST
     const WarpedMotionParams *params = &mbmi->wm_params[0];
     WarpedMotionParams base_params;
     av1_get_warp_base_params(
         cm,
 #if !CONFIG_WARP_REF_LIST
         xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
         mbmi,
 #if !CONFIG_WARP_REF_LIST
         mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
         &base_params, NULL
 #if CONFIG_WARP_REF_LIST
         ,
         mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     );
 
@@ -940,7 +939,7 @@ static void update_warp_delta_stats(const AV1_COMMON *cm,
                                   fc);
 #if CONFIG_WARP_REF_LIST
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 }
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
@@ -1416,7 +1415,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
           update_warp_delta_stats(cm,
 #if !CONFIG_WARP_REF_LIST
                                   xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
                                   mbmi, mbmi_ext,
 #if CONFIG_ENTROPY_STATS
                                   counts,
@@ -1883,7 +1882,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #if CONFIG_WARP_REF_LIST
                        ,
                        NULL, 0, NULL
-#endif
+#endif  // CONFIG_WARP_REF_LIST
       );
       // TODO(Ravi): Populate mbmi_ext->ref_mv_stack[ref_frame][4] and
       // mbmi_ext->weight[ref_frame][4] inside av1_find_mv_refs.

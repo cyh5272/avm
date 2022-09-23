@@ -770,7 +770,7 @@ enum {
 #if CONFIG_WARP_REF_LIST
 #define MAX_WARP_REF_CANDIDATES 4
 #define WARP_REF_CONTEXTS 1
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if CONFIG_CONTEXT_DERIVATION
 #define INTRA_INTER_SKIP_TXFM_CONTEXTS 2
@@ -980,7 +980,7 @@ typedef enum {
   PROJ_DEFAULT,        /**< Default values */
   WARP_PROJ_TYPES = 5, /**< Num projection types */
 } WarpProjectionType;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 /*!\endcond */
 

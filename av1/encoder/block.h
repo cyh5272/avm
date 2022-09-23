@@ -254,7 +254,7 @@ typedef struct {
    * warp_param_stack is the warp candidate list.
    */
   WARP_CANDIDATE warp_param_stack[SINGLE_REF_FRAMES][MAX_WARP_REF_CANDIDATES];
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 } MB_MODE_INFO_EXT;
 
@@ -290,7 +290,7 @@ typedef struct {
 #if CONFIG_WARP_REF_LIST
   //! warp_param_stack is the warp candidate list.
   WARP_CANDIDATE warp_param_stack[MAX_WARP_REF_CANDIDATES];
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 } MB_MODE_INFO_EXT_FRAME;
 
@@ -865,7 +865,7 @@ typedef struct {
 #if CONFIG_WARP_REF_LIST
   //! warp_ref_idx_cost
   int warp_ref_idx_cost[3][WARP_REF_CONTEXTS][2];
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   //! warp_extend_cost
   int warp_extend_cost[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2][2];
 #else

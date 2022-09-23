@@ -150,14 +150,13 @@ static void write_warp_ref_idx(FRAME_CONTEXT *ec_ctx, const MB_MODE_INFO *mbmi,
   }
   int max_idx_bits = mbmi->max_num_warp_candidates - 1;
   for (int bit_idx = 0; bit_idx < max_idx_bits; ++bit_idx) {
-    aom_cdf_prob *warp_ref_idx_cdf =
-        av1_get_warp_ref_idx_cdf(ec_ctx, mbmi, bit_idx);
+    aom_cdf_prob *warp_ref_idx_cdf = av1_get_warp_ref_idx_cdf(ec_ctx, bit_idx);
     aom_write_symbol(w, mbmi->warp_ref_idx != bit_idx, warp_ref_idx_cdf, 2);
 
     if (mbmi->warp_ref_idx == bit_idx) break;
   }
 }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 #if CONFIG_IMPROVED_JMVD && CONFIG_JOINT_MVD
 // Write scale mode flag for joint mvd coding mode
@@ -414,26 +413,26 @@ static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #if CONFIG_WARP_REF_LIST
   assert(mbmi->warp_ref_idx < mbmi->max_num_warp_candidates);
   write_warp_ref_idx(xd->tile_ctx, mbmi, w);
-  if (!allow_warp_parameter_signaling(cm, mbmi)) {
+  if (!allow_warp_parameter_signaling(mbmi)) {
     return;
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
   const WarpedMotionParams *params = &mbmi->wm_params[0];
   WarpedMotionParams base_params;
   av1_get_warp_base_params(cm,
 #if !CONFIG_WARP_REF_LIST
                            xd,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
                            mbmi,
 #if !CONFIG_WARP_REF_LIST
                            mbmi_ext_frame->ref_mv_stack,
-#endif
+#endif  //! CONFIG_WARP_REF_LIST
                            &base_params, NULL
 #if CONFIG_WARP_REF_LIST
                            ,
                            mbmi_ext_frame->warp_param_stack
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   );
 
   // The RDO stage should not give us a model which is not warpable.

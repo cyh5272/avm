@@ -1038,7 +1038,7 @@ static const aom_cdf_prob default_warp_ref_idx1_cdf[WARP_REF_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(15903) } };
 static const aom_cdf_prob default_warp_ref_idx2_cdf[WARP_REF_CONTEXTS][CDF_SIZE(
     2)] = { { AOM_CDF2(18242) } };
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 static const aom_cdf_prob
     default_warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)] = {
       { AOM_CDF15(2185, 4369, 6554, 8738, 10923, 13107, 15292, 17476, 19661,
@@ -2057,7 +2057,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warp_ref_idx_cdf[0], default_warp_ref_idx0_cdf);
   av1_copy(fc->warp_ref_idx_cdf[1], default_warp_ref_idx1_cdf);
   av1_copy(fc->warp_ref_idx_cdf[2], default_warp_ref_idx2_cdf);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   av1_copy(fc->warp_delta_param_cdf, default_warp_delta_param_cdf);
   av1_copy(fc->warp_extend_cdf, default_warp_extend_cdf);
 #else

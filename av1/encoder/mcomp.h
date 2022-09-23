@@ -502,7 +502,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 #if CONFIG_WARP_REF_LIST
                         ,
                         WARP_CANDIDATE *warp_param_stack
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 );
 
 #if CONFIG_WARP_REF_LIST
@@ -510,7 +510,7 @@ int av1_refine_mv_for_base_param_warp_model(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, MB_MODE_INFO *mbmi,
     const MB_MODE_INFO_EXT *mbmi_ext,
     const SUBPEL_MOTION_SEARCH_PARAMS *ms_params);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
 void av1_refine_mv_for_warp_extend(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                    const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,

@@ -3399,15 +3399,15 @@ static AOM_INLINE void decode_tile_sb_row(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_REF_MV_BANK || CONFIG_WARP_REF_LIST
     DecoderCodingBlock *const dcb = &td->dcb;
     MACROBLOCKD *const xd = &dcb->xd;
-#endif
+#endif  // CONFIG_REF_MV_BANK || CONFIG_WARP_REF_LIST
 
 #if CONFIG_REF_MV_BANK
     xd->ref_mv_bank.rmb_sb_hits = 0;
-#endif
+#endif  // CONFIG_REF_MV_BANK
 
 #if CONFIG_WARP_REF_LIST
     xd->warp_param_bank.wpb_sb_hits = 0;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     // Decoding of the super-block
     decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
@@ -3493,7 +3493,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_WARP_REF_LIST
     av1_zero(xd->warp_param_bank);
     xd->warp_param_bank_pt = &td->warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
          mi_col += cm->seq_params.mib_size) {
@@ -3517,7 +3517,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_WARP_REF_LIST
       xd->warp_param_bank.wpb_sb_hits = 0;
       td->warp_param_bank = xd->warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
       decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
                           cm->seq_params.sb_size, 0x3);
 
@@ -4004,7 +4004,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_WARP_REF_LIST
     av1_zero(xd->warp_param_bank);
     xd->warp_param_bank_pt = &td->warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
          mi_col += cm->seq_params.mib_size) {
@@ -4026,7 +4026,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
 #if CONFIG_WARP_REF_LIST
       xd->warp_param_bank.wpb_sb_hits = 0;
       td->warp_param_bank = xd->warp_param_bank;
-#endif
+#endif  // CONFIG_WARP_REF_LIST
       // Bit-stream parsing of the superblock
       decode_partition_sb(pbi, td, mi_row, mi_col, td->bit_reader,
                           cm->seq_params.sb_size, 0x1);

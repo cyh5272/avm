@@ -196,7 +196,7 @@ static INLINE void copy_mbmi_ext_frame_to_mbmi_ext(
            mbmi_ext_best->warp_param_stack,
            sizeof(mbmi_ext->warp_param_stack[MAX_WARP_REF_CANDIDATES]));
   }
-#endif
+#endif  // CONFIG_WARP_REF_LIST
 }
 
 void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
@@ -1222,7 +1222,7 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[0], ctx_tr->warp_ref_idx_cdf[0], 2);
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[1], ctx_tr->warp_ref_idx_cdf[1], 2);
   AVERAGE_CDF(ctx_left->warp_ref_idx_cdf[2], ctx_tr->warp_ref_idx_cdf[2], 2);
-#endif
+#endif  // CONFIG_WARP_REF_LIST
   AVERAGE_CDF(ctx_left->warp_extend_cdf, ctx_tr->warp_extend_cdf, 2);
 #else
   AVERAGE_CDF(ctx_left->motion_mode_cdf, ctx_tr->motion_mode_cdf, MOTION_MODES);
