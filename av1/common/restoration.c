@@ -2252,9 +2252,15 @@ void av1_loop_restoration_filter_unit(
 static void filter_frame_on_unit(const RestorationTileLimits *limits,
                                  const AV1PixelRect *tile_rect,
                                  int rest_unit_idx, void *priv, int32_t *tmpbuf,
-                                 RestorationLineBuffers *rlbs,
-                                 int reset_banks) {
+                                 RestorationLineBuffers *rlbs
+#if LR_SEARCH_BUG_WORKAROUND
+                                 ,
+                                 int reset_banks
+#endif  // LR_SEARCH_BUG_WORKAROUND
+) {
+#if LR_SEARCH_BUG_WORKAROUND
   (void)reset_banks;
+#endif  // LR_SEARCH_BUG_WORKAROUND
   FilterFrameCtxt *ctxt = (FilterFrameCtxt *)priv;
   const RestorationInfo *rsi = ctxt->rsi;
 
