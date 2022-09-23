@@ -102,14 +102,14 @@ void av1_setup_scale_factors_for_frame(struct scale_factors *sf, int other_w,
     sf->scale_value_y = scaled_y;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
     sf->scale_value_x_gen = scaled_x_gen;
-    sf->scale_value_x_gen = scaled_y_gen;
+    sf->scale_value_y_gen = scaled_y_gen;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   } else {
     sf->scale_value_x = unscaled_value;
     sf->scale_value_y = unscaled_value;
 #if CONFIG_ACROSS_SCALE_TPL_MVS
     sf->scale_value_x_gen = unscaled_value_gen;
-    sf->scale_value_x_gen = unscaled_value_gen;
+    sf->scale_value_y_gen = unscaled_value_gen;
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   }
 }
