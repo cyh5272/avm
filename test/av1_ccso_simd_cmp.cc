@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2022, Alliance for Open Media. All rights reserved
  *
  * This source code is subject to the terms of the BSD 3-Clause Clear License
  * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
@@ -24,9 +24,6 @@
 #include "test/acm_random.h"
 #include "test/function_equivalence_test.h"
 #include "test/register_state_check.h"
-
-#define WEDGE_WEIGHT_BITS 6
-#define MAX_MASK_VALUE (1 << (WEDGE_WEIGHT_BITS))
 
 using libaom_test::ACMRandom;
 using libaom_test::FunctionEquivalenceTest;
@@ -216,16 +213,16 @@ TEST_P(CCSOWITHBUFTest, RandomValues) {
 //////////////////////////////////////////////////////////////////////////////
 // ccso_derive_src_block_avx2
 //////////////////////////////////////////////////////////////////////////////
-typedef void (*CCSO_Drive_Src)(const uint16_t *src_y, uint8_t *const src_cls0,
-                               uint8_t *const src_cls1, const int src_y_stride,
-                               const int ccso_stride, const int x, const int y,
-                               const int pic_width, const int pic_height,
-                               const int y_uv_hscale, const int y_uv_vscale,
-                               const int thr, const int neg_thr,
-                               const int *src_loc, const int blk_size);
-typedef libaom_test::FuncParam<CCSO_Drive_Src> TestFuncsCCSO_Drive_Src;
+typedef void (*CCSO_Derive_Src)(const uint16_t *src_y, uint8_t *const src_cls0,
+                                uint8_t *const src_cls1, const int src_y_stride,
+                                const int ccso_stride, const int x, const int y,
+                                const int pic_width, const int pic_height,
+                                const int y_uv_hscale, const int y_uv_vscale,
+                                const int thr, const int neg_thr,
+                                const int *src_loc, const int blk_size);
+typedef libaom_test::FuncParam<CCSO_Derive_Src> TestFuncsCCSO_Derive_Src;
 
-class CCSODeriveSrcTest : public CCSOFilterTest<CCSO_Drive_Src> {
+class CCSODeriveSrcTest : public CCSOFilterTest<CCSO_Derive_Src> {
  protected:
   void Execute() {
     ccso_stride_ = src_y_stride_ - (CCSO_PADDING_SIZE << 1);
@@ -333,8 +330,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 INSTANTIATE_TEST_SUITE_P(
     AVX2, CCSODeriveSrcTest,
-    ::testing::Values(TestFuncsCCSO_Drive_Src(ccso_derive_src_block_c,
-                                              ccso_derive_src_block_avx2)));
+    ::testing::Values(TestFuncsCCSO_Derive_Src(ccso_derive_src_block_c,
+                                               ccso_derive_src_block_avx2)));
 
 INSTANTIATE_TEST_SUITE_P(AVX2, CCSOWITHBUFTest,
                          ::testing::Values(TestFuncsCCSO_With_BUF(

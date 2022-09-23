@@ -43,7 +43,7 @@ void apply_ccso_filter_hbd(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
                            const int dst_stride, const int8_t *filter_offset,
                            const uint8_t quant_step_size,
                            const uint8_t ext_filter_support);
-#endif
+#endif  // CONFIG_CCSO_EXT
 #if CONFIG_CCSO_EXT
 /* Apply CCSO on one color component */
 typedef void (*CCSO_FILTER_FUNC)(AV1_COMMON *cm, MACROBLOCKD *xd,
@@ -51,7 +51,7 @@ typedef void (*CCSO_FILTER_FUNC)(AV1_COMMON *cm, MACROBLOCKD *xd,
                                  uint16_t *dst_yuv, const int dst_stride,
                                  const uint8_t thr, const uint8_t filter_sup,
                                  const uint8_t max_band_log2);
-#endif
+#endif  // CONFIG_CCSO_EXT
 
 void ccso_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm, MACROBLOCKD *xd,
                 uint16_t *ext_rec_y);

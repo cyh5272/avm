@@ -54,7 +54,7 @@ uint64_t *training_dist_block;
 const int ccso_offset[8] = { -10, -7, -3, -1, 0, 1, 3, 7 };
 #else
 const int ccso_offset[8] = { -7, -5, -3, -1, 0, 1, 3, 5 };
-#endif
+#endif  // CONFIG_CCSO_EXT
 const uint8_t quant_sz[4] = { 16, 8, 32, 64 };
 
 #if CONFIG_CCSO_EXT
@@ -250,7 +250,7 @@ void ccso_try_chroma_filter(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
     src_cls1 += (ccso_stride << (blk_log2 + y_uv_vscale));
   }
 }
-#endif
+#endif  // CONFIG_CCSO_EXT
 
 uint64_t compute_distortion_block_c(const uint16_t *org, const int org_stride,
                                     const uint16_t *rec16, const int rec_stride,

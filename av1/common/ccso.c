@@ -288,7 +288,7 @@ void ccso_apply_chroma_sb_filter(AV1_COMMON *cm, MACROBLOCKD *xd,
     src_y += (ccso_ext_stride << (blk_log2 + y_uv_vscale));
   }
 }
-#endif
+#endif  // CONFIG_CCSO_EXT
 
 #if !CONFIG_CCSO_EXT
 /* Apply CCSO for one filtering unit using c code (high bit-depth) */
@@ -421,7 +421,7 @@ void apply_ccso_filter_hbd(AV1_COMMON *cm, MACROBLOCKD *xd, const int plane,
     rec_uv_16 += (dst_stride << log2_filter_unit_size);
   }
 }
-#endif
+#endif  // !CONFIG_CCSO_EXT
 
 /* Apply CCSO for one frame */
 void ccso_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm, MACROBLOCKD *xd,
