@@ -794,7 +794,7 @@ static AV1LrMTInfo *get_lr_job_info(AV1LrSync *lr_sync) {
   return cur_job_info;
 }
 #if LR_SEARCH_BUG_WORKAROUND
-RusPerTileHelper rus_per_tile_helper_tc;
+RusPerTileHelper rus_per_tile_helper_tc = { 0 };
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
 // Implement row loop restoration for each thread.

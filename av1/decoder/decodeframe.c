@@ -1831,7 +1831,7 @@ static AOM_INLINE void read_filter_quadtree(int QP, int cnn_index,
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #if LR_SEARCH_BUG_WORKAROUND
-RusPerTileHelper rus_per_tile_helper_df;
+RusPerTileHelper rus_per_tile_helper_df = { 0 };
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
 // TODO(slavarnway): eliminate bsize and subsize in future commits
@@ -4022,9 +4022,6 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
   int tile_row, tile_col;
   uint8_t allow_update_cdf;
   const uint8_t *raw_data_end = NULL;
-#if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
   if (tiles->large_scale) {
     tile_rows_start = single_row ? dec_tile_row : 0;
     tile_rows_end = single_row ? dec_tile_row + 1 : tile_rows;
@@ -4087,6 +4084,9 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
     td->dcb.xd.tmp_obmc_bufs[j] = td->tmp_obmc_bufs[j];
   }
 
+#if LR_SEARCH_BUG_WORKAROUND
+  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+#endif  // LR_SEARCH_BUG_WORKAROUND
   for (tile_row = tile_rows_start; tile_row < tile_rows_end; ++tile_row) {
     const int row = inv_row_order ? tile_rows - 1 - tile_row : tile_row;
 
@@ -5002,9 +5002,6 @@ static const uint8_t *decode_tiles_row_mt(AV1Decoder *pbi, const uint8_t *data,
   int max_threads;
   const uint8_t *raw_data_end = NULL;
   int max_sb_rows = 0;
-#if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
   if (tiles->large_scale) {
     tile_rows_start = single_row ? dec_tile_row : 0;
     tile_rows_end = single_row ? dec_tile_row + 1 : tile_rows;
@@ -5057,6 +5054,9 @@ static const uint8_t *decode_tiles_row_mt(AV1Decoder *pbi, const uint8_t *data,
     decoder_alloc_tile_data(pbi, n_tiles);
   }
 
+#if LR_SEARCH_BUG_WORKAROUND
+  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+#endif  // LR_SEARCH_BUG_WORKAROUND
   for (int row = 0; row < tile_rows; row++) {
     for (int col = 0; col < tile_cols; col++) {
       TileDataDec *tile_data = pbi->tile_data + row * tiles->cols + col;

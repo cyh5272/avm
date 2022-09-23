@@ -2281,7 +2281,7 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
 }
 
 #if LR_SEARCH_BUG_WORKAROUND
-RusPerTileHelper rus_per_tile_helper_st;
+RusPerTileHelper rus_per_tile_helper_st = { 0 };
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
 static AOM_INLINE void write_modes_sb(
