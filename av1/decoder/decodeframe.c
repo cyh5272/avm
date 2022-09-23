@@ -1830,6 +1830,10 @@ static AOM_INLINE void read_filter_quadtree(int QP, int cnn_index,
 }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
+#if LR_SEARCH_BUG_WORKAROUND
+RusPerTileHelper rus_per_tile_helper_df;
+#endif  // LR_SEARCH_BUG_WORKAROUND
+
 // TODO(slavarnway): eliminate bsize and subsize in future commits
 static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                                         ThreadData *const td, int mi_row,
@@ -1870,11 +1874,18 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #endif  // CONFIG_CNN_RESTORATION
       int rcol0, rcol1, rrow0, rrow1;
       if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                             &rcol0, &rcol1, &rrow0, &rrow1)) {
+                                             &rcol0, &rcol1, &rrow0, &rrow1,
+                                             true)) {
         const int rstride = cm->rst_info[plane].horz_units_per_tile;
         for (int rrow = rrow0; rrow < rrow1; ++rrow) {
           for (int rcol = rcol0; rcol < rcol1; ++rcol) {
             const int runit_idx = rcol + rrow * rstride;
+#if LR_SEARCH_BUG_WORKAROUND
+            if (should_this_ru_reset(rrow, rcol, &rus_per_tile_helper_df,
+                                     plane)) {
+              av1_reset_loop_restoration(xd, plane, plane + 1);
+            }
+#endif  // LR_SEARCH_BUG_WORKAROUND
             loop_restoration_read_sb_coeffs(cm, xd, reader, plane, runit_idx);
           }
         }
@@ -3909,7 +3920,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
   av1_zero_above_context(cm, xd, tile_info.mi_col_start, tile_info.mi_col_end,
                          tile_row);
   av1_reset_loop_filter_delta(xd, num_planes);
-  av1_reset_loop_restoration(xd, num_planes);
+  av1_reset_loop_restoration(xd, 0, num_planes);
 
 #if CONFIG_REF_MV_BANK
   av1_zero(xd->ref_mv_bank);
@@ -4011,7 +4022,9 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
   int tile_row, tile_col;
   uint8_t allow_update_cdf;
   const uint8_t *raw_data_end = NULL;
-
+#if LR_SEARCH_BUG_WORKAROUND
+  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+#endif  // LR_SEARCH_BUG_WORKAROUND
   if (tiles->large_scale) {
     tile_rows_start = single_row ? dec_tile_row : 0;
     tile_rows_end = single_row ? dec_tile_row + 1 : tile_rows;
@@ -4405,7 +4418,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
   av1_zero_above_context(cm, xd, tile_info.mi_col_start, tile_info.mi_col_end,
                          tile_row);
   av1_reset_loop_filter_delta(xd, num_planes);
-  av1_reset_loop_restoration(xd, num_planes);
+  av1_reset_loop_restoration(xd, 0, num_planes);
 
 #if CONFIG_REF_MV_BANK
   av1_zero(xd->ref_mv_bank);
@@ -4989,7 +5002,9 @@ static const uint8_t *decode_tiles_row_mt(AV1Decoder *pbi, const uint8_t *data,
   int max_threads;
   const uint8_t *raw_data_end = NULL;
   int max_sb_rows = 0;
-
+#if LR_SEARCH_BUG_WORKAROUND
+  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+#endif  // LR_SEARCH_BUG_WORKAROUND
   if (tiles->large_scale) {
     tile_rows_start = single_row ? dec_tile_row : 0;
     tile_rows_end = single_row ? dec_tile_row + 1 : tile_rows;
