@@ -414,7 +414,7 @@ void ccso_filter_block_hbd_with_buf_avx2(
     const int y_uv_hscale, const int y_uv_vscale, const int max_val,
     const uint8_t shift_bits) {
   __m256i all0 = _mm256_set1_epi16(0);
-  __m256i allmax = _mm256_set1_epi16(max_val);
+  __m256i allmax = _mm256_set1_epi16(((short)max_val));
   __m128i shufsub =
       _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 13, 12, 9, 8, 5, 4, 1, 0);
   //__m256i masksub1 = _mm256_set_m128i(shufsub, shufsub);
