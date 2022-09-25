@@ -2310,8 +2310,9 @@ static AOM_INLINE void write_modes_sb(
     if (cm->use_cnn[plane]) continue;
 #endif  // CONFIG_CNN_RESTORATION
     int rcol0, rcol1, rrow0, rrow1;
-    if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                           &rcol0, &rcol1, &rrow0, &rrow1, 0)) {
+    if (cm->rst_info[plane].frame_restoration_type != RESTORE_NONE &&
+        av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
+                                           &rcol0, &rcol1, &rrow0, &rrow1)) {
       const int rstride = cm->rst_info[plane].horz_units_per_tile;
       for (int rrow = rrow0; rrow < rrow1; ++rrow) {
         for (int rcol = rcol0; rcol < rcol1; ++rcol) {
@@ -5037,7 +5038,9 @@ static uint32_t write_tiles_in_tg_obus(AV1_COMP *const cpi, uint8_t *const dst,
   int first_tg = 1;
 
 #if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_st = get_rus_per_tile_helper(cm);
+  if (cm->rst_info[0].restoration_unit_size > 0) {
+    rus_per_tile_helper_st = get_rus_per_tile_helper(cm);
+  }
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
   *largest_tile_id = 0;
