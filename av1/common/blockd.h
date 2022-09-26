@@ -1911,7 +1911,8 @@ void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
                               const WienerNonsepInfo *info, int class_id);
 #endif  // CONFIG_WIENER_NONSEP
 
-void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);
+void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start,
+                                int plane_end);
 
 typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   int blk_row, int blk_col,

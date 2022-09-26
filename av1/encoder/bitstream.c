@@ -2289,6 +2289,10 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
   }
 }
 
+#if LR_SEARCH_BUG_WORKAROUND
+RusPerTileHelper rus_per_tile_helper_st = { 0 };
+#endif  // LR_SEARCH_BUG_WORKAROUND
+
 static AOM_INLINE void write_modes_sb(
     AV1_COMP *const cpi, const TileInfo *const tile, aom_writer *const w,
     const TokenExtra **tok, const TokenExtra *const tok_end, int mi_row,
@@ -2316,13 +2320,19 @@ static AOM_INLINE void write_modes_sb(
 #endif  // CONFIG_CNN_RESTORATION
     int rcol0, rcol1, rrow0, rrow1;
     if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                           &rcol0, &rcol1, &rrow0, &rrow1)) {
+                                           &rcol0, &rcol1, &rrow0, &rrow1, 0)) {
       const int rstride = cm->rst_info[plane].horz_units_per_tile;
       for (int rrow = rrow0; rrow < rrow1; ++rrow) {
         for (int rcol = rcol0; rcol < rcol1; ++rcol) {
           const int runit_idx = rcol + rrow * rstride;
           const RestorationUnitInfo *rui =
               &cm->rst_info[plane].unit_info[runit_idx];
+#if LR_SEARCH_BUG_WORKAROUND
+          if (should_this_ru_reset(rrow, rcol, &rus_per_tile_helper_st,
+                                   plane)) {
+            av1_reset_loop_restoration(xd, plane, plane + 1);
+          }
+#endif  // LR_SEARCH_BUG_WORKAROUND
           loop_restoration_write_sb_coeffs(cm, x, rui, w, plane,
                                            cpi->td.counts);
         }
@@ -5042,6 +5052,10 @@ static uint32_t write_tiles_in_tg_obus(AV1_COMP *const cpi, uint8_t *const dst,
   const int have_tiles = tile_cols * tile_rows > 1;
   int first_tg = 1;
 
+#if LR_SEARCH_BUG_WORKAROUND
+  rus_per_tile_helper_st = get_rus_per_tile_helper(cm);
+#endif  // LR_SEARCH_BUG_WORKAROUND
+
   *largest_tile_id = 0;
 
   if (tiles->large_scale) {
@@ -5237,7 +5251,7 @@ static uint32_t write_tiles_in_tg_obus(AV1_COMP *const cpi, uint8_t *const dst,
       mode_bc.allow_update_cdf =
           mode_bc.allow_update_cdf && !cm->features.disable_cdf_update;
       const int num_planes = av1_num_planes(cm);
-      av1_reset_loop_restoration(&cpi->td.mb.e_mbd, num_planes);
+      av1_reset_loop_restoration(&cpi->td.mb.e_mbd, 0, num_planes);
 
       aom_start_encode(&mode_bc, dst + total_size);
       write_modes(cpi, &tile_info, &mode_bc, tile_row, tile_col);

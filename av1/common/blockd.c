@@ -126,8 +126,9 @@ void av1_reset_loop_filter_delta(MACROBLOCKD *xd, int num_planes) {
   for (int lf_id = 0; lf_id < frame_lf_count; ++lf_id) xd->delta_lf[lf_id] = 0;
 }
 
-void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes) {
-  for (int p = 0; p < num_planes; ++p) {
+void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start,
+                                int plane_end) {
+  for (int p = plane_start; p < plane_end; ++p) {
     av1_reset_wiener_bank(&xd->wiener_info[p]);
     av1_reset_sgrproj_bank(&xd->sgrproj_info[p]);
 #if CONFIG_WIENER_NONSEP
