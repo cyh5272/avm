@@ -1873,9 +1873,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
       if (cm->use_cnn[plane]) continue;
 #endif  // CONFIG_CNN_RESTORATION
       int rcol0, rcol1, rrow0, rrow1;
-      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                             &rcol0, &rcol1, &rrow0, &rrow1,
-                                             0)) {
+      if (cm->rst_info[plane].frame_restoration_type != RESTORE_NONE &&
+          av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
+                                             &rcol0, &rcol1, &rrow0, &rrow1)) {
         const int rstride = cm->rst_info[plane].horz_units_per_tile;
         for (int rrow = rrow0; rrow < rrow1; ++rrow) {
           for (int rcol = rcol0; rcol < rcol1; ++rcol) {
@@ -4085,7 +4085,9 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
   }
 
 #if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+  if (cm->rst_info[0].restoration_unit_size > 0) {
+    rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+  }
 #endif  // LR_SEARCH_BUG_WORKAROUND
   for (tile_row = tile_rows_start; tile_row < tile_rows_end; ++tile_row) {
     const int row = inv_row_order ? tile_rows - 1 - tile_row : tile_row;
@@ -5055,7 +5057,9 @@ static const uint8_t *decode_tiles_row_mt(AV1Decoder *pbi, const uint8_t *data,
   }
 
 #if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+  if (cm->rst_info[0].restoration_unit_size > 0) {
+    rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
+  }
 #endif  // LR_SEARCH_BUG_WORKAROUND
   for (int row = 0; row < tile_rows; row++) {
     for (int col = 0; col < tile_cols; col++) {
