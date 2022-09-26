@@ -1852,7 +1852,7 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
 #else
       cfl_store_tx(xd, blk_row, blk_col, luma_tx_size,
                    mbmi->sb_type[PLANE_TYPE_UV]);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
     }
 #if CONFIG_IMPROVED_CFL
     CFL_CTX *const cfl = &xd->cfl;

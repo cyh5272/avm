@@ -231,7 +231,7 @@ void cfl_implicit_fetch_neighbor_luma(const AV1_COMMON *cm,
         output_q3[i >> 1] =
             (input[i] + input[i + 1] + input[bot] + input[bot + 1] + 2) << 1;
 #endif
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
       }
     } else if (sub_y) {
       uint16_t *input = CONVERT_TO_SHORTPTR(dst) - 2 * input_stride;
@@ -279,7 +279,7 @@ void cfl_implicit_fetch_neighbor_luma(const AV1_COMMON *cm,
         output_q3[j >> 1] = (input[0] + input[1] + input[bot] + input[bot + 1])
                             << 1;
 #endif
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
         input += input_stride * 2;
       }
     } else if (sub_y) {
@@ -439,7 +439,7 @@ void cfl_derive_block_implicit_scaling_factor(uint16_t *l, const uint16_t *c,
     *alpha = 0;
   }
 }
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 
 void cfl_derive_implicit_scaling_factor(MACROBLOCKD *const xd, int plane,
                                         int row, int col, TX_SIZE tx_size) {
@@ -571,7 +571,7 @@ void cfl_luma_subsampling_420_hbd_colocated(const uint16_t *input,
     output_q3 += CFL_BUF_LINE;
   }
 }
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 
 static void cfl_luma_subsampling_422_hbd_c(const uint16_t *input,
                                            int input_stride,
@@ -619,7 +619,7 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
 #if CONFIG_ADAPTIVE_DS_FILTER
                       ,
                       int filter_type
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 ) {
   const int width = tx_size_wide[tx_size];
   const int height = tx_size_high[tx_size];
@@ -690,7 +690,7 @@ static void cfl_store(MACROBLOCKD *const xd, CFL_CTX *cfl, const uint8_t *input,
 #endif
     cfl_subsampling_hbd(tx_size, sub_x, sub_y)(CONVERT_TO_SHORTPTR(input),
                                                input_stride, recon_buf_q3);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 }
 
 // Adjust the row and column of blocks smaller than 8X8, as chroma-referenced
@@ -716,7 +716,7 @@ void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
 #if CONFIG_ADAPTIVE_DS_FILTER
                   ,
                   int filter_type
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 ) {
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
@@ -732,7 +732,7 @@ void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
   cfl_store(xd, cfl, dst, pd->dst.stride, row, col, tx_size, filter_type);
 #else
   cfl_store(xd, cfl, dst, pd->dst.stride, row, col, tx_size);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 }
 
 static INLINE int max_intra_block_width(const MACROBLOCKD *xd,
@@ -755,7 +755,7 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size
 #if CONFIG_ADAPTIVE_DS_FILTER
                      ,
                      int filter_type
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 ) {
   CFL_CTX *const cfl = &xd->cfl;
   struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
@@ -774,5 +774,5 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size
             filter_type);
 #else
   cfl_store(xd, cfl, pd->dst.buf, pd->dst.stride, row, col, tx_size);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 }

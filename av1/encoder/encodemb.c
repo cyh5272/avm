@@ -1036,7 +1036,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                  cm->seq_params.enable_cfl_ds_filter);
 #else
     cfl_store_tx(xd, blk_row, blk_col, tx_size, plane_bsize);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
   }
 }
 

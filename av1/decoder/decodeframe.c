@@ -250,7 +250,7 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
                  cm->seq_params.enable_cfl_ds_filter);
 #else
     cfl_store_tx(xd, row, col, tx_size, mbmi->sb_type[AOM_PLANE_Y]);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
   }
 }
 
@@ -1121,7 +1121,7 @@ static AOM_INLINE void cfl_store_inter_block(AV1_COMMON *const cm,
                     cm->seq_params.enable_cfl_ds_filter);
 #else
     cfl_store_block(xd, mbmi->sb_type[PLANE_TYPE_Y], mbmi->tx_size);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
   }
 }
 
@@ -5179,7 +5179,7 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 
 #if CONFIG_ADAPTIVE_DS_FILTER
   seq_params->enable_cfl_ds_filter = aom_rb_read_literal(rb, 2);
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 }
 
 static int read_global_motion_params(WarpedMotionParams *params,

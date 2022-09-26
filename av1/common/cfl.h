@@ -83,7 +83,7 @@ void cfl_store_block(MACROBLOCKD *const xd, BLOCK_SIZE bsize, TX_SIZE tx_size
 #if CONFIG_ADAPTIVE_DS_FILTER
                      ,
                      int filter_type
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 );
 
 void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
@@ -91,7 +91,7 @@ void cfl_store_tx(MACROBLOCKD *const xd, int row, int col, TX_SIZE tx_size,
 #if CONFIG_ADAPTIVE_DS_FILTER
                   ,
                   int filter_type
-#endif
+#endif  // CONFIG_ADAPTIVE_DS_FILTER
 );
 
 #if CONFIG_ADAPTIVE_DS_FILTER
