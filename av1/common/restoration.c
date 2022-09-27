@@ -335,6 +335,46 @@ AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
   return rect;
 }
 
+// Finds a pixel rectangle for a RU, given the limits in ru domain
+// (i.e. ru_start_row, ru_end_row, ru_start_col, ru_end_col)
+// and the ru size (ru_height and ru_width).
+// Note that offset RUs vertically by RESTORATION_UNIT_OFFSET for luma,
+// and RESTORATION_UNIT_OFFSET >> ss_y for chroma, so
+// that the first RU in col is shorter than the rest.
+// Note the limits of the last RU in row or col is simply the size
+// of the image, which makes the last RU either bigger or smaller
+// than the other RUs.
+AV1PixelRect av1_get_rutile_rect(const AV1_COMMON *cm, int plane,
+                                 int ru_start_row, int ru_end_row,
+                                 int ru_start_col, int ru_end_col,
+                                 int ru_height, int ru_width) {
+  AV1PixelRect rect;
+  const RestorationInfo *rsi = &cm->rst_info[plane];
+
+  int ss_x = plane && cm->seq_params.subsampling_x;
+  int ss_y = plane && cm->seq_params.subsampling_y;
+  const int plane_height =
+      ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y);
+  const int plane_width = ROUND_POWER_OF_TWO(cm->superres_upscaled_width, ss_x);
+
+  const int runit_offset = RESTORATION_UNIT_OFFSET >> ss_y;
+  // Top limit is a multiple of RU height minus the offset, clamped to be
+  // non-negative. So the first RU vertically is shorter than the rest.
+  // The bottom limit is similar except for the apecial case for the last RU.
+  rect.top = AOMMAX(ru_start_row * ru_height - runit_offset, 0);
+  rect.bottom = rsi->vert_units_per_tile == ru_end_row
+                    ? plane_height
+                    : AOMMAX(ru_end_row * ru_height - runit_offset, 0);
+
+  // Left limit is a multiple of RU width.
+  // The right limit is similar except for the apecial case for the last RU.
+  rect.left = ru_start_col * ru_width;
+  rect.right = rsi->horz_units_per_tile == ru_end_col ? plane_width
+                                                      : ru_end_col * ru_width;
+
+  return rect;
+}
+
 // Count horizontal or vertical units per tile (use a width or height for
 // tile_size, respectively). We basically want to divide the tile size by the
 // size of a restoration unit. Rather than rounding up unconditionally as you
@@ -2387,6 +2427,7 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
       cm->seq_params.bit_depth);
   assert(luma_buf != NULL);
 #endif  // CONFIG_WIENER_NONSEP && CONFIG_WIENER_NONSEP_CROSS_FILT
+  RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
 
   for (int plane = 0; plane < num_planes; ++plane) {
     if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) {
@@ -2433,9 +2474,9 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     ctxt[plane].class_id_stride = cm->mi_params.class_id_stride[plane];
 #endif  // CONFIG_PC_WIENER
 
-    av1_foreach_rest_unit_in_plane(cm, plane, lr_ctxt->on_rest_unit,
-                                   &ctxt[plane], &ctxt[plane].tile_rect,
-                                   cm->rst_tmpbuf, cm->rlbs);
+    av1_foreach_rest_unit_in_plane(
+        cm, plane, lr_ctxt->on_rest_unit, &ctxt[plane], &ctxt[plane].tile_rect,
+        cm->rst_tmpbuf, cm->rlbs, &rus_per_tile_helper);
   }
 
 #if CONFIG_WIENER_NONSEP && CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -2490,6 +2531,7 @@ RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm) {
 
   helper.ru_size[0] = cm->rst_info[0].restoration_unit_size;
   helper.ru_size[1] = cm->rst_info[1].restoration_unit_size;
+  helper.ru_size[2] = helper.ru_size[1];
 
   const CommonTileParams *actual_tiles = &cm->tiles;
   helper.tile_cols = actual_tiles->cols;
@@ -2524,8 +2566,8 @@ RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm) {
 void av1_foreach_rest_unit_in_row(
     RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
     rest_unit_visitor_t on_rest_unit, int row_number, int unit_size,
-    int unit_idx0, int hunits_per_tile, int vunits_per_tile, int plane,
-    void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
+    int unit_idx0, int hunits_per_tile, int vunits_per_tile, int unit_stride,
+    int plane, void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
     sync_read_fn_t on_sync_read, sync_write_fn_t on_sync_write,
     struct AV1LrSyncData *const lr_sync
 #if LR_SEARCH_BUG_WORKAROUND
@@ -2544,7 +2586,11 @@ void av1_foreach_rest_unit_in_row(
     limits->h_end = tile_rect->left + x0 + w;
     assert(limits->h_end <= tile_rect->right);
 
-    const int unit_idx = unit_idx0 + row_number * hunits_per_tile + j;
+    // Note that the hunits_per_tile is for the number of horz RUs in the
+    // rutile, but unit_stride is the stride for RU info for the full frame.
+    // If the tile is the full frame, then unit_stride will be the same as
+    // hunits_per_tile, but not always.
+    const int unit_idx = unit_idx0 + row_number * unit_stride + j;
 
     // No sync for even numbered rows
     // For odd numbered rows, Loop Restoration of current block requires the LR
@@ -2591,10 +2637,10 @@ void av1_lr_sync_write_dummy(void *const lr_sync, int r, int c,
 }
 
 static void foreach_rest_unit_in_tile(
-    const AV1PixelRect *tile_rect, int tile_row, int tile_col, int tile_cols,
-    int hunits_per_tile, int vunits_per_tile, int units_per_tile, int unit_size,
-    int ss_y, int plane, rest_unit_visitor_t on_rest_unit, void *priv,
-    int32_t *tmpbuf, RestorationLineBuffers *rlbs
+    const AV1PixelRect *tile_rect, int unit_idx0, int hunits_per_tile,
+    int vunits_per_tile, int unit_stride, int unit_size, int ss_y, int plane,
+    rest_unit_visitor_t on_rest_unit, void *priv, int32_t *tmpbuf,
+    RestorationLineBuffers *rlbs
 #if LR_SEARCH_BUG_WORKAROUND
     ,
     const struct RusPerTileHelper *rus_per_tile_helper
@@ -2602,9 +2648,6 @@ static void foreach_rest_unit_in_tile(
 ) {
   const int tile_h = tile_rect->bottom - tile_rect->top;
   const int ext_size = unit_size * 3 / 2;
-
-  const int tile_idx = tile_col + tile_row * tile_cols;
-  const int unit_idx0 = tile_idx * units_per_tile;
 
   int y0 = 0, i = 0;
   while (y0 < tile_h) {
@@ -2622,8 +2665,8 @@ static void foreach_rest_unit_in_tile(
 
     av1_foreach_rest_unit_in_row(
         &limits, tile_rect, on_rest_unit, i, unit_size, unit_idx0,
-        hunits_per_tile, vunits_per_tile, plane, priv, tmpbuf, rlbs,
-        av1_lr_sync_read_dummy, av1_lr_sync_write_dummy, NULL
+        hunits_per_tile, vunits_per_tile, unit_stride, plane, priv, tmpbuf,
+        rlbs, av1_lr_sync_read_dummy, av1_lr_sync_write_dummy, NULL
 #if LR_SEARCH_BUG_WORKAROUND
         ,
         rus_per_tile_helper
@@ -2635,26 +2678,46 @@ static void foreach_rest_unit_in_tile(
   }
 }
 
-void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
-                                    rest_unit_visitor_t on_rest_unit,
-                                    void *priv, AV1PixelRect *tile_rect,
-                                    int32_t *tmpbuf,
-                                    RestorationLineBuffers *rlbs) {
-#if LR_SEARCH_BUG_WORKAROUND
-  RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
+void av1_foreach_rest_unit_in_plane(
+    const struct AV1Common *cm, int plane, rest_unit_visitor_t on_rest_unit,
+    void *priv, AV1PixelRect *tile_rect, int32_t *tmpbuf,
+    RestorationLineBuffers *rlbs, const RusPerTileHelper *rus_per_tile_helper) {
+  (void)rus_per_tile_helper;
   const int is_uv = plane > 0;
   const int ss_y = is_uv && cm->seq_params.subsampling_y;
 
   const RestorationInfo *rsi = &cm->rst_info[plane];
 
-  foreach_rest_unit_in_tile(tile_rect, LR_TILE_ROW, LR_TILE_COL, LR_TILE_COLS,
-                            rsi->horz_units_per_tile, rsi->vert_units_per_tile,
-                            rsi->units_per_tile, rsi->restoration_unit_size,
-                            ss_y, plane, on_rest_unit, priv, tmpbuf, rlbs
+  const int unit_idx0 =
+      (LR_TILE_ROW * LR_TILE_COLS + LR_TILE_COL) * rsi->units_per_tile;
+  foreach_rest_unit_in_tile(tile_rect, unit_idx0, rsi->horz_units_per_tile,
+                            rsi->vert_units_per_tile, rsi->horz_units_per_tile,
+                            rsi->restoration_unit_size, ss_y, plane,
+                            on_rest_unit, priv, tmpbuf, rlbs
 #if LR_SEARCH_BUG_WORKAROUND
                             ,
-                            &rus_per_tile_helper
+                            rus_per_tile_helper
+#endif  // LR_SEARCH_BUG_WORKAROUND
+  );
+}
+
+void av1_foreach_rest_unit_in_rutile(
+    const struct AV1Common *cm, int plane, int unit_idx0, int horz_units,
+    int vert_units, rest_unit_visitor_t on_rest_unit, void *priv,
+    AV1PixelRect *tile_rect, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
+    const RusPerTileHelper *rus_per_tile_helper) {
+  (void)rus_per_tile_helper;
+  const int is_uv = plane > 0;
+  const int ss_y = is_uv && cm->seq_params.subsampling_y;
+
+  const RestorationInfo *rsi = &cm->rst_info[plane];
+
+  foreach_rest_unit_in_tile(
+      tile_rect, unit_idx0, horz_units, vert_units, rsi->horz_units_per_tile,
+      rsi->restoration_unit_size, ss_y, plane, on_rest_unit, priv, tmpbuf, rlbs
+#if LR_SEARCH_BUG_WORKAROUND
+      ,
+      rus_per_tile_helper
 #endif  // LR_SEARCH_BUG_WORKAROUND
   );
 }
@@ -2746,8 +2809,6 @@ void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
   assert(tile_info.mi_row_start < tile_info.mi_row_end);
   assert(tile_info.mi_col_start < tile_info.mi_col_end);
 
-  // TODO(debargha): Please fix this with the actual RU size.
-  //  rsi->restoration_unit_size is zero if the RU mode is RESTORE_NONE.
   *ru_row_start = 0;
   *ru_col_start = 0;
   *ru_row_end = 0;
@@ -2773,11 +2834,16 @@ void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
   // Scan SBs in reverse row by row, right to left to find first SB that has RU
   // info in it.
   found = 0;
-  for (int mi_row = tile_info.mi_row_end - 1;
-       mi_row >= tile_info.mi_row_start && !found;
+  const int sb_mi_row_end =
+      tile_info.mi_row_end - 1 -
+      (tile_info.mi_row_end - 1) % cm->seq_params.mib_size;
+  const int sb_mi_col_end =
+      tile_info.mi_col_end - 1 -
+      (tile_info.mi_col_end - 1) % cm->seq_params.mib_size;
+  for (int mi_row = sb_mi_row_end; mi_row >= tile_info.mi_row_start && !found;
        mi_row -= cm->seq_params.mib_size) {
-    for (int mi_col = tile_info.mi_col_end - 1;
-         mi_col >= tile_info.mi_col_start; mi_col -= cm->seq_params.mib_size) {
+    for (int mi_col = sb_mi_col_end; mi_col >= tile_info.mi_col_start;
+         mi_col -= cm->seq_params.mib_size) {
       if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
                                              cm->seq_params.sb_size, &rcol0,
                                              &rcol1, &rrow0, &rrow1)) {

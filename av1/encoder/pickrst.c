@@ -125,6 +125,7 @@ typedef struct {
 
 typedef struct {
   const YV12_BUFFER_CONFIG *src;
+  const YV12_BUFFER_CONFIG *dgd;
   YV12_BUFFER_CONFIG *dst;
 
   const AV1_COMMON *cm;
@@ -398,6 +399,9 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
                                 Vector *unit_stack, Vector *unit_indices,
 #endif  // CONFIG_RST_MERGECOEFFS
                                 RestSearchCtxt *rsc) {
+  const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
+
+  const int is_uv = plane != AOM_PLANE_Y;
   rsc->src = src;
   rsc->dst = dst;
   rsc->cm = cm;
@@ -405,16 +409,14 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
   rsc->plane = plane;
   rsc->rusi = rusi;
   rsc->lpf_sf = lpf_sf;
-
-  const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
-  const int is_uv = plane != AOM_PLANE_Y;
+  rsc->dgd = dgd;
 
   rsc->plane_width = src->crop_widths[is_uv];
   rsc->plane_height = src->crop_heights[is_uv];
-  rsc->src_buffer = src->buffers[plane];
   rsc->src_stride = src->strides[is_uv];
-  rsc->dgd_buffer = dgd->buffers[plane];
+  rsc->src_buffer = src->buffers[plane];
   rsc->dgd_stride = dgd->strides[is_uv];
+  rsc->dgd_buffer = dgd->buffers[plane];
   rsc->tile_rect = av1_whole_frame_rect(cm, is_uv);
   assert(src->crop_widths[is_uv] == dgd->crop_widths[is_uv]);
   assert(src->crop_heights[is_uv] == dgd->crop_heights[is_uv]);
@@ -4295,7 +4297,9 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   }
 }
 
-static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
+static double search_rest_type(RestSearchCtxt *rsc,
+                               const RusPerTileHelper *rus_per_tile_helper,
+                               RestorationType rtype) {
   static const rest_unit_visitor_t funs[RESTORE_TYPES] = {
     search_norestore,
     search_wiener,
@@ -4308,18 +4312,45 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
 #endif  // CONFIG_WIENER_NONSEP
     search_switchable
   };
-
-  reset_rsc(rsc);
-  rsc_on_tile(rsc);
-
-  av1_foreach_rest_unit_in_plane(rsc->cm, rsc->plane, funs[rtype], rsc,
-                                 &rsc->tile_rect, rsc->cm->rst_tmpbuf, NULL);
+  int64_t total_bits = 0;
+  int64_t total_sse = 0;
+  const int is_uv = rsc->plane > 0;
+  for (int tile_row = 0; tile_row < rus_per_tile_helper->tile_rows;
+       tile_row++) {
+    for (int tile_col = 0; tile_col < rus_per_tile_helper->tile_cols;
+         tile_col++) {
+      const int ru_start_row =
+          rus_per_tile_helper->begin_ru_row_in_tile[rsc->plane][tile_row];
+      const int ru_end_row =
+          rus_per_tile_helper->end_ru_row_in_tile[rsc->plane][tile_row];
+      const int ru_start_col =
+          rus_per_tile_helper->begin_ru_col_in_tile[rsc->plane][tile_col];
+      const int ru_end_col =
+          rus_per_tile_helper->end_ru_col_in_tile[rsc->plane][tile_col];
+      const int ru_size = rus_per_tile_helper->ru_size[rsc->plane];
+      AV1PixelRect rutile_rect =
+          av1_get_rutile_rect(rsc->cm, is_uv, ru_start_row, ru_end_row,
+                              ru_start_col, ru_end_col, ru_size, ru_size);
+      reset_rsc(rsc);
+      rsc_on_tile(rsc);
+      const int unit_idx0 =
+          ru_start_row * rsc->cm->rst_info[rsc->plane].horz_units_per_tile +
+          ru_start_col;
+      av1_foreach_rest_unit_in_rutile(
+          rsc->cm, rsc->plane, unit_idx0, ru_end_col - ru_start_col,
+          ru_end_row - ru_start_row, funs[rtype], rsc, &rutile_rect,
+          rsc->cm->rst_tmpbuf, NULL, rus_per_tile_helper);
 #if CONFIG_RST_MERGECOEFFS
-  aom_vector_clear(rsc->unit_stack);
-  aom_vector_clear(rsc->unit_indices);
+      aom_vector_clear(rsc->unit_stack);
+      aom_vector_clear(rsc->unit_indices);
 #endif  // CONFIG_RST_MERGECOEFFS
-  return RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      rsc->x->rdmult, rsc->bits >> 4, rsc->sse, rsc->cm->seq_params.bit_depth);
+      total_bits += rsc->bits;
+      total_sse += rsc->sse;
+    }
+  }
+  return RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, total_bits >> 4,
+                                        total_sse,
+                                        rsc->cm->seq_params.bit_depth);
 }
 
 static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
@@ -4355,6 +4386,42 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
   }
 #endif  // CONFIG_LR_FLEX_SYNTAX
   return;
+}
+
+static void finalize_unit_info(RestorationType frame_rtype,
+                               RestUnitSearchInfo *rusi, RestSearchCtxt *rsc,
+                               const RusPerTileHelper *rus_per_tile_helper) {
+  const AV1_COMMON *cm = rsc->cm;
+  const int plane = rsc->plane;
+  const RestorationInfo *rsi = &cm->rst_info[plane];
+  if (frame_rtype != RESTORE_NONE) {
+    for (int tile_row = 0; tile_row < rus_per_tile_helper->tile_rows;
+         tile_row++) {
+      for (int tile_col = 0; tile_col < rus_per_tile_helper->tile_cols;
+           tile_col++) {
+        reset_all_banks(rsc);
+        const int ru_start_row =
+            rus_per_tile_helper->begin_ru_row_in_tile[plane][tile_row];
+        const int ru_end_row =
+            rus_per_tile_helper->end_ru_row_in_tile[plane][tile_row];
+        const int ru_start_col =
+            rus_per_tile_helper->begin_ru_col_in_tile[plane][tile_col];
+        const int ru_end_col =
+            rus_per_tile_helper->end_ru_col_in_tile[plane][tile_col];
+        for (int ru_row = ru_start_row; ru_row < ru_end_row; ++ru_row) {
+          for (int ru_col = ru_start_col; ru_col < ru_end_col; ++ru_col) {
+#if LR_SEARCH_BUG_WORKAROUND
+            const int reset_banks = should_this_ru_reset(
+                ru_row, ru_col, rus_per_tile_helper, plane);
+            if (reset_banks) reset_all_banks(rsc);
+#endif  // LR_SEARCH_BUG_WORKAROUND
+            const int u = ru_row * rsi->horz_units_per_tile + ru_col;
+            copy_unit_info(frame_rtype, &rusi[u], &rsi->unit_info[u], rsc);
+          }
+        }
+      }
+    }
+  }
 }
 
 void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
@@ -4429,7 +4496,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     double best_cost = 0;
     RestorationType best_rtype = RESTORE_NONE;
 
-    if (!cpi->sf.lpf_sf.disable_loop_restoration_chroma || !plane) {
+    if (!(cpi->sf.lpf_sf.disable_loop_restoration_chroma && plane)) {
       av1_extend_frame(rsc.dgd_buffer, rsc.plane_width, rsc.plane_height,
                        rsc.dgd_stride, RESTORATION_BORDER, RESTORATION_BORDER);
 
@@ -4445,7 +4512,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
           continue;
 #endif  // CONFIG_PC_WIENER
 
-        double cost = search_rest_type(&rsc, r);
+        double cost = search_rest_type(&rsc, &rus_per_tile_helper, r);
         // printf("Plane[%d] r[%d]: cost %f\n", plane, r, cost);
 #if CONFIG_COMBINE_PC_NS_WIENER
         assert(RESTORE_PC_WIENER < RESTORE_WIENER_NONSEP);
@@ -4471,23 +4538,8 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     if (plane == plane_start) cm->lr_y_rdcost = best_cost;
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
-    reset_all_banks(&rsc);
-#if LR_SEARCH_BUG_WORKAROUND
-    const RestorationInfo *rsi = &cm->rst_info[plane];
-#endif  // LR_SEARCH_BUG_WORKAROUND
-    if (best_rtype != RESTORE_NONE) {
-      for (int u = 0; u < plane_ntiles; ++u) {
-#if LR_SEARCH_BUG_WORKAROUND
-        const int ru_row = u / rsi->horz_units_per_tile;
-        const int ru_col = u % rsi->horz_units_per_tile;
-        const int reset_banks =
-            should_this_ru_reset(ru_row, ru_col, &rus_per_tile_helper, plane);
-        if (reset_banks) reset_all_banks(&rsc);
-#endif  // LR_SEARCH_BUG_WORKAROUND
-        copy_unit_info(best_rtype, &rusi[u], &cm->rst_info[plane].unit_info[u],
-                       &rsc);
-      }
-    }
+    finalize_unit_info(best_rtype, rusi, &rsc, &rus_per_tile_helper);
+
 #if CONFIG_LR_FLEX_SYNTAX
     assert(IMPLIES(
         cm->features.lr_tools_count[plane] < 2,
