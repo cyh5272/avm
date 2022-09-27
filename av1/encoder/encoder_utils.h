@@ -881,7 +881,9 @@ static AOM_INLINE void set_size_independent_vars(AV1_COMP *cpi) {
   av1_set_speed_features_framesize_independent(cpi, cpi->speed);
   av1_set_rd_speed_thresholds(cpi);
   cm->features.interp_filter = SWITCHABLE;
+#if !CONFIG_IMPROVED_WARP
   cm->features.switchable_motion_mode = 1;
+#endif  // !CONFIG_IMPROVED_WARP
 #if CONFIG_OPTFLOW_REFINEMENT
   cm->features.opfl_refine_type = REFINE_SWITCHABLE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT

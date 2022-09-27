@@ -625,12 +625,17 @@ typedef struct {
 } FrameDimensionCfg;
 
 typedef struct {
+#if CONFIG_IMPROVED_WARP
+  // Bitmask of which motion modes are enabled at the sequence level
+  int seq_enabled_motion_modes;
+#else
   // Indicates if warped motion should be enabled.
   bool enable_warped_motion;
   // Indicates if warped motion should be evaluated or not.
   bool allow_warped_motion;
   // Indicates if OBMC motion should be enabled.
   bool enable_obmc;
+#endif  // CONFIG_IMPROVED_WARP
 } MotionModeCfg;
 
 typedef struct {
@@ -858,8 +863,10 @@ typedef struct {
   bool ref_frame_mvs_present;
   // Indicates if ref_frame_mvs should be enabled at the frame level.
   bool enable_ref_frame_mvs;
+#if !CONFIG_IMPROVED_WARP
   // Indicates if interintra compound mode is enabled.
   bool enable_interintra_comp;
+#endif
   // Indicates if global motion should be enabled.
   bool enable_global_motion;
   // Indicates if palette should be enabled.

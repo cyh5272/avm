@@ -467,8 +467,13 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 #endif  // !CONFIG_ACROSS_SCALE_TPL_MVS
   seq->enable_tip_hole_fill = seq->enable_tip;
 #endif  // CONFIG_TIP
+#if CONFIG_IMPROVED_WARP
+  seq->seq_enabled_motion_modes =
+      oxcf->motion_mode_cfg.seq_enabled_motion_modes;
+#else
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
+#endif  // CONFIG_IMPROVED_WARP
   seq->enable_masked_compound = oxcf->comp_type_cfg.enable_masked_comp;
   seq->enable_intra_edge_filter = oxcf->intra_mode_cfg.enable_intra_edge_filter;
   seq->enable_filter_intra = oxcf->intra_mode_cfg.enable_filter_intra;
@@ -844,7 +849,10 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   cm->features.interp_filter =
       oxcf->tile_cfg.enable_large_scale_tile ? EIGHTTAP_REGULAR : SWITCHABLE;
 
+#if !CONFIG_IMPROVED_WARP
   cm->features.switchable_motion_mode = 1;
+#endif  // !CONFIG_IMPROVED_WARP
+
 #if CONFIG_OPTFLOW_REFINEMENT
   cm->features.opfl_refine_type = REFINE_SWITCHABLE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
@@ -3258,8 +3266,10 @@ static int encode_frame_to_data_rate(AV1_COMP *cpi, size_t *size,
   // is separated from frame_might_allow_ref_frame_mvs().
   features->allow_ref_frame_mvs &= !cm->tiles.large_scale;
 
+#if !CONFIG_IMPROVED_WARP
   features->allow_warped_motion = oxcf->motion_mode_cfg.allow_warped_motion &&
                                   frame_might_allow_warped_motion(cm);
+#endif  // !CONFIG_IMPROVED_WARP
 
   cpi->last_frame_type = current_frame->frame_type;
 

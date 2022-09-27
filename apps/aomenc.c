@@ -158,6 +158,11 @@ static const int av1_arg_ctrl_map[] = { AOME_SET_CPUUSED,
                                         AV1E_SET_ENABLE_INTERINTRA_WEDGE,
                                         AV1E_SET_ENABLE_GLOBAL_MOTION,
                                         AV1E_SET_ENABLE_WARPED_MOTION,
+#if CONFIG_IMPROVED_WARP
+                                        AV1E_SET_ENABLE_WARPED_CAUSAL,
+                                        AV1E_SET_ENABLE_WARP_DELTA,
+                                        AV1E_SET_ENABLE_WARP_EXTEND,
+#endif  // CONFIG_IMPROVED_WARP
                                         AV1E_SET_ENABLE_FILTER_INTRA,
                                         AV1E_SET_ENABLE_SMOOTH_INTRA,
                                         AV1E_SET_ENABLE_PAETH_INTRA,
@@ -351,6 +356,11 @@ const arg_def_t *av1_ctrl_args[] = {
   &g_av1_codec_arg_defs.enable_interintra_wedge,
   &g_av1_codec_arg_defs.enable_global_motion,
   &g_av1_codec_arg_defs.enable_warped_motion,
+#if CONFIG_IMPROVED_WARP
+  &g_av1_codec_arg_defs.enable_warped_causal,
+  &g_av1_codec_arg_defs.enable_warp_delta,
+  &g_av1_codec_arg_defs.enable_warp_extend,
+#endif  // CONFIG_IMPROVED_WARP
   &g_av1_codec_arg_defs.enable_filter_intra,
   &g_av1_codec_arg_defs.enable_smooth_intra,
   &g_av1_codec_arg_defs.enable_paeth_intra,
@@ -414,8 +424,10 @@ const arg_def_t *av1_ctrl_args[] = {
 #endif
   &g_av1_codec_arg_defs.subgop_config_str,
   &g_av1_codec_arg_defs.subgop_config_path,
-  &g_av1_codec_arg_defs.frame_hash_metadata,
-  &g_av1_codec_arg_defs.frame_hash_per_plane,
+  // TODO(rachelbarker): These arguments do not have corresponding entries
+  // in av1_arg_ctrl_map[]. Either add entries there, or remove these lines
+  //&g_av1_codec_arg_defs.frame_hash_metadata,
+  //&g_av1_codec_arg_defs.frame_hash_per_plane,
   NULL,
 };
 
@@ -638,6 +650,11 @@ static void init_config(cfg_options_t *config) {
 #endif
   config->enable_obmc = 1;
   config->enable_warped_motion = 1;
+#if CONFIG_IMPROVED_WARP
+  config->enable_warped_causal = 1;
+  config->enable_warp_delta = 1;
+  config->enable_warp_extend = 1;
+#endif  // CONFIG_IMPROVED_WARP
   config->enable_global_motion = 1;
   config->enable_diff_wtd_comp = 1;
   config->enable_interintra_comp = 1;
@@ -1485,20 +1502,28 @@ static void show_stream_config(struct stream_state *stream,
   );
 
   fprintf(stdout,
-          "Tool setting (Inter)           : OBMC (%d), WarpMotion (%d), "
-          "GlobalMotion (%d)\n",
-          encoder_cfg->enable_obmc, encoder_cfg->enable_warped_motion,
-          encoder_cfg->enable_global_motion);
+          "Tool setting (Inter)           : InterIntra (%d), OBMC (%d), "
+          "Warp (%d)\n",
+          encoder_cfg->enable_interintra_comp, encoder_cfg->enable_obmc,
+          encoder_cfg->enable_warped_motion);
+
+#if CONFIG_IMPROVED_WARP
+  fprintf(stdout,
+          "                               : WARPED_CAUSAL (%d), "
+          "WARP_DELTA (%d), WARP_EXTEND (%d)\n",
+          encoder_cfg->enable_warped_causal, encoder_cfg->enable_warp_delta,
+          encoder_cfg->enable_warp_extend);
+#endif  // CONFIG_IMPROVED_WARP
+
 #if CONFIG_TIP
   fprintf(stdout, "                               : TIP (%d)\n",
           encoder_cfg->enable_tip);
 #endif  // CONFIG_TIP
 
   fprintf(stdout,
-          "                               : DiffCompound "
-          "(%d), InterIntra (%d)\n",
-          encoder_cfg->enable_diff_wtd_comp,
-          encoder_cfg->enable_interintra_comp);
+          "                               : GlobalMotion (%d), "
+          "DiffCompound (%d)\n",
+          encoder_cfg->enable_global_motion, encoder_cfg->enable_diff_wtd_comp);
 
   fprintf(stdout,
           "                               : MaskCompound: (%d), "

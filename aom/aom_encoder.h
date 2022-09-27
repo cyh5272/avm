@@ -363,10 +363,24 @@ typedef struct cfg_options {
    *
    */
   unsigned int enable_obmc;
-  /*!\brief enable Warped Motion
+  /*!\brief enable local warped motion
    *
    */
   unsigned int enable_warped_motion;
+#if CONFIG_IMPROVED_WARP
+  /*!\brief enable spatial warp prediction
+   *
+   */
+  unsigned int enable_warped_causal;
+  /*!\brief enable explicit warp models
+   *
+   */
+  unsigned int enable_warp_delta;
+  /*!\brief enable warp extension
+   *
+   */
+  unsigned int enable_warp_extend;
+#endif  // CONFIG_IMPROVED_WARP
   /*!\brief enable global motion
    *
    */

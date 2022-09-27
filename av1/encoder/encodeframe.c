@@ -1366,6 +1366,21 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
 
   features->allow_intrabc &= (oxcf->kf_cfg.enable_intrabc);
 
+#if CONFIG_IMPROVED_WARP
+  // Decide which motion modes to scan this frame
+  // TODO(rachelbarker): Rework pruning into something more unified in phase 2
+  int enabled_motion_modes = cm->seq_params.seq_enabled_motion_modes;
+
+  if ((enabled_motion_modes & (1 << WARPED_CAUSAL)) != 0 &&
+      cpi->sf.inter_sf.prune_warped_prob_thresh > 0) {
+    const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
+    if (frame_probs->warped_probs[update_type] <
+        cpi->sf.inter_sf.prune_warped_prob_thresh)
+      enabled_motion_modes &= ~(1 << WARPED_CAUSAL);
+  }
+
+  features->enabled_motion_modes = enabled_motion_modes;
+#else
   if (features->allow_warped_motion &&
       cpi->sf.inter_sf.prune_warped_prob_thresh > 0) {
     const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
@@ -1373,6 +1388,7 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
         cpi->sf.inter_sf.prune_warped_prob_thresh)
       features->allow_warped_motion = 0;
   }
+#endif  // CONFIG_IMPROVED_WARP
 
   int hash_table_created = 0;
   if (!is_stat_generation_stage(cpi) && av1_use_hash_me(cpi)) {
@@ -1627,6 +1643,10 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
     }
   }
 
+#if CONFIG_IMPROVED_WARP
+  // TODO(rachelbarker): Improve pruning logic in phase 2
+#endif  // CONFIG_IMPROVED_WARP
+
   if (!cpi->sf.inter_sf.disable_obmc &&
       cpi->sf.inter_sf.prune_obmc_prob_thresh > 0) {
     const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
@@ -1642,8 +1662,12 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
     }
   }
 
+#if CONFIG_IMPROVED_WARP
+  if (cpi->sf.inter_sf.prune_warped_prob_thresh > 0) {
+#else
   if (features->allow_warped_motion &&
       cpi->sf.inter_sf.prune_warped_prob_thresh > 0) {
+#endif  // CONFIG_IMPROVED_WARP
     const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
     int sum = 0;
     for (i = 0; i < 2; i++) sum += cpi->td.rd_counts.warped_used[i];
@@ -1711,7 +1735,9 @@ void av1_encode_frame(AV1_COMP *cpi) {
     features->interp_filter = SWITCHABLE;
     if (cm->tiles.large_scale) features->interp_filter = EIGHTTAP_REGULAR;
 
+#if !CONFIG_IMPROVED_WARP
     features->switchable_motion_mode = 1;
+#endif  // !CONFIG_IMPROVED_WARP
 
     rdc->compound_ref_used_flag = 0;
     rdc->skip_mode_used_flag = 0;

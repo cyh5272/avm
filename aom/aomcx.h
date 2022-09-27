@@ -958,7 +958,7 @@ enum aome_enc_control_id {
    */
   AV1E_SET_ENABLE_GLOBAL_MOTION = 95,
 
-  /*!\brief Codec control function to turn on / off warped motion usage
+  /*!\brief Codec control function to turn on / off local warped motion
    * at sequence level, int parameter
    *
    * - 0 = disable
@@ -966,6 +966,9 @@ enum aome_enc_control_id {
    */
   AV1E_SET_ENABLE_WARPED_MOTION = 96,
 
+#if CONFIG_IMPROVED_WARP
+/* Note: enum value 97 unused */
+#else
   /*!\brief Codec control function to turn on / off warped motion usage
    * at frame level, int parameter
    *
@@ -976,6 +979,7 @@ enum aome_enc_control_id {
    * - 1 = enable (default)
    */
   AV1E_SET_ALLOW_WARPED_MOTION = 97,
+#endif  // CONFIG_IMPROVED_WARP
 
   /*!\brief Codec control function to turn on / off filter intra usage at
    * sequence level, int parameter
@@ -1278,6 +1282,32 @@ enum aome_enc_control_id {
   /*!\brief Control to get frame info
    */
   AV1E_GET_FRAME_INFO = 165,
+
+#if CONFIG_IMPROVED_WARP
+  /*!\brief Codec control function to turn on / off spatial warp prediction
+   * at sequence level, int parameter
+   *
+   * - 0 = disable
+   * - 1 = enable (default)
+   */
+  AV1E_SET_ENABLE_WARPED_CAUSAL = 166,
+
+  /*!\brief Codec control function to turn on / off explicit warp models
+   * at sequence level, int parameter
+   *
+   * - 0 = disable
+   * - 1 = enable (default)
+   */
+  AV1E_SET_ENABLE_WARP_DELTA = 167,
+
+  /*!\brief Codec control function to turn on / off warp extension
+   * at sequence level, int parameter
+   *
+   * - 0 = disable
+   * - 1 = enable (default)
+   */
+  AV1E_SET_ENABLE_WARP_EXTEND = 168,
+#endif  // CONFIG_IMPROVED_WARP
 };
 
 /*!\brief aom 1-D scaling mode
@@ -1571,8 +1601,10 @@ AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_GLOBAL_MOTION, int)
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_WARPED_MOTION, int)
 #define AOM_CTRL_AV1E_SET_ENABLE_WARPED_MOTION
 
+#if !CONFIG_IMPROVED_WARP
 AOM_CTRL_USE_TYPE(AV1E_SET_ALLOW_WARPED_MOTION, int)
 #define AOM_CTRL_AV1E_SET_ALLOW_WARPED_MOTION
+#endif  // !CONFIG_IMPROVED_WARP
 
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_FILTER_INTRA, int)
 #define AOM_CTRL_AV1E_SET_ENABLE_FILTER_INTRA
@@ -1765,6 +1797,17 @@ AOM_CTRL_USE_TYPE(AV1E_SET_SUBGOP_CONFIG_STR, const char *)
 
 AOM_CTRL_USE_TYPE(AV1E_SET_SUBGOP_CONFIG_PATH, const char *)
 #define AOM_CTRL_AV1E_SET_SUBGOP_CONFIG_PATH
+
+#if CONFIG_IMPROVED_WARP
+AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_WARPED_CAUSAL, int)
+#define AOM_CTRL_AV1E_SET_ENABLE_WARPED_CAUSAL
+
+AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_WARP_DELTA, int)
+#define AOM_CTRL_AV1E_SET_ENABLE_WARP_DELTA
+
+AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_WARP_EXTEND, int)
+#define AOM_CTRL_AV1E_SET_ENABLE_WARP_EXTEND
+#endif  // CONFIG_IMPROVED_WARP
 
 /*!\endcond */
 /*! @} - end defgroup aom_encoder */
