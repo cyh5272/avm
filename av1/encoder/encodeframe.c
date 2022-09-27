@@ -935,6 +935,11 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
   av1_crc32c_calculator_init(
       &td->mb.txfm_search_info.mb_rd_record.crc_calculator);
 
+#if CONFIG_WARP_REF_LIST && RESET_WARP_BANK_AT_TILE
+  av1_zero(td->mb.e_mbd.warp_param_bank);
+  td->mb.e_mbd.warp_param_bank_pt = &td->mb.e_mbd.warp_param_bank;
+#endif  // CONFIG_WARP_REF_LIST
+
   for (int mi_row = tile_info->mi_row_start; mi_row < tile_info->mi_row_end;
        mi_row += cm->seq_params.mib_size) {
 #if CONFIG_REF_MV_BANK
@@ -944,7 +949,7 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
 #endif
 #endif  // CONFIG_REF_MV_BANK
 
-#if CONFIG_WARP_REF_LIST
+#if CONFIG_WARP_REF_LIST && !RESET_WARP_BANK_AT_TILE
     av1_zero(td->mb.e_mbd.warp_param_bank);
     td->mb.e_mbd.warp_param_bank_pt = &td->mb.e_mbd.warp_param_bank;
 #endif  // CONFIG_WARP_REF_LIST
