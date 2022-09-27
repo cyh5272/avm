@@ -193,4 +193,19 @@ void av1_convolve_2d_sobel_y_c(const uint8_t *src, int src_stride, double *dst,
 }  // extern "C"
 #endif
 
+void prepare_feature_sum_bufs_c(int *feature_sum_buffers[],
+                                int16_t *feature_line_buffers[],
+                                int feature_length, int buffer_row,
+                                int col_begin, int col_end, int buffer_col);
+void update_feature_sum_bufs_c(int *feature_sum_buffers[],
+                               int16_t *feature_line_buffers[],
+                               int feature_length, int buffer_row,
+                               int col_begin, int col_end, int buffer_col);
+void calc_gradient_in_various_directions_c(int16_t *feature_line_buffers[],
+                                           int row, int buffer_row,
+                                           const uint16_t *dgd, int dgd_stride,
+                                           int width, int col_begin,
+                                           int col_end, int feature_length,
+                                           int buffer_col);
+
 #endif  // AOM_AV1_COMMON_CONVOLVE_H_
