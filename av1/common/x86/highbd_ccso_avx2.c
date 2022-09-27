@@ -180,7 +180,7 @@ void ccso_filter_block_hbd_wo_buf_avx2(
         // multiple band offset implementation
         __m128i offset_reg = _mm256_extracti128_si256(idx2, 0);
         uint8_t offset_idx[16];
-        uint8_t offset_array[16];
+        int8_t offset_array[16];
         _mm_store_si128((__m128i *)offset_idx, offset_reg);
         for (int i = 0; i < 16; i++) {
           offset_array[i] = offset_buf[offset_idx[i]];

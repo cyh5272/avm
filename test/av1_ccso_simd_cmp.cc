@@ -82,7 +82,7 @@ class CCSOFilterTest : public FunctionEquivalenceTest<F> {
 
     const uint8_t shift_bits_a[2] = { 8, 10 };
     shift_bits_ = shift_bits_a[this->rng_(2)];
-
+    max_val_ = (1 << shift_bits_) - 1;
     isSingleBand_ = this->rng_(2);
 
     Execute();
