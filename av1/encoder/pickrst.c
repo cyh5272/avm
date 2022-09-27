@@ -4396,9 +4396,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   RestSearchCtxt rsc;
   const int plane_start = AOM_PLANE_Y;
   const int plane_end = num_planes > 1 ? AOM_PLANE_V : AOM_PLANE_Y;
-#if LR_SEARCH_BUG_WORKAROUND
-  const RusPerTileHelper rus_per_tile_helper = get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
+  const RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
 
 #if CONFIG_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT

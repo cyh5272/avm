@@ -723,7 +723,6 @@ void av1_loop_restoration_filter_frame_init(AV1LrStruct *lr_ctxt,
 void av1_loop_restoration_copy_planes(AV1LrStruct *loop_rest_ctxt,
                                       struct AV1Common *cm, int num_planes);
 
-#if LR_SEARCH_BUG_WORKAROUND
 typedef struct RusPerTileHelper {
   int num_planes;
   int tile_rows;
@@ -732,9 +731,12 @@ typedef struct RusPerTileHelper {
   int end_ru_row_in_tile[MAX_MB_PLANE][MAX_TILE_ROWS + 1];
   int begin_ru_col_in_tile[MAX_MB_PLANE][MAX_TILE_COLS + 1];
   int end_ru_col_in_tile[MAX_MB_PLANE][MAX_TILE_COLS + 1];
+  int ru_size[MAX_MB_PLANE];
 } RusPerTileHelper;
 
-RusPerTileHelper get_rus_per_tile_helper(const struct AV1Common *cm);
+RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm);
+
+#if LR_SEARCH_BUG_WORKAROUND
 int should_this_ru_reset(int ru_row, int ru_col,
                          const struct RusPerTileHelper *helper, int plane);
 #endif  // LR_SEARCH_BUG_WORKAROUND

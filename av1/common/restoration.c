@@ -2481,9 +2481,15 @@ int should_this_ru_reset(int ru_row, int ru_col,
     return 0;
   }
 }
+#endif  // LR_SEARCH_BUG_WORKAROUND
 
-RusPerTileHelper get_rus_per_tile_helper(const struct AV1Common *cm) {
+RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm) {
   RusPerTileHelper helper = { 0 };
+
+  if (cm->rst_info[0].restoration_unit_size == 0) return helper;
+
+  helper.ru_size[0] = cm->rst_info[0].restoration_unit_size;
+  helper.ru_size[1] = cm->rst_info[1].restoration_unit_size;
 
   const CommonTileParams *actual_tiles = &cm->tiles;
   helper.tile_cols = actual_tiles->cols;
@@ -2512,10 +2518,8 @@ RusPerTileHelper get_rus_per_tile_helper(const struct AV1Common *cm) {
       helper.end_ru_col_in_tile[plane][tile_col] = ru_col_end;
     }
   }
-
   return helper;
 }
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
 void av1_foreach_rest_unit_in_row(
     RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
@@ -2637,7 +2641,7 @@ void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
                                     int32_t *tmpbuf,
                                     RestorationLineBuffers *rlbs) {
 #if LR_SEARCH_BUG_WORKAROUND
-  RusPerTileHelper rus_per_tile_helper = get_rus_per_tile_helper(cm);
+  RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
 #endif  // LR_SEARCH_BUG_WORKAROUND
   const int is_uv = plane > 0;
   const int ss_y = is_uv && cm->seq_params.subsampling_y;

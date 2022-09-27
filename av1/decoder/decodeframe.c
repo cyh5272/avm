@@ -4085,9 +4085,7 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
   }
 
 #if LR_SEARCH_BUG_WORKAROUND
-  if (cm->rst_info[0].restoration_unit_size > 0) {
-    rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
-  }
+  rus_per_tile_helper_df = av1_get_rus_per_tile_helper(cm);
 #endif  // LR_SEARCH_BUG_WORKAROUND
   for (tile_row = tile_rows_start; tile_row < tile_rows_end; ++tile_row) {
     const int row = inv_row_order ? tile_rows - 1 - tile_row : tile_row;
@@ -5057,9 +5055,7 @@ static const uint8_t *decode_tiles_row_mt(AV1Decoder *pbi, const uint8_t *data,
   }
 
 #if LR_SEARCH_BUG_WORKAROUND
-  if (cm->rst_info[0].restoration_unit_size > 0) {
-    rus_per_tile_helper_df = get_rus_per_tile_helper(cm);
-  }
+  rus_per_tile_helper_df = av1_get_rus_per_tile_helper(cm);
 #endif  // LR_SEARCH_BUG_WORKAROUND
   for (int row = 0; row < tile_rows; row++) {
     for (int col = 0; col < tile_cols; col++) {

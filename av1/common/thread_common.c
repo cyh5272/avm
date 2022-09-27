@@ -978,9 +978,7 @@ void av1_loop_restoration_filter_frame_mt(YV12_BUFFER_CONFIG *frame,
   AV1LrStruct *loop_rest_ctxt = (AV1LrStruct *)lr_ctxt;
 
 #if LR_SEARCH_BUG_WORKAROUND
-  if (cm->rst_info[0].restoration_unit_size > 0) {
-    rus_per_tile_helper_tc = get_rus_per_tile_helper(cm);
-  }
+  rus_per_tile_helper_tc = av1_get_rus_per_tile_helper(cm);
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
   av1_loop_restoration_filter_frame_init(loop_rest_ctxt, frame, cm,

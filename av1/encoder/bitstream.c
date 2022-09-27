@@ -5038,9 +5038,7 @@ static uint32_t write_tiles_in_tg_obus(AV1_COMP *const cpi, uint8_t *const dst,
   int first_tg = 1;
 
 #if LR_SEARCH_BUG_WORKAROUND
-  if (cm->rst_info[0].restoration_unit_size > 0) {
-    rus_per_tile_helper_st = get_rus_per_tile_helper(cm);
-  }
+  rus_per_tile_helper_st = av1_get_rus_per_tile_helper(cm);
 #endif  // LR_SEARCH_BUG_WORKAROUND
 
   *largest_tile_id = 0;
