@@ -528,10 +528,10 @@ void ccso_filter_block_hbd_with_buf_avx2(
       lut_idx_ext = _mm256_add_epi16(lut_idx_ext, cur_src_cls1_final);
 
       uint16_t offset_idx[16];
-      uint16_t offset_array[16];
+      int16_t offset_array[16];
       _mm256_store_si256((__m256i *)offset_idx, lut_idx_ext);
       for (int i = 0; i < 16; i++) {
-        offset_array[i] = filter_offset[offset_idx[i]];
+        offset_array[i] = (int16_t)(filter_offset[offset_idx[i]]);
       }
       __m256i offset = _mm256_loadu_si256((const __m256i *)offset_array);
 
