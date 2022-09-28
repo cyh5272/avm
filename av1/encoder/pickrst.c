@@ -88,21 +88,6 @@ static const var_part_extractor_type var_part_extractors[NUM_EXTRACTORS] = {
   aom_highbd_get_v_var,
 };
 
-#if CONFIG_RST_MERGECOEFFS
-// Function type to determine edge cost
-// info : pointer to unspecified structure type, cast in function, holds any
-//  information needed to calculate edge cost
-// path : pointer to Vector holding current path to edge represented as int
-//  indexes of nodes
-// node_idx : node where path ends and edge starts
-// max_out_nodes: max outgoing edges from node
-// out_edge: outgoing edge we are calculating cost for
-// Returns cost of edge.
-typedef double (*graph_edge_cost_t)(const void *info, Vector *path,
-                                    int node_idx, int max_out_nodes,
-                                    int out_edge);
-#endif  // CONFIG_RST_MERGECOEFFS
-
 static int64_t sse_restoration_unit(const RestorationTileLimits *limits,
                                     const YV12_BUFFER_CONFIG *src,
                                     const YV12_BUFFER_CONFIG *dst, int plane) {
@@ -1244,9 +1229,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       // First unit in stack has larger unit_bits because the
       // merged coeffs are linked to it.
       if (old_unit->rest_unit_idx == begin_idx_cand) {
-        const int new_bits =
-            count_sgrproj_bits_set(&x->mode_costs, &rui_temp_cand.sgrproj_info,
-                                   &old_unit->ref_sgrproj_bank);
+        const int new_bits = (int)count_sgrproj_bits_set(
+            &x->mode_costs, &rui_temp_cand.sgrproj_info,
+            &old_unit->ref_sgrproj_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.sgrproj_restore_cost[1] + new_bits;
       } else {
@@ -1254,7 +1239,7 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                           ref_sgrproj_info_cand);
         assert(equal_ref >= 0);  // Must exist in bank
         ref_sgrproj_info_tmp.bank_ref = equal_ref;
-        const int merge_bits = count_sgrproj_bits(
+        const int merge_bits = (int)count_sgrproj_bits(
             &x->mode_costs, &ref_sgrproj_info_tmp, &old_unit->ref_sgrproj_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.sgrproj_restore_cost[1] + merge_bits;
@@ -1650,10 +1635,11 @@ static int64_t compute_score(int wiener_win, int64_t *M, int64_t *H,
       ab[k * wiener_win + l] = a[l + plane_off] * b[k + plane_off];
   }
   for (k = 0; k < wiener_win2; ++k) {
-    P += ab[k] * M[k] / WIENER_FILT_STEP / WIENER_FILT_STEP;
+    P += (int64_t)ab[k] * M[k] / (WIENER_FILT_STEP * WIENER_FILT_STEP);
     for (l = 0; l < wiener_win2; ++l) {
-      Q += ab[k] * H[k * wiener_win2 + l] * ab[l] / WIENER_FILT_STEP /
-           WIENER_FILT_STEP / WIENER_FILT_STEP / WIENER_FILT_STEP;
+      Q += ((int64_t)ab[k] * (H[k * wiener_win2 + l] / WIENER_FILT_STEP) /
+            WIENER_FILT_STEP) *
+           (int64_t)ab[l] / (WIENER_FILT_STEP * WIENER_FILT_STEP);
     }
   }
   Score = Q - 2 * P;
@@ -2420,7 +2406,7 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     finer_tile_search_wiener(rsc, NULL, tile_rect, &rui_temp_cand, wiener_win,
                              reduced_wiener_win);
     aom_vector_clear(current_unit_indices);
-    if (compute_score(reduced_wiener_win, M_AVG, M_AVG,
+    if (compute_score(reduced_wiener_win, M_AVG, H_AVG,
                       rui_temp_cand.wiener_info.vfilter,
                       rui_temp_cand.wiener_info.hfilter) > 0) {
       continue;
@@ -2444,9 +2430,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       // First unit in stack has larger unit_bits because the
       // merged coeffs are linked to it.
       if (old_unit->rest_unit_idx == begin_idx_cand) {
-        const int new_bits = count_wiener_bits_set(wiener_win, &x->mode_costs,
-                                                   &rui_temp_cand.wiener_info,
-                                                   &old_unit->ref_wiener_bank);
+        const int new_bits = (int)count_wiener_bits_set(
+            wiener_win, &x->mode_costs, &rui_temp_cand.wiener_info,
+            &old_unit->ref_wiener_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.wiener_restore_cost[1] + new_bits;
       } else {
@@ -2454,9 +2440,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                          ref_wiener_info_cand);
         assert(equal_ref >= 0);  // Must exist in bank
         ref_wiener_info_tmp.bank_ref = equal_ref;
-        const int merge_bits =
-            count_wiener_bits(wiener_win, &x->mode_costs, &ref_wiener_info_tmp,
-                              &old_unit->ref_wiener_bank);
+        const int merge_bits = (int)count_wiener_bits(
+            wiener_win, &x->mode_costs, &ref_wiener_info_tmp,
+            &old_unit->ref_wiener_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.wiener_restore_cost[1] + merge_bits;
       }
@@ -3489,7 +3475,7 @@ double set_cand_merge_sse_and_bits(
       WienerNonsepInfo tmp_filters = old_rusi->wienerns_info;
       copy_nsfilter_taps_for_class(&tmp_filters, &rui_merge_cand->wienerns_info,
                                    class_id);
-      const int new_bits = count_wienerns_bits_set(
+      const int new_bits = (int)count_wienerns_bits_set(
           is_uv, &x->mode_costs, &tmp_filters, &old_unit->ref_wienerns_bank,
           nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =
@@ -3499,7 +3485,7 @@ double set_cand_merge_sse_and_bits(
           &old_unit->ref_wienerns_bank, token_wienerns_info_cand,
           nsfilter_params->ncoeffs, class_id, equal_ref_for_class);
       assert(is_equal >= 0);  // Must exist in bank
-      const int merge_bits = count_wienerns_bits(
+      const int merge_bits = (int)count_wienerns_bits(
           is_uv, &x->mode_costs, &old_rusi->wienerns_info,
           &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
       assert(merge_bits == count_wienerns_bits_set(
@@ -3526,7 +3512,7 @@ double set_cand_merge_sse_and_bits(
       // TODO: Merge bits calculated this way is not entirely correct since we
       //  don't know the optimal merge status for classes > class_id.
       // Using count_wienerns_bits_set just in case.
-      const int merge_bits = count_wienerns_bits_set(
+      const int merge_bits = (int)count_wienerns_bits_set(
           is_uv, &x->mode_costs, token_wienerns_info_cand,
           &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =

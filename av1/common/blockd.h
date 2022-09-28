@@ -768,9 +768,12 @@ typedef struct {
  */
 typedef struct {
   /*!
-   * Filter data.
+   * Filter data - number of classes
    */
   int num_classes;
+  /*!
+   * Filter data - taps
+   */
   DECLARE_ALIGNED(16, int16_t,
                   allfiltertaps[WIENERNS_MAX_CLASSES * WIENERNS_YUV_MAX]);
 
