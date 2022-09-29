@@ -3165,6 +3165,21 @@ static void select_tx_partition_type(
       memcpy(full_blk_skip, this_blk_skip,
              sizeof(*this_blk_skip) * MAX_TX_PARTITIONS);
     }
+
+    // Early termination based on rd of NONE mode
+    if (type == TX_PARTITION_NONE && tmp_rd != INT64_MAX) {
+      if (cpi->sf.tx_sf.txb_split_cap) {
+        if (p->eobs[block] == 0) break;
+      }
+
+      const int search_level = cpi->sf.tx_sf.adaptive_txb_search_level;
+      if (search_level) {
+        if ((tmp_rd - (tmp_rd >> search_level)) > ref_best_rd) {
+          *is_cost_valid = 0;
+          break;
+        }
+      }
+    }
   }
 
   if (best_rd == INT64_MAX) *is_cost_valid = 0;
