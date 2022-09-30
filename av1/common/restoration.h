@@ -44,10 +44,6 @@ extern "C" {
 // tile pictures. (b) is averted but a form of (a) persists albeit with the
 // search being aware of it.
 //
-// TODO(oguleryuz, debargha):
-// A full fix should have the encoder search follow the same handling order of
-// RUs as the rest of the pipeline.
-#define LR_SEARCH_BUG_WORKAROUND 0
 
 #if CONFIG_PC_WIENER
 #define PC_WIENER_FILTER_CHROMA 0
@@ -544,12 +540,7 @@ typedef void (*rest_unit_visitor_t)(const RestorationTileLimits *limits,
                                     const AV1PixelRect *tile_rect,
                                     int rest_unit_idx, void *priv,
                                     int32_t *tmpbuf,
-                                    RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                    ,
-                                    int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-);
+                                    RestorationLineBuffers *rlbs);
 
 typedef struct FilterFrameCtxt {
   const RestorationInfo *rsi;
@@ -735,23 +726,13 @@ void av1_foreach_rest_unit_in_plane(
     void *priv, AV1PixelRect *tile_rect, int32_t *tmpbuf,
     RestorationLineBuffers *rlbs, const RusPerTileHelper *rus_per_tile_helper);
 
-#if LR_SEARCH_BUG_WORKAROUND
-int should_this_ru_reset(int ru_row, int ru_col,
-                         const struct RusPerTileHelper *helper, int plane);
-#endif  // LR_SEARCH_BUG_WORKAROUND
-
 void av1_foreach_rest_unit_in_row(
     RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
     rest_unit_visitor_t on_rest_unit, int row_number, int unit_size,
     int unit_idx0, int hunits_per_tile, int vunits_per_tile, int unit_stride,
     int plane, void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
     sync_read_fn_t on_sync_read, sync_write_fn_t on_sync_write,
-    struct AV1LrSyncData *const lr_sync
-#if LR_SEARCH_BUG_WORKAROUND
-    ,
-    const struct RusPerTileHelper *rus_per_tile_helper
-#endif  // LR_SEARCH_BUG_WORKAROUND
-);
+    struct AV1LrSyncData *const lr_sync);
 void av1_foreach_rest_unit_in_rutile(
     const struct AV1Common *cm, int plane, int unit_idx0, int horz_units,
     int vert_units, rest_unit_visitor_t on_rest_unit, void *priv,

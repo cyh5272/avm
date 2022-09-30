@@ -1018,18 +1018,10 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                       const AV1PixelRect *tile,
                                       int rest_unit_idx, void *priv,
                                       int32_t *tmpbuf,
-                                      RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                      ,
-                                      int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                      RestorationLineBuffers *rlbs) {
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) av1_reset_sgrproj_bank(&rsc->sgrproj_bank);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const AV1_COMMON *const cm = rsc->cm;
@@ -1697,17 +1689,9 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
                                         int rest_unit_idx, void *priv,
                                         int32_t *tmpbuf,
-                                        RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                        ,
-                                        int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                        RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
-#if LR_SEARCH_BUG_WORKAROUND
-  (void)reset_banks;
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -2130,19 +2114,11 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                      const AV1PixelRect *tile_rect,
                                      int rest_unit_idx, void *priv,
                                      int32_t *tmpbuf,
-                                     RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                     ,
-                                     int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                     RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) av1_reset_wiener_bank(&rsc->wiener_bank);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wiener_restore_cost[0];
@@ -2567,18 +2543,10 @@ static AOM_INLINE void search_norestore(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
                                         int rest_unit_idx, void *priv,
                                         int32_t *tmpbuf,
-                                        RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                        ,
-                                        int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                        RestorationLineBuffers *rlbs) {
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
-#if LR_SEARCH_BUG_WORKAROUND
-  (void)reset_banks;
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -3583,22 +3551,11 @@ double accumulate_merge_stats(const RestSearchCtxt *rsc,
 static void search_wienerns(const RestorationTileLimits *limits,
                             const AV1PixelRect *tile_rect, int rest_unit_idx,
                             void *priv, int32_t *tmpbuf,
-                            RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                            ,
-                            int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                            RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks)
-    av1_reset_wienerns_bank(
-        &rsc->wienerns_bank, rsc->cm->quant_params.base_qindex,
-        rsc->wienerns_bank.filter[0].num_classes, rsc->plane);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wienerns_restore_cost[0];
@@ -4123,20 +4080,12 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
 static void search_switchable(const RestorationTileLimits *limits,
                               const AV1PixelRect *tile_rect, int rest_unit_idx,
                               void *priv, int32_t *tmpbuf,
-                              RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                              ,
-                              int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                              RestorationLineBuffers *rlbs) {
   (void)limits;
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) reset_all_banks(rsc);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -4410,11 +4359,6 @@ static void finalize_unit_info(RestorationType frame_rtype,
             rus_per_tile_helper->end_ru_col_in_tile[plane][tile_col];
         for (int ru_row = ru_start_row; ru_row < ru_end_row; ++ru_row) {
           for (int ru_col = ru_start_col; ru_col < ru_end_col; ++ru_col) {
-#if LR_SEARCH_BUG_WORKAROUND
-            const int reset_banks = should_this_ru_reset(
-                ru_row, ru_col, rus_per_tile_helper, plane);
-            if (reset_banks) reset_all_banks(rsc);
-#endif  // LR_SEARCH_BUG_WORKAROUND
             const int u = ru_row * rsi->horz_units_per_tile + ru_col;
             copy_unit_info(frame_rtype, &rusi[u], &rsi->unit_info[u], rsc);
           }

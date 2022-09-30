@@ -793,9 +793,6 @@ static AV1LrMTInfo *get_lr_job_info(AV1LrSync *lr_sync) {
 
   return cur_job_info;
 }
-#if LR_SEARCH_BUG_WORKAROUND
-RusPerTileHelper rus_per_tile_helper_tc = { 0 };
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
 // Implement row loop restoration for each thread.
 static int loop_restoration_row_worker(void *arg1, void *arg2) {
@@ -842,12 +839,7 @@ static int loop_restoration_row_worker(void *arg1, void *arg2) {
           ctxt[plane].rsi->vert_units_per_tile,
           ctxt[plane].rsi->horz_units_per_tile, plane, &ctxt[plane],
           lrworkerdata->rst_tmpbuf, lrworkerdata->rlbs, on_sync_read,
-          on_sync_write, lr_sync
-#if LR_SEARCH_BUG_WORKAROUND
-          ,
-          &rus_per_tile_helper_tc
-#endif  // LR_SEARCH_BUG_WORKAROUND
-      );
+          on_sync_write, lr_sync);
 
       copy_funs[plane](lr_ctxt->dst, lr_ctxt->frame, ctxt[plane].tile_rect.left,
                        ctxt[plane].tile_rect.right, cur_job_info->v_copy_start,
@@ -977,10 +969,6 @@ void av1_loop_restoration_filter_frame_mt(YV12_BUFFER_CONFIG *frame,
   const int num_planes = av1_num_planes(cm);
 
   AV1LrStruct *loop_rest_ctxt = (AV1LrStruct *)lr_ctxt;
-
-#if LR_SEARCH_BUG_WORKAROUND
-  rus_per_tile_helper_tc = av1_get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   av1_loop_restoration_filter_frame_init(loop_rest_ctxt, frame, cm,
                                          optimized_lr, num_planes);
