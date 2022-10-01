@@ -88,21 +88,6 @@ static const var_part_extractor_type var_part_extractors[NUM_EXTRACTORS] = {
   aom_highbd_get_v_var,
 };
 
-#if CONFIG_RST_MERGECOEFFS
-// Function type to determine edge cost
-// info : pointer to unspecified structure type, cast in function, holds any
-//  information needed to calculate edge cost
-// path : pointer to Vector holding current path to edge represented as int
-//  indexes of nodes
-// node_idx : node where path ends and edge starts
-// max_out_nodes: max outgoing edges from node
-// out_edge: outgoing edge we are calculating cost for
-// Returns cost of edge.
-typedef double (*graph_edge_cost_t)(const void *info, Vector *path,
-                                    int node_idx, int max_out_nodes,
-                                    int out_edge);
-#endif  // CONFIG_RST_MERGECOEFFS
-
 static int64_t sse_restoration_unit(const RestorationTileLimits *limits,
                                     const YV12_BUFFER_CONFIG *src,
                                     const YV12_BUFFER_CONFIG *dst, int plane) {
@@ -140,6 +125,7 @@ typedef struct {
 
 typedef struct {
   const YV12_BUFFER_CONFIG *src;
+  const YV12_BUFFER_CONFIG *dgd;
   YV12_BUFFER_CONFIG *dst;
 
   const AV1_COMMON *cm;
@@ -413,6 +399,9 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
                                 Vector *unit_stack, Vector *unit_indices,
 #endif  // CONFIG_RST_MERGECOEFFS
                                 RestSearchCtxt *rsc) {
+  const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
+
+  const int is_uv = plane != AOM_PLANE_Y;
   rsc->src = src;
   rsc->dst = dst;
   rsc->cm = cm;
@@ -420,16 +409,14 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
   rsc->plane = plane;
   rsc->rusi = rusi;
   rsc->lpf_sf = lpf_sf;
-
-  const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
-  const int is_uv = plane != AOM_PLANE_Y;
+  rsc->dgd = dgd;
 
   rsc->plane_width = src->crop_widths[is_uv];
   rsc->plane_height = src->crop_heights[is_uv];
-  rsc->src_buffer = src->buffers[plane];
   rsc->src_stride = src->strides[is_uv];
-  rsc->dgd_buffer = dgd->buffers[plane];
+  rsc->src_buffer = src->buffers[plane];
   rsc->dgd_stride = dgd->strides[is_uv];
+  rsc->dgd_buffer = dgd->buffers[plane];
   rsc->tile_rect = av1_whole_frame_rect(cm, is_uv);
   assert(src->crop_widths[is_uv] == dgd->crop_widths[is_uv]);
   assert(src->crop_heights[is_uv] == dgd->crop_heights[is_uv]);
@@ -1031,18 +1018,10 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                       const AV1PixelRect *tile,
                                       int rest_unit_idx, void *priv,
                                       int32_t *tmpbuf,
-                                      RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                      ,
-                                      int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                      RestorationLineBuffers *rlbs) {
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) av1_reset_sgrproj_bank(&rsc->sgrproj_bank);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const AV1_COMMON *const cm = rsc->cm;
@@ -1244,9 +1223,9 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
       // First unit in stack has larger unit_bits because the
       // merged coeffs are linked to it.
       if (old_unit->rest_unit_idx == begin_idx_cand) {
-        const int new_bits =
-            count_sgrproj_bits_set(&x->mode_costs, &rui_temp_cand.sgrproj_info,
-                                   &old_unit->ref_sgrproj_bank);
+        const int new_bits = (int)count_sgrproj_bits_set(
+            &x->mode_costs, &rui_temp_cand.sgrproj_info,
+            &old_unit->ref_sgrproj_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.sgrproj_restore_cost[1] + new_bits;
       } else {
@@ -1254,7 +1233,7 @@ static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                           ref_sgrproj_info_cand);
         assert(equal_ref >= 0);  // Must exist in bank
         ref_sgrproj_info_tmp.bank_ref = equal_ref;
-        const int merge_bits = count_sgrproj_bits(
+        const int merge_bits = (int)count_sgrproj_bits(
             &x->mode_costs, &ref_sgrproj_info_tmp, &old_unit->ref_sgrproj_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.sgrproj_restore_cost[1] + merge_bits;
@@ -1650,10 +1629,11 @@ static int64_t compute_score(int wiener_win, int64_t *M, int64_t *H,
       ab[k * wiener_win + l] = a[l + plane_off] * b[k + plane_off];
   }
   for (k = 0; k < wiener_win2; ++k) {
-    P += ab[k] * M[k] / WIENER_FILT_STEP / WIENER_FILT_STEP;
+    P += (int64_t)ab[k] * M[k] / (WIENER_FILT_STEP * WIENER_FILT_STEP);
     for (l = 0; l < wiener_win2; ++l) {
-      Q += ab[k] * H[k * wiener_win2 + l] * ab[l] / WIENER_FILT_STEP /
-           WIENER_FILT_STEP / WIENER_FILT_STEP / WIENER_FILT_STEP;
+      Q += ((int64_t)ab[k] * (H[k * wiener_win2 + l] / WIENER_FILT_STEP) /
+            WIENER_FILT_STEP) *
+           (int64_t)ab[l] / (WIENER_FILT_STEP * WIENER_FILT_STEP);
     }
   }
   Score = Q - 2 * P;
@@ -1709,17 +1689,9 @@ static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
                                         int rest_unit_idx, void *priv,
                                         int32_t *tmpbuf,
-                                        RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                        ,
-                                        int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                        RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
-#if LR_SEARCH_BUG_WORKAROUND
-  (void)reset_banks;
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -2142,19 +2114,11 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                      const AV1PixelRect *tile_rect,
                                      int rest_unit_idx, void *priv,
                                      int32_t *tmpbuf,
-                                     RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                     ,
-                                     int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                     RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) av1_reset_wiener_bank(&rsc->wiener_bank);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wiener_restore_cost[0];
@@ -2420,7 +2384,7 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     finer_tile_search_wiener(rsc, NULL, tile_rect, &rui_temp_cand, wiener_win,
                              reduced_wiener_win);
     aom_vector_clear(current_unit_indices);
-    if (compute_score(reduced_wiener_win, M_AVG, M_AVG,
+    if (compute_score(reduced_wiener_win, M_AVG, H_AVG,
                       rui_temp_cand.wiener_info.vfilter,
                       rui_temp_cand.wiener_info.hfilter) > 0) {
       continue;
@@ -2444,9 +2408,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
       // First unit in stack has larger unit_bits because the
       // merged coeffs are linked to it.
       if (old_unit->rest_unit_idx == begin_idx_cand) {
-        const int new_bits = count_wiener_bits_set(wiener_win, &x->mode_costs,
-                                                   &rui_temp_cand.wiener_info,
-                                                   &old_unit->ref_wiener_bank);
+        const int new_bits = (int)count_wiener_bits_set(
+            wiener_win, &x->mode_costs, &rui_temp_cand.wiener_info,
+            &old_unit->ref_wiener_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.wiener_restore_cost[1] + new_bits;
       } else {
@@ -2454,9 +2418,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                          ref_wiener_info_cand);
         assert(equal_ref >= 0);  // Must exist in bank
         ref_wiener_info_tmp.bank_ref = equal_ref;
-        const int merge_bits =
-            count_wiener_bits(wiener_win, &x->mode_costs, &ref_wiener_info_tmp,
-                              &old_unit->ref_wiener_bank);
+        const int merge_bits = (int)count_wiener_bits(
+            wiener_win, &x->mode_costs, &ref_wiener_info_tmp,
+            &old_unit->ref_wiener_bank);
         old_unit->merge_bits_cand =
             x->mode_costs.wiener_restore_cost[1] + merge_bits;
       }
@@ -2579,18 +2543,10 @@ static AOM_INLINE void search_norestore(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
                                         int rest_unit_idx, void *priv,
                                         int32_t *tmpbuf,
-                                        RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                        ,
-                                        int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                                        RestorationLineBuffers *rlbs) {
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
-#if LR_SEARCH_BUG_WORKAROUND
-  (void)reset_banks;
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -3489,7 +3445,7 @@ double set_cand_merge_sse_and_bits(
       WienerNonsepInfo tmp_filters = old_rusi->wienerns_info;
       copy_nsfilter_taps_for_class(&tmp_filters, &rui_merge_cand->wienerns_info,
                                    class_id);
-      const int new_bits = count_wienerns_bits_set(
+      const int new_bits = (int)count_wienerns_bits_set(
           is_uv, &x->mode_costs, &tmp_filters, &old_unit->ref_wienerns_bank,
           nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =
@@ -3499,7 +3455,7 @@ double set_cand_merge_sse_and_bits(
           &old_unit->ref_wienerns_bank, token_wienerns_info_cand,
           nsfilter_params->ncoeffs, class_id, equal_ref_for_class);
       assert(is_equal >= 0);  // Must exist in bank
-      const int merge_bits = count_wienerns_bits(
+      const int merge_bits = (int)count_wienerns_bits(
           is_uv, &x->mode_costs, &old_rusi->wienerns_info,
           &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
       assert(merge_bits == count_wienerns_bits_set(
@@ -3526,7 +3482,7 @@ double set_cand_merge_sse_and_bits(
       // TODO: Merge bits calculated this way is not entirely correct since we
       //  don't know the optimal merge status for classes > class_id.
       // Using count_wienerns_bits_set just in case.
-      const int merge_bits = count_wienerns_bits_set(
+      const int merge_bits = (int)count_wienerns_bits_set(
           is_uv, &x->mode_costs, token_wienerns_info_cand,
           &old_unit->ref_wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
       old_unit->merge_bits_cand =
@@ -3595,22 +3551,11 @@ double accumulate_merge_stats(const RestSearchCtxt *rsc,
 static void search_wienerns(const RestorationTileLimits *limits,
                             const AV1PixelRect *tile_rect, int rest_unit_idx,
                             void *priv, int32_t *tmpbuf,
-                            RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                            ,
-                            int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                            RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks)
-    av1_reset_wienerns_bank(
-        &rsc->wienerns_bank, rsc->cm->quant_params.base_qindex,
-        rsc->wienerns_bank.filter[0].num_classes, rsc->plane);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wienerns_restore_cost[0];
@@ -4135,20 +4080,12 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
 static void search_switchable(const RestorationTileLimits *limits,
                               const AV1PixelRect *tile_rect, int rest_unit_idx,
                               void *priv, int32_t *tmpbuf,
-                              RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                              ,
-                              int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-) {
+                              RestorationLineBuffers *rlbs) {
   (void)limits;
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
-#if LR_SEARCH_BUG_WORKAROUND
-  if (reset_banks) reset_all_banks(rsc);
-#endif  // LR_SEARCH_BUG_WORKAROUND
 
   const MACROBLOCK *const x = rsc->x;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -4309,7 +4246,9 @@ static AOM_INLINE void copy_unit_info(RestorationType frame_rtype,
   }
 }
 
-static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
+static double search_rest_type(RestSearchCtxt *rsc,
+                               const RusPerTileHelper *rus_per_tile_helper,
+                               RestorationType rtype) {
   static const rest_unit_visitor_t funs[RESTORE_TYPES] = {
     search_norestore,
     search_wiener,
@@ -4322,18 +4261,45 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
 #endif  // CONFIG_WIENER_NONSEP
     search_switchable
   };
-
-  reset_rsc(rsc);
-  rsc_on_tile(rsc);
-
-  av1_foreach_rest_unit_in_plane(rsc->cm, rsc->plane, funs[rtype], rsc,
-                                 &rsc->tile_rect, rsc->cm->rst_tmpbuf, NULL);
+  int64_t total_bits = 0;
+  int64_t total_sse = 0;
+  const int is_uv = rsc->plane > 0;
+  for (int tile_row = 0; tile_row < rus_per_tile_helper->tile_rows;
+       tile_row++) {
+    for (int tile_col = 0; tile_col < rus_per_tile_helper->tile_cols;
+         tile_col++) {
+      const int ru_start_row =
+          rus_per_tile_helper->begin_ru_row_in_tile[rsc->plane][tile_row];
+      const int ru_end_row =
+          rus_per_tile_helper->end_ru_row_in_tile[rsc->plane][tile_row];
+      const int ru_start_col =
+          rus_per_tile_helper->begin_ru_col_in_tile[rsc->plane][tile_col];
+      const int ru_end_col =
+          rus_per_tile_helper->end_ru_col_in_tile[rsc->plane][tile_col];
+      const int ru_size = rus_per_tile_helper->ru_size[rsc->plane];
+      AV1PixelRect rutile_rect =
+          av1_get_rutile_rect(rsc->cm, is_uv, ru_start_row, ru_end_row,
+                              ru_start_col, ru_end_col, ru_size, ru_size);
+      reset_rsc(rsc);
+      rsc_on_tile(rsc);
+      const int unit_idx0 =
+          ru_start_row * rsc->cm->rst_info[rsc->plane].horz_units_per_tile +
+          ru_start_col;
+      av1_foreach_rest_unit_in_rutile(
+          rsc->cm, rsc->plane, unit_idx0, ru_end_col - ru_start_col,
+          ru_end_row - ru_start_row, funs[rtype], rsc, &rutile_rect,
+          rsc->cm->rst_tmpbuf, NULL, rus_per_tile_helper);
 #if CONFIG_RST_MERGECOEFFS
-  aom_vector_clear(rsc->unit_stack);
-  aom_vector_clear(rsc->unit_indices);
+      aom_vector_clear(rsc->unit_stack);
+      aom_vector_clear(rsc->unit_indices);
 #endif  // CONFIG_RST_MERGECOEFFS
-  return RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      rsc->x->rdmult, rsc->bits >> 4, rsc->sse, rsc->cm->seq_params.bit_depth);
+      total_bits += rsc->bits;
+      total_sse += rsc->sse;
+    }
+  }
+  return RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, total_bits >> 4,
+                                        total_sse,
+                                        rsc->cm->seq_params.bit_depth);
 }
 
 static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
@@ -4369,6 +4335,37 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
   }
 #endif  // CONFIG_LR_FLEX_SYNTAX
   return;
+}
+
+static void finalize_unit_info(RestorationType frame_rtype,
+                               RestUnitSearchInfo *rusi, RestSearchCtxt *rsc,
+                               const RusPerTileHelper *rus_per_tile_helper) {
+  const AV1_COMMON *cm = rsc->cm;
+  const int plane = rsc->plane;
+  const RestorationInfo *rsi = &cm->rst_info[plane];
+  if (frame_rtype != RESTORE_NONE) {
+    for (int tile_row = 0; tile_row < rus_per_tile_helper->tile_rows;
+         tile_row++) {
+      for (int tile_col = 0; tile_col < rus_per_tile_helper->tile_cols;
+           tile_col++) {
+        reset_all_banks(rsc);
+        const int ru_start_row =
+            rus_per_tile_helper->begin_ru_row_in_tile[plane][tile_row];
+        const int ru_end_row =
+            rus_per_tile_helper->end_ru_row_in_tile[plane][tile_row];
+        const int ru_start_col =
+            rus_per_tile_helper->begin_ru_col_in_tile[plane][tile_col];
+        const int ru_end_col =
+            rus_per_tile_helper->end_ru_col_in_tile[plane][tile_col];
+        for (int ru_row = ru_start_row; ru_row < ru_end_row; ++ru_row) {
+          for (int ru_col = ru_start_col; ru_col < ru_end_col; ++ru_col) {
+            const int u = ru_row * rsi->horz_units_per_tile + ru_col;
+            copy_unit_info(frame_rtype, &rusi[u], &rsi->unit_info[u], rsc);
+          }
+        }
+      }
+    }
+  }
 }
 
 void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
@@ -4410,9 +4407,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   RestSearchCtxt rsc;
   const int plane_start = AOM_PLANE_Y;
   const int plane_end = num_planes > 1 ? AOM_PLANE_V : AOM_PLANE_Y;
-#if LR_SEARCH_BUG_WORKAROUND
-  const RusPerTileHelper rus_per_tile_helper = get_rus_per_tile_helper(cm);
-#endif  // LR_SEARCH_BUG_WORKAROUND
+  const RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
 
 #if CONFIG_WIENER_NONSEP
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -4445,7 +4440,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     double best_cost = 0;
     RestorationType best_rtype = RESTORE_NONE;
 
-    if (!cpi->sf.lpf_sf.disable_loop_restoration_chroma || !plane) {
+    if (!(cpi->sf.lpf_sf.disable_loop_restoration_chroma && plane)) {
       av1_extend_frame(rsc.dgd_buffer, rsc.plane_width, rsc.plane_height,
                        rsc.dgd_stride, RESTORATION_BORDER, RESTORATION_BORDER);
 
@@ -4461,7 +4456,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
           continue;
 #endif  // CONFIG_PC_WIENER
 
-        double cost = search_rest_type(&rsc, r);
+        double cost = search_rest_type(&rsc, &rus_per_tile_helper, r);
         // printf("Plane[%d] r[%d]: cost %f\n", plane, r, cost);
 #if CONFIG_COMBINE_PC_NS_WIENER
         assert(RESTORE_PC_WIENER < RESTORE_WIENER_NONSEP);
@@ -4487,23 +4482,8 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
     if (plane == plane_start) cm->lr_y_rdcost = best_cost;
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
-    reset_all_banks(&rsc);
-#if LR_SEARCH_BUG_WORKAROUND
-    const RestorationInfo *rsi = &cm->rst_info[plane];
-#endif  // LR_SEARCH_BUG_WORKAROUND
-    if (best_rtype != RESTORE_NONE) {
-      for (int u = 0; u < plane_ntiles; ++u) {
-#if LR_SEARCH_BUG_WORKAROUND
-        const int ru_row = u / rsi->horz_units_per_tile;
-        const int ru_col = u % rsi->horz_units_per_tile;
-        const int reset_banks =
-            should_this_ru_reset(ru_row, ru_col, &rus_per_tile_helper, plane);
-        if (reset_banks) reset_all_banks(&rsc);
-#endif  // LR_SEARCH_BUG_WORKAROUND
-        copy_unit_info(best_rtype, &rusi[u], &cm->rst_info[plane].unit_info[u],
-                       &rsc);
-      }
-    }
+    finalize_unit_info(best_rtype, rusi, &rsc, &rus_per_tile_helper);
+
 #if CONFIG_LR_FLEX_SYNTAX
     assert(IMPLIES(
         cm->features.lr_tools_count[plane] < 2,

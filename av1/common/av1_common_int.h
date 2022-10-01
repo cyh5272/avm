@@ -632,31 +632,37 @@ typedef struct {
 #endif  // CONFIG_TIP
 
 #if CONFIG_LR_FLEX_SYNTAX
-  uint8_t lr_tools_disable_mask[MAX_MB_PLANE];  // mask of lr tool(s) to
-                                                // disable. To disable tool i in
-                                                // RestorationType enum where:
-                                                // 1 <= i <=
-                                                // RESTORE_SWITCHABLE_TYPES, set
-                                                // the ith bit in least to most
-                                                // significant order to 1.
-  int lr_tools_count[MAX_MB_PLANE];             // Number of lr tools enabled
-  int lr_switchable_tools_count[MAX_MB_PLANE];  // Number of lr options in
-                                                // switchable mode
-  int lr_frame_tools_count[MAX_MB_PLANE];  // Number of lr modes available at
-                                           // frame level
-  int lr_last_switchable_ndx
-      [MAX_MB_PLANE];  // index of last bit transmitted for
-                       // convenience. Beyond this index there is
-                       // exactly one allowed option, and therefore
-                       // there is no need to signal anything.
-  int lr_last_switchable_ndx_0_type
-      [MAX_MB_PLANE];  // Restoration Type if last bit
-                       // transmitted is 0 for convenience. If
-                       // the last bit
-                       // (lr_last_switchable_ndx) transmitted
-                       // is 0, the restoration type is
-                       // lr_last_switchable_ndx_0_type.
-#endif                 // CONFIG_LR_FLEX_SYNTAX
+  /*!
+   * mask of lr tool(s) to disable. To disable tool i in RestorationType enum
+   * where: * 1 <= i <= RESTORE_SWITCHABLE_TYPES, set the ith bit in least to
+   * most ignificant order to 1.
+   */
+  uint8_t lr_tools_disable_mask[MAX_MB_PLANE];
+  /*!
+   * Number of lr tools enabled
+   */
+  int lr_tools_count[MAX_MB_PLANE];
+  /*!
+   * Number of lr options in switchable mode
+   */
+  int lr_switchable_tools_count[MAX_MB_PLANE];
+  /*!
+   * Number of lr modes available at frame level
+   */
+  int lr_frame_tools_count[MAX_MB_PLANE];
+  /*!
+   * index of last bit transmitted for convenience. Beyond this index
+   * there is exactly one allowed option, and therefore there is no need
+   * to signal anything.
+   */
+  int lr_last_switchable_ndx[MAX_MB_PLANE];
+  /*!
+   * Restoration Type if last bit transmitted is 0 for convenience. If the
+   * last bit (lr_last_switchable_ndx) transmitted is 0, the
+   * restoration type is lr_last_switchable_ndx_0_type.
+   */
+  int lr_last_switchable_ndx_0_type[MAX_MB_PLANE];
+#endif  // CONFIG_LR_FLEX_SYNTAX
 } FeatureFlags;
 
 /*!

@@ -44,10 +44,6 @@ extern "C" {
 // tile pictures. (b) is averted but a form of (a) persists albeit with the
 // search being aware of it.
 //
-// TODO(oguleryuz, debargha):
-// A full fix should have the encoder search follow the same handling order of
-// RUs as the rest of the pipeline.
-#define LR_SEARCH_BUG_WORKAROUND 1
 
 #if CONFIG_PC_WIENER
 #define PC_WIENER_FILTER_CHROMA 0
@@ -544,12 +540,7 @@ typedef void (*rest_unit_visitor_t)(const RestorationTileLimits *limits,
                                     const AV1PixelRect *tile_rect,
                                     int rest_unit_idx, void *priv,
                                     int32_t *tmpbuf,
-                                    RestorationLineBuffers *rlbs
-#if LR_SEARCH_BUG_WORKAROUND
-                                    ,
-                                    int reset_banks
-#endif  // LR_SEARCH_BUG_WORKAROUND
-);
+                                    RestorationLineBuffers *rlbs);
 
 typedef struct FilterFrameCtxt {
   const RestorationInfo *rsi;
@@ -680,13 +671,6 @@ typedef void (*sync_read_fn_t)(void *const lr_sync, int r, int c, int plane);
 typedef void (*sync_write_fn_t)(void *const lr_sync, int r, int c,
                                 const int sb_cols, int plane);
 
-// Call on_rest_unit for each loop restoration unit in the plane.
-void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
-                                    rest_unit_visitor_t on_rest_unit,
-                                    void *priv, AV1PixelRect *tile_rect,
-                                    int32_t *tmpbuf,
-                                    RestorationLineBuffers *rlbs);
-
 // Return 1 iff the block at mi_row, mi_col with size bsize is a
 // top-level superblock containing the top-left corner of at least one
 // loop restoration unit.
@@ -723,7 +707,6 @@ void av1_loop_restoration_filter_frame_init(AV1LrStruct *lr_ctxt,
 void av1_loop_restoration_copy_planes(AV1LrStruct *loop_rest_ctxt,
                                       struct AV1Common *cm, int num_planes);
 
-#if LR_SEARCH_BUG_WORKAROUND
 typedef struct RusPerTileHelper {
   int num_planes;
   int tile_rows;
@@ -732,26 +715,35 @@ typedef struct RusPerTileHelper {
   int end_ru_row_in_tile[MAX_MB_PLANE][MAX_TILE_ROWS + 1];
   int begin_ru_col_in_tile[MAX_MB_PLANE][MAX_TILE_COLS + 1];
   int end_ru_col_in_tile[MAX_MB_PLANE][MAX_TILE_COLS + 1];
+  int ru_size[MAX_MB_PLANE];
 } RusPerTileHelper;
 
-RusPerTileHelper get_rus_per_tile_helper(const struct AV1Common *cm);
-int should_this_ru_reset(int ru_row, int ru_col,
-                         const struct RusPerTileHelper *helper, int plane);
-#endif  // LR_SEARCH_BUG_WORKAROUND
+RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm);
+
+// Call on_rest_unit for each loop restoration unit in the plane.
+void av1_foreach_rest_unit_in_plane(
+    const struct AV1Common *cm, int plane, rest_unit_visitor_t on_rest_unit,
+    void *priv, AV1PixelRect *tile_rect, int32_t *tmpbuf,
+    RestorationLineBuffers *rlbs, const RusPerTileHelper *rus_per_tile_helper);
 
 void av1_foreach_rest_unit_in_row(
     RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
     rest_unit_visitor_t on_rest_unit, int row_number, int unit_size,
-    int unit_idx0, int hunits_per_tile, int vunits_per_tile, int plane,
-    void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
+    int unit_idx0, int hunits_per_tile, int vunits_per_tile, int unit_stride,
+    int plane, void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
     sync_read_fn_t on_sync_read, sync_write_fn_t on_sync_write,
-    struct AV1LrSyncData *const lr_sync
-#if LR_SEARCH_BUG_WORKAROUND
-    ,
-    const struct RusPerTileHelper *rus_per_tile_helper
-#endif  // LR_SEARCH_BUG_WORKAROUND
-);
+    struct AV1LrSyncData *const lr_sync);
+void av1_foreach_rest_unit_in_rutile(
+    const struct AV1Common *cm, int plane, int unit_idx0, int horz_units,
+    int vert_units, rest_unit_visitor_t on_rest_unit, void *priv,
+    AV1PixelRect *tile_rect, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
+    const RusPerTileHelper *rus_per_tile_helper);
+
 AV1PixelRect av1_whole_frame_rect(const struct AV1Common *cm, int is_uv);
+AV1PixelRect av1_get_rutile_rect(const struct AV1Common *cm, int is_uv,
+                                 int ru_start_row, int ru_end_row,
+                                 int ru_start_col, int ru_end_col,
+                                 int ru_height, int ru_width);
 int av1_lr_count_units_in_tile(int unit_size, int tile_size);
 void av1_lr_sync_read_dummy(void *const lr_sync, int r, int c, int plane);
 void av1_lr_sync_write_dummy(void *const lr_sync, int r, int c,
