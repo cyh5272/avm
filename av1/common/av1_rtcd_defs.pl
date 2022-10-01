@@ -24,6 +24,7 @@ print <<EOF
 #include "av1/common/convolve.h"
 #include "av1/common/av1_txfm.h"
 #include "av1/common/odintrin.h"
+#include "av1/common/pc_wiener_filters.h"
 #include "av1/common/restoration.h"
 
 struct macroblockd;
@@ -100,6 +101,11 @@ specialize qw/av1_convolve_symmetric_dual_subtract_center_highbd avx2/;
 
 add_proto qw/void fill_directional_feature_buffers_highbd/, "int *feature_sum_buffers[], int16_t *feature_line_buffers[], int row, int buffer_row, const uint16_t *dgd, int dgd_stride, int width, int feature_lead, int feature_lag";
 specialize qw/fill_directional_feature_buffers_highbd avx2/;
+
+add_proto qw/void av1_fill_directional_feature_accumulators/, "int dir_feature_accum[NUM_PC_WIENER_FEATURES][PC_WIENER_FEATURE_ACC_SIZE], int *feature_sum_buff[NUM_PC_WIENER_FEATURES], int width, int col_offset, int feature_lead, int feature_lag";
+specialize qw/av1_fill_directional_feature_accumulators avx2/;
+add_proto qw/void av1_fill_tskip_feature_accumulator/, "int16_t tskip_feature_accum[PC_WIENER_FEATURE_ACC_SIZE], int8_t* tskip_sum_buff, int width, int col_offset,int tskip_lead, int tskip_lag";
+specialize qw/av1_fill_tskip_feature_accumulator avx2/;
 
 # directional intra predictor functions
 add_proto qw/void av1_dr_prediction_z1/, "uint8_t *dst, ptrdiff_t stride, int bw, int bh, const uint8_t *above, const uint8_t *left, int upsample_above, int dx, int dy, int mrl_index";
