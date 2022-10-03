@@ -2679,16 +2679,18 @@ static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
                        "Failed to allocate frame buffer");
   }
 
-  tip_frame_buf->bit_depth = (unsigned int)seq_params->bit_depth;
-  tip_frame_buf->color_primaries = seq_params->color_primaries;
-  tip_frame_buf->transfer_characteristics =
-      seq_params->transfer_characteristics;
-  tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
-  tip_frame_buf->monochrome = seq_params->monochrome;
-  tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
-  tip_frame_buf->color_range = seq_params->color_range;
-  tip_frame_buf->render_width = cm->render_width;
-  tip_frame_buf->render_height = cm->render_height;
+  if (tip_frame_buf) {
+    tip_frame_buf->bit_depth = (unsigned int)seq_params->bit_depth;
+    tip_frame_buf->color_primaries = seq_params->color_primaries;
+    tip_frame_buf->transfer_characteristics =
+        seq_params->transfer_characteristics;
+    tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+    tip_frame_buf->monochrome = seq_params->monochrome;
+    tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
+    tip_frame_buf->color_range = seq_params->color_range;
+    tip_frame_buf->render_width = cm->render_width;
+    tip_frame_buf->render_height = cm->render_height;
+  }
 }
 #endif  // CONFIG_TIP
 
@@ -6086,16 +6088,18 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 
 #if CONFIG_TIP
   YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
-  tip_frame_buf->bit_depth = seq_params->bit_depth;
-  tip_frame_buf->color_primaries = seq_params->color_primaries;
-  tip_frame_buf->transfer_characteristics =
-      seq_params->transfer_characteristics;
-  tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
-  tip_frame_buf->monochrome = seq_params->monochrome;
-  tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
-  tip_frame_buf->color_range = seq_params->color_range;
-  tip_frame_buf->render_width = cm->render_width;
-  tip_frame_buf->render_height = cm->render_height;
+  if (tip_frame_buf) {
+    tip_frame_buf->bit_depth = seq_params->bit_depth;
+    tip_frame_buf->color_primaries = seq_params->color_primaries;
+    tip_frame_buf->transfer_characteristics =
+        seq_params->transfer_characteristics;
+    tip_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+    tip_frame_buf->monochrome = seq_params->monochrome;
+    tip_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
+    tip_frame_buf->color_range = seq_params->color_range;
+    tip_frame_buf->render_width = cm->render_width;
+    tip_frame_buf->render_height = cm->render_height;
+  }
 #endif  // CONFIG_TIP
 
   if (pbi->need_resync) {
