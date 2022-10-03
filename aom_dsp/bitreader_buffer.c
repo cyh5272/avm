@@ -69,23 +69,23 @@ uint32_t aom_rb_read_uvlc(struct aom_read_bit_buffer *rb) {
   return base + value;
 }
 
-uint16_t aom_rb_read_primitive_quniform(struct aom_read_bit_buffer *rb,
-                                        uint16_t n) {
+uint32_t aom_rb_read_primitive_quniform(struct aom_read_bit_buffer *rb,
+                                        uint32_t n) {
   if (n <= 1) return 0;
-  const int l = get_msb(n) + 1;
-  const int m = (1 << l) - n;
-  const int v = aom_rb_read_literal(rb, l - 1);
+  const uint32_t l = get_msb(n) + 1;
+  const uint32_t m = (1 << l) - n;
+  const uint32_t v = aom_rb_read_literal(rb, l - 1);
   return v < m ? v : (v << 1) - m + aom_rb_read_bit(rb);
 }
 
-static uint16_t aom_rb_read_primitive_subexpfin(struct aom_read_bit_buffer *rb,
-                                                uint16_t n, uint16_t k) {
-  int i = 0;
-  int mk = 0;
+static uint32_t aom_rb_read_primitive_subexpfin(struct aom_read_bit_buffer *rb,
+                                                uint32_t n, uint32_t k) {
+  uint32_t i = 0;
+  uint32_t mk = 0;
 
   while (1) {
-    int b = (i ? k + i - 1 : k);
-    int a = (1 << b);
+    uint32_t b = (i ? k + i - 1 : k);
+    uint32_t a = (1 << b);
 
     if (n <= mk + 3 * a) {
       return aom_rb_read_primitive_quniform(rb, n - mk) + mk;
@@ -103,15 +103,15 @@ static uint16_t aom_rb_read_primitive_subexpfin(struct aom_read_bit_buffer *rb,
   return 0;
 }
 
-static uint16_t aom_rb_read_primitive_refsubexpfin(
-    struct aom_read_bit_buffer *rb, uint16_t n, uint16_t k, uint16_t ref) {
+static uint32_t aom_rb_read_primitive_refsubexpfin(
+    struct aom_read_bit_buffer *rb, uint32_t n, uint32_t k, uint32_t ref) {
   return inv_recenter_finite_nonneg(n, ref,
                                     aom_rb_read_primitive_subexpfin(rb, n, k));
 }
 
-int16_t aom_rb_read_signed_primitive_refsubexpfin(
-    struct aom_read_bit_buffer *rb, uint16_t n, uint16_t k, int16_t ref) {
+int32_t aom_rb_read_signed_primitive_refsubexpfin(
+    struct aom_read_bit_buffer *rb, uint32_t n, uint32_t k, int32_t ref) {
   ref += n - 1;
-  const uint16_t scaled_n = (n << 1) - 1;
+  const uint32_t scaled_n = (n << 1) - 1;
   return aom_rb_read_primitive_refsubexpfin(rb, scaled_n, k, ref) - n + 1;
 }
