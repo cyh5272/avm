@@ -1291,11 +1291,11 @@ static int get_qstep(int base_qindex, int bit_depth, int *shift) {
 static int buffer_width = 0;
 static int16_t *feature_line_buffers[NUM_FEATURE_LINE_BUFFERS] = { 0 };
 static int *feature_sum_buffers[NUM_PC_WIENER_FEATURES] = { 0 };
-static int16_t *tskip_sum_buffer = 0;
+static int8_t *tskip_sum_buffer = 0;
 
 static int directional_feature_accumulator[NUM_PC_WIENER_FEATURES]
                                           [PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
-static int tskip_feature_accumulator[PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+static int16_t tskip_feature_accumulator[PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
 
 static int feature_normalizers[NUM_PC_WIENER_FEATURES + 1] = { 0 };
 
@@ -1324,7 +1324,7 @@ static void allocate_pcwiener_line_buffers(int procunit_width) {
         (int *)(aom_malloc(buffer_width * sizeof(*feature_sum_buffers[j])));
   }
   tskip_sum_buffer =
-      (int16_t *)(aom_malloc(buffer_width * sizeof(*tskip_sum_buffer)));
+      (int8_t *)(aom_malloc(buffer_width * sizeof(*tskip_sum_buffer)));
 }
 
 static void free_pcwiener_line_buffers() {
@@ -1364,6 +1364,9 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
   // TODO(oguleryuz): tskip needs boundary extension.
   assert(use_strict_bounds == true);
   const int tskip_length = tskip_lead + tskip_lag + 1;
+  // Ensure the data stored in tskip_sum_buffer does not exceed signed 8-bit
+  // range.
+  assert((tskip_length + height) <= 127);
   const int col_begin = -tskip_lead;
   const int col_end = width + tskip_lag;
   const int clamped_row = AOMMAX(AOMMIN(row, height - 1), 0);
