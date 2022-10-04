@@ -68,6 +68,14 @@ struct av1_extracfg {
   unsigned int enable_deblocking;
   unsigned int enable_cdef;
   unsigned int enable_restoration;
+  unsigned int enable_wiener;
+  unsigned int enable_sgrproj;
+#if CONFIG_PC_WIENER
+  unsigned int enable_pc_wiener;
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  unsigned int enable_wienerns;
+#endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
   unsigned int enable_ccso;
 #endif
@@ -367,6 +375,14 @@ static struct av1_extracfg default_extra_cfg = {
   1,                                         // enable_deblocking
   1,                                         // enable_cdef
   1,                                         // enable_restoration
+  1,                                         // enable_wiener
+  1,                                         // enable_sgrproj
+#if CONFIG_PC_WIENER
+  1,    // enable_pc_wiener
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  1,    // enable_wienerns
+#endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
   1,  // enable_ccso
 #endif
@@ -859,6 +875,14 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_deblocking = extra_cfg->enable_deblocking;
   cfg->enable_cdef = extra_cfg->enable_cdef;
   cfg->enable_restoration = extra_cfg->enable_restoration;
+  cfg->enable_wiener = extra_cfg->enable_wiener;
+  cfg->enable_sgrproj = extra_cfg->enable_sgrproj;
+#if CONFIG_PC_WIENER
+  cfg->enable_pc_wiener = extra_cfg->enable_pc_wiener;
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  cfg->enable_wienerns = extra_cfg->enable_wienerns;
+#endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
   cfg->enable_ccso = extra_cfg->enable_ccso;
 #endif
@@ -946,6 +970,15 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
   extra_cfg->enable_deblocking = cfg->enable_deblocking;
   extra_cfg->enable_cdef = cfg->enable_cdef;
   extra_cfg->enable_restoration = cfg->enable_restoration;
+  extra_cfg->enable_wiener = cfg->enable_wiener;
+  extra_cfg->enable_sgrproj = cfg->enable_sgrproj;
+#if CONFIG_PC_WIENER
+  extra_cfg->enable_pc_wiener = cfg->enable_pc_wiener;
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  extra_cfg->enable_wienerns = cfg->enable_wienerns;
+#endif  // CONFIG_WIENER_NONSEP
+
 #if CONFIG_CCSO
   extra_cfg->enable_ccso = cfg->enable_ccso;
 #endif
@@ -1208,6 +1241,34 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   tool_cfg->enable_deblocking = extra_cfg->enable_deblocking;
   tool_cfg->enable_cdef = extra_cfg->enable_cdef;
   tool_cfg->enable_restoration = extra_cfg->enable_restoration;
+  tool_cfg->enable_wiener =
+      tool_cfg->enable_restoration & extra_cfg->enable_wiener;
+  tool_cfg->enable_sgrproj =
+      tool_cfg->enable_restoration & extra_cfg->enable_sgrproj;
+#if CONFIG_PC_WIENER
+  tool_cfg->enable_pc_wiener =
+      tool_cfg->enable_restoration & extra_cfg->enable_pc_wiener;
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  tool_cfg->enable_wienerns =
+      tool_cfg->enable_restoration & extra_cfg->enable_wienerns;
+#endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_PC_WIENER && CONFIG_WIENER_NONSEP
+  tool_cfg->enable_restoration &=
+      (tool_cfg->enable_wiener | tool_cfg->enable_sgrproj |
+       tool_cfg->enable_pc_wiener | tool_cfg->enable_wienerns);
+#elif CONFIG_PC_WIENER && !CONFIG_WIENER_NONSEP
+  tool_cfg->enable_restoration &=
+      (tool_cfg->enable_wiener | tool_cfg->enable_sgrproj |
+       tool_cfg->enable_pc_wiener);
+#elif !CONFIG_PC_WIENER && CONFIG_WIENER_NONSEP
+  tool_cfg->enable_restoration &=
+      (tool_cfg->enable_wiener | tool_cfg->enable_sgrproj |
+       tool_cfg->enable_wienerns);
+#else
+  tool_cfg->enable_restoration &=
+      (tool_cfg->enable_wiener | tool_cfg->enable_sgrproj);
+#endif  // CONFIG_PC_WIENER && CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
   tool_cfg->enable_ccso = extra_cfg->enable_ccso;
 #endif
@@ -3467,6 +3528,22 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_restoration,
                               argv, err_string)) {
     extra_cfg.enable_restoration = arg_parse_uint_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_wiener, argv,
+                              err_string)) {
+    extra_cfg.enable_wiener = arg_parse_uint_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_sgrproj, argv,
+                              err_string)) {
+    extra_cfg.enable_sgrproj = arg_parse_uint_helper(&arg, err_string);
+#if CONFIG_PC_WIENER
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_pc_wiener,
+                              argv, err_string)) {
+    extra_cfg.enable_pc_wiener = arg_parse_uint_helper(&arg, err_string);
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_wienerns, argv,
+                              err_string)) {
+    extra_cfg.enable_wienerns = arg_parse_uint_helper(&arg, err_string);
+#endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_ccso, argv,
                               err_string)) {
@@ -4060,7 +4137,13 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #if CONFIG_JOINT_MVD
         1,
 #endif  // CONFIG_JOINT_MVD
-        1, 1,   1,   1,
+        1, 1,   1,   1, 1, 1,
+#if CONFIG_PC_WIENER
+        1,
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+        1,
+#endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_CCSO
         1,
 #endif

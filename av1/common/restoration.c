@@ -1349,7 +1349,9 @@ static void fill_directional_feature_buffers_highbd(
 
   int buffer_col = 0;
   // TODO(oguleryuz): Reduce buffer sizes for downsampling.
+#if defined(__GCC__)
 #pragma GCC ivdep
+#endif
   for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
     feature_sum_buffers[0][buffer_col] -=
         feature_line_buffers[buffer_row_0][buffer_col];
@@ -1362,7 +1364,9 @@ static void fill_directional_feature_buffers_highbd(
   }
 
   buffer_col = 0;
+#if defined(__GCC__)
 #pragma GCC ivdep
+#endif
   for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
     // Fix an issue with odd-sized rows/columns. (If the right/lower extension
     // of the frame is extended by 4 pixels instead of the current 3 AOMMIN can
@@ -1395,7 +1399,9 @@ static void fill_directional_feature_buffers_highbd(
   }
 
   buffer_col = 0;
+#if defined(__GCC__)
 #pragma GCC ivdep
+#endif
   for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
     feature_sum_buffers[0][buffer_col] +=
         feature_line_buffers[buffer_row_0][buffer_col];
@@ -1472,7 +1478,9 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
     tskip_sum_buffer[buffer_col] += tskip[left_tskip_id];
     ++buffer_col;
   }
+#if defined(__GCC__)
 #pragma GCC ivdep
+#endif
   for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
     const uint8_t tskip_val = tskip[tskip_id_base + col];
 
@@ -1504,7 +1512,9 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
       tskip_sum_buffer[buffer_col] -= tskip[left_tskip_id];
       ++buffer_col;
     }
+#if defined(__GCC__)
 #pragma GCC ivdep
+#endif
     for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
       const uint8_t tskip_val = tskip[tskip_id_base + col];
 
