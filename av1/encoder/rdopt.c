@@ -40,6 +40,9 @@
 #include "av1/common/reconintra.h"
 #include "av1/common/scan.h"
 #include "av1/common/seg_common.h"
+#if CONFIG_TIP
+#include "av1/common/tip.h"
+#endif  // CONFIG_TIP
 #include "av1/common/txb_common.h"
 #include "av1/common/warped_motion.h"
 
