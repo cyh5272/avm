@@ -1265,6 +1265,93 @@ void av1_apply_selfguided_restoration_c(const uint8_t *dat8, int width,
   }
 }
 
+// Accumulates tskip over a window of rows centered at row. If use_strict_bounds
+// is false tskip must have valid data extending for rows from
+// [row_begin, row_end) where,
+//    row_begin = row - PC_WIENER_TSKIP_LENGTH / 2
+//    row_end = row + PC_WIENER_TSKIP_LENGTH / 2 + 1.
+// This version of the routine assumes use_strict_bounds is true.
+void av1_fill_tskip_sum_buffer_c(int row, const uint8_t *tskip,
+                                 int tskip_stride, int8_t *tx_skip_sum_buffer,
+                                 int width, int height, int tskip_lead,
+                                 int tskip_lag, bool use_strict_bounds) {
+  // TODO(oguleryuz): tskip needs boundary extension.
+  assert(use_strict_bounds == true);
+  (void)use_strict_bounds;
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+  // Ensure the data stored in tskip_sum_buffer does not exceed signed 8-bit
+  // range.
+  assert((tskip_length + height) <= 127);
+  const int col_begin = -tskip_lead;
+  const int col_end = width + tskip_lag;
+  const int clamped_row = AOMMAX(AOMMIN(row, height - 1), 0);
+
+  int buffer_col = 0;
+  int tskip_id_base = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
+  int left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
+  for (int col = col_begin; col < 0; ++col) {
+    tx_skip_sum_buffer[buffer_col] += tskip[left_tskip_id];
+    ++buffer_col;
+  }
+#if defined(__GCC__)
+#pragma GCC ivdep
+#endif
+  for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
+    const uint8_t tskip_val = tskip[tskip_id_base + col];
+
+    for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
+      tx_skip_sum_buffer[buffer_col] += tskip_val;
+      ++buffer_col;
+    }
+  }
+
+  for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width; ++col) {
+    int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
+    tx_skip_sum_buffer[buffer_col] += tskip[tskip_id];
+    ++buffer_col;
+  }
+  int right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
+  for (int col = width; col < col_end; ++col) {
+    tx_skip_sum_buffer[buffer_col] += tskip[right_tskip_id];
+    ++buffer_col;
+  }
+
+  int subtract_row = row - tskip_length;
+  if (subtract_row >= -tskip_lead) {
+    assert(subtract_row <= height - 1);
+    subtract_row = subtract_row >= 0 ? subtract_row : 0;
+    buffer_col = 0;
+    tskip_id_base = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
+    left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
+    for (int col = col_begin; col < 0; ++col) {
+      tx_skip_sum_buffer[buffer_col] -= tskip[left_tskip_id];
+      ++buffer_col;
+    }
+#if defined(__GCC__)
+#pragma GCC ivdep
+#endif
+    for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
+      const uint8_t tskip_val = tskip[tskip_id_base + col];
+
+      for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
+        tx_skip_sum_buffer[buffer_col] -= tskip_val;
+        ++buffer_col;
+      }
+    }
+    for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width;
+         ++col) {
+      int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
+      tx_skip_sum_buffer[buffer_col] -= tskip[tskip_id];
+      ++buffer_col;
+    }
+    right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
+    for (int col = width; col < col_end; ++col) {
+      tx_skip_sum_buffer[buffer_col] -= tskip[right_tskip_id];
+      ++buffer_col;
+    }
+  }
+}
+
 #if CONFIG_PC_WIENER
 
 // TODO(oguleryuz): This should remain in sync with av1_convert_qindex_to_q.
@@ -1349,92 +1436,6 @@ static void clear_line_buffers() {
     memset(feature_sum_buffers[k], 0,
            sizeof(*feature_sum_buffers[k]) * buffer_width);
   memset(tskip_sum_buffer, 0, sizeof(*tskip_sum_buffer) * buffer_width);
-}
-
-// Accumulates tskip over a window of rows centered at row. If use_strict_bounds
-// is false tskip must have valid data extending for rows from
-// [row_begin, row_end) where,
-//    row_begin = row - PC_WIENER_TSKIP_LENGTH / 2
-//    row_end = row + PC_WIENER_TSKIP_LENGTH / 2 + 1.
-// This version of the routine assumes use_strict_bounds is true.
-static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
-                                  int tskip_stride, int width, int height,
-                                  int tskip_lead, int tskip_lag,
-                                  bool use_strict_bounds) {
-  // TODO(oguleryuz): tskip needs boundary extension.
-  assert(use_strict_bounds == true);
-  const int tskip_length = tskip_lead + tskip_lag + 1;
-  // Ensure the data stored in tskip_sum_buffer does not exceed signed 8-bit
-  // range.
-  assert((tskip_length + height) <= 127);
-  const int col_begin = -tskip_lead;
-  const int col_end = width + tskip_lag;
-  const int clamped_row = AOMMAX(AOMMIN(row, height - 1), 0);
-
-  int buffer_col = 0;
-  int tskip_id_base = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
-  int left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
-  for (int col = col_begin; col < 0; ++col) {
-    tskip_sum_buffer[buffer_col] += tskip[left_tskip_id];
-    ++buffer_col;
-  }
-#if defined(__GCC__)
-#pragma GCC ivdep
-#endif
-  for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
-    const uint8_t tskip_val = tskip[tskip_id_base + col];
-
-    for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
-      tskip_sum_buffer[buffer_col] += tskip_val;
-      ++buffer_col;
-    }
-  }
-
-  for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width; ++col) {
-    int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
-    tskip_sum_buffer[buffer_col] += tskip[tskip_id];
-    ++buffer_col;
-  }
-  int right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
-  for (int col = width; col < col_end; ++col) {
-    tskip_sum_buffer[buffer_col] += tskip[right_tskip_id];
-    ++buffer_col;
-  }
-
-  int subtract_row = row - tskip_length;
-  if (subtract_row >= -tskip_lead) {
-    assert(subtract_row <= height - 1);
-    subtract_row = subtract_row >= 0 ? subtract_row : 0;
-    buffer_col = 0;
-    tskip_id_base = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
-    left_tskip_id = tskip_id_base + (0 >> MI_SIZE_LOG2);
-    for (int col = col_begin; col < 0; ++col) {
-      tskip_sum_buffer[buffer_col] -= tskip[left_tskip_id];
-      ++buffer_col;
-    }
-#if defined(__GCC__)
-#pragma GCC ivdep
-#endif
-    for (int col = 0; col < (width >> MI_SIZE_LOG2); ++col) {
-      const uint8_t tskip_val = tskip[tskip_id_base + col];
-
-      for (int i = 0; i < (1 << MI_SIZE_LOG2); ++i) {
-        tskip_sum_buffer[buffer_col] -= tskip_val;
-        ++buffer_col;
-      }
-    }
-    for (int col = (width >> MI_SIZE_LOG2) << MI_SIZE_LOG2; col < width;
-         ++col) {
-      int tskip_id = tskip_id_base + (col >> MI_SIZE_LOG2);
-      tskip_sum_buffer[buffer_col] -= tskip[tskip_id];
-      ++buffer_col;
-    }
-    right_tskip_id = tskip_id_base + ((width - 1) >> MI_SIZE_LOG2);
-    for (int col = width; col < col_end; ++col) {
-      tskip_sum_buffer[buffer_col] -= tskip[right_tskip_id];
-      ++buffer_col;
-    }
-  }
 }
 
 // Does the initialization of feature accumulator for column 0.
@@ -1732,8 +1733,9 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
         stride, width, feature_lead, feature_lag);
   }
   for (int row = 0; row < tskip_length - 1; ++row) {
-    fill_tskip_sum_buffer(row - tskip_lead, tskip, tskip_stride, width, height,
-                          tskip_lead, tskip_lag, tskip_strict);
+    av1_fill_tskip_sum_buffer(row - tskip_lead, tskip, tskip_stride,
+                              tskip_sum_buffer, width, height, tskip_lead,
+                              tskip_lag, tskip_strict);
   }
   for (int i = 0; i < height; ++i) {
     // Ensure window is three pixels or a potential issue with odd-sized frames.
@@ -1742,8 +1744,9 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
         feature_sum_buffers, feature_line_buffers, row_to_process,
         feature_length - 1, dgd, stride, width, feature_lead, feature_lag);
 
-    fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride, width, height,
-                          tskip_lead, tskip_lag, tskip_strict);
+    av1_fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride,
+                              tskip_sum_buffer, width, height, tskip_lead,
+                              tskip_lag, tskip_strict);
 #if PC_WIENER_BLOCK_SIZE > 1
     bool skip_row_compute =
         i % PC_WIENER_BLOCK_SIZE != PC_WIENER_BLOCK_ROW_OFFSET;
