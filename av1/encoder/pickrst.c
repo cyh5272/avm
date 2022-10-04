@@ -4303,8 +4303,9 @@ static double search_rest_type(RestSearchCtxt *rsc,
 }
 
 static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
-                               RestSearchCtxt *rsc) {
+                               RestSearchCtxt *rsc, const ToolCfg *tool_cfg) {
   (void)rsc;
+  (void)tool_cfg;
 #if CONFIG_LR_FLEX_SYNTAX
   rsi->sw_lr_tools_disable_mask = 0;
   uint8_t sw_lr_tools_disable_mask = 0;
@@ -4322,8 +4323,19 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
       ntools++;
       rused = j;
 #if CONFIG_LR_FLEX_SYNTAX
+      assert((rsc->cm->features.lr_tools_disable_mask[rsc->plane] & (1 << j)) ==
+             0);
     } else {
       sw_lr_tools_disable_mask |= (1 << j);
+#else
+      assert(IMPLIES(j == RESTORE_WIENER, tool_cfg->enable_wiener));
+      assert(IMPLIES(j == RESTORE_SGRPROJ, tool_cfg->enable_sgrproj));
+#if CONFIG_PC_WIENER
+      assert(IMPLIES(j == RESTORE_PC_WIENER, tool_cfg->enable_pc_wiener));
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+      assert(IMPLIES(j == RESTORE_WIENER_NONSEP, tool_cfg->enable_wienerns));
+#endif  // CONFIG_WIENER_NONSEP
 #endif  // CONFIG_LR_FLEX_SYNTAX
     }
   }
@@ -4448,7 +4460,29 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
 #if CONFIG_LR_FLEX_SYNTAX
         if (cpi->common.features.lr_tools_disable_mask[plane > 0] & (1 << r))
           continue;
+#else
+        const ToolCfg *const tool_cfg = &cpi->oxcf.tool_cfg;
+        switch (r) {
+          case RESTORE_WIENER:
+            if (!tool_cfg->enable_wiener) continue;
+            break;
+          case RESTORE_SGRPROJ:
+            if (!tool_cfg->enable_sgrproj) continue;
+            break;
+#if CONFIG_PC_WIENER
+          case RESTORE_PC_WIENER:
+            if (!tool_cfg->enable_pc_wiener) continue;
+            break;
+#endif  // CONFIG_PC_WIENER
+#if CONFIG_WIENER_NONSEP
+          case RESTORE_WIENER_NONSEP:
+            if (!tool_cfg->enable_wienerns) continue;
+            break;
+#endif  // CONFIG_WIENER_NONSEP
+          default: break;
+        };
 #endif  // CONFIG_LR_FLEX_SYNTAX
+
 #if CONFIG_PC_WIENER
         // TODO: Redundant search_pc_wiener will skip search for this case.
         if (plane != AOM_PLANE_Y && r == RESTORE_PC_WIENER &&
@@ -4489,7 +4523,8 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
         cm->features.lr_tools_count[plane] < 2,
         cm->rst_info[plane].frame_restoration_type != RESTORE_SWITCHABLE));
 #endif  // CONFIG_LR_FLEX_SYNTAX
-    adjust_frame_rtype(&cm->rst_info[plane], plane_ntiles, &rsc);
+    adjust_frame_rtype(&cm->rst_info[plane], plane_ntiles, &rsc,
+                       &cpi->oxcf.tool_cfg);
   }
 
 #if CONFIG_SAVE_IN_LOOP_DATA
