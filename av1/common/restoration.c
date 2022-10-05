@@ -1272,13 +1272,18 @@ static int get_qstep(int base_qindex, int bit_depth, int *shift) {
 //  by enc/dec so that alloc/free cycles are reduced.
 #define MAX_FEATURE_LENGTH PC_WIENER_FEATURE_LENGTH_LUMA
 #define NUM_FEATURE_LINE_BUFFERS (NUM_PC_WIENER_FEATURES * MAX_FEATURE_LENGTH)
+// Vector size needed to hold feature accumulator values at 4x4 level.
+#define PC_WIENER_FEATURE_ACC_SIZE                               \
+  (RESTORATION_PROC_UNIT_SIZE + PC_WIENER_FEATURE_LENGTH_LUMA) / \
+      PC_WIENER_BLOCK_SIZE
 static int buffer_width = 0;
 static int16_t *feature_line_buffers[NUM_FEATURE_LINE_BUFFERS] = { 0 };
 static int *feature_sum_buffers[NUM_PC_WIENER_FEATURES] = { 0 };
 static int16_t *tskip_sum_buffer = 0;
 
-static int directional_feature_accumulator[NUM_PC_WIENER_FEATURES] = { 0 };
-static int tskip_feature_accumulator = 0;
+static int directional_feature_accumulator[NUM_PC_WIENER_FEATURES]
+                                          [PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+static int tskip_feature_accumulator[PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
 
 static int feature_normalizers[NUM_PC_WIENER_FEATURES + 1] = { 0 };
 
@@ -1495,76 +1500,121 @@ static void fill_tskip_sum_buffer(int row, const uint8_t *tskip,
   }
 }
 
-static void fill_directional_feature_accumulators(int col, int col_offset,
-                                                  int feature_lead,
-                                                  int feature_lag) {
-  const int feature_length = feature_lead + feature_lag + 1;
-  const int col_base = col + col_offset + feature_lead;
-  const int cl = col_base - feature_length;
-  // Lose the if check.
-  if (cl < 0) {
-    const int cr = col_base;
+// Does the initialization of feature accumulator for column 0.
+static void init_directional_feature_accumulator(int col, int feature_lead,
+                                                 int feature_lag) {
+  assert(col == 0);
+  for (int col_offset = -feature_lead; col_offset < feature_lag; ++col_offset) {
+    const int col_base = col + col_offset + feature_lead;
     for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
-      directional_feature_accumulator[k] += feature_sum_buffers[k][cr];
+      assert(col_base >= 0);
+      directional_feature_accumulator[k][0] += feature_sum_buffers[k][col_base];
     }
-    return;
-  }
-  const int cr = col_base;
-  for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
-    directional_feature_accumulator[k] +=
-        feature_sum_buffers[k][cr] - feature_sum_buffers[k][cl];
   }
 }
 
-static void fill_tskip_feature_accumulator(int col, int col_offset,
+static void fill_directional_feature_accumulators(int width, int col_offset,
+                                                  int feature_lead,
+                                                  int feature_lag) {
+  int col = 0;
+  const int feature_length = feature_lead + feature_lag + 1;
+  int col_base = col + col_offset + feature_lead;
+
+  // For width equals to zero case.
+  for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
+    directional_feature_accumulator[k][0] += feature_sum_buffers[k][col_base];
+  }
+
+  // For the remaining width.
+  col_base++;
+  for (col = 1; col < width; ++col, ++col_base) {
+    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
+    const int cl = col_base - feature_length;
+    // Currently, the buffer 'directional_feature_accumulator' is used to hold
+    // the accumulated (from the 0th to start of the block position) gradient
+    // values corresponds to each direction. These accumulated values are used
+    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
+    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
+    // samples. Here, cur_idx and prev_idx are used to update this accumulate
+    // buffer appropriately.
+    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
+    const int prev_idx =
+        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
+    for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
+      directional_feature_accumulator[k][cur_idx] =
+          directional_feature_accumulator[k][prev_idx] +
+          feature_sum_buffers[k][col_base] - feature_sum_buffers[k][cl];
+    }
+  }
+}
+
+static void init_tskip_feature_accumulator(int col, int tskip_lead,
+                                           int tskip_lag) {
+  assert(col == 0);
+  for (int col_offset = -tskip_lead; col_offset < tskip_lag; ++col_offset) {
+    // Add tskip_lead to ensure buffer access is from >=0.
+    const int col_base = col + col_offset + tskip_lead;
+    tskip_feature_accumulator[0] += tskip_sum_buffer[col_base];
+  }
+}
+
+static void fill_tskip_feature_accumulator(int width, int col_offset,
                                            int tskip_lead, int tskip_lag) {
   const int tskip_length = tskip_lead + tskip_lag + 1;
-
+  int col = 0;
   // Add tskip_lead to ensure buffer access is from >=0.
-  const int col_base = col + col_offset + tskip_lead;
+  int col_base = col + col_offset + tskip_lead;
   assert(col_base >= 0);
-  const int cl = col_base - tskip_length;
-  // Lose the if check.
-  if (cl < 0) {
-    const int cr = col_base;
-    tskip_feature_accumulator += tskip_sum_buffer[cr];
-    return;
+  // For width equals to zero case.
+  tskip_feature_accumulator[0] += tskip_sum_buffer[col_base];
+
+  // For the remaining width.
+  col_base++;
+  for (col = 1; col < width; ++col, ++col_base) {
+    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
+    const int cl = col_base - tskip_length;
+    // Currently, the buffer 'directional_feature_accumulator' is used to hold
+    // the accumulated (from the 0th to start of the block position) gradient
+    // values corresponds to each direction. These accumulated values are used
+    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
+    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
+    // samples. Here, cur_idx and prev_idx are used to update this accumulate
+    // buffer appropriately.
+    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
+    const int prev_idx =
+        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
+    tskip_feature_accumulator[cur_idx] = tskip_feature_accumulator[prev_idx] +
+                                         tskip_sum_buffer[col_base] -
+                                         tskip_sum_buffer[cl];
   }
-  const int cr = col_base;
-  tskip_feature_accumulator += tskip_sum_buffer[cr] - tskip_sum_buffer[cl];
 }
 
 // Initializes the accumulators.
 static void initialize_feature_accumulators(int feature_lead, int feature_lag,
                                             int tskip_lead, int tskip_lag) {
-  for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
-    directional_feature_accumulator[k] = 0;
-  }
-  tskip_feature_accumulator = 0;
-
+  av1_zero(directional_feature_accumulator);
+  av1_zero(tskip_feature_accumulator);
   // Initialize accumulators on the leftmost portion of the line.
-  for (int col_offset = -feature_lead; col_offset < feature_lag; ++col_offset) {
-    fill_directional_feature_accumulators(0, col_offset, feature_lead,
-                                          feature_lag);
-  }
-  for (int col_offset = -tskip_lead; col_offset < tskip_lag; ++col_offset) {
-    fill_tskip_feature_accumulator(0, col_offset, tskip_lead, tskip_lag);
-  }
+  init_directional_feature_accumulator(0, feature_lead, feature_lag);
+  init_tskip_feature_accumulator(0, tskip_lead, tskip_lag);
 }
 
 // Updates the accumulators.
-static void update_accumulators(int col, int feature_lead, int feature_lag,
-                                int tskip_lead, int tskip_lag) {
-  fill_directional_feature_accumulators(col, feature_lag, feature_lead,
+static void update_accumulators(int feature_lead, int feature_lag,
+                                int tskip_lead, int tskip_lag, int width) {
+  fill_directional_feature_accumulators(width, feature_lag, feature_lead,
                                         feature_lag);
-  fill_tskip_feature_accumulator(col, tskip_lag, tskip_lead, tskip_lag);
+  fill_tskip_feature_accumulator(width, tskip_lag, tskip_lead, tskip_lag);
 }
 
 // Calculates the features needed for get_pcwiener_index.
-static void calculate_features(int32_t *feature_vector, int bit_depth) {
+static void calculate_features(int32_t *feature_vector, int bit_depth,
+                               int col) {
+  // Index derivation to retrieve the stored accumulated value.
+  const int accum_index = col / PC_WIENER_BLOCK_SIZE;
   for (int f = 0; f < NUM_PC_WIENER_FEATURES; ++f) {
-    feature_vector[f] =
-        directional_feature_accumulator[f] * feature_normalizers[f];
+    feature_vector[f] = directional_feature_accumulator[f][accum_index] *
+                        feature_normalizers[f];
   }
   const int bit_depth_shift = bit_depth - 8;
   if (bit_depth_shift) {
@@ -1574,7 +1624,7 @@ static void calculate_features(int32_t *feature_vector, int bit_depth) {
   }
   const int tskip_index = NUM_PC_WIENER_FEATURES;
   feature_vector[tskip_index] =
-      tskip_feature_accumulator * feature_normalizers[tskip_index];
+      tskip_feature_accumulator[accum_index] * feature_normalizers[tskip_index];
 }
 
 // Lookup table useful in calculating the filter indices within
@@ -1630,11 +1680,11 @@ static void set_feature_normalizers(bool is_uv) {
   }
 }
 
-static uint8_t get_pcwiener_index(int bit_depth, int32_t *multiplier) {
+static uint8_t get_pcwiener_index(int bit_depth, int32_t *multiplier, int col) {
   int32_t feature_vector[NUM_PC_WIENER_FEATURES + 1];  // 255 x actual
 
   // Fill the feature vector.
-  calculate_features(feature_vector, bit_depth);
+  calculate_features(feature_vector, bit_depth, col);
 
   // actual * 256
   const int tskip_index = NUM_PC_WIENER_FEATURES;
@@ -1756,17 +1806,15 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #else
     bool skip_row_compute = false;
 #endif  // PC_WIENER_BLOCK_SIZE > 1
-    // Initialize accumulators on the leftmost portion of the line.
     if (!skip_row_compute) {
+      // Initialize accumulators on the leftmost portion of the line.
       initialize_feature_accumulators(feature_lead, feature_lag, tskip_lead,
                                       tskip_lag);
+      // Fill accumulators for processing width.
+      update_accumulators(feature_lead, feature_lag, tskip_lead, tskip_lag,
+                          width);
     }
     for (int j = 0; j < width; ++j) {
-      if (!skip_row_compute) {
-        update_accumulators(j, feature_lead, feature_lag, tskip_lead,
-                            tskip_lag);
-      }
-
 #if PC_WIENER_BLOCK_SIZE > 1
       if (skip_row_compute ||
           j % PC_WIENER_BLOCK_SIZE != PC_WIENER_BLOCK_COL_OFFSET)
@@ -1774,7 +1822,8 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // PC_WIENER_BLOCK_SIZE > 1
 
       int32_t multiplier = 0;
-      const uint8_t filter_index = get_pcwiener_index(bit_depth, &multiplier);
+      const uint8_t filter_index =
+          get_pcwiener_index(bit_depth, &multiplier, j);
 
       // Store classification.
       class_id[(i >> MI_SIZE_LOG2) * class_id_stride + (j >> MI_SIZE_LOG2)] =
