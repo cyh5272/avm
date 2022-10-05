@@ -1043,10 +1043,14 @@ void av1_convolve_symmetric_dual_highbd_c(
   }
   // The dual channel may have a (0, 0) offset, in which case it must be the
   // last one.
+  int32_t singleton_tap_dual = 0;
   if (filter_config->num_pixels2 % 2) {
-    assert(filter_config->config2[num_sym_taps_dual][NONSEP_ROW_ID] == 0 &&
-           filter_config->config2[num_sym_taps_dual][NONSEP_COL_ID] == 0);
-    pixel_offset_diffs_dual[num_sym_taps_dual] = 0;
+    const int last_config = filter_config->num_pixels2 - 1;
+    assert(filter_config->config2[last_config][NONSEP_ROW_ID] == 0 &&
+           filter_config->config2[last_config][NONSEP_COL_ID] == 0);
+    const int singleton_tap_index =
+        filter_config->config2[last_config][NONSEP_BUF_POS];
+    singleton_tap_dual += filter[singleton_tap_index];
   }
   // End compute conveniences.
 
@@ -1078,19 +1082,16 @@ void av1_convolve_symmetric_dual_highbd_c(
         const int16_t tmp_sum = dgd_dual[dgd_dual_id + diff];
         compute_buffer_dual[k] += tmp_sum;  // 16-bit arithmetic.
       }
-      if (filter_config->num_pixels2 % 2) {
-        const int16_t tmp_sum = dgd_dual[dgd_dual_id];
-        compute_buffer_dual[num_sym_taps_dual] = tmp_sum;  // 16-bit arithmetic.
-      }
+
       // Handle singleton tap.
       int32_t tmp = singleton_tap * dgd[dgd_id];
-
       for (int k = 0; k < num_sym_taps; ++k) {
         const int pos = filter_config->config[2 * k][NONSEP_BUF_POS];
         tmp += (int32_t)filter[pos] * compute_buffer[k];  // 32-bit arithmetic.
       }
-      for (int k = 0; k < num_sym_taps_dual + (filter_config->num_pixels2 % 2);
-           ++k) {
+
+      tmp += singleton_tap_dual * dgd_dual[dgd_dual_id];
+      for (int k = 0; k < num_sym_taps_dual; ++k) {
         const int pos = filter_config->config2[2 * k][NONSEP_BUF_POS];
         tmp += (int32_t)filter[pos] *
                compute_buffer_dual[k];  // 32-bit arithmetic.

@@ -162,6 +162,33 @@ const WienernsFilterPairParameters wienerns_filters_midqp = {
   &wienerns_filter_y, &wienerns_filter_uv
 };
 
+// Configs for the first set of filters for the case without subtract center.
+// Add a tap at (0, 0).
+const int wienerns_wout_subtract_center_config_y[][3] = {
+  { 1, 0, 0 },  { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
+  { -2, 0, 2 }, { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
+  { -1, 1, 5 }, { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
+  { -2, 1, 7 }, { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
+  { 3, 0, 10 }, { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 }, { 0, 0, 12 },
+};
+
+// Add a tap at (0, 0).
+const int wienerns_wout_subtract_center_config_uv_from_uv[][3] = {
+  { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
+  { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
+  { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
+};
+
+// Adjust the beginning tap to account for the above change and add a tap at
+// (0, 0).
+const int wienerns_wout_subtract_center_config_uv_from_y[][3] = {
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  { 1, 0, 7 },   { -1, 0, 7 },  { 0, 1, 8 },   { 0, -1, 8 }, { 1, 1, 9 },
+  { -1, -1, 9 }, { -1, 1, 10 }, { 1, -1, 10 }, { 2, 0, 11 }, { -2, 0, 11 },
+  { 0, 2, 12 },  { 0, -2, 12 }, { 0, 0, 13 },
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+};
+
 ///////////////////////////////////////////////////////////////////////////
 // Second filter configuration
 ///////////////////////////////////////////////////////////////////////////
@@ -1970,9 +1997,76 @@ const uint8_t *get_pc_wiener_sub_classifier(int num_classes) {
 }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
+// Enables running of wienerns filters without the subtract-center option.
+#define ADD_CENTER_TAP_TO_WIENERNS 1
+
+#if ADD_CENTER_TAP_TO_WIENERNS
+// Adjust wienerns config and filters to use the non-subtract-center path.
+static void adjust_filter_and_config(const NonsepFilterConfig *nsfilter_config,
+                                     const WienerNonsepInfo *wienerns_info,
+                                     int is_uv,
+                                     NonsepFilterConfig *adjusted_config,
+                                     WienerNonsepInfo *adjusted_info) {
+  *adjusted_config = *nsfilter_config;
+  *adjusted_info = *wienerns_info;
+
+  // Add the center tap.
+  adjusted_config->num_pixels += 1;
+  if (adjusted_config->num_pixels2) {
+    adjusted_config->num_pixels2 += 1;
+  }
+
+  adjusted_config->subtract_center = 0;
+  adjusted_config->config =
+      is_uv ? wienerns_wout_subtract_center_config_uv_from_uv
+            : wienerns_wout_subtract_center_config_y;
+  adjusted_config->config2 = NULL;
+
+  // Handle luma -> luma or chroma -> chroma case.
+  // Add a center tap at the end of the filter that is the minus the sum of the
+  // taps.
+  const int num_sym_taps = nsfilter_config->num_pixels / 2;
+  const int center_tap_index = num_sym_taps;
+  const int num_classes = wienerns_info->num_classes;
+  for (int class_id = 0; class_id < num_classes; ++class_id) {
+    int16_t *adjusted_filter = nsfilter_taps(adjusted_info, class_id);
+    int sum = 0;
+    for (int i = 0; i < num_sym_taps; ++i) {
+      sum += adjusted_filter[i];
+    }
+    adjusted_filter[center_tap_index] = -2 * sum;
+  }
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  if (is_uv) {
+    adjusted_config->config2 = wienerns_wout_subtract_center_config_uv_from_y;
+    const int num_sym_taps_dual = nsfilter_config->num_pixels2 / 2;
+    const int begin_idx = num_sym_taps;
+    const int end_idx = begin_idx + num_sym_taps_dual;
+    const int center_tap_index_dual = end_idx + 1;
+
+    // luma -> chroma part of the dual filter. This case needs a shift of the
+    // filter since we added a tap to the chroma -> chroma part above.
+    for (int class_id = 0; class_id < num_classes; ++class_id) {
+      const int16_t *dual_filter = const_nsfilter_taps(wienerns_info, class_id);
+      int16_t *adjusted_filter = nsfilter_taps(adjusted_info, class_id);
+      int sum = 0;
+      for (int i = begin_idx; i < end_idx; ++i) {
+        sum += dual_filter[i];
+        // Shift the filter by one to account for the center tap above.
+        adjusted_filter[i + 1] = dual_filter[i];
+      }
+      // Add the center tap at the end.
+      adjusted_filter[center_tap_index_dual] = -2 * sum;
+    }
+  }
+#endif
+}
+#endif  // ADD_CENTER_TAP_TO_WIENERNS
+
 void apply_wienerns_class_id_highbd(
-    const uint8_t *dgd8, int width, int height, int stride, int base_qindex,
-    const WienerNonsepInfo *wienerns_info, uint8_t *dst8, int dst_stride,
+    const uint8_t *dgd8, int width, int height, int stride,
+    const WienerNonsepInfo *wienerns_info,
+    const NonsepFilterConfig *nsfilter_config, uint8_t *dst8, int dst_stride,
     int plane, const uint8_t *luma8, int luma_stride, int bit_depth
 #if CONFIG_COMBINE_PC_NS_WIENER
     ,
@@ -1983,13 +2077,11 @@ void apply_wienerns_class_id_highbd(
   (void)luma8;
   (void)luma_stride;
   int is_uv = (plane != AOM_PLANE_Y);
-  const NonsepFilterConfig *nsfilter_config =
-      get_wienerns_config(base_qindex, is_uv);
+
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   if (is_uv && nsfilter_config->num_pixels2 != 0) {
     assert(wienerns_info->num_classes == 1);
     const int16_t *filter = const_nsfilter_taps(wienerns_info, 0);
-    const int16_t *filter_ = filter;
 
     const int block_size = 4;
     for (int r = 0; r < height; r += block_size) {
@@ -2002,7 +2094,7 @@ void apply_wienerns_class_id_highbd(
         const int w = AOMMIN(block_size, width - c);
         av1_convolve_nonsep_dual_highbd(
             dgd8_row + c, w, h, stride, luma8_row + c, luma_stride,
-            nsfilter_config, filter_, dst8_row + c, dst_stride, bit_depth);
+            nsfilter_config, filter, dst8_row + c, dst_stride, bit_depth);
       }
     }
     return;
@@ -2035,8 +2127,8 @@ void apply_wienerns_class_id_highbd(
       }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
-      const int16_t *filter = const_nsfilter_taps(wienerns_info, sub_class_id);
-      const int16_t *block_filter = filter;
+      const int16_t *block_filter =
+          const_nsfilter_taps(wienerns_info, sub_class_id);
       av1_convolve_nonsep_highbd(dgd8_row + c, w, h, stride, nsfilter_config,
                                  block_filter, dst8_row + c, dst_stride,
                                  bit_depth);
@@ -2073,11 +2165,38 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   assert(rui->wienerns_info.num_classes == 1);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
+  int is_uv = rui->plane != AOM_PLANE_Y;
+  const NonsepFilterConfig *orig_config =
+      get_wienerns_config(rui->base_qindex, is_uv);
+#if ADD_CENTER_TAP_TO_WIENERNS
+  NonsepFilterConfig adjusted_config;
+  WienerNonsepInfo adjusted_info;
+  adjust_filter_and_config(orig_config, &rui->wienerns_info, is_uv,
+                           &adjusted_config, &adjusted_info);
+  const NonsepFilterConfig *nsfilter_config = &adjusted_config;
+  const WienerNonsepInfo *nsfilter_info = &adjusted_info;
+#if CONFIG_WIENER_NONSEP_CROSS_FILT
+  if (is_uv && orig_config->num_pixels2 != 0) {
+    // Dual code doesn't have the non-subtract center SIMD path yet. No change
+    // in config or taps. (Enabling will run
+    // av1_convolve_symmetric_dual_highbd_c().)
+    const int add_center_tap_to_cross = 0;
+    if (!add_center_tap_to_cross) {
+      nsfilter_config = orig_config;
+      nsfilter_info = &rui->wienerns_info;
+    }
+  }
+#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+#else
+  const NonsepFilterConfig *nsfilter_config = orig_config;
+  const WienerNonsepInfo *nsfilter_info = &rui->wienerns_info;
+#endif  // ADD_CENTER_TAP_TO_WIENERNS
+
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
     apply_wienerns_class_id_highbd(
-        src + j, w, stripe_height, src_stride, rui->base_qindex,
-        &rui->wienerns_info, dst + j, dst_stride, rui->plane,
+        src + j, w, stripe_height, src_stride, nsfilter_info, nsfilter_config,
+        dst + j, dst_stride, rui->plane,
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
         rui->luma + j, rui->luma_stride,
 #else

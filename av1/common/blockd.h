@@ -760,6 +760,9 @@ typedef struct {
 #else
 #define WIENERNS_MAX_CLASSES 1
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
+
+// Need two of the WIENERNS_YUV_MAX to store potential center taps. Adjust
+// accordingly.
 #define WIENERNS_YUV_MAX 32
 // Special symbol to indicate the set of all classes.
 #define ALL_WIENERNS_CLASSES -17
