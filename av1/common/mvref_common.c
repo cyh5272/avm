@@ -3432,8 +3432,8 @@ uint8_t av1_selectSamples(MV *mv, int *pts, int *pts_inref, int len,
 // left-top pixel of current block.
 uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
                         int *pts_inref) {
-  const MB_MODE_INFO *const mbmi0 = xd->mi[0];
-  const int ref_frame = mbmi0->ref_frame[0];
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const int ref_frame = mbmi->ref_frame[0];
   const int up_available = xd->up_available;
   const int left_available = xd->left_available;
   int i, mi_step;
@@ -3447,20 +3447,19 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
   // scan the nearest above rows
   if (up_available) {
     const int mi_row_offset = -1;
-    const MB_MODE_INFO *mbmi = xd->mi[mi_row_offset * mi_stride];
-    uint8_t superblock_width = mi_size_wide[mbmi->sb_type[PLANE_TYPE_Y]];
+    const MB_MODE_INFO *above_mbmi = xd->mi[mi_row_offset * mi_stride];
+    uint8_t above_block_width = mi_size_wide[above_mbmi->sb_type[PLANE_TYPE_Y]];
 
-    if (xd->width <= superblock_width) {
-      // Handle "current block width <= above block width" case.
-      const int col_offset = -mi_col % superblock_width;
+    if (xd->width <= above_block_width) {
+      const int col_offset = -mi_col % above_block_width;
 
       if (col_offset < 0) do_tl = 0;
-      if (col_offset + superblock_width > xd->width) do_tr = 0;
+      if (col_offset + above_block_width > xd->width) do_tr = 0;
 
 #if CONFIG_COMPOUND_WARP_SAMPLES
-      for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-        if (mbmi->ref_frame[ref] == ref_frame) {
-          record_samples(mbmi, ref, pts, pts_inref, 0, -1, col_offset, 1);
+      for (int ref = 0; ref < 1 + has_second_ref(above_mbmi); ++ref) {
+        if (above_mbmi->ref_frame[ref] == ref_frame) {
+          record_samples(above_mbmi, ref, pts, pts_inref, 0, -1, col_offset, 1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3469,24 +3468,23 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-        record_samples(mbmi, pts, pts_inref, 0, -1, col_offset, 1);
+      if (above_mbmi->ref_frame[0] == ref_frame && above_mbmi->ref_frame[1] == NONE_FRAME) {
+        record_samples(above_mbmi, pts, pts_inref, 0, -1, col_offset, 1);
         pts += 2;
         pts_inref += 2;
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
 #endif  // CONFIG_COMPOUND_WARP_SAMPLES
-    } else {
-      // Handle "current block width > above block width" case.
+    } else {  // xd->width > above_block_width
       for (i = 0; i < AOMMIN(xd->width, cm->mi_params.mi_cols - mi_col);
            i += mi_step) {
-        mbmi = xd->mi[i + mi_row_offset * mi_stride];
-        superblock_width = mi_size_wide[mbmi->sb_type[PLANE_TYPE_Y]];
-        mi_step = AOMMIN(xd->width, superblock_width);
+        above_mbmi = xd->mi[i + mi_row_offset * mi_stride];
+        above_block_width = mi_size_wide[above_mbmi->sb_type[PLANE_TYPE_Y]];
+        mi_step = AOMMIN(xd->width, above_block_width);
 #if CONFIG_COMPOUND_WARP_SAMPLES
-        for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-          if (mbmi->ref_frame[ref] == ref_frame) {
-            record_samples(mbmi, ref, pts, pts_inref, 0, -1, i, 1);
+        for (int ref = 0; ref < 1 + has_second_ref(above_mbmi); ++ref) {
+          if (above_mbmi->ref_frame[ref] == ref_frame) {
+            record_samples(above_mbmi, ref, pts, pts_inref, 0, -1, i, 1);
             pts += 2;
             pts_inref += 2;
             if (++np >= LEAST_SQUARES_SAMPLES_MAX)
@@ -3494,9 +3492,9 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
           }
         }
 #else
-        if (mbmi->ref_frame[0] == ref_frame &&
-            mbmi->ref_frame[1] == NONE_FRAME) {
-          record_samples(mbmi, pts, pts_inref, 0, -1, i, 1);
+        if (above_mbmi->ref_frame[0] == ref_frame &&
+            above_mbmi->ref_frame[1] == NONE_FRAME) {
+          record_samples(above_mbmi, pts, pts_inref, 0, -1, i, 1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3512,19 +3510,18 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
   // scan the nearest left columns
   if (left_available) {
     const int mi_col_offset = -1;
-    const MB_MODE_INFO *mbmi = xd->mi[mi_col_offset];
-    uint8_t superblock_height = mi_size_high[mbmi->sb_type[PLANE_TYPE_Y]];
+    const MB_MODE_INFO *left_mbmi = xd->mi[mi_col_offset];
+    uint8_t left_block_height = mi_size_high[left_mbmi->sb_type[PLANE_TYPE_Y]];
 
-    if (xd->height <= superblock_height) {
-      // Handle "current block height <= above block height" case.
-      const int row_offset = -mi_row % superblock_height;
+    if (xd->height <= left_block_height) {
+      const int row_offset = -mi_row % left_block_height;
 
       if (row_offset < 0) do_tl = 0;
 
 #if CONFIG_COMPOUND_WARP_SAMPLES
-      for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-        if (mbmi->ref_frame[ref] == ref_frame) {
-          record_samples(mbmi, ref, pts, pts_inref, row_offset, 1, 0, -1);
+      for (int ref = 0; ref < 1 + has_second_ref(left_mbmi); ++ref) {
+        if (left_mbmi->ref_frame[ref] == ref_frame) {
+          record_samples(left_mbmi, ref, pts, pts_inref, row_offset, 1, 0, -1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3533,24 +3530,23 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-        record_samples(mbmi, pts, pts_inref, row_offset, 1, 0, -1);
+      if (left_mbmi->ref_frame[0] == ref_frame && left_mbmi->ref_frame[1] == NONE_FRAME) {
+        record_samples(left_mbmi, pts, pts_inref, row_offset, 1, 0, -1);
         pts += 2;
         pts_inref += 2;
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
 #endif  // CONFIG_COMPOUND_WARP_SAMPLES
-    } else {
-      // Handle "current block height > above block height" case.
+    } else {  // xd->height > left_block_height
       for (i = 0; i < AOMMIN(xd->height, cm->mi_params.mi_rows - mi_row);
            i += mi_step) {
-        mbmi = xd->mi[mi_col_offset + i * mi_stride];
-        superblock_height = mi_size_high[mbmi->sb_type[PLANE_TYPE_Y]];
-        mi_step = AOMMIN(xd->height, superblock_height);
+        left_mbmi = xd->mi[mi_col_offset + i * mi_stride];
+        left_block_height = mi_size_high[left_mbmi->sb_type[PLANE_TYPE_Y]];
+        mi_step = AOMMIN(xd->height, left_block_height);
 #if CONFIG_COMPOUND_WARP_SAMPLES
-        for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-          if (mbmi->ref_frame[ref] == ref_frame) {
-            record_samples(mbmi, ref, pts, pts_inref, i, 1, 0, -1);
+        for (int ref = 0; ref < 1 + has_second_ref(left_mbmi); ++ref) {
+          if (left_mbmi->ref_frame[ref] == ref_frame) {
+            record_samples(left_mbmi, ref, pts, pts_inref, i, 1, 0, -1);
             pts += 2;
             pts_inref += 2;
             if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3559,9 +3555,9 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
           }
         }
 #else
-        if (mbmi->ref_frame[0] == ref_frame &&
-            mbmi->ref_frame[1] == NONE_FRAME) {
-          record_samples(mbmi, pts, pts_inref, i, 1, 0, -1);
+        if (left_mbmi->ref_frame[0] == ref_frame &&
+            left_mbmi->ref_frame[1] == NONE_FRAME) {
+          record_samples(left_mbmi, pts, pts_inref, i, 1, 0, -1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3578,19 +3574,19 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
   if (do_tl && left_available && up_available) {
     const int mi_row_offset = -1;
     const int mi_col_offset = -1;
-    MB_MODE_INFO *mbmi = xd->mi[mi_col_offset + mi_row_offset * mi_stride];
+    const MB_MODE_INFO *tl_mbmi = xd->mi[mi_col_offset + mi_row_offset * mi_stride];
 #if CONFIG_COMPOUND_WARP_SAMPLES
-    for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-      if (mbmi->ref_frame[ref] == ref_frame) {
-        record_samples(mbmi, ref, pts, pts_inref, 0, -1, 0, -1);
+    for (int ref = 0; ref < 1 + has_second_ref(tl_mbmi); ++ref) {
+      if (tl_mbmi->ref_frame[ref] == ref_frame) {
+        record_samples(tl_mbmi, ref, pts, pts_inref, 0, -1, 0, -1);
         pts += 2;
         pts_inref += 2;
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
     }
 #else
-    if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-      record_samples(mbmi, pts, pts_inref, 0, -1, 0, -1);
+    if (tl_mbmi->ref_frame[0] == ref_frame && tl_mbmi->ref_frame[1] == NONE_FRAME) {
+      record_samples(tl_mbmi, pts, pts_inref, 0, -1, 0, -1);
       pts += 2;
       pts_inref += 2;
       if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
@@ -3607,12 +3603,12 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
     if (is_inside(tile, mi_col, mi_row, &trb_pos)) {
       const int mi_row_offset = -1;
       const int mi_col_offset = xd->width;
-      const MB_MODE_INFO *mbmi =
+      const MB_MODE_INFO *tr_mbmi =
           xd->mi[mi_col_offset + mi_row_offset * mi_stride];
 #if CONFIG_COMPOUND_WARP_SAMPLES
-      for (int ref = 0; ref < 1 + has_second_ref(mbmi); ++ref) {
-        if (mbmi->ref_frame[ref] == ref_frame) {
-          record_samples(mbmi, ref, pts, pts_inref, 0, -1, xd->width, 1);
+      for (int ref = 0; ref < 1 + has_second_ref(tr_mbmi); ++ref) {
+        if (tr_mbmi->ref_frame[ref] == ref_frame) {
+          record_samples(tr_mbmi, ref, pts, pts_inref, 0, -1, xd->width, 1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3621,8 +3617,8 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (mbmi->ref_frame[0] == ref_frame && mbmi->ref_frame[1] == NONE_FRAME) {
-        record_samples(mbmi, pts, pts_inref, 0, -1, xd->width, 1);
+      if (tr_mbmi->ref_frame[0] == ref_frame && tr_mbmi->ref_frame[1] == NONE_FRAME) {
+        record_samples(tr_mbmi, pts, pts_inref, 0, -1, xd->width, 1);
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
 #endif  // CONFIG_COMPOUND_WARP_SAMPLES
