@@ -86,4 +86,11 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_TIP AND CONFIG_TEMPORAL_GLOBAL_MV)
     change_config_and_warn(CONFIG_TEMPORAL_GLOBAL_MV 0 !CONFIG_TIP)
   endif()
+
+  # CONFIG_IMPROVED_WARP depends on CONFIG_EXTENDED_WARP_PREDICTION
+  if(NOT CONFIG_EXTENDED_WARP_PREDICTION AND CONFIG_IMPROVED_WARP)
+    change_config_and_warn(CONFIG_IMPROVED_WARP 0
+                           !CONFIG_EXTENDED_WARP_PREDICTION)
+  endif()
+
 endmacro()
