@@ -1999,6 +1999,7 @@ const uint8_t *get_pc_wiener_sub_classifier(int num_classes) {
 
 // Enables running of wienerns filters without the subtract-center option.
 #define ADD_CENTER_TAP_TO_WIENERNS 1
+#define ADD_CENTER_TAP_TO_WIENERNS_CROSS 0
 
 #if ADD_CENTER_TAP_TO_WIENERNS
 // Adjust wienerns config and filters to use the non-subtract-center path.
@@ -2180,8 +2181,7 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
     // Dual code doesn't have the non-subtract center SIMD path yet. No change
     // in config or taps. (Enabling will run
     // av1_convolve_symmetric_dual_highbd_c().)
-    const int add_center_tap_to_cross = 0;
-    if (!add_center_tap_to_cross) {
+    if (!ADD_CENTER_TAP_TO_WIENERNS_CROSS) {
       nsfilter_config = orig_config;
       nsfilter_info = &rui->wienerns_info;
     }
