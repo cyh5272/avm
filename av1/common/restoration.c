@@ -2159,10 +2159,11 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
 }
 
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-uint8_t *wienerns_copy_luma_highbd(const uint8_t *dgd, int height_y,
-                                   int width_y, int in_stride, uint8_t **luma8,
-                                   int height_uv, int width_uv, int border,
-                                   int out_stride, int bd) {
+uint16_t *wienerns_copy_luma_highbd(const uint8_t *dgd8, int height_y,
+                                    int width_y, int in_stride, uint8_t **luma8,
+                                    int height_uv, int width_uv, int border,
+                                    int out_stride, int bd) {
+  (void)bd;
   uint16_t *aug_luma = (uint16_t *)malloc(
       sizeof(uint16_t) * (width_uv + 2 * border) * (height_uv + 2 * border));
   memset(
@@ -2171,39 +2172,81 @@ uint8_t *wienerns_copy_luma_highbd(const uint8_t *dgd, int height_y,
   uint16_t *luma[1];
   *luma = aug_luma + border * out_stride + border;
   *luma8 = CONVERT_TO_BYTEPTR(*luma);
-  av1_highbd_resize_plane(dgd, height_y, width_y, in_stride,
+#if WIENERNS_CROSS_FILT_LUMA_TYPE == 0
+  uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
+  const int ss_x = (((width_y + 1) >> 1) == width_uv);
+  const int ss_y = (((height_y + 1) >> 1) == height_uv);
+  for (int r = 0; r < height_uv; ++r) {
+    for (int c = 0; c < width_uv; ++c) {
+      (*luma)[r * out_stride + c] =
+          dgd[(1 + ss_y) * r * in_stride + (1 + ss_x) * c];
+    }
+  }
+#elif WIENERNS_CROSS_FILT_LUMA_TYPE == 1
+  uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
+  const int ss_x = (((width_y + 1) >> 1) == width_uv);
+  const int ss_y = (((height_y + 1) >> 1) == height_uv);
+  if (ss_x && ss_y) {  // 420
+    int r;
+    for (r = 0; r < height_y / 2; ++r) {
+      int c;
+      for (c = 0; c < width_y / 2; ++c) {
+        (*luma)[r * out_stride + c] =
+            (dgd[2 * r * in_stride + 2 * c] +
+             dgd[2 * r * in_stride + 2 * c + 1] +
+             dgd[(2 * r + 1) * in_stride + 2 * c] +
+             dgd[(2 * r + 1) * in_stride + 2 * c + 1] + 2) >>
+            2;
+      }
+      // handle odd width_y
+      for (; c < width_uv; ++c) {
+        (*luma)[r * out_stride + c] =
+            (dgd[2 * r * in_stride + 2 * c] +
+             dgd[(2 * r + 1) * in_stride + 2 * c] + 1) >>
+            1;
+      }
+    }
+    // handle odd height_y
+    for (; r < height_uv; ++r) {
+      int c;
+      for (c = 0; c < width_y / 2; ++c) {
+        (*luma)[r * out_stride + c] =
+            (dgd[2 * r * in_stride + 2 * c] +
+             dgd[2 * r * in_stride + 2 * c + 1] + 1) >>
+            1;
+      }
+      // handle odd height_y and width_y
+      for (; c < width_uv; ++c) {
+        (*luma)[r * out_stride + c] = dgd[2 * r * in_stride + 2 * c];
+      }
+    }
+  } else if (ss_x && !ss_y) {  // 422
+    for (int r = 0; r < height_uv; ++r) {
+      int c;
+      for (c = 0; c < width_y / 2; ++c) {
+        (*luma)[r * out_stride + c] =
+            (dgd[r * in_stride + 2 * c] + dgd[r * in_stride + 2 * c + 1] + 1) >>
+            1;
+      }
+      // handle odd width_y
+      for (; c < width_uv; ++c) {
+        (*luma)[r * out_stride + c] = dgd[r * in_stride + 2 * c];
+      }
+    }
+  } else if (!ss_x && !ss_y) {  // 444
+    for (int r = 0; r < height_uv; ++r) {
+      for (int c = 0; c < width_uv; ++c) {
+        (*luma)[r * out_stride + c] = dgd[r * in_stride + c];
+      }
+    }
+  } else {
+    assert(0 && "Invalid dimensions");
+  }
+#else
+  av1_highbd_resize_plane(dgd8, height_y, width_y, in_stride,
                           CONVERT_TO_BYTEPTR(*luma), height_uv, width_uv,
                           out_stride, bd);
-  // extend border by replication
-  for (int r = 0; r < height_uv; ++r) {
-    for (int c = -border; c < 0; ++c)
-      (*luma)[r * out_stride + c] = (*luma)[r * out_stride];
-    for (int c = 0; c < border; ++c)
-      (*luma)[r * out_stride + width_uv + c] =
-          (*luma)[r * out_stride + width_uv - 1];
-  }
-  for (int r = -border; r < 0; ++r) {
-    memcpy(&(*luma)[r * out_stride - border], &(*luma)[-border],
-           (width_uv + 2 * border) * sizeof((*luma)[0]));
-  }
-  for (int r = 0; r < border; ++r)
-    memcpy(&(*luma)[(height_uv + r) * out_stride - border],
-           &(*luma)[(height_uv - 1) * out_stride - border],
-           (width_uv + 2 * border) * sizeof((*luma)[0]));
-  return (uint8_t *)aug_luma;
-}
-
-uint8_t *wienerns_copy_luma(const uint8_t *dgd, int height_y, int width_y,
-                            int in_stride, uint8_t **luma, int height_uv,
-                            int width_uv, int border, int out_stride) {
-  uint8_t *aug_luma = (uint8_t *)malloc(
-      sizeof(uint8_t) * (width_uv + 2 * border) * (height_uv + 2 * border));
-  memset(
-      aug_luma, 0,
-      sizeof(*aug_luma) * (width_uv + 2 * border) * (height_uv + 2 * border));
-  *luma = aug_luma + border * out_stride + border;
-  av1_resize_plane(dgd, height_y, width_y, in_stride, *luma, height_uv,
-                   width_uv, out_stride);
+#endif  // WIENERNS_CROSS_FILT_LUMA_TYPE
   // extend border by replication
   for (int r = 0; r < height_uv; ++r) {
     for (int c = -border; c < 0; ++c)
@@ -2223,7 +2266,6 @@ uint8_t *wienerns_copy_luma(const uint8_t *dgd, int height_y, int width_y,
   return aug_luma;
 }
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-
 #endif  // CONFIG_WIENER_NONSEP
 
 static void wiener_filter_stripe_highbd(const RestorationUnitInfo *rui,
@@ -2523,11 +2565,11 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
 
 #if CONFIG_WIENER_NONSEP && CONFIG_WIENER_NONSEP_CROSS_FILT
   uint8_t *luma = NULL;
-  uint8_t *luma_buf;
+  uint16_t *luma_buf;
   const YV12_BUFFER_CONFIG *dgd = &cm->cur_frame->buf;
   int luma_stride = dgd->crop_widths[1] + 2 * WIENERNS_UV_BRD;
   luma_buf = wienerns_copy_luma_highbd(
-      dgd->buffers[AOM_PLANE_Y], dgd->crop_heights[AOM_PLANE_Y],
+      (dgd->buffers[AOM_PLANE_Y]), dgd->crop_heights[AOM_PLANE_Y],
       dgd->crop_widths[AOM_PLANE_Y], dgd->strides[AOM_PLANE_Y], &luma,
       dgd->crop_heights[1], dgd->crop_widths[1], WIENERNS_UV_BRD, luma_stride,
       cm->seq_params.bit_depth);

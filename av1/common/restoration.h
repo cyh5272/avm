@@ -521,13 +521,16 @@ static INLINE void set_default_wienerns(WienerNonsepInfo *wienerns_info,
 }
 
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-uint8_t *wienerns_copy_luma(const uint8_t *dgd, int height_y, int width_y,
-                            int in_stride, uint8_t **luma, int height_uv,
-                            int width_uv, int border, int out_stride);
-uint8_t *wienerns_copy_luma_highbd(const uint8_t *dgd, int height_y,
-                                   int width_y, int in_stride, uint8_t **luma8,
-                                   int height_uv, int width_uv, int border,
-                                   int out_stride, int bd);
+
+// 0: Skip luma pixels to scale down to chroma (simplest)
+// 1: Average 4 or 2 luma pixels to scale down to chroma
+// 2: Use 8-tap downsampling filter
+#define WIENERNS_CROSS_FILT_LUMA_TYPE 0
+
+uint16_t *wienerns_copy_luma_highbd(const uint8_t *dgd8, int height_y,
+                                    int width_y, int in_stride, uint8_t **luma8,
+                                    int height_uv, int width_uv, int border,
+                                    int out_stride, int bd);
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 
 #endif  // CONFIG_WIENER_NONSEP
