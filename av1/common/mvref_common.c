@@ -3468,13 +3468,14 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (above_mbmi->ref_frame[0] == ref_frame && above_mbmi->ref_frame[1] == NONE_FRAME) {
+      if (above_mbmi->ref_frame[0] == ref_frame &&
+          above_mbmi->ref_frame[1] == NONE_FRAME) {
         record_samples(above_mbmi, pts, pts_inref, 0, -1, col_offset, 1);
         pts += 2;
         pts_inref += 2;
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
-#endif  // CONFIG_COMPOUND_WARP_SAMPLES
+#endif        // CONFIG_COMPOUND_WARP_SAMPLES
     } else {  // xd->width > above_block_width
       for (i = 0; i < AOMMIN(xd->width, cm->mi_params.mi_cols - mi_col);
            i += mi_step) {
@@ -3530,13 +3531,14 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (left_mbmi->ref_frame[0] == ref_frame && left_mbmi->ref_frame[1] == NONE_FRAME) {
+      if (left_mbmi->ref_frame[0] == ref_frame &&
+          left_mbmi->ref_frame[1] == NONE_FRAME) {
         record_samples(left_mbmi, pts, pts_inref, row_offset, 1, 0, -1);
         pts += 2;
         pts_inref += 2;
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
-#endif  // CONFIG_COMPOUND_WARP_SAMPLES
+#endif        // CONFIG_COMPOUND_WARP_SAMPLES
     } else {  // xd->height > left_block_height
       for (i = 0; i < AOMMIN(xd->height, cm->mi_params.mi_rows - mi_row);
            i += mi_step) {
@@ -3574,7 +3576,8 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
   if (do_top_left && left_available && up_available) {
     const int mi_row_offset = -1;
     const int mi_col_offset = -1;
-    const MB_MODE_INFO *top_left_mbmi = xd->mi[mi_col_offset + mi_row_offset * mi_stride];
+    const MB_MODE_INFO *top_left_mbmi =
+        xd->mi[mi_col_offset + mi_row_offset * mi_stride];
 #if CONFIG_COMPOUND_WARP_SAMPLES
     for (int ref = 0; ref < 1 + has_second_ref(top_left_mbmi); ++ref) {
       if (top_left_mbmi->ref_frame[ref] == ref_frame) {
@@ -3585,7 +3588,8 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
       }
     }
 #else
-    if (top_left_mbmi->ref_frame[0] == ref_frame && top_left_mbmi->ref_frame[1] == NONE_FRAME) {
+    if (top_left_mbmi->ref_frame[0] == ref_frame &&
+        top_left_mbmi->ref_frame[1] == NONE_FRAME) {
       record_samples(top_left_mbmi, pts, pts_inref, 0, -1, 0, -1);
       pts += 2;
       pts_inref += 2;
@@ -3608,7 +3612,8 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
 #if CONFIG_COMPOUND_WARP_SAMPLES
       for (int ref = 0; ref < 1 + has_second_ref(top_right_mbmi); ++ref) {
         if (top_right_mbmi->ref_frame[ref] == ref_frame) {
-          record_samples(top_right_mbmi, ref, pts, pts_inref, 0, -1, xd->width, 1);
+          record_samples(top_right_mbmi, ref, pts, pts_inref, 0, -1, xd->width,
+                         1);
           pts += 2;
           pts_inref += 2;
           if (++np >= LEAST_SQUARES_SAMPLES_MAX) {
@@ -3617,7 +3622,8 @@ uint8_t av1_findSamples(const AV1_COMMON *cm, MACROBLOCKD *xd, int *pts,
         }
       }
 #else
-      if (top_right_mbmi->ref_frame[0] == ref_frame && top_right_mbmi->ref_frame[1] == NONE_FRAME) {
+      if (top_right_mbmi->ref_frame[0] == ref_frame &&
+          top_right_mbmi->ref_frame[1] == NONE_FRAME) {
         record_samples(top_right_mbmi, pts, pts_inref, 0, -1, xd->width, 1);
         if (++np >= LEAST_SQUARES_SAMPLES_MAX) return LEAST_SQUARES_SAMPLES_MAX;
       }
