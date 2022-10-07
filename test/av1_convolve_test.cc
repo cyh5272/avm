@@ -20,6 +20,10 @@
 #include "test/clear_system_state.h"
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
+#if CONFIG_PC_WIENER
+#include "av1/common/pc_wiener_filters.h"
+#endif  // CONFIG_PC_WIENER
+
 namespace {
 
 // TODO(any): Remove following INTERP_FILTERS_ALL define, so that 12-tap filter
@@ -1467,4 +1471,207 @@ INSTANTIATE_TEST_SUITE_P(
 #endif  // HAVE_AVX2
 
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
+
+//////////////////////////////////////////////////////////
+// Unit-test corresponds to buffer accumulations to derive filter
+// index for each block size (pc_wiener_block_size: 4x4)
+//////////////////////////////////////////////////////////
+
+#if CONFIG_PC_WIENER
+typedef void (*fill_directional_feature_buffers_highbd_func)(
+    int *feature_sum_buffers[], int16_t *feature_line_buffers[], int row,
+    int buffer_row, const uint16_t *dgd, int dgd_stride, int width,
+    int feature_lead, int feature_lag);
+
+class AV1FillDirFeatureBufHighbdTest
+    : public AV1ConvolveTest<fill_directional_feature_buffers_highbd_func> {
+ public:
+  void RunTest() {
+    for (int i = 0; i < kTestIterations; i++) {
+      // Set buffer values here.
+      SetBufferValues();
+      TestConvolve();
+    }
+  }
+
+  void RunSpeedTest() { SpeedTestConvolve(); };
+
+ protected:
+  virtual void SetUp() {
+    for (int j = 0; j < NUM_FEATURE_LINE_BUFFERS; ++j) {
+      feature_line_buffers_c_[j] = static_cast<int16_t *>(
+          (aom_malloc(buffer_width_ * sizeof(*feature_line_buffers_c_[j]))));
+      ASSERT_NE(feature_line_buffers_c_[j], nullptr);
+
+      feature_line_buffers_simd_[j] = static_cast<int16_t *>(
+          (aom_malloc(buffer_width_ * sizeof(*feature_line_buffers_simd_[j]))));
+      ASSERT_NE(feature_line_buffers_simd_[j], nullptr);
+    }
+
+    for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
+      feature_sum_buffers_c_[j] = static_cast<int *>(
+          (aom_malloc(buffer_width_ * sizeof(*feature_sum_buffers_c_[j]))));
+      ASSERT_NE(feature_sum_buffers_c_[j], nullptr);
+
+      feature_sum_buffers_simd_[j] = static_cast<int *>(
+          (aom_malloc(buffer_width_ * sizeof(*feature_sum_buffers_simd_[j]))));
+      ASSERT_NE(feature_sum_buffers_simd_[j], nullptr);
+    }
+  }
+
+  virtual void TearDown() {
+    for (int j = 0; j < NUM_FEATURE_LINE_BUFFERS; ++j) {
+      aom_free(feature_line_buffers_c_[j]);
+      feature_line_buffers_c_[j] = NULL;
+      aom_free(feature_line_buffers_simd_[j]);
+      feature_line_buffers_simd_[j] = NULL;
+    }
+
+    for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
+      aom_free(feature_sum_buffers_c_[j]);
+      feature_sum_buffers_c_[j] = NULL;
+      aom_free(feature_sum_buffers_simd_[j]);
+      feature_sum_buffers_simd_[j] = NULL;
+    }
+  }
+
+  void SetBufferValues() {
+    const int bitdepth = GetParam().BitDepth();
+    for (int j = 0; j < NUM_FEATURE_LINE_BUFFERS; ++j) {
+      Randomize(feature_line_buffers_c_[j], buffer_width_, bitdepth);
+      memcpy(feature_line_buffers_simd_[j], feature_line_buffers_c_[j],
+             buffer_width_ * sizeof(*feature_line_buffers_simd_[j]));
+    }
+
+    for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
+      RandomizeSigned31(feature_sum_buffers_c_[j], buffer_width_, 31);
+      memcpy(feature_sum_buffers_simd_[j], feature_sum_buffers_c_[j],
+             buffer_width_ * sizeof(*feature_sum_buffers_simd_[j]));
+    }
+  }
+
+ private:
+  libaom_test::ACMRandom rnd_;
+  static constexpr int kSpeedIterations = 10000;
+  static constexpr int kTestIterations = 100;
+
+  void TestConvolve() {
+    const int width = GetParam().Block().Width();
+    const int height = GetParam().Block().Height();
+    // Input buffer allocation.
+    const uint16_t *input = FirstRandomInput16(GetParam());
+    const int input_stride = width;
+
+    // C function call
+    for (int i = 0; i < height; ++i) {
+      const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
+      fill_directional_feature_buffers_highbd_c(
+          feature_sum_buffers_c_, feature_line_buffers_c_, row_to_process,
+          feature_length - 1, input, input_stride, width, feature_lead,
+          feature_lag);
+    }
+
+    // SIMD function call
+    for (int i = 0; i < height; ++i) {
+      const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
+      GetParam().TestFunction()(feature_sum_buffers_simd_,
+                                feature_line_buffers_simd_, row_to_process,
+                                feature_length - 1, input, input_stride, width,
+                                feature_lead, feature_lag);
+    }
+
+    // Compare the outputs of C and SIMD
+    for (int i = 0; i < NUM_PC_WIENER_FEATURES; i++) {
+      int *c_buf = feature_sum_buffers_c_[i];
+      int *simd_buf = feature_sum_buffers_simd_[i];
+      for (int j = 0; j < buffer_width_; ++j) {
+        ASSERT_EQ(c_buf[j], simd_buf[j])
+            << "feature_buf=" << i << " Pixel mismatch at width (" << i << ")";
+      }
+    }
+  }
+
+  void SpeedTestConvolve() {
+    const int width = GetParam().Block().Width();
+    const int height = GetParam().Block().Height();
+
+    // Input buffer allocation.
+    const uint16_t *input = FirstRandomInput16(GetParam());
+    const int input_stride = width;
+
+    // Calculate time taken for C function
+    aom_usec_timer timer;
+    aom_usec_timer_start(&timer);
+    for (int i = 0; i < kSpeedIterations; ++i) {
+      for (int i = 0; i < height; ++i) {
+        const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
+        fill_directional_feature_buffers_highbd_c(
+            feature_sum_buffers_c_, feature_line_buffers_c_, row_to_process,
+            feature_length - 1, input, input_stride, width, feature_lead,
+            feature_lag);
+      }
+    }
+    aom_usec_timer_mark(&timer);
+    auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+
+    // Calculate time taken by optimized/intrinsic function
+    aom_usec_timer_start(&timer);
+    for (int i = 0; i < kSpeedIterations; ++i) {
+      for (int i = 0; i < height; ++i) {
+        const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
+        GetParam().TestFunction()(feature_sum_buffers_simd_,
+                                  feature_line_buffers_simd_, row_to_process,
+                                  feature_length - 1, input, input_stride,
+                                  width, feature_lead, feature_lag);
+      }
+    }
+    aom_usec_timer_mark(&timer);
+    auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
+
+    float c_time_per_pixel =
+        (float)1000.0 * elapsed_time_c / (kSpeedIterations * width * height);
+    float opt_time_per_pixel =
+        (float)1000.0 * elapsed_time_opt / (kSpeedIterations * width * height);
+    float scaling = c_time_per_pixel / opt_time_per_pixel;
+    printf(
+        "%3dx%-3d: c_time_per_pixel=%10.5f, "
+        "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+        width, height, c_time_per_pixel, opt_time_per_pixel, scaling);
+  }
+
+  // Fills the array p with signed integers.
+  void Randomize(int16_t *p, int size, int max_bit_range) {
+    ASSERT_TRUE(max_bit_range < 16) << "max_bit_range has to be less than 16";
+    for (int i = 0; i < size; ++i) {
+      p[i] = rnd_.Rand15Signed() & ((1 << max_bit_range) - 1);
+    }
+  }
+
+  // Fills the array p with signed integers of 31 bit range.
+  void RandomizeSigned31(int *p, int size, int max_bit_range) {
+    for (int i = 0; i < size; ++i) {
+      p[i] = rnd_.Rand31() & ((1 << max_bit_range) - 1);
+    }
+  }
+
+  int *feature_sum_buffers_c_[NUM_PC_WIENER_FEATURES];
+  int *feature_sum_buffers_simd_[NUM_PC_WIENER_FEATURES];
+  int16_t *feature_line_buffers_c_[NUM_FEATURE_LINE_BUFFERS];
+  int16_t *feature_line_buffers_simd_[NUM_FEATURE_LINE_BUFFERS];
+  const int feature_lead = PC_WIENER_FEATURE_LEAD_LUMA;
+  const int feature_lag = PC_WIENER_FEATURE_LAG_LUMA;
+  const int feature_length = PC_WIENER_FEATURE_LENGTH_LUMA;
+  const int buffer_width_ = MAX_SB_SIZE + kInputPadding;
+};
+
+TEST_P(AV1FillDirFeatureBufHighbdTest, RunTest) { RunTest(); }
+
+TEST_P(AV1FillDirFeatureBufHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1FillDirFeatureBufHighbdTest,
+    BuildHighbdParams(fill_directional_feature_buffers_highbd_avx2));
+#endif  // HAVE_AVX2
+#endif  // CONFIG_PC_WIENER
 }  // namespace

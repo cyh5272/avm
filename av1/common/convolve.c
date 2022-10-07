@@ -1303,3 +1303,129 @@ void av1_convolve_nonsep_mask_highbd(
     }
   }
 }
+
+void prepare_feature_sum_bufs_c(int *feature_sum_buffers[],
+                                int16_t *feature_line_buffers[],
+                                int feature_length, int buffer_row,
+                                int col_begin, int col_end, int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+#if defined(__GCC__)
+#pragma GCC ivdep
+#endif
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
+    feature_sum_buffers[0][buffer_col] -=
+        feature_line_buffers[buffer_row_0][buffer_col];
+    feature_sum_buffers[1][buffer_col] -=
+        feature_line_buffers[buffer_row_1][buffer_col];
+    feature_sum_buffers[2][buffer_col] -=
+        feature_line_buffers[buffer_row_2][buffer_col];
+    feature_sum_buffers[3][buffer_col] -=
+        feature_line_buffers[buffer_row_3][buffer_col];
+  }
+}
+
+void calc_gradient_in_various_directions_c(int16_t *feature_line_buffers[],
+                                           int row, int buffer_row,
+                                           const uint16_t *dgd, int dgd_stride,
+                                           int width, int col_begin,
+                                           int col_end, int feature_length,
+                                           int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+
+#if defined(__GCC__)
+#pragma GCC ivdep
+#endif
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
+    // Fix an issue with odd-sized rows/columns. (If the right/lower extension
+    // of the frame is extended by 4 pixels instead of the current 3 AOMMIN can
+    // be discarded.
+    const int dgd_col = AOMMIN(col, width + 3 - 2);
+    const int dgd_id = row * dgd_stride + dgd_col;
+    const int prev_row = dgd_id - dgd_stride;
+    const int next_row = dgd_id + dgd_stride;
+
+    // D V A
+    // H O H
+    // A V D
+    const int16_t base_value = 2 * dgd[dgd_id];  // O.
+    const int16_t horizontal_diff =
+        dgd[dgd_id + 1] + dgd[dgd_id - 1] - base_value;           // H.
+    int16_t vertical_diff = dgd[prev_row] - base_value;           // V.
+    int16_t anti_diagonal_diff = dgd[prev_row + 1] - base_value;  // A.
+    int16_t diagonal_diff = dgd[prev_row - 1] - base_value;       // D.
+
+    vertical_diff += dgd[next_row];
+    anti_diagonal_diff += dgd[next_row - 1];
+    diagonal_diff += dgd[next_row + 1];
+
+    feature_line_buffers[buffer_row_0][buffer_col] =
+        abs(horizontal_diff);                                             // fo
+    feature_line_buffers[buffer_row_1][buffer_col] = abs(vertical_diff);  // f1
+    feature_line_buffers[buffer_row_2][buffer_col] =
+        abs(anti_diagonal_diff);                                          // f2
+    feature_line_buffers[buffer_row_3][buffer_col] = abs(diagonal_diff);  // f3
+  }
+}
+
+void update_feature_sum_bufs_c(int *feature_sum_buffers[],
+                               int16_t *feature_line_buffers[],
+                               int feature_length, int buffer_row,
+                               int col_begin, int col_end, int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+#if defined(__GCC__)
+#pragma GCC ivdep
+#endif
+  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
+    feature_sum_buffers[0][buffer_col] +=
+        feature_line_buffers[buffer_row_0][buffer_col];
+    feature_sum_buffers[1][buffer_col] +=
+        feature_line_buffers[buffer_row_1][buffer_col];
+    feature_sum_buffers[2][buffer_col] +=
+        feature_line_buffers[buffer_row_2][buffer_col];
+    feature_sum_buffers[3][buffer_col] +=
+        feature_line_buffers[buffer_row_3][buffer_col];
+  }
+}
+
+// add this to the request.
+
+// Calculates and accumulates the gradients over a window around row. If
+// use_strict_bounds is false dgd must have valid data on this column extending
+// for rows from [row_begin, row_end) where,
+//    row_begin = row - PC_WIENER_FEATURE_LENGTH / 2
+//    row_end = row + PC_WIENER_FEATURE_LENGTH / 2 + 1.
+// This version of the routine assumes use_strict_bounds is false.
+void fill_directional_feature_buffers_highbd_c(
+    int *feature_sum_bufs[], int16_t *feature_line_bufs[], int row,
+    int buffer_row, const uint16_t *dgd, int dgd_stride, int width,
+    int feature_lead, int feature_lag) {
+  const int feature_length = feature_lead + feature_lag + 1;
+  const int col_begin = -feature_lead;
+  const int col_end = width + feature_lag;
+  int buffer_col = 0;
+
+  // TODO(oguleryuz): Reduce buffer sizes of feature_sum_buffers and
+  // feature_line_buffers for downsampling.
+  // Preparation of feature sum buffers by subtracting the feature line buffers.
+  prepare_feature_sum_bufs_c(feature_sum_bufs, feature_line_bufs,
+                             feature_length, buffer_row, col_begin, col_end,
+                             buffer_col);
+
+  // Compute the gradient across different directions.
+  calc_gradient_in_various_directions_c(feature_line_bufs, row, buffer_row, dgd,
+                                        dgd_stride, width, col_begin, col_end,
+                                        feature_length, buffer_col);
+
+  // Update the feature sum buffers with updated feature line buffers.
+  update_feature_sum_bufs_c(feature_sum_bufs, feature_line_bufs, feature_length,
+                            buffer_row, col_begin, col_end, buffer_col);
+}
