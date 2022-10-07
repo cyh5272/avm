@@ -1071,7 +1071,7 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth,
 
     const int qp_threshold = (max_q * 7) / 10;
     if (qp < qp_threshold) {
-      factor = AOMMIN((cbrt(q_val * 4) / 8) * 100, 76);
+      factor = AOMMIN((cbrt(q_val * 8) / 8) * 100, 76);
       if (level == 1) {
         factor = (factor * 7) / 8;
       } else if (level == 2) {
