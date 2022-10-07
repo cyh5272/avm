@@ -1556,3 +1556,235 @@ void av1_convolve_symmetric_dual_subtract_center_highbd_avx2(
                        accum_out_r0r1, accum_out_r2r3, block_row_begin,
                        block_col_begin);
 }
+
+/* Computes the gradient across different directions for a given pixel using 3
+ * tap filter. The following shows gradient calculation
+ * A0 V0 D0
+ * H0 C  H1
+ * D1 V1 A1
+ * At a given pixel position C,
+ * Horzontal gradient = H0 - 2*C + H1
+ * Vertical gradient = V0 - 2*C + V1
+ * Diagonal gradient = D0 - 2*C + D1
+ * Anti diagonal gradient = A0 - 2*C + A1
+ * Feature lines buffers are updated here by taking the absolute of these
+ * gradient information.
+ */
+void calc_gradient_in_various_directions_avx2(
+    int16_t *feature_line_buffers[], int row, int buffer_row,
+    const uint16_t *dgd, int dgd_stride, int width, int col_begin, int col_end,
+    int feature_length, int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+  const int16_t *line_buf0 = feature_line_buffers[buffer_row_0];
+  const int16_t *line_buf1 = feature_line_buffers[buffer_row_1];
+  const int16_t *line_buf2 = feature_line_buffers[buffer_row_2];
+  const int16_t *line_buf3 = feature_line_buffers[buffer_row_3];
+  const int tot_width = col_end - col_begin;
+  // Width for which SIMD is possible due to constrains of odd width.
+  const int pos_simd_width = AOMMIN(tot_width, width + 3 - 2);
+  const uint16_t *cur_row = dgd + (row * dgd_stride) + col_begin;
+  const uint16_t *prev_row = cur_row - dgd_stride;
+  const uint16_t *next_row = cur_row + dgd_stride;
+
+  // Process width multiples of 16.
+  for (int wd = 0; wd + 16 < pos_simd_width; wd += 16) {
+    // p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16
+    const __m256i src_p = _mm256_loadu_si256((__m256i const *)(prev_row));
+    // c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 c16
+    const __m256i src_c = _mm256_loadu_si256((__m256i const *)(cur_row));
+    // n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16
+    const __m256i src_n = _mm256_loadu_si256((__m256i const *)(next_row));
+
+    // p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+    const __m256i src_pm1 = _mm256_loadu_si256((__m256i const *)(prev_row - 1));
+    // c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+    const __m256i src_cm1 = _mm256_loadu_si256((__m256i const *)(cur_row - 1));
+    // n0 n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15
+    const __m256i src_nm1 = _mm256_loadu_si256((__m256i const *)(next_row - 1));
+
+    // p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17
+    const __m256i src_pp1 = _mm256_loadu_si256((__m256i const *)(prev_row + 1));
+    // c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 c16 c17
+    const __m256i src_cp1 = _mm256_loadu_si256((__m256i const *)(cur_row + 1));
+    // n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17
+    const __m256i src_np1 = _mm256_loadu_si256((__m256i const *)(next_row + 1));
+
+    // Horizontal Gradient calculation
+    const __m256i base_val = _mm256_add_epi16(src_c, src_c);
+    const __m256i partial_horz_diff = _mm256_add_epi16(src_cm1, src_cp1);
+    const __m256i horz_diff = _mm256_sub_epi16(partial_horz_diff, base_val);
+    const __m256i abs_horz_diff = _mm256_abs_epi16(horz_diff);
+    _mm256_storeu_si256((__m256i *)(line_buf0 + wd), abs_horz_diff);
+
+    // Vertical Gradient calculation
+    const __m256i partial_vert_diff = _mm256_add_epi16(src_p, src_n);
+    const __m256i vert_diff = _mm256_sub_epi16(partial_vert_diff, base_val);
+    const __m256i abs_vert_diff = _mm256_abs_epi16(vert_diff);
+    _mm256_storeu_si256((__m256i *)(line_buf1 + wd), abs_vert_diff);
+
+    // Diagonal Gradient calculation
+    const __m256i partial_diag_diff = _mm256_add_epi16(src_pm1, src_np1);
+    const __m256i diag_diff = _mm256_sub_epi16(partial_diag_diff, base_val);
+    const __m256i abs_diag_diff = _mm256_abs_epi16(diag_diff);
+    _mm256_storeu_si256((__m256i *)(line_buf3 + wd), abs_diag_diff);
+
+    // Anti-Diagonal Gradient calculation
+    const __m256i partial_anti_diag_diff = _mm256_add_epi16(src_pp1, src_nm1);
+    const __m256i anti_diag_diff =
+        _mm256_sub_epi16(partial_anti_diag_diff, base_val);
+    const __m256i abs_anti_diag_diff = _mm256_abs_epi16(anti_diag_diff);
+    _mm256_storeu_si256((__m256i *)(line_buf2 + wd), abs_anti_diag_diff);
+
+    cur_row += 16;
+    prev_row += 16;
+    next_row += 16;
+    buffer_col += 16;
+  }
+
+  // Invoke C function to process remaining width.
+  const int remaining_width = tot_width - buffer_col;
+  if (remaining_width)
+    calc_gradient_in_various_directions_c(
+        feature_line_buffers, row, buffer_row, dgd, dgd_stride, width,
+        buffer_col - 1, col_end, feature_length, buffer_col);
+}
+
+void prepare_feature_sum_bufs_avx2(int *feature_sum_buffers[],
+                                   int16_t *feature_line_buffers[],
+                                   int feature_length, int buffer_row,
+                                   int col_begin, int col_end, int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+  const int16_t *line_buf0 = feature_line_buffers[buffer_row_0];
+  const int16_t *line_buf1 = feature_line_buffers[buffer_row_1];
+  const int16_t *line_buf2 = feature_line_buffers[buffer_row_2];
+  const int16_t *line_buf3 = feature_line_buffers[buffer_row_3];
+  int *sum_buf0 = feature_sum_buffers[0];
+  int *sum_buf1 = feature_sum_buffers[1];
+  int *sum_buf2 = feature_sum_buffers[2];
+  int *sum_buf3 = feature_sum_buffers[3];
+  const int tot_width = col_end - col_begin;
+
+  // Process width multiples of 8.
+  for (int wd = 0; wd + 8 < tot_width; wd += 8) {
+    const __m128i line0 = _mm_loadu_si128((__m128i const *)(line_buf0 + wd));
+    const __m128i line1 = _mm_loadu_si128((__m128i const *)(line_buf1 + wd));
+    const __m128i line2 = _mm_loadu_si128((__m128i const *)(line_buf2 + wd));
+    const __m128i line3 = _mm_loadu_si128((__m128i const *)(line_buf3 + wd));
+    const __m256i sum0 = _mm256_loadu_si256((__m256i const *)(sum_buf0 + wd));
+    const __m256i sum1 = _mm256_loadu_si256((__m256i const *)(sum_buf1 + wd));
+    const __m256i sum2 = _mm256_loadu_si256((__m256i const *)(sum_buf2 + wd));
+    const __m256i sum3 = _mm256_loadu_si256((__m256i const *)(sum_buf3 + wd));
+
+    const __m256i line00 = _mm256_cvtepi16_epi32(line0);
+    const __m256i line11 = _mm256_cvtepi16_epi32(line1);
+    const __m256i line22 = _mm256_cvtepi16_epi32(line2);
+    const __m256i line33 = _mm256_cvtepi16_epi32(line3);
+
+    const __m256i sub0 = _mm256_sub_epi32(sum0, line00);
+    const __m256i sub1 = _mm256_sub_epi32(sum1, line11);
+    const __m256i sub2 = _mm256_sub_epi32(sum2, line22);
+    const __m256i sub3 = _mm256_sub_epi32(sum3, line33);
+
+    _mm256_storeu_si256((__m256i *)(sum_buf0 + wd), sub0);
+    _mm256_storeu_si256((__m256i *)(sum_buf1 + wd), sub1);
+    _mm256_storeu_si256((__m256i *)(sum_buf2 + wd), sub2);
+    _mm256_storeu_si256((__m256i *)(sum_buf3 + wd), sub3);
+    buffer_col += 8;
+  }
+
+  // Invoke C function to process remaining width.
+  const int remaining_width = tot_width - buffer_col;
+  if (remaining_width)
+    prepare_feature_sum_bufs_c(feature_sum_buffers, feature_line_buffers,
+                               feature_length, buffer_row, 0, remaining_width,
+                               buffer_col);
+}
+
+static void update_feature_sum_bufs_avx2(int *feature_sum_buffers[],
+                                         int16_t *feature_line_buffers[],
+                                         int feature_length, int buffer_row,
+                                         int col_begin, int col_end,
+                                         int buffer_col) {
+  const int buffer_row_0 = buffer_row;
+  const int buffer_row_1 = buffer_row_0 + feature_length;
+  const int buffer_row_2 = buffer_row_1 + feature_length;
+  const int buffer_row_3 = buffer_row_2 + feature_length;
+  const int16_t *line_buf0 = feature_line_buffers[buffer_row_0];
+  const int16_t *line_buf1 = feature_line_buffers[buffer_row_1];
+  const int16_t *line_buf2 = feature_line_buffers[buffer_row_2];
+  const int16_t *line_buf3 = feature_line_buffers[buffer_row_3];
+  int *sum_buf0 = feature_sum_buffers[0];
+  int *sum_buf1 = feature_sum_buffers[1];
+  int *sum_buf2 = feature_sum_buffers[2];
+  int *sum_buf3 = feature_sum_buffers[3];
+  const int tot_width = col_end - col_begin;
+
+  for (int wd = 0; wd + 8 < tot_width; wd += 8) {
+    const __m128i line0 = _mm_loadu_si128((__m128i const *)(line_buf0 + wd));
+    const __m128i line1 = _mm_loadu_si128((__m128i const *)(line_buf1 + wd));
+    const __m128i line2 = _mm_loadu_si128((__m128i const *)(line_buf2 + wd));
+    const __m128i line3 = _mm_loadu_si128((__m128i const *)(line_buf3 + wd));
+    const __m256i fsum0 = _mm256_loadu_si256((__m256i const *)(sum_buf0 + wd));
+    const __m256i fsum1 = _mm256_loadu_si256((__m256i const *)(sum_buf1 + wd));
+    const __m256i fsum2 = _mm256_loadu_si256((__m256i const *)(sum_buf2 + wd));
+    const __m256i fsum3 = _mm256_loadu_si256((__m256i const *)(sum_buf3 + wd));
+
+    const __m256i line00 = _mm256_cvtepi16_epi32(line0);
+    const __m256i line11 = _mm256_cvtepi16_epi32(line1);
+    const __m256i line22 = _mm256_cvtepi16_epi32(line2);
+    const __m256i line33 = _mm256_cvtepi16_epi32(line3);
+
+    const __m256i sub0 = _mm256_add_epi32(fsum0, line00);
+    const __m256i sub1 = _mm256_add_epi32(fsum1, line11);
+    const __m256i sub2 = _mm256_add_epi32(fsum2, line22);
+    const __m256i sub3 = _mm256_add_epi32(fsum3, line33);
+
+    _mm256_storeu_si256((__m256i *)(sum_buf0 + wd), sub0);
+    _mm256_storeu_si256((__m256i *)(sum_buf1 + wd), sub1);
+    _mm256_storeu_si256((__m256i *)(sum_buf2 + wd), sub2);
+    _mm256_storeu_si256((__m256i *)(sum_buf3 + wd), sub3);
+    buffer_col += 8;
+  }
+
+  // Invoke C function to process remaining width.
+  const int remaining_width = tot_width - buffer_col;
+  if (remaining_width)
+    update_feature_sum_bufs_c(feature_sum_buffers, feature_line_buffers,
+                              feature_length, buffer_row, 0, remaining_width,
+                              buffer_col);
+}
+
+void fill_directional_feature_buffers_highbd_avx2(
+    int *feature_sum_buffers[], int16_t *feature_line_buffers[], int row,
+    int buffer_row, const uint16_t *dgd, int dgd_stride, int width,
+    int feature_lead, int feature_lag) {
+  const int feature_length = feature_lead + feature_lag + 1;
+  const int col_begin = -feature_lead;
+  const int col_end = width + feature_lag;
+  int buffer_col = 0;
+  // In the below AVX2 functions, total width to be processed is calculated
+  // using col_end-col_begin. Hence, this assert is needed for width to be >= 0
+  // always.
+  assert(col_begin <= col_end);
+
+  // Preparation of feature sum buffers by subtracting the feature line buffers.
+  prepare_feature_sum_bufs_avx2(feature_sum_buffers, feature_line_buffers,
+                                feature_length, buffer_row, col_begin, col_end,
+                                buffer_col);
+
+  // Compute the gradient across different directions.
+  calc_gradient_in_various_directions_avx2(
+      feature_line_buffers, row, buffer_row, dgd, dgd_stride, width, col_begin,
+      col_end, feature_length, buffer_col);
+
+  // Update the feature sum buffers with updated feature line buffers.
+  update_feature_sum_bufs_avx2(feature_sum_buffers, feature_line_buffers,
+                               feature_length, buffer_row, col_begin, col_end,
+                               buffer_col);
+}

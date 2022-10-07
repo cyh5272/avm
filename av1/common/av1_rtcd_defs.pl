@@ -95,6 +95,9 @@ specialize qw/av1_convolve_symmetric_subtract_center_highbd avx2/;
 add_proto qw/void av1_convolve_symmetric_dual_subtract_center_highbd/, "const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual, int dgd_dual_stride, const NonsepFilterConfig *filter_config, const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth, int block_row_begin, int block_row_end, int block_col_begin, int block_col_end";
 specialize qw/av1_convolve_symmetric_dual_subtract_center_highbd avx2/;
 
+add_proto qw/void fill_directional_feature_buffers_highbd/, "int *feature_sum_buffers[], int16_t *feature_line_buffers[], int row, int buffer_row, const uint16_t *dgd, int dgd_stride, int width, int feature_lead, int feature_lag";
+specialize qw/fill_directional_feature_buffers_highbd avx2/;
+
 # directional intra predictor functions
 add_proto qw/void av1_dr_prediction_z1/, "uint8_t *dst, ptrdiff_t stride, int bw, int bh, const uint8_t *above, const uint8_t *left, int upsample_above, int dx, int dy, int mrl_index";
 specialize qw/av1_dr_prediction_z1 avx2/;
