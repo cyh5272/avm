@@ -1297,12 +1297,6 @@ static int get_qstep(int base_qindex, int bit_depth, int *shift) {
 
 // TODO(oguleryuz): These need to move into allocated line buffers accessible
 //  by enc/dec so that alloc/free cycles are reduced.
-#define MAX_FEATURE_LENGTH PC_WIENER_FEATURE_LENGTH_LUMA
-#define NUM_FEATURE_LINE_BUFFERS (NUM_PC_WIENER_FEATURES * MAX_FEATURE_LENGTH)
-// Vector size needed to hold feature accumulator values at 4x4 level.
-#define PC_WIENER_FEATURE_ACC_SIZE                               \
-  (RESTORATION_PROC_UNIT_SIZE + PC_WIENER_FEATURE_LENGTH_LUMA) / \
-      PC_WIENER_BLOCK_SIZE
 static int buffer_width = 0;
 static int16_t *feature_line_buffers[NUM_FEATURE_LINE_BUFFERS] = { 0 };
 static int *feature_sum_buffers[NUM_PC_WIENER_FEATURES] = { 0 };
@@ -1323,94 +1317,6 @@ static void rotate_feature_line_buffers(int feature_len) {
       feature_line_buffers[row] = feature_line_buffers[row + 1];
     }
     feature_line_buffers[row_begin + feature_len - 1] = buffer_0;
-  }
-}
-
-// add this to the request.
-
-// Calculates and accumulates the gradients over a window around row. If
-// use_strict_bounds is false dgd must have valid data on this column extending
-// for rows from [row_begin, row_end) where,
-//    row_begin = row - PC_WIENER_FEATURE_LENGTH / 2
-//    row_end = row + PC_WIENER_FEATURE_LENGTH / 2 + 1.
-// This version of the routine assumes use_strict_bounds is false.
-static void fill_directional_feature_buffers_highbd(
-    int row, int buffer_row, const uint16_t *dgd, int dgd_stride, int width,
-    int feature_lead, int feature_lag, bool use_strict_bounds) {
-  assert(use_strict_bounds == false);
-  const int feature_length = feature_lead + feature_lag + 1;
-  const int col_begin = -feature_lead;
-  const int col_end = width + feature_lag;
-
-  const int buffer_row_0 = buffer_row;
-  const int buffer_row_1 = buffer_row_0 + feature_length;
-  const int buffer_row_2 = buffer_row_1 + feature_length;
-  const int buffer_row_3 = buffer_row_2 + feature_length;
-
-  int buffer_col = 0;
-  // TODO(oguleryuz): Reduce buffer sizes for downsampling.
-#if defined(__GCC__)
-#pragma GCC ivdep
-#endif
-  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
-    feature_sum_buffers[0][buffer_col] -=
-        feature_line_buffers[buffer_row_0][buffer_col];
-    feature_sum_buffers[1][buffer_col] -=
-        feature_line_buffers[buffer_row_1][buffer_col];
-    feature_sum_buffers[2][buffer_col] -=
-        feature_line_buffers[buffer_row_2][buffer_col];
-    feature_sum_buffers[3][buffer_col] -=
-        feature_line_buffers[buffer_row_3][buffer_col];
-  }
-
-  buffer_col = 0;
-#if defined(__GCC__)
-#pragma GCC ivdep
-#endif
-  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
-    // Fix an issue with odd-sized rows/columns. (If the right/lower extension
-    // of the frame is extended by 4 pixels instead of the current 3 AOMMIN can
-    // be discarded.
-    const int dgd_col = AOMMIN(col, width + 3 - 2);
-    const int dgd_id = row * dgd_stride + dgd_col;
-    const int prev_row = dgd_id - dgd_stride;
-    const int next_row = dgd_id + dgd_stride;
-
-    // D V A
-    // H O H
-    // A V D
-    const int16_t base_value = 2 * dgd[dgd_id];  // O.
-    const int16_t horizontal_diff =
-        dgd[dgd_id + 1] + dgd[dgd_id - 1] - base_value;           // H.
-    int16_t vertical_diff = dgd[prev_row] - base_value;           // V.
-    int16_t anti_diagonal_diff = dgd[prev_row + 1] - base_value;  // A.
-    int16_t diagonal_diff = dgd[prev_row - 1] - base_value;       // D.
-
-    vertical_diff += dgd[next_row];
-    anti_diagonal_diff += dgd[next_row - 1];
-    diagonal_diff += dgd[next_row + 1];
-
-    feature_line_buffers[buffer_row_0][buffer_col] =
-        abs(horizontal_diff);                                             // fo
-    feature_line_buffers[buffer_row_1][buffer_col] = abs(vertical_diff);  // f1
-    feature_line_buffers[buffer_row_2][buffer_col] =
-        abs(anti_diagonal_diff);                                          // f2
-    feature_line_buffers[buffer_row_3][buffer_col] = abs(diagonal_diff);  // f3
-  }
-
-  buffer_col = 0;
-#if defined(__GCC__)
-#pragma GCC ivdep
-#endif
-  for (int col = col_begin; col < col_end; ++col, ++buffer_col) {
-    feature_sum_buffers[0][buffer_col] +=
-        feature_line_buffers[buffer_row_0][buffer_col];
-    feature_sum_buffers[1][buffer_col] +=
-        feature_line_buffers[buffer_row_1][buffer_col];
-    feature_sum_buffers[2][buffer_col] +=
-        feature_line_buffers[buffer_row_2][buffer_col];
-    feature_sum_buffers[3][buffer_col] +=
-        feature_line_buffers[buffer_row_3][buffer_col];
   }
 }
 
@@ -1820,10 +1726,16 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   assert((1 << MI_SIZE_LOG2) == PC_WIENER_BLOCK_SIZE);
   set_feature_normalizers(is_uv);
   clear_line_buffers();
+
+  // Currently, code support when 'strict_bounds' (i.e. dir_strict) is true is
+  // yet to be added in 'fill_directional_feature_buffers_highbd()' function.
+  // Hence, not prefered to pass this variable as an argument to this function
+  // to avoid build failure.
+  assert(dir_strict == false);
   for (int row = 0; row < feature_length - 1; ++row) {
-    fill_directional_feature_buffers_highbd(row - feature_lead, row, dgd,
-                                            stride, width, feature_lead,
-                                            feature_lag, dir_strict);
+    fill_directional_feature_buffers_highbd(
+        feature_sum_buffers, feature_line_buffers, row - feature_lead, row, dgd,
+        stride, width, feature_lead, feature_lag);
   }
   for (int row = 0; row < tskip_length - 1; ++row) {
     fill_tskip_sum_buffer(row - tskip_lead, tskip, tskip_stride, width, height,
@@ -1832,9 +1744,10 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
   for (int i = 0; i < height; ++i) {
     // Ensure window is three pixels or a potential issue with odd-sized frames.
     const int row_to_process = AOMMIN(i + feature_lag, height + 3 - 2);
-    fill_directional_feature_buffers_highbd(row_to_process, feature_length - 1,
-                                            dgd, stride, width, feature_lead,
-                                            feature_lag, dir_strict);
+    fill_directional_feature_buffers_highbd(
+        feature_sum_buffers, feature_line_buffers, row_to_process,
+        feature_length - 1, dgd, stride, width, feature_lead, feature_lag);
+
     fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride, width, height,
                           tskip_lead, tskip_lag, tskip_strict);
 #if PC_WIENER_BLOCK_SIZE > 1
