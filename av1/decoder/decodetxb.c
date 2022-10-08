@@ -314,7 +314,6 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
 
   *eob = av1_get_max_eob(tx_size);
   eob_data->eob = *eob;
-  eob_data->max_scan_line = *eob;
 
   if (*eob > 1) {
     memset(levels_buf, 0, sizeof(*levels_buf) * TX_PAD_2D);
@@ -329,6 +328,7 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
     uint8_t sign;
     tran_low_t level = levels[get_padded_idx_left(pos, bwl)];
     if (level) {
+      *max_scan_line = AOMMAX(*max_scan_line, pos);
       int idtx_sign_ctx = get_sign_ctx_skip(signs, levels, pos, bwl);
       sign =
           aom_read_symbol(r, ec_ctx->idtx_sign_cdf[idtx_sign_ctx], 2, ACCT_STR);
