@@ -164,15 +164,6 @@ const WienernsFilterPairParameters wienerns_filters_midqp = {
 
 // Configs for the first set of filters for the case without subtract center.
 // Add a tap at (0, 0).
-const int wienerns_wout_subtract_center_config_y[][3] = {
-  { 1, 0, 0 },  { -1, 0, 0 },  { 0, 1, 1 },   { 0, -1, 1 },  { 2, 0, 2 },
-  { -2, 0, 2 }, { 0, 2, 3 },   { 0, -2, 3 },  { 1, 1, 4 },   { -1, -1, 4 },
-  { -1, 1, 5 }, { 1, -1, 5 },  { 2, 1, 6 },   { -2, -1, 6 }, { 2, -1, 7 },
-  { -2, 1, 7 }, { 1, 2, 8 },   { -1, -2, 8 }, { 1, -2, 9 },  { -1, 2, 9 },
-  { 3, 0, 10 }, { -3, 0, 10 }, { 0, 3, 11 },  { 0, -3, 11 }, { 0, 0, 12 },
-};
-
-// Add a tap at (0, 0).
 const int wienerns_wout_subtract_center_config_uv_from_uv[][3] = {
   { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
   { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
@@ -1922,6 +1913,8 @@ const uint8_t *get_pc_wiener_sub_classifier(int num_classes) {
 
 // Enables running of wienerns filters without the subtract-center option.
 #define ADD_CENTER_TAP_TO_WIENERNS 1
+// Enabling these will run non-SIMD av1_convolve_symmetric_dual_highbd_c().
+#define ADD_CENTER_TAP_TO_WIENERNS_CHROMA 0
 #define ADD_CENTER_TAP_TO_WIENERNS_CROSS 0
 
 #if ADD_CENTER_TAP_TO_WIENERNS
@@ -1941,9 +1934,10 @@ static void adjust_filter_and_config(const NonsepFilterConfig *nsfilter_config,
   }
 
   adjusted_config->subtract_center = 0;
+  // Non-subtract-center SIMD has hard-coded pcwiener_tap_config_luma for luma.
   adjusted_config->config =
       is_uv ? wienerns_wout_subtract_center_config_uv_from_uv
-            : wienerns_wout_subtract_center_config_y;
+            : pcwiener_tap_config_luma;
   adjusted_config->config2 = NULL;
 
   // Handle luma -> luma or chroma -> chroma case.
@@ -1954,9 +1948,28 @@ static void adjust_filter_and_config(const NonsepFilterConfig *nsfilter_config,
   const int num_classes = wienerns_info->num_classes;
   for (int class_id = 0; class_id < num_classes; ++class_id) {
     int16_t *adjusted_filter = nsfilter_taps(adjusted_info, class_id);
+    const int16_t *orig_filter = const_nsfilter_taps(wienerns_info, class_id);
     int sum = 0;
     for (int i = 0; i < num_sym_taps; ++i) {
-      sum += adjusted_filter[i];
+      sum += orig_filter[i];
+      if (!is_uv) {
+        // Non-subtract center SIMD code has hard-coded a config. Map filters to
+        // that config.
+        // TODO: Once configs are standardized clean up and do this only once.
+        const int filter_pos_row = nsfilter_config->config[2 * i][0];
+        const int filter_pos_col = nsfilter_config->config[2 * i][1];
+        int found_index = -1;
+        for (int j = 0; j < 2 * num_sym_taps; ++j) {
+          if (adjusted_config->config[j][0] == filter_pos_row &&
+              adjusted_config->config[j][1] == filter_pos_col) {
+            found_index = j;
+            break;
+          }
+        }
+        assert(found_index != -1);
+        adjusted_filter[adjusted_config->config[found_index][2]] =
+            orig_filter[i];
+      }
     }
     adjusted_filter[center_tap_index] = -2 * sum;
   }
@@ -2100,14 +2113,18 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   const NonsepFilterConfig *nsfilter_config = &adjusted_config;
   const WienerNonsepInfo *nsfilter_info = &adjusted_info;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (is_uv && orig_config->num_pixels2 != 0) {
+  if (is_uv && !ADD_CENTER_TAP_TO_WIENERNS_CROSS) {
     // Dual code doesn't have the non-subtract center SIMD path yet. No change
     // in config or taps. (Enabling will run
     // av1_convolve_symmetric_dual_highbd_c().)
-    if (!ADD_CENTER_TAP_TO_WIENERNS_CROSS) {
-      nsfilter_config = orig_config;
-      nsfilter_info = &rui->wienerns_info;
-    }
+    nsfilter_config = orig_config;
+    nsfilter_info = &rui->wienerns_info;
+  }
+#else
+  if (is_uv && !ADD_CENTER_TAP_TO_WIENERNS_CHROMA) {
+    // Chroma code doesn't have the non-subtract center SIMD path yet.
+    nsfilter_config = orig_config;
+    nsfilter_info = &rui->wienerns_info;
   }
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #else
