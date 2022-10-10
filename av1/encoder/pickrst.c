@@ -2719,7 +2719,7 @@ static int16_t quantize(double x, int16_t minv, int16_t n, int prec_bits) {
 
 // quantize_wrapper() allows a better (in D) solution to the linear system
 // compared to rounding. It is intended as a better initializer than rounding.
-// As is, quantize_wrapper() only uses distortion but it can be augmnted to use
+// As is, quantize_wrapper() only uses distortion but it can be augmented to use
 // total D-R cost. Intended use is to initialize with quantize_wrapper() then
 // run a reduced set of iterations within finer_tile_search_wienerns() for
 // complexity and quality improvements.
