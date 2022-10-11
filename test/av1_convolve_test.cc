@@ -18,10 +18,12 @@
 #include "config/aom_dsp_rtcd.h"
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
+#include "test/util.h"
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
 #if CONFIG_PC_WIENER
 #include "av1/common/pc_wiener_filters.h"
+#include "av1/common/restoration.h"
 #endif  // CONFIG_PC_WIENER
 
 namespace {
@@ -1672,6 +1674,161 @@ TEST_P(AV1FillDirFeatureBufHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
 INSTANTIATE_TEST_SUITE_P(
     AVX2, AV1FillDirFeatureBufHighbdTest,
     BuildHighbdParams(fill_directional_feature_buffers_highbd_avx2));
+#endif  // HAVE_AVX2
+
+typedef void (*FillTSkipSumBufferFunc)(int row, const uint8_t *tskip,
+                                       int tskip_stride,
+                                       int8_t *tskip_sum_buffer, int width,
+                                       int height, int tskip_lead,
+                                       int tskip_lag, bool use_strict_bounds);
+
+typedef std::tuple<const FillTSkipSumBufferFunc> AV1FillTSkipSumBufferFuncParam;
+
+class AV1Fill_TSkip_Sum_BufferTest
+    : public ::testing::TestWithParam<AV1FillTSkipSumBufferFuncParam> {
+ public:
+  virtual void SetUp() { target_func_ = GET_PARAM(0); }
+
+  void RunTest() {
+    for (int i = 0; i < kTestIterations; i++) {
+      TestTSkipSum();
+    }
+  }
+  void RunSpeedTest() { SpeedTestTSkipSum(); };
+
+ private:
+  libaom_test::ACMRandom rnd_;
+  FillTSkipSumBufferFunc target_func_;
+
+  static constexpr int kSpeedIterations = 10000;
+  static constexpr int kTestIterations = 100;
+  static constexpr int kNumPlanes = 2;
+  static constexpr int kWidth = RESTORATION_PROC_UNIT_SIZE;
+  static constexpr int kHeight = RESTORATION_PROC_UNIT_SIZE;
+  static constexpr int kInputWidth = MI_SIZE_64X64;
+  static constexpr int kInputStride = MI_SIZE_64X64;
+  static constexpr int kOutputWidth =
+      (RESTORATION_PROC_UNIT_SIZE + PC_WIENER_FEATURE_LENGTH_LUMA - 1);
+
+  uint8_t input_buffer_[MI_SIZE_64X64 * MI_SIZE_64X64];
+  int8_t ref_buffer_[kOutputWidth];
+  int8_t test_buffer_[kOutputWidth];
+  const bool tskip_strict_ = true;
+
+  int RandBool() {
+    const uint32_t value = rnd_.Rand8();
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 7) & 0x1;
+  }
+
+  void TestTSkipSum() {
+    for (int i = 0; i < kInputWidth * kInputStride; ++i) {
+      input_buffer_[i] = static_cast<uint8_t>(RandBool() ? 1 : 0);
+    }
+
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int ss_y = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int plane_height = kHeight >> ss_y;
+      const int tskip_lead =
+          is_uv ? PC_WIENER_TSKIP_LEAD_CHROMA : PC_WIENER_TSKIP_LEAD_LUMA;
+      const int tskip_lag =
+          is_uv ? PC_WIENER_TSKIP_LAG_CHROMA : PC_WIENER_TSKIP_LAG_LUMA;
+
+      memset(ref_buffer_, 0, sizeof(*ref_buffer_) * kOutputWidth);
+      memset(test_buffer_, 0, sizeof(*test_buffer_) * kOutputWidth);
+
+      // Reference function
+      for (int row = -tskip_lead; row < (tskip_lag + plane_height); ++row) {
+        av1_fill_tskip_sum_buffer_c(row, input_buffer_, kInputStride,
+                                    ref_buffer_, plane_width, plane_height,
+                                    tskip_lead, tskip_lag, tskip_strict_);
+      }
+
+      // Test function
+      for (int row = -tskip_lead; row < (tskip_lag + plane_height); ++row) {
+        target_func_(row, input_buffer_, kInputStride, test_buffer_,
+                     plane_width, plane_height, tskip_lead, tskip_lag,
+                     tskip_strict_);
+      }
+
+      // Compare the output of reference and test for bit match
+      for (int i = 0; i < kOutputWidth; ++i) {
+        ASSERT_EQ(ref_buffer_[i], test_buffer_[i])
+            << " Mismatch at (" << i << ")";
+      }
+    }
+  }
+
+  void SpeedTestTSkipSum() {
+    for (int i = 0; i < kInputWidth * kInputStride; ++i) {
+      input_buffer_[i] = static_cast<uint8_t>(RandBool() ? 1 : 0);
+    }
+
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int ss_y = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int plane_height = kHeight >> ss_y;
+      const int tskip_lead =
+          is_uv ? PC_WIENER_TSKIP_LEAD_CHROMA : PC_WIENER_TSKIP_LEAD_LUMA;
+      const int tskip_lag =
+          is_uv ? PC_WIENER_TSKIP_LAG_CHROMA : PC_WIENER_TSKIP_LAG_LUMA;
+
+      memset(ref_buffer_, 0, sizeof(*ref_buffer_) * kOutputWidth);
+      memset(test_buffer_, 0, sizeof(*test_buffer_) * kOutputWidth);
+
+      // Calculate time taken by reference/c function
+      aom_usec_timer timer;
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        // Reference function
+        for (int row = -tskip_lead; row < (tskip_lag + plane_height - 1);
+             ++row) {
+          av1_fill_tskip_sum_buffer_c(row, input_buffer_, kInputStride,
+                                      ref_buffer_, plane_width, plane_height,
+                                      tskip_lead, tskip_lag, tskip_strict_);
+        }
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+
+      // Calculate time taken by optimized/intrinsic function
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        for (int row = -tskip_lead; row < (tskip_lag + plane_height - 1);
+             ++row) {
+          target_func_(row, input_buffer_, kInputStride, test_buffer_,
+                       plane_width, plane_height, tskip_lead, tskip_lag,
+                       tskip_strict_);
+        }
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
+
+      float c_time_per_pixel =
+          (float)1000.0 * elapsed_time_c / kSpeedIterations;
+      float opt_time_per_pixel =
+          (float)1000.0 * elapsed_time_opt / kSpeedIterations;
+      float scaling = c_time_per_pixel / opt_time_per_pixel;
+      printf(
+          " %3dx%-3d: c_time_per_pixel=%10.5f, "
+          "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+          plane_width, plane_height, c_time_per_pixel, opt_time_per_pixel,
+          scaling);
+    }
+  }
+};
+
+TEST_P(AV1Fill_TSkip_Sum_BufferTest, RunTest) { RunTest(); }
+TEST_P(AV1Fill_TSkip_Sum_BufferTest, DISABLED_Speed) { RunSpeedTest(); }
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(AVX2, AV1Fill_TSkip_Sum_BufferTest,
+                         ::testing::Values(av1_fill_tskip_sum_buffer_avx2));
 #endif  // HAVE_AVX2
 #endif  // CONFIG_PC_WIENER
 }  // namespace
