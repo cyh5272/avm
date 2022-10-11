@@ -1788,3 +1788,143 @@ void fill_directional_feature_buffers_highbd_avx2(
                                feature_length, buffer_row, col_begin, col_end,
                                buffer_col);
 }
+
+static const uint8_t shuffle_mask_low[32] = { 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
+                                              2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5,
+                                              5, 5, 6, 6, 6, 6, 7, 7, 7, 7 };
+
+static const uint8_t shuffle_mask_high[32] = { 8,  8,  8,  8,  9,  9,  9,  9,
+                                               10, 10, 10, 10, 11, 11, 11, 11,
+                                               12, 12, 12, 12, 13, 13, 13, 13,
+                                               14, 14, 14, 14, 15, 15, 15, 15 };
+
+static AOM_INLINE void set_left_and_right_tskip_sum(int8_t *tskip_sum_buffer,
+                                                    int col_begin, int width,
+                                                    int col_end,
+                                                    int8_t left_tskip,
+                                                    int8_t right_tskip) {
+  int buffer_col = 0;
+  for (int col = col_begin; col < 0; ++col) {
+    tskip_sum_buffer[buffer_col] = left_tskip;
+    ++buffer_col;
+  }
+
+  buffer_col += width;
+  for (int col = width; col < col_end; ++col) {
+    tskip_sum_buffer[buffer_col] = right_tskip;
+    ++buffer_col;
+  }
+}
+
+void av1_fill_tskip_sum_buffer_avx2(int row, const uint8_t *tskip,
+                                    int tskip_stride, int8_t *tskip_sum_buffer,
+                                    int width, int height, int tskip_lead,
+                                    int tskip_lag, bool use_strict_bounds) {
+  if ((width != 64) && (width != 32)) {
+    av1_fill_tskip_sum_buffer_c(row, tskip, tskip_stride, tskip_sum_buffer,
+                                width, height, tskip_lead, tskip_lag,
+                                use_strict_bounds);
+    return;
+  }
+  // TODO(oguleryuz): tskip needs boundary extension.
+  assert(use_strict_bounds == true);
+  const int col_begin = -tskip_lead;
+  const int col_end = width + tskip_lag;
+
+  const int clamped_row = AOMMAX(AOMMIN(row, height - 1), 0);
+  const int tskip_id_base_add = (clamped_row >> MI_SIZE_LOG2) * tskip_stride;
+
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+  int subtract_row = row - tskip_length;
+  int tskip_id_base_sub = 0;
+
+  if (subtract_row >= -tskip_lead) {
+    assert(subtract_row <= height - 1);
+    subtract_row = subtract_row >= 0 ? subtract_row : 0;
+    tskip_id_base_sub = (subtract_row >> MI_SIZE_LOG2) * tskip_stride;
+  }
+
+  if (width == 64) {
+    __m128i tx_skip_add =
+        _mm_loadu_si128((__m128i *)(tskip + tskip_id_base_add));
+
+    if (subtract_row >= -tskip_lead) {
+      const __m128i tx_skip_sub =
+          _mm_loadu_si128((__m128i *)(tskip + tskip_id_base_sub));
+      tx_skip_add = _mm_sub_epi8(tx_skip_add, tx_skip_sub);
+    }
+
+    // tx_skip_add
+    // a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15
+    const __m256i tx_skip_add_temp = _mm256_broadcastsi128_si256(tx_skip_add);
+    // tx_skip_add_low
+    // a0 a0 a0 a0 a1 a1 a1 a1 a2 a2 a2 a2 a3 a3 a3 a3
+    // a4 a4 a4 a4 a5 a5 a5 a5 a6 a6 a6 a6 a7 a7 a7 a7
+    const __m256i tx_skip_add_low = _mm256_shuffle_epi8(
+        tx_skip_add_temp, _mm256_loadu_si256((__m256i *)shuffle_mask_low));
+    // tx_skip_add_high
+    // a8  a8  a8  a8  a9  a9  a9  a9  a10 a10 a10 a10 a11 a11 a11 a11
+    // a12 a12 a12 a12 a13 a13 a13 a13 a14 a14 a14 a14 a15 a15 a15 a15
+    const __m256i tx_skip_add_high = _mm256_shuffle_epi8(
+        tx_skip_add_temp, _mm256_loadu_si256((__m256i *)shuffle_mask_high));
+
+    const __m256i tskip_0 =
+        _mm256_loadu_si256((__m256i *)(tskip_sum_buffer - col_begin));
+    const __m256i tskip_1 =
+        _mm256_loadu_si256((__m256i *)(tskip_sum_buffer - col_begin + 32));
+
+    const __m256i tskip_sum_low = _mm256_add_epi8(tskip_0, tx_skip_add_low);
+    const __m256i tskip_sum_high = _mm256_add_epi8(tskip_1, tx_skip_add_high);
+
+    _mm256_storeu_si256((__m256i *)(tskip_sum_buffer - col_begin),
+                        tskip_sum_low);
+    _mm256_storeu_si256((__m256i *)(tskip_sum_buffer - col_begin + 32),
+                        tskip_sum_high);
+
+    // Extend data from [col_begin, 0) and [width, col_end).
+    const int8_t left_tskip = _mm256_extract_epi8(tskip_sum_low, 0);
+    if (col_begin == -1 && (col_end == (width + 4))) {
+      *((int8_t *)tskip_sum_buffer) = left_tskip;
+      *((int32_t *)(tskip_sum_buffer - col_begin + width)) =
+          _mm256_extract_epi32(tskip_sum_high, 7);
+    } else {
+      const int8_t right_tskip = _mm256_extract_epi8(tskip_sum_high, 31);
+      set_left_and_right_tskip_sum(tskip_sum_buffer, col_begin, width, col_end,
+                                   left_tskip, right_tskip);
+    }
+  } else if (width == 32) {
+    __m128i tx_skip_add =
+        _mm_loadl_epi64((__m128i *)(tskip + tskip_id_base_add));
+
+    if (subtract_row >= -tskip_lead) {
+      const __m128i tx_skip_sub =
+          _mm_loadl_epi64((__m128i *)(tskip + tskip_id_base_sub));
+      tx_skip_add = _mm_sub_epi8(tx_skip_add, tx_skip_sub);
+    }
+
+    const __m256i tx_skip_add_temp = _mm256_broadcastsi128_si256(tx_skip_add);
+    // tx_skip_add_low
+    // a0 a0 a0 a0 a1 a1 a1 a1 a2 a2 a2 a2 a3 a3 a3 a3
+    // a4 a4 a4 a4 a5 a5 a5 a5 a6 a6 a6 a6 a7 a7 a7 a7
+    const __m256i tx_skip_add_low = _mm256_shuffle_epi8(
+        tx_skip_add_temp, _mm256_loadu_si256((__m256i *)shuffle_mask_low));
+
+    const __m256i tskip_0 =
+        _mm256_loadu_si256((__m256i *)(tskip_sum_buffer - col_begin));
+    const __m256i tskip_sum_low = _mm256_add_epi8(tskip_0, tx_skip_add_low);
+
+    _mm256_storeu_si256((__m256i *)(tskip_sum_buffer - col_begin),
+                        tskip_sum_low);
+
+    // Extend data from [col_begin, 0) and [width, col_end).
+    const int8_t left_tskip = _mm256_extract_epi8(tskip_sum_low, 0);
+    const int8_t right_tskip = _mm256_extract_epi8(tskip_sum_low, 31);
+    if (col_begin == -1 && (col_end == (width + 1))) {
+      *((int8_t *)tskip_sum_buffer) = left_tskip;
+      *((int8_t *)(tskip_sum_buffer - col_begin + width)) = right_tskip;
+    } else {
+      set_left_and_right_tskip_sum(tskip_sum_buffer, col_begin, width, col_end,
+                                   left_tskip, right_tskip);
+    }
+  }
+}
