@@ -31,20 +31,6 @@ extern "C" {
 
 /*!\cond */
 
-// Encoder LR mode search treats the entire frame as a single tile. In
-// multi-tile pictures this leads to:
-// (a) sub-optimal mode decisions at tile boundaries where writing/reading mode
-//     side-information resets the relevant banks.
-// (b) encoder decoder mismatches if an RU's modes are conditioned on prior RUs.
-//
-// The core issue is that read/write processes RUs in raster scan within *tiles*
-// whereas the encoder search handles RUS in raster scan within *a frame*.
-//
-// This workaround calculates and resets the banks of relevant RUs for multi-
-// tile pictures. (b) is averted but a form of (a) persists albeit with the
-// search being aware of it.
-//
-
 #if CONFIG_PC_WIENER
 #define PC_WIENER_FILTER_CHROMA 0
 #define PC_WIENER_CLASSIFY_CHROMA 0
