@@ -2715,6 +2715,24 @@ static int16_t quantize(double x, int16_t minv, int16_t n, int prec_bits) {
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
+#define USE_Q_WRAPPER 1
+
+// quantize_wrapper() allows a better (in D) solution to the linear system
+// compared to rounding. It is intended as a better initializer than rounding.
+// As is, quantize_wrapper() only uses distortion but it can be augmented to use
+// total D-R cost. Intended use is to initialize with quantize_wrapper() then
+// run a reduced set of iterations within finer_tile_search_wienerns() for
+// complexity and quality improvements.
+//
+// ~20 q_wrapper iterations are ~ 1 finer_tile iteration for a 256 x 256 RU.
+// When effective RU size increases with RST_MERGE the 10x simplifcation will
+// increase.
+#define Q_WRAPPER_MAX_ITER 20
+#define MAX_INCREMENT 2  // Controls the extent of each greedy update.
+
+// After Q_WRAPPER_MAX_ITER iterations one can reduce the finer_tile iterations.
+#define FINER_TILE_SEARCH_WIENERNS_ITER_STEP (USE_Q_WRAPPER ? 5 : 12)
+
 // TODO: bits calculations for merge cases, tile_rect = NULL, are wrong. Need to
 //  use the merge leader's bank rather than rsc->wienerns_bank.
 static int64_t finer_tile_search_wienerns(
@@ -2758,7 +2776,7 @@ static int64_t finer_tile_search_wienerns(
   const int num_feat = nsfilter_params->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
 
-  const int iter_step = 12;
+  const int iter_step = FINER_TILE_SEARCH_WIENERNS_ITER_STEP;
   for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
     int16_t *curr_nsfilter = nsfilter_taps(&curr, c_id);
     int16_t *rui_wienerns_info_nsfilter =
@@ -3149,6 +3167,122 @@ static int linsolve_wrapper(int n, const double *A, int stride, const double *b,
   return 1;
 }
 
+#if USE_Q_WRAPPER
+static void quantize_wrapper(int n, const double *square_mat_A, int stride,
+                             const double *b, double *float_soln,
+                             const WienernsFilterParameters *nsfilter_params,
+                             WienerNonsepInfo *wienerns_info,
+                             int max_num_iterations, int class_id) {
+  const int beg_feat = 0;
+  const int end_feat = nsfilter_params->ncoeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
+
+  int c_id_begin = 0;
+  int c_id_end = wienerns_info->num_classes;
+  if (class_id != ALL_WIENERNS_CLASSES) {
+    c_id_begin = class_id;
+    c_id_end = class_id + 1;
+  }
+
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    int16_t *nsfilter = nsfilter_taps(wienerns_info, c_id);
+    for (int k = beg_feat; k < end_feat; ++k) {
+      nsfilter[k] =
+          quantize(float_soln[k - beg_feat],
+                   wienerns_coeffs[k - beg_feat][WIENERNS_MIN_ID],
+                   (1 << wienerns_coeffs[k - beg_feat][WIENERNS_BIT_ID]),
+                   nsfilter_params->nsfilter_config.prec_bits);
+    }
+  }
+
+  if (max_num_iterations <= 0) return;
+
+  const int dim = n;
+  assert(dim <= end_feat - beg_feat);
+
+  const double tap_qstep = 1 << nsfilter_params->nsfilter_config.prec_bits;
+  const double eps = 1e-10;
+  double *error = (double *)aom_malloc(dim * sizeof(*error));
+  double *half_normalizers = (double *)aom_malloc(dim * sizeof(*error));
+
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    int16_t *nsfilter = nsfilter_taps(wienerns_info, c_id);
+
+    // Set baseline error.
+    for (int row = 0; row < dim; ++row) {
+      double sum = 0;
+      for (int col = 0; col < dim; ++col) {
+        const int tap_index = col + beg_feat;
+        sum += square_mat_A[row * stride + col] * nsfilter[tap_index];
+      }
+      error[row] = b[row] * tap_qstep - sum;
+    }
+
+    // Set normalizers.
+    for (int col = 0; col < dim; ++col) {
+      double sum = 0;
+      for (int row = 0; row < dim; ++row) {
+        sum +=
+            square_mat_A[row * stride + col] * square_mat_A[row * stride + col];
+      }
+      half_normalizers[col] = AOMMAX(sum, eps) / 2;
+    }
+
+    double prev_err = 1e90;
+    int change = 1;
+    int num_iterations = 0;
+    while (change && num_iterations < max_num_iterations) {
+#ifndef NDEBUG
+      double err_sum = 0;
+      for (int row = 0; row < dim; ++row) {
+        err_sum += error[row] * error[row];
+      }
+      assert(err_sum <= prev_err);
+      prev_err = err_sum;
+#endif
+      // TODO: Switch to pseudo-random traversal.
+      const int offset = 1723 * num_iterations;
+      ++num_iterations;
+      change = 0;
+      for (int k = 0; k < dim; ++k) {
+        const int col = (k + offset) % dim;
+        double sum = 0;
+        for (int row = 0; row < dim; ++row) {
+          sum += square_mat_A[row * stride + col] * error[row];
+        }
+
+        const double abs_sum = fabs(sum);
+        const int tap_index = col + beg_feat;
+        int updated_tap = nsfilter[tap_index];
+        if (abs_sum >= half_normalizers[col]) {
+          // This should be an integer division. Can also do a search for
+          // abs(increment) = 0, 1, 2, ...
+          const double increment = CLIP(sum / (2 * half_normalizers[col]),
+                                        -MAX_INCREMENT, MAX_INCREMENT);
+
+          // TODO: This is D only. Potentially work in bits and cost.
+          updated_tap = quantize((nsfilter[tap_index] + increment) / tap_qstep,
+                                 wienerns_coeffs[col][WIENERNS_MIN_ID],
+                                 (1 << wienerns_coeffs[col][WIENERNS_BIT_ID]),
+                                 nsfilter_params->nsfilter_config.prec_bits);
+        }
+        const int tap_diff = updated_tap - nsfilter[tap_index];
+        if (tap_diff) {
+          change += abs(tap_diff);
+          // Update error.
+          for (int row = 0; row < dim; ++row) {
+            error[row] -= square_mat_A[row * stride + col] * tap_diff;
+          }
+          nsfilter[tap_index] = updated_tap;
+        }
+      }
+    }
+  }
+  aom_free(half_normalizers);
+  aom_free(error);
+}
+#endif  // USE_Q_WRAPPER
+
 static int compute_quantized_wienerns_filter(
     RestSearchCtxt *rsc, const uint8_t *dgd, const uint8_t *src,
     const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
@@ -3186,9 +3320,7 @@ static int compute_quantized_wienerns_filter(
 #else
   const int end_pixel = nsfilter_params->nsfilter_config.num_pixels;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
   const int num_feat = nsfilter_params->ncoeffs;
-  const int prec_bits = nsfilter_params->nsfilter_config.prec_bits;
 
   int64_t real_sse = 0;  // for debuggung purposes
   for (int c_id = 0; c_id < num_classes; ++c_id) {
@@ -3290,6 +3422,17 @@ static int compute_quantized_wienerns_filter(
       // for (int k = 0; k < num_feat; ++k) err -= x[k] * b[k];
       do {
         // if ((int64_t)err > real_sse) break;
+#if USE_Q_WRAPPER
+        for (int c_id = 0; c_id < num_classes; ++c_id) {
+          quantize_wrapper(num_feat - reduce, A + c_id * stride_A, num_feat,
+                           b + c_id * stride_b, solver_x + c_id * stride_b,
+                           nsfilter_params, &rui->wienerns_info,
+                           Q_WRAPPER_MAX_ITER, c_id);
+        }
+#else
+        const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
+            nsfilter_params->coeffs;
+        const int prec_bits = nsfilter_params->nsfilter_config.prec_bits;
         const int beg_feat = 0;
         const int end_feat = nsfilter_params->ncoeffs;
         for (int c_id = 0; c_id < num_classes; ++c_id) {
@@ -3307,6 +3450,7 @@ static int compute_quantized_wienerns_filter(
             //     prec_bits);
           }
         }
+#endif  // USE_Q_WRAPPER
         // double errq = err + eval_quadratic(num_feat, A, num_feat, e);
         assert(rui->class_id_restrict == -1);
         int64_t real_errq =
@@ -3793,6 +3937,12 @@ static void search_wienerns(const RestorationTileLimits *limits,
           linsolve_wrapper(num_feat, solver_A_AVG, num_feat, solver_b_AVG,
                            solver_merge_filter_stats);
       if (linsolve_successful) {
+#if USE_Q_WRAPPER
+        quantize_wrapper(num_feat, solver_A_AVG, num_feat, solver_b_AVG,
+                         solver_merge_filter_stats, nsfilter_params,
+                         &rui_merge_cand.wienerns_info, Q_WRAPPER_MAX_ITER,
+                         c_id);
+#else
         const int beg_feat = 0;
         const int end_feat = nsfilter_params->ncoeffs;
         const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] =
@@ -3807,6 +3957,7 @@ static void search_wienerns(const RestorationTileLimits *limits,
                        (1 << wienerns_coeffs[k - beg_feat][WIENERNS_BIT_ID]),
                        nsfilter_params->nsfilter_config.prec_bits);
         }
+#endif  // USE_Q_WRAPPER
       } else {
         continue;
       }
