@@ -1874,7 +1874,7 @@ const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index) {
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 // Enables running of wienerns filters without the subtract-center option.
-#define ADD_CENTER_TAP_TO_WIENERNS 1
+#define ADD_CENTER_TAP_TO_WIENERNS 0
 // Enabling these will run non-SIMD av1_convolve_symmetric_dual_highbd_c().
 #define ADD_CENTER_TAP_TO_WIENERNS_CHROMA 1
 #define ADD_CENTER_TAP_TO_WIENERNS_CROSS 1
