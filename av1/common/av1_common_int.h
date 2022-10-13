@@ -525,6 +525,9 @@ typedef struct SequenceHeader {
   uint8_t separate_uv_delta_q;
   int8_t base_y_dc_delta_q;
   int8_t base_uv_dc_delta_q;
+#if CONFIG_EXT_QUANT_UPD
+  int8_t base_uv_ac_delta_q;
+#endif  // CONFIG_EXT_QUANT_UPD
   uint8_t film_grain_params_present;
 
   // Operating point info.

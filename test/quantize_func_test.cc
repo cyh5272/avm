@@ -104,7 +104,7 @@ class QuantizeTest : public ::testing::TestWithParam<QuantizeParam> {
   }
 
   void InitQuantizer() {
-    av1_build_quantizer(bd_, 0, 0, 0, 0, 0, 0, 0, &qtab_->quant,
+    av1_build_quantizer(bd_, 0, 0, 0, 0, 0, 0, 0, 0, &qtab_->quant,
                         &qtab_->dequant);
   }
 

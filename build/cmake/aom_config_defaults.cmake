@@ -137,6 +137,7 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
+set_aom_config_var(CONFIG_EXT_QUANT_UPD 0 "AV2 updated ext-quant.")
 set_aom_config_var(
   CONFIG_ATC_COEFCODING 1
   "AV2 enable adaptive transform coefficient coding improvement.")

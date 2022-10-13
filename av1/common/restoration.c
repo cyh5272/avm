@@ -1236,13 +1236,13 @@ static int get_qstep(int base_qindex, int bit_depth, int *shift) {
   switch (bit_depth) {
     case AOM_BITS_8:
       *shift = 2 + base_shift;
-      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+      return av1_ac_quant_QTX(base_qindex, 0, 0, bit_depth);
     case AOM_BITS_10:
       *shift = 4 + base_shift;
-      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+      return av1_ac_quant_QTX(base_qindex, 0, 0, bit_depth);
     case AOM_BITS_12:
       *shift = 6 + base_shift;
-      return av1_ac_quant_QTX(base_qindex, 0, bit_depth);
+      return av1_ac_quant_QTX(base_qindex, 0, 0, bit_depth);
     default:
       assert(0 && "bit_depth should be AOM_BITS_8, AOM_BITS_10 or AOM_BITS_12");
       return -1;
