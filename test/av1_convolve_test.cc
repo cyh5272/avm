@@ -1830,5 +1830,319 @@ TEST_P(AV1Fill_TSkip_Sum_BufferTest, DISABLED_Speed) { RunSpeedTest(); }
 INSTANTIATE_TEST_SUITE_P(AVX2, AV1Fill_TSkip_Sum_BufferTest,
                          ::testing::Values(av1_fill_tskip_sum_buffer_avx2));
 #endif  // HAVE_AVX2
+
+//////////////////////////////////////////////////////////
+//       unit-test for 'directional_feature_accum'      //
+//////////////////////////////////////////////////////////
+typedef void (*FillDirFeatureAccumFunc)(
+    int dir_feature_accum[NUM_PC_WIENER_FEATURES][PC_WIENER_FEATURE_ACC_SIZE],
+    int *feature_sum_buf[NUM_PC_WIENER_FEATURES], int width, int col_offset,
+    int feature_lead, int feature_lag);
+
+typedef std::tuple<const FillDirFeatureAccumFunc>
+    AV1FillDirFeatureAccumFuncParam;
+
+class AV1FeatureDirAccumHighbdTest
+    : public ::testing::TestWithParam<AV1FillDirFeatureAccumFuncParam> {
+ public:
+  void RunTest() {
+    for (int i = 0; i < kTestIterations; i++) {
+      FillInputBufs();
+      TestFillDirFeatureAccum();
+    }
+  }
+
+  void RunSpeedTest() { SpeedTestConvolve(); };
+
+  virtual void SetUp() {
+    target_func_ = GET_PARAM(0);
+
+    for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
+      feature_sum_buf[j] =
+          (int *)(aom_malloc(kInputWidth * sizeof(*feature_sum_buf[j])));
+    }
+  }
+
+  virtual void TearDown() {
+    for (int j = 0; j < NUM_PC_WIENER_FEATURES; ++j) {
+      aom_free(feature_sum_buf[j]);
+      feature_sum_buf[j] = NULL;
+    }
+  }
+
+ private:
+  libaom_test::ACMRandom rnd_;
+  FillDirFeatureAccumFunc target_func_;
+
+  static constexpr int kSpeedIterations = 1000000;
+  static constexpr int kTestIterations = 100;
+  static constexpr int kNumPlanes = 2;
+  static constexpr int kWidth = RESTORATION_PROC_UNIT_SIZE;
+  static constexpr int kInputWidth =
+      (RESTORATION_PROC_UNIT_SIZE + PC_WIENER_FEATURE_LENGTH_LUMA - 1);
+
+  int *feature_sum_buf[NUM_PC_WIENER_FEATURES];
+  int dir_feature_accum_buf_c[NUM_PC_WIENER_FEATURES]
+                             [PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+  int dir_feature_accum_buf_simd[NUM_PC_WIENER_FEATURES]
+                                [PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+  int RandBool() {
+    const uint32_t value = rnd_.Rand8();
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 7) & 0x1;
+  }
+
+  void FillInputBufs() {
+    for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i) {
+      for (int j = 0; j < kInputWidth; ++j) {
+        // For the extreme values case, the maimum input that feature_sum_buf
+        // can take is (kInputWidth * 2 * input_max_value). Hence, clipping the
+        // value generated to 23 bit.
+        const int max_range = (1 << 23);
+        const int value = rnd_.Rand31() % max_range;
+        feature_sum_buf[i][j] =
+            static_cast<uint8_t>(RandBool() ? value : -value);
+      }
+    }
+    // Reset output buffers
+    av1_zero(dir_feature_accum_buf_c);
+    av1_zero(dir_feature_accum_buf_simd);
+  }
+
+  void TestFillDirFeatureAccum() {
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int feature_lead =
+          is_uv ? PC_WIENER_FEATURE_LEAD_CHROMA : PC_WIENER_FEATURE_LEAD_LUMA;
+      const int feature_lag =
+          is_uv ? PC_WIENER_FEATURE_LAG_CHROMA : PC_WIENER_FEATURE_LAG_LUMA;
+
+      // Reset output buffers
+      av1_zero(dir_feature_accum_buf_c);
+      av1_zero(dir_feature_accum_buf_simd);
+
+      // C function call
+      av1_fill_directional_feature_accumulators_c(
+          dir_feature_accum_buf_c, feature_sum_buf, plane_width, feature_lag,
+          feature_lead, feature_lag);
+
+      // SIMD function call
+      target_func_(dir_feature_accum_buf_simd, feature_sum_buf, plane_width,
+                   feature_lag, feature_lead, feature_lag);
+
+      // Compare the output of reference and test for bit match
+      for (int i = 0; i < NUM_PC_WIENER_FEATURES; i++) {
+        for (int j = 0; j < PC_WIENER_FEATURE_ACC_SIZE; j++) {
+          ASSERT_EQ(dir_feature_accum_buf_c[i][j],
+                    dir_feature_accum_buf_simd[i][j])
+              << " Feature_Buf: Pixel mismatch at (" << i << ", " << j << ", "
+              << plane_width << ")";
+        }
+      }
+    }
+  }
+
+  void SpeedTestConvolve() {
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int feature_lead =
+          is_uv ? PC_WIENER_FEATURE_LEAD_CHROMA : PC_WIENER_FEATURE_LEAD_LUMA;
+      const int feature_lag =
+          is_uv ? PC_WIENER_FEATURE_LAG_CHROMA : PC_WIENER_FEATURE_LAG_LUMA;
+      FillInputBufs();
+
+      // Calculate time taken by reference/c function
+      aom_usec_timer timer;
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        av1_fill_directional_feature_accumulators_c(
+            dir_feature_accum_buf_c, feature_sum_buf, plane_width, feature_lag,
+            feature_lead, feature_lag);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+
+      // Calculate time taken by optimized/intrinsic function
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        target_func_(dir_feature_accum_buf_simd, feature_sum_buf, plane_width,
+                     feature_lag, feature_lead, feature_lag);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
+
+      float c_time_per_pixel =
+          (float)1000.0 * elapsed_time_c / (kSpeedIterations * plane_width);
+      float opt_time_per_pixel =
+          (float)1000.0 * elapsed_time_opt / (kSpeedIterations * plane_width);
+      float scaling = c_time_per_pixel / opt_time_per_pixel;
+      printf(
+          " %3d: c_time_per_pixel=%10.5f, "
+          "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+          plane_width, c_time_per_pixel, opt_time_per_pixel, scaling);
+    }
+  }
+};
+
+TEST_P(AV1FeatureDirAccumHighbdTest, RunTest) { RunTest(); }
+TEST_P(AV1FeatureDirAccumHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1FeatureDirAccumHighbdTest,
+    ::testing::Values(av1_fill_directional_feature_accumulators_avx2));
+#endif  // HAVE_AVX2
+
+//////////////////////////////////////////////////////////
+//     unit-test for 'fill_tskip_feature_accumulator'   //
+//////////////////////////////////////////////////////////
+typedef void (*FillTskip_Accumulator_func)(
+    int16_t tskip_feature_accum[PC_WIENER_FEATURE_ACC_SIZE],
+    int8_t *tskip_sum_buff, int width, int col_offset, int tskip_lead,
+    int tskip_lag);
+typedef std::tuple<const FillTskip_Accumulator_func>
+    AV1FillTSkipAccumBufferFuncParam;
+
+class AV1TskipAccumHighbdTest
+    : public ::testing::TestWithParam<AV1FillTSkipAccumBufferFuncParam> {
+ public:
+  virtual void SetUp() { target_func_ = GET_PARAM(0); }
+
+  void RunTest() {
+    for (int i = 0; i < kTestIterations; i++) TestTskipAccum();
+  }
+
+  void RunSpeedTest() { SpeedTestTskipAccum(); };
+
+ private:
+  libaom_test::ACMRandom rnd_;
+  FillTskip_Accumulator_func target_func_;
+
+  static constexpr int kSpeedIterations = 1000000;
+  static constexpr int kTestIterations = 100;
+  static constexpr int kNumPlanes = 2;
+  static constexpr int kWidth = RESTORATION_PROC_UNIT_SIZE;
+  static constexpr int kInputWidth =
+      (RESTORATION_PROC_UNIT_SIZE + PC_WIENER_FEATURE_LENGTH_LUMA - 1);
+
+  int8_t *tskip_sum_buf;
+  int16_t tskip_feature_accum_c[PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+  int16_t tskip_feature_accum_simd[PC_WIENER_FEATURE_ACC_SIZE] = { 0 };
+
+  void buffer_alloc_and_set_data() {
+    tskip_sum_buf =
+        (int8_t *)(aom_malloc(kInputWidth * sizeof(*tskip_sum_buf)));
+    // Input buffer filling. Tskip buffer max value will not cross width of
+    // restoration unit size. Hence, the generated values are clipped to the
+    // same.
+    for (int i = 0; i < kInputWidth; ++i) {
+      const int8_t value =
+          static_cast<int8_t>(rnd_.Rand8() % RESTORATION_PROC_UNIT_SIZE);
+      tskip_sum_buf[i] = static_cast<uint8_t>(RandBool() ? value : -value);
+    }
+  }
+
+  int RandBool() {
+    const uint32_t value = rnd_.Rand8();
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 7) & 0x1;
+  }
+
+  void TestTskipAccum() {
+    // Allocate memory and fill input buffer
+    buffer_alloc_and_set_data();
+
+    // Loop over luma and chroma plane
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int tskip_lead =
+          is_uv ? PC_WIENER_TSKIP_LEAD_CHROMA : PC_WIENER_TSKIP_LEAD_LUMA;
+      const int tskip_lag =
+          is_uv ? PC_WIENER_TSKIP_LAG_CHROMA : PC_WIENER_TSKIP_LAG_LUMA;
+      av1_zero(tskip_feature_accum_c);
+      av1_zero(tskip_feature_accum_simd);
+
+      // C function call
+      av1_fill_tskip_feature_accumulator_c(tskip_feature_accum_c, tskip_sum_buf,
+                                           plane_width, tskip_lag, tskip_lead,
+                                           tskip_lag);
+
+      // SIMD function call
+      target_func_(tskip_feature_accum_simd, tskip_sum_buf, plane_width,
+                   tskip_lag, tskip_lead, tskip_lag);
+
+      // Compare the output of reference and test for bit match
+      for (int i = 0; i < PC_WIENER_FEATURE_ACC_SIZE; i++) {
+        ASSERT_EQ(tskip_feature_accum_c[i], tskip_feature_accum_simd[i])
+            << " Feature_Buf: Pixel mismatch at (" << i << "," << plane_width
+            << ")";
+      }
+    }
+    aom_free(tskip_sum_buf);
+    tskip_sum_buf = NULL;
+  }
+
+  void SpeedTestTskipAccum() {
+    // Allocate memory and fill input buffer
+    buffer_alloc_and_set_data();
+
+    for (int plane = 0; plane < kNumPlanes; ++plane) {
+      const int is_uv = (plane > 0);
+      const int ss_x = is_uv ? 1 : 0;
+      const int plane_width = kWidth >> ss_x;
+      const int tskip_lead =
+          is_uv ? PC_WIENER_TSKIP_LEAD_CHROMA : PC_WIENER_TSKIP_LEAD_LUMA;
+      const int tskip_lag =
+          is_uv ? PC_WIENER_TSKIP_LAG_CHROMA : PC_WIENER_TSKIP_LAG_LUMA;
+
+      // Calculate time taken by reference/c function
+      aom_usec_timer timer;
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        av1_fill_tskip_feature_accumulator_c(tskip_feature_accum_c,
+                                             tskip_sum_buf, plane_width,
+                                             tskip_lag, tskip_lead, tskip_lag);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
+
+      // Calculate time taken by optimized/intrinsic function
+      aom_usec_timer_start(&timer);
+      for (int i = 0; i < kSpeedIterations; ++i) {
+        target_func_(tskip_feature_accum_simd, tskip_sum_buf, plane_width,
+                     tskip_lag, tskip_lead, tskip_lag);
+      }
+      aom_usec_timer_mark(&timer);
+      auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
+
+      float c_time_per_pixel =
+          (float)1000.0 * elapsed_time_c / (kSpeedIterations * plane_width);
+      float opt_time_per_pixel =
+          (float)1000.0 * elapsed_time_opt / (kSpeedIterations * plane_width);
+      float scaling = c_time_per_pixel / opt_time_per_pixel;
+      printf(
+          " %3d: c_time_per_pixel=%10.5f, "
+          "opt_time_per_pixel=%10.5f,  scaling=%f \n",
+          plane_width, c_time_per_pixel, opt_time_per_pixel, scaling);
+    }
+    aom_free(tskip_sum_buf);
+    tskip_sum_buf = NULL;
+  }
+};
+
+TEST_P(AV1TskipAccumHighbdTest, RunTest) { RunTest(); }
+TEST_P(AV1TskipAccumHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1TskipAccumHighbdTest,
+    ::testing::Values(av1_fill_tskip_feature_accumulator_avx2));
+#endif  // HAVE_AVX2
 #endif  // CONFIG_PC_WIENER
 }  // namespace

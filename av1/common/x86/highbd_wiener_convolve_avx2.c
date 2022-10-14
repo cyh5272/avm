@@ -1928,3 +1928,342 @@ void av1_fill_tskip_sum_buffer_avx2(int row, const uint8_t *tskip,
     }
   }
 }
+
+#define LOAD_INPUT_DATA(cb, cl)                      \
+  /*A0 A1 A2 A3 A4 A5 A6 A7*/                        \
+  src_A = _mm256_loadu_si256((__m256i *)(lb0 + cb)); \
+  /* B0 B1 B2 B3 B4 B5 B6 B7 */                      \
+  src_B = _mm256_loadu_si256((__m256i *)(lb1 + cb)); \
+  /* C0 C1 C2 C3 C4 C5 C6 C7 */                      \
+  src_C = _mm256_loadu_si256((__m256i *)(lb2 + cb)); \
+  /* D0 D1 D2 D3 D4 D5 D6 D7 */                      \
+  src_D = _mm256_loadu_si256((__m256i *)(lb3 + cb)); \
+  /* a0 a1 a2 a3 a4 a5 a6 a7 */                      \
+  src_a = _mm256_loadu_si256((__m256i *)(lb0 + cl)); \
+  /* b0 b1 b2 b3 b4 b5 b6 b7*/                       \
+  src_b = _mm256_loadu_si256((__m256i *)(lb1 + cl)); \
+  /* c0 c1 c2 c3 c4 c5 c6 c7 */                      \
+  src_c = _mm256_loadu_si256((__m256i *)(lb2 + cl)); \
+  /* d0 d1 d2 d3 d4 d5 d6 d7 */                      \
+  src_d = _mm256_loadu_si256((__m256i *)(lb3 + cl));
+
+static AOM_INLINE void process_feature_accum_wd8(__m256i src_A, __m256i src_B,
+                                                 __m256i src_C, __m256i src_D,
+                                                 __m256i src_a, __m256i src_b,
+                                                 __m256i src_c, __m256i src_d,
+                                                 __m256i *result) {
+  // ra0 ra1 ra2 ra3 ra4 ra5 ra6 ra7
+  const __m256i diff_Aa = _mm256_sub_epi32(src_A, src_a);
+  // rb0 rb1 rb2 rb3 rb4 rb5 rb6 rb7
+  const __m256i diff_Bb = _mm256_sub_epi32(src_B, src_b);
+  // rc0 rc1 rc2 rc3 rc4 rc5 rc6 rc7
+  const __m256i diff_Cc = _mm256_sub_epi32(src_C, src_c);
+  // rd0 rd1 rd2 rd3 rd4 rd5 rd6 rd7
+  const __m256i diff_Dd = _mm256_sub_epi32(src_D, src_d);
+  // ra0+ra1 ra2+ra3 rb0+rb1 rb2+rb3 ra4+ra5 ra6+ra7 rb4+rb5 rb6+rb7
+  const __m256i result0 = _mm256_hadd_epi32(diff_Aa, diff_Bb);
+  // rc0+rc1 rc2+rc3 rd0+rd1 rd2+rd3 rc4+rc5 rc6+rc7 rd4+rd5 rd6+rd7
+  const __m256i result1 = _mm256_hadd_epi32(diff_Cc, diff_Dd);
+  // ra0+ra1+ra2+ra3 rb0+rb1+rb2+rb3 rc0+rc1+rc2+rc3 rd0+rd1+rd2+rd3  --
+  // ra4+ra5+ra6+ra7 rb4+rb5+rb6+rb7 rc4+rc5+rc6+rc7 rd4+rd5+rd6+rd7
+  *result = _mm256_hadd_epi32(result0, result1);
+}
+
+static AOM_INLINE void unpack_results_and_store(
+    int dir_feature_accum[][PC_WIENER_FEATURE_ACC_SIZE], __m256i result0,
+    __m256i result1, int cur_col) {
+  const int cur_idx = cur_col / 4;
+  const int *sb0 = dir_feature_accum[0];
+  const int *sb1 = dir_feature_accum[1];
+  const int *sb2 = dir_feature_accum[2];
+  const int *sb3 = dir_feature_accum[3];
+
+  const __m128i accumu_r0 = _mm_set1_epi32(dir_feature_accum[0][cur_idx]);
+  const __m128i accumu_r1 = _mm_set1_epi32(dir_feature_accum[1][cur_idx]);
+  const __m128i accumu_r2 = _mm_set1_epi32(dir_feature_accum[2][cur_idx]);
+  const __m128i accumu_r3 = _mm_set1_epi32(dir_feature_accum[3][cur_idx]);
+
+  // ra0+ra1+ra2+ra3 rb0+rb1+rb2+rb3 rc0+rc1+rc2+rc3 rd0+rd1+rd2+rd3
+  const __m128i f1 = _mm256_castsi256_si128(result0);
+  // ra4+ra5+ra6+ra7 rb4+rb5+rb6+rb7 rc4+rc5+rc6+rc7 rd4+rd5+rd6+rd7
+  const __m128i fresult01 = _mm256_extractf128_si256(result0, 1);
+  // a0-a7 b0-b7 c0-c7 d0-d7
+  const __m128i f2 = _mm_add_epi32(f1, fresult01);
+  // ra8+ra9+ra10+ra11 rb8+rb9+rb10+rb11 rc8+rc9+rc10+rc11 rd8+rd9+rd10+rd11
+  const __m128i fresult10 = _mm256_castsi256_si128(result1);
+  // a0-a11 b0-b11 c0-c11 d0-d11
+  const __m128i f3 = _mm_add_epi32(f2, fresult10);
+  // ra12+ra13+ra14+ra15 rb12+rb13+rb14+rb15 rc12+rc13+rc14+rc15
+  // rd12+rd13+rd14+rd15
+  const __m128i fresult11 = _mm256_extractf128_si256(result1, 1);
+  // a0-a15 b0-b15 c0-c15 d0-d15
+  const __m128i f4 = _mm_add_epi32(f3, fresult11);
+
+  // ra0-ra3 ra0-ra7 rb0-rb3 rb0-rb7
+  const __m128i r00 = _mm_unpacklo_epi32(f1, f2);
+  // rc0-rc3 rc0-rc7 rd0-rd3 rd0-rd7
+  const __m128i r20 = _mm_unpackhi_epi32(f1, f2);
+  // ra0-ra11  ra0-ra15 rb0-rb11 rb0-rb15
+  const __m128i r01 = _mm_unpacklo_epi32(f3, f4);
+  // rc0-rc11  rc0-rc15 rd0-rd11 rd0-rd15
+  const __m128i r21 = _mm_unpackhi_epi32(f3, f4);
+  // ra0-ra3 ra0-ra7 ra0-ra11  ra0-ra15
+  __m128i r0 = _mm_unpacklo_epi64(r00, r01);
+  // rb0-rb3 rb0-rb7 rb0-rb11  rb0-rb15
+  __m128i r1 = _mm_unpackhi_epi64(r00, r01);
+  // rc0-rc3 rc0-rc7 rc0-rc11  rc0-rc15
+  __m128i r2 = _mm_unpacklo_epi64(r20, r21);
+  // rd0-rd3 rd0-rd7 rd0-rd11  rd0-rd15
+  __m128i r3 = _mm_unpackhi_epi64(r20, r21);
+
+  r0 = _mm_add_epi32(r0, accumu_r0);
+  r1 = _mm_add_epi32(r1, accumu_r1);
+  r2 = _mm_add_epi32(r2, accumu_r2);
+  r3 = _mm_add_epi32(r3, accumu_r3);
+
+  _mm_storeu_si128((__m128i *)(sb0 + cur_idx + 1), r0);
+  _mm_storeu_si128((__m128i *)(sb1 + cur_idx + 1), r1);
+  _mm_storeu_si128((__m128i *)(sb2 + cur_idx + 1), r2);
+  _mm_storeu_si128((__m128i *)(sb3 + cur_idx + 1), r3);
+}
+
+static AOM_INLINE void process_feature_accum_wd16(
+    int dir_feature_accum[][PC_WIENER_FEATURE_ACC_SIZE], int *feature_sum_buf[],
+    int cur_col, int cb, int feature_length) {
+  const int cl = cb - feature_length;
+  const int *lb0 = feature_sum_buf[0];
+  const int *lb1 = feature_sum_buf[1];
+  const int *lb2 = feature_sum_buf[2];
+  const int *lb3 = feature_sum_buf[3];
+  __m256i src_A, src_B, src_C, src_D, src_a, src_b, src_c, src_d;
+
+  // Process the first 8 pixels.
+  LOAD_INPUT_DATA(cb, cl)
+  __m256i result0 = _mm256_set1_epi16(0);
+  process_feature_accum_wd8(src_A, src_B, src_C, src_D, src_a, src_b, src_c,
+                            src_d, &result0);
+
+  // Process the next 8 pixels.
+  LOAD_INPUT_DATA(cb + 8, cl + 8)
+  __m256i result1 = _mm256_set1_epi16(0);
+  process_feature_accum_wd8(src_A, src_B, src_C, src_D, src_a, src_b, src_c,
+                            src_d, &result1);
+
+  unpack_results_and_store(dir_feature_accum, result0, result1, cur_col);
+}
+
+static AOM_INLINE void process_feature_accum_wd15(
+    int dir_feature_accum[][PC_WIENER_FEATURE_ACC_SIZE], int *feature_sum_buf[],
+    int cur_col, int cb, int feature_length) {
+  const int cl = cb - feature_length;
+  const int *lb0 = feature_sum_buf[0];
+  const int *lb1 = feature_sum_buf[1];
+  const int *lb2 = feature_sum_buf[2];
+  const int *lb3 = feature_sum_buf[3];
+  __m256i src_A, src_B, src_C, src_D, src_a, src_b, src_c, src_d;
+
+  // Process the first 8 pixels.
+  LOAD_INPUT_DATA(cb, cl);
+  __m256i result0 = _mm256_set1_epi16(0);
+  process_feature_accum_wd8(src_A, src_B, src_C, src_D, src_a, src_b, src_c,
+                            src_d, &result0);
+
+  // Process the next 8 pixels.
+  LOAD_INPUT_DATA(cb + 8, cl + 8);
+  const __m256i zero = _mm256_setzero_si256();
+  src_A = _mm256_blend_epi32(src_A, zero, 0x80);
+  src_B = _mm256_blend_epi32(src_B, zero, 0x80);
+  src_C = _mm256_blend_epi32(src_C, zero, 0x80);
+  src_D = _mm256_blend_epi32(src_D, zero, 0x80);
+  src_a = _mm256_blend_epi32(src_a, zero, 0x80);
+  src_b = _mm256_blend_epi32(src_b, zero, 0x80);
+  src_c = _mm256_blend_epi32(src_c, zero, 0x80);
+  src_d = _mm256_blend_epi32(src_d, zero, 0x80);
+  __m256i result1 = zero;
+  process_feature_accum_wd8(src_A, src_B, src_C, src_D, src_a, src_b, src_c,
+                            src_d, &result1);
+
+  unpack_results_and_store(dir_feature_accum, result0, result1, cur_col);
+}
+
+void av1_fill_directional_feature_accumulators_avx2(
+    int dir_feature_accum[NUM_PC_WIENER_FEATURES][PC_WIENER_FEATURE_ACC_SIZE],
+    int *feature_sum_buf[NUM_PC_WIENER_FEATURES], int width, int col_offset,
+    int feature_lead, int feature_lag) {
+  // SIMD is specifically implemented for pc_wiener block size equal to 4x4 and
+  // restoration unit size must be 64x64 for luma or 32x32 for chroma plane.
+  if ((PC_WIENER_BLOCK_SIZE != 4) || ((width != 64) && (width != 32))) {
+    assert(0 &&
+           "Intrinsic support is not available for PC_WIENER_BLOCK_SIZE != 4 "
+           "or width != 32 or 64");
+    av1_fill_directional_feature_accumulators_c(
+        dir_feature_accum, feature_sum_buf, width, col_offset, feature_lead,
+        feature_lag);
+    return;
+  }
+
+  // Process width equal to 0 case here.
+  int cur_col = 0;
+  const int feature_length = feature_lead + feature_lag + 1;
+  int cb = cur_col + col_offset + feature_lead;
+  for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
+    dir_feature_accum[k][0] += feature_sum_buf[k][cb];
+  }
+  ++cb;
+
+  // Process the remaining width here.
+  if (width == 64) {
+    // Process next 16 (i.e., 1 to 16) pixels here.
+    cur_col = 1;
+    process_feature_accum_wd16(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+
+    // Process next 16 (i.e., 17 to 32) pixels here.
+    cur_col += 16;
+    cb += 16;
+    process_feature_accum_wd16(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+
+    // Process next 16 (i.e., 33 to 48) pixels here.
+    cur_col += 16;
+    cb += 16;
+    process_feature_accum_wd16(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+
+    // Process remaining 15 (i.e., 49 to 63) pixels here.
+    cur_col += 16;
+    cb += 16;
+    process_feature_accum_wd15(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+  } else if (width == 32) {
+    // Process next 16 pixels here.
+    cur_col = 1;
+    process_feature_accum_wd16(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+
+    // Process remaining 15 pixels here.
+    cur_col += 16;
+    cb += 16;
+    process_feature_accum_wd15(dir_feature_accum, feature_sum_buf, cur_col, cb,
+                               feature_length);
+  } else {
+    // For any other case, C support is added. So this assert should not be
+    // invoked.
+    assert(0);
+  }
+}
+
+// To make last 8bit element of 256bit register to zero.
+static const int8_t blend_mask[32] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                       0, 0, 0, 0, 0, 0, 0, 0, 0, -1 };
+
+static AOM_INLINE void process_accumulation_wd32(const __m256i src_A,
+                                                 const __m256i src_a,
+                                                 const __m128i accum_reg,
+                                                 int16_t *tskip_out) {
+  // d1 - - - - d32
+  const __m256i diff_Aa = _mm256_sub_epi8(src_A, src_a);
+  const __m256i diff0 = _mm256_cvtepi8_epi16(_mm256_castsi256_si128(diff_Aa));
+  const __m256i diff1 =
+      _mm256_cvtepi8_epi16(_mm256_extractf128_si256(diff_Aa, 1));
+  // d1+d2 d3+d4 d5+d6 d7+d8 d17+d18 d19+d20 d21+d22 d23+d24 |
+  // d9+d10 d11+d12 d13+d14 d15+d16 d25+d26 d27+d28 d29+d30 d31+d32
+  const __m256i r1 = _mm256_hadd_epi16(diff0, diff1);
+  // d1+d2 d3+d4 d5+d6 d7+d8 d9+d10 d11+d12 d13+d14 d15+d16 |
+  // d17+d18 d19+d20 d21+d22 d23+d24 d25+d26 d27+d28 d29+d30 d31+d32
+  __m256i r2 = _mm256_permute4x64_epi64(r1, 0xd8);
+  // sum of: d1d4 d5d8 d9d12 d13d16 d17d20 d21d24 d25d28 d29d32
+  r2 = _mm256_hadd_epi16(
+      r2, _mm256_castsi128_si256(_mm256_extractf128_si256(r2, 1)));
+  // sum of: d1d4 d5d8 d9d12 d13d16 d17d20 d21d24 d25d28 d29d32
+  // const __m256i r2 = _mm256_permute4x64_epi64(r1, 0x54);
+  // d1d4 d5d8  d9d12 d13d16 d17d20 d21d24 d25d28 d29d32 | x
+  const __m128i low128 = _mm256_castsi256_si128(r2);
+  //  0   d1d4  d5d8   d9d12  d13d16 d17d20 d21d24 d25d28
+  __m128i tmp_shift = _mm_bslli_si128(low128, 2);
+  // d1d4 d1d8  d5d12  d9d16  d13d20 d17d24 d21d28 d25d32
+  const __m128i result0 = _mm_add_epi16(low128, tmp_shift);
+  //   0    0   d1d4   d1d8   d5d12  d9d16  d13d20 d17d24
+  tmp_shift = _mm_bslli_si128(result0, 4);
+  // d1d4 d1d8  d1d12  d1d16  d5d20  d9d24  d13d28 d17d32
+  const __m128i result1 = _mm_add_epi16(result0, tmp_shift);
+  //  0     0     0      0    d1d4   d1d8   d1d12  d1d16
+  tmp_shift = _mm_bslli_si128(result1, 8);
+  // d1d4 d1d8  d1d12  d1d16  d1d20  d1d24  d1d28 d1d32
+  const __m128i result2 = _mm_add_epi16(result1, tmp_shift);
+  // Add the 0th result to all the values
+  const __m128i result = _mm_add_epi16(accum_reg, result2);
+  _mm_storeu_si128((__m128i *)(tskip_out), result);
+}
+
+void av1_fill_tskip_feature_accumulator_avx2(
+    int16_t tskip_feature_accum[PC_WIENER_FEATURE_ACC_SIZE],
+    int8_t *tskip_sum_buf, int width, int col_offset, int tskip_lead,
+    int tskip_lag) {
+  // SIMD is specifically implemented for pc_wiener block size equal to 4x4 and
+  // restoration unit size must be 64x64 for luma or 32x32 for chroma plane.
+  if ((PC_WIENER_BLOCK_SIZE != 4) || ((width != 64) && (width != 32))) {
+    assert(0 &&
+           "Intrinsic support is not available for PC_WIENER_BLOCK_SIZE != 4 "
+           "or width != 32 or 64");
+    av1_fill_tskip_feature_accumulator_c(tskip_feature_accum, tskip_sum_buf,
+                                         width, col_offset, tskip_lead,
+                                         tskip_lag);
+    return;
+  }
+
+  // Process pixel 0 case here.
+  int col_base = col_offset + tskip_lead;
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+  assert(col_base >= 0);
+  tskip_feature_accum[0] += tskip_sum_buf[col_base];
+  col_base++;
+  int cl = col_base - tskip_length;
+
+  // Process the remaining width here.
+  if (width == 64) {
+    // Processing of the next 32 pixels.
+    const __m256i src_A =
+        _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + col_base));
+    const __m256i src_a =
+        _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + cl));
+    __m128i accum_reg = _mm_set1_epi16(tskip_feature_accum[0]);
+    process_accumulation_wd32(src_A, src_a, accum_reg, &tskip_feature_accum[1]);
+
+    // Process the remianing 31 pixels here. Eventhough 31 pixels are processed
+    // here, load 32 here and make the last 8bit of 256 bit register to zero.
+    // Load will not overflow as enough elements will be there in the
+    // tskip_sum_buffer.
+    col_base += 32;
+    cl = col_base - tskip_length;
+    __m256i src_B =
+        _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + col_base));
+    __m256i src_b = _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + cl));
+    const __m256i blend_reg = _mm256_loadu_si256((__m256i *)blend_mask);
+    const __m256i zero = _mm256_setzero_si256();
+    src_B = _mm256_blendv_epi8(src_B, zero, blend_reg);
+    src_b = _mm256_blendv_epi8(src_b, zero, blend_reg);
+    accum_reg = _mm_set1_epi16(tskip_feature_accum[8]);
+    process_accumulation_wd32(src_B, src_b, accum_reg, &tskip_feature_accum[9]);
+  } else if (width == 32) {
+    // Process the remianing 31 pixels here. Eventhough 31 pixels are processed
+    // here, load 32 here and make the last 8bit of 256 bit register to zero.
+    // Load will not overflow as enough elements will be there in the
+    // tskip_sum_buffer.
+    __m256i src_A =
+        _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + col_base));
+    __m256i src_a = _mm256_loadu_si256((__m256i const *)(tskip_sum_buf + cl));
+    const __m256i blend_reg = _mm256_loadu_si256((__m256i *)blend_mask);
+    const __m256i zero = _mm256_setzero_si256();
+    __m128i accum_reg = _mm_set1_epi16(tskip_feature_accum[0]);
+
+    src_A = _mm256_blendv_epi8(src_A, zero, blend_reg);
+    src_a = _mm256_blendv_epi8(src_a, zero, blend_reg);
+    process_accumulation_wd32(src_A, src_a, accum_reg, &tskip_feature_accum[1]);
+  } else {
+    // For any other case, C support is added. So this assert should not be
+    // invoked.
+    assert(0);
+  }
+}
