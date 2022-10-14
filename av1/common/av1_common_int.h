@@ -844,6 +844,10 @@ struct CommonModeInfoParams {
    * Useful in saving lr modes.
    */
   uint8_t *lr_mode_info[MAX_MB_PLANE];
+  /*!
+   * lr_mode_info stride
+   */
+  uint32_t lr_mode_info_stride[MAX_MB_PLANE];
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
   /**
    * \name Function pointers to allow separate logic for encoder and decoder.

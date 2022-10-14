@@ -116,12 +116,6 @@ static void dec_free_mi(CommonModeInfoParams *mi_params) {
   mi_params->mi_alloc_size = 0;
   aom_free(mi_params->tx_type_map);
   mi_params->tx_type_map = NULL;
-#if CONFIG_SAVE_IN_LOOP_DATA
-  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
-    aom_free(mi_params->lr_mode_info[plane]);
-    mi_params->lr_mode_info[plane] = NULL;
-  }
-#endif  // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
   av1_dealloc_class_id_array(mi_params);
 #endif  // CONFIG_PC_WIENER

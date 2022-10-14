@@ -2546,10 +2546,7 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_SAVE_IN_LOOP_DATA
     ctxt[plane].lr_mode_info = cm->mi_params.lr_mode_info[plane];
-    const int tmp_stride = cm->mi_params.mi_cols << MI_SIZE_LOG2;
-    const int lr_mode_info_stride =
-        plane != AOM_PLANE_Y ? tmp_stride / 2 : tmp_stride;
-    ctxt[plane].lr_mode_info_stride = lr_mode_info_stride;
+    ctxt[plane].lr_mode_info_stride = cm->mi_params.lr_mode_info_stride[plane];
 #endif  // CONFIG_SAVE_IN_LOOP_DATA
 #if CONFIG_PC_WIENER
     ctxt[plane].tskip = cm->mi_params.tx_skip[plane];
