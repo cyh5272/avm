@@ -1279,8 +1279,11 @@ void av1_fill_tskip_sum_buffer_c(int row, const uint8_t *tskip,
   assert(use_strict_bounds == true);
   (void)use_strict_bounds;
   const int tskip_length = tskip_lead + tskip_lag + 1;
-  // Ensure the data stored in tskip_sum_buffer does not exceed signed 8-bit
-  // range.
+  // The buffer 'tskip' holds binary values (0, 1) and 'tskip_sum_buffer'
+  // accumulates the values in 'tskip' buffer for 'height + tskip_length - 1'
+  // times. Thus, the highest positive value possible in 'tskip_sum_buffer' is
+  // 'height + tskip_length - 1'. As 'tskip_sum_buffer' is 8-bit signed integer
+  // type 'height + tskip_length - 1' should be less than 127.
   assert((tskip_length + height) <= 127);
   const int col_begin = -tskip_lead;
   const int col_end = width + tskip_lag;
@@ -1451,41 +1454,6 @@ static void init_directional_feature_accumulator(int col, int feature_lead,
   }
 }
 
-static void fill_directional_feature_accumulators(int width, int col_offset,
-                                                  int feature_lead,
-                                                  int feature_lag) {
-  int col = 0;
-  const int feature_length = feature_lead + feature_lag + 1;
-  int col_base = col + col_offset + feature_lead;
-
-  // For width equals to zero case.
-  for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
-    directional_feature_accumulator[k][0] += feature_sum_buffers[k][col_base];
-  }
-
-  // For the remaining width.
-  col_base++;
-  for (col = 1; col < width; ++col, ++col_base) {
-    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
-    const int cl = col_base - feature_length;
-    // Currently, the buffer 'directional_feature_accumulator' is used to hold
-    // the accumulated (from the 0th to start of the block position) gradient
-    // values corresponds to each direction. These accumulated values are used
-    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
-    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
-    // samples. Here, cur_idx and prev_idx are used to update this accumulate
-    // buffer appropriately.
-    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
-    const int prev_idx =
-        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
-    for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
-      directional_feature_accumulator[k][cur_idx] =
-          directional_feature_accumulator[k][prev_idx] +
-          feature_sum_buffers[k][col_base] - feature_sum_buffers[k][cl];
-    }
-  }
-}
-
 static void init_tskip_feature_accumulator(int col, int tskip_lead,
                                            int tskip_lag) {
   assert(col == 0);
@@ -1493,37 +1461,6 @@ static void init_tskip_feature_accumulator(int col, int tskip_lead,
     // Add tskip_lead to ensure buffer access is from >=0.
     const int col_base = col + col_offset + tskip_lead;
     tskip_feature_accumulator[0] += tskip_sum_buffer[col_base];
-  }
-}
-
-static void fill_tskip_feature_accumulator(int width, int col_offset,
-                                           int tskip_lead, int tskip_lag) {
-  const int tskip_length = tskip_lead + tskip_lag + 1;
-  int col = 0;
-  // Add tskip_lead to ensure buffer access is from >=0.
-  int col_base = col + col_offset + tskip_lead;
-  assert(col_base >= 0);
-  // For width equals to zero case.
-  tskip_feature_accumulator[0] += tskip_sum_buffer[col_base];
-
-  // For the remaining width.
-  col_base++;
-  for (col = 1; col < width; ++col, ++col_base) {
-    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
-    const int cl = col_base - tskip_length;
-    // Currently, the buffer 'directional_feature_accumulator' is used to hold
-    // the accumulated (from the 0th to start of the block position) gradient
-    // values corresponds to each direction. These accumulated values are used
-    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
-    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
-    // samples. Here, cur_idx and prev_idx are used to update this accumulate
-    // buffer appropriately.
-    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
-    const int prev_idx =
-        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
-    tskip_feature_accumulator[cur_idx] = tskip_feature_accumulator[prev_idx] +
-                                         tskip_sum_buffer[col_base] -
-                                         tskip_sum_buffer[cl];
   }
 }
 
@@ -1540,9 +1477,12 @@ static void initialize_feature_accumulators(int feature_lead, int feature_lag,
 // Updates the accumulators.
 static void update_accumulators(int feature_lead, int feature_lag,
                                 int tskip_lead, int tskip_lag, int width) {
-  fill_directional_feature_accumulators(width, feature_lag, feature_lead,
-                                        feature_lag);
-  fill_tskip_feature_accumulator(width, tskip_lag, tskip_lead, tskip_lag);
+  av1_fill_directional_feature_accumulators(
+      directional_feature_accumulator, feature_sum_buffers, width, feature_lag,
+      feature_lead, feature_lag);
+  av1_fill_tskip_feature_accumulator(tskip_feature_accumulator,
+                                     tskip_sum_buffer, width, tskip_lag,
+                                     tskip_lead, tskip_lag);
 }
 
 // Calculates the features needed for get_pcwiener_index.
@@ -1869,7 +1809,11 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
   setup_qval_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
-
+    // The function update_accumulator() is used to compute the accumulated
+    // result of tx_skip and feature direction filtering output at
+    // PC_WIENER_BLOCk_SIZE samples. The SIMD for the same is implemented with
+    // an assumption of PC_WIENER_BLOCK_SIZE as 4x4 and procunit_width as 32
+    // or 64.
     apply_pc_wiener_highbd(
         src + j, w, stripe_height, src_stride, dst + j, dst_stride,
         rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
