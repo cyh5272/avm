@@ -60,40 +60,44 @@
   (((x)*25 + PC_WIENER_FEATURE_AREA_LUMA / 2) / PC_WIENER_FEATURE_AREA_LUMA)
 
 // Should be positive numbers.
-const int32_t feature_normalizers_luma[NUM_PC_WIENER_FEATURES] = {
+static const int32_t feature_normalizers_luma[NUM_PC_WIENER_FEATURES] = {
   SCALE_LUMA(13), SCALE_LUMA(5384), SCALE_LUMA(4713), SCALE_LUMA(4426)
 };
-const int32_t feature_normalizers_chroma[NUM_PC_WIENER_FEATURES] = { 36, 14956,
-                                                                     13092,
-                                                                     12294 };
-const int32_t tskip_normalizer = (int)(256 / NUM_PC_WIENER_TSKIP_TAPS_LUMA);
+static const int32_t feature_normalizers_chroma[NUM_PC_WIENER_FEATURES] = {
+  36, 14956, 13092, 12294
+};
+static const int32_t tskip_normalizer =
+    (int)(256 / NUM_PC_WIENER_TSKIP_TAPS_LUMA);
 
-const int32_t mode_weights[NUM_PC_WIENER_FEATURES][3] = { { -527, 15325, 321 },
-                                                          { 26436, -17705,
-                                                            17905 },
-                                                          { 366, -147, -194 },
-                                                          { 202, -267, -179 } };
+static const int32_t mode_weights[NUM_PC_WIENER_FEATURES][3] = {
+  { -527, 15325, 321 },
+  { 26436, -17705, 17905 },
+  { 366, -147, -194 },
+  { 202, -267, -179 }
+};
 
-const int32_t mode_offsets[NUM_PC_WIENER_FEATURES] = { -547, -21565, -573,
-                                                       -680 };
+static const int32_t mode_offsets[NUM_PC_WIENER_FEATURES] = { -547, -21565,
+                                                              -573, -680 };
 
 // Origin-symmetric taps first then the last singleton tap.
-const int pcwiener_tap_config_luma[2 * NUM_PC_WIENER_TAPS_LUMA - 1][3] = {
-  { -3, 0, 0 },  { 3, 0, 0 },  { -2, -1, 1 }, { 2, 1, 1 },   { -2, 0, 2 },
-  { 2, 0, 2 },   { -2, 1, 3 }, { 2, -1, 3 },  { -1, -2, 4 }, { 1, 2, 4 },
-  { -1, -1, 5 }, { 1, 1, 5 },  { -1, 0, 6 },  { 1, 0, 6 },   { -1, 1, 7 },
-  { 1, -1, 7 },  { -1, 2, 8 }, { 1, -2, 8 },  { 0, -3, 9 },  { 0, 3, 9 },
-  { 0, -2, 10 }, { 0, 2, 10 }, { 0, -1, 11 }, { 0, 1, 11 },  { 0, 0, 12 },
-};
+static const int
+    pcwiener_tap_config_luma[2 * NUM_PC_WIENER_TAPS_LUMA - 1][3] = {
+      { -3, 0, 0 },  { 3, 0, 0 },  { -2, -1, 1 }, { 2, 1, 1 },   { -2, 0, 2 },
+      { 2, 0, 2 },   { -2, 1, 3 }, { 2, -1, 3 },  { -1, -2, 4 }, { 1, 2, 4 },
+      { -1, -1, 5 }, { 1, 1, 5 },  { -1, 0, 6 },  { 1, 0, 6 },   { -1, 1, 7 },
+      { 1, -1, 7 },  { -1, 2, 8 }, { 1, -2, 8 },  { 0, -3, 9 },  { 0, 3, 9 },
+      { 0, -2, 10 }, { 0, 2, 10 }, { 0, -1, 11 }, { 0, 1, 11 },  { 0, 0, 12 },
+    };
 
-const int pcwiener_tap_config_chroma[2 * NUM_PC_WIENER_TAPS_CHROMA - 1][3] = {
-  { -2, -2, 0 }, { 2, 2, 0 },   { -2, 0, 1 }, { 2, 0, 1 },  { -2, 2, 2 },
-  { 2, -2, 2 },  { -1, -1, 3 }, { 1, 1, 3 },  { -1, 0, 4 }, { 1, 0, 4 },
-  { -1, 1, 5 },  { 1, -1, 5 },  { 0, -2, 6 }, { 0, 2, 6 },  { 0, -1, 7 },
-  { 0, 1, 7 },   { 0, 0, 8 },
-};
+static const int
+    pcwiener_tap_config_chroma[2 * NUM_PC_WIENER_TAPS_CHROMA - 1][3] = {
+      { -2, -2, 0 }, { 2, 2, 0 },   { -2, 0, 1 }, { 2, 0, 1 },  { -2, 2, 2 },
+      { 2, -2, 2 },  { -1, -1, 3 }, { 1, 1, 3 },  { -1, 0, 4 }, { 1, 0, 4 },
+      { -1, 1, 5 },  { 1, -1, 5 },  { 0, -2, 6 }, { 0, 2, 6 },  { 0, -1, 7 },
+      { 0, 1, 7 },   { 0, 0, 8 },
+    };
 
-const int16_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LUMA] = {
+static const int16_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LUMA] = {
   //    0 ----------------------------------------------------------------------
   { 26, -85, -116, 35, -95, 351, 365, -225, 36, 31, -150, 482, -1311 },
   //    1 ----------------------------------------------------------------------
@@ -608,7 +612,7 @@ const int16_t pcwiener_filters_luma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_LU
   { 75, 49, -272, -56, -69, -37, 417, 631, -257, 35, 103, 106, -1451 },
 };
 
-const int16_t pcwiener_filters_chroma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_CHROMA] = {
+static const int16_t pcwiener_filters_chroma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_CHROMA] = {
   //    0 ----------------------------------------------------------------------
   { -140, -30, 46, 497, 274, -261, -6, 188, -1137 },
   //    1 ----------------------------------------------------------------------
@@ -1123,11 +1127,14 @@ const int16_t pcwiener_filters_chroma[NUM_PC_WIENER_FILTERS][NUM_PC_WIENER_TAPS_
   { 42, 26, -220, -91, 12, 1185, 123, -398, -1361 }
 };
 
-const int32_t pc_wiener_thresholds[NUM_PC_WIENER_FEATURES] = { 512, 64, 8, 1 };
-const int32_t pc_wiener_threshold_shift = 5;
+static const int32_t pc_wiener_thresholds[NUM_PC_WIENER_FEATURES] = { 512, 64,
+                                                                      8, 1 };
+static const int32_t pc_wiener_threshold_shift = 5;
 
-const uint8_t pc_wiener_sub_classify_to_one[NUM_PC_WIENER_FILTERS] = { 0 };
-const uint8_t pc_wiener_sub_classify_to_two[NUM_PC_WIENER_FILTERS] = {
+static const uint8_t pc_wiener_sub_classify_to_one[NUM_PC_WIENER_FILTERS] = {
+  0
+};
+static const uint8_t pc_wiener_sub_classify_to_two[NUM_PC_WIENER_FILTERS] = {
   0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0,
   0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0,
   0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -1139,7 +1146,7 @@ const uint8_t pc_wiener_sub_classify_to_two[NUM_PC_WIENER_FILTERS] = {
   1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
   1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1
 };
-const uint8_t pc_wiener_sub_classify_to_four[NUM_PC_WIENER_FILTERS] = {
+static const uint8_t pc_wiener_sub_classify_to_four[NUM_PC_WIENER_FILTERS] = {
   0, 1, 1, 2, 0, 0, 2, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 2, 0, 0, 1, 0, 1, 0,
   0, 2, 1, 1, 1, 2, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 2, 0, 1, 1, 0, 0, 1, 2,
   0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 0, 1, 0, 2, 3, 0, 0,
@@ -1151,7 +1158,7 @@ const uint8_t pc_wiener_sub_classify_to_four[NUM_PC_WIENER_FILTERS] = {
   0, 2, 1, 2, 0, 0, 0, 1, 1, 0, 1, 2, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1,
   1, 1, 1, 1, 1, 1, 0, 0, 1, 2, 1, 0, 0, 0, 1, 1, 0, 2, 1, 1, 0, 1
 };
-const uint8_t pc_wiener_sub_classify_to_eight[NUM_PC_WIENER_FILTERS] = {
+static const uint8_t pc_wiener_sub_classify_to_eight[NUM_PC_WIENER_FILTERS] = {
   0, 1, 6, 2, 0, 0, 7, 0, 0, 0, 0, 0, 6, 0, 1, 1, 0, 6, 1, 2, 0, 0, 4, 0, 4, 0,
   0, 2, 1, 4, 4, 2, 1, 1, 0, 0, 1, 0, 5, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 4, 2,
   5, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 4, 0, 1, 2, 6, 7, 1, 0, 1, 5, 2, 3, 0, 0,
@@ -1163,23 +1170,26 @@ const uint8_t pc_wiener_sub_classify_to_eight[NUM_PC_WIENER_FILTERS] = {
   7, 2, 4, 2, 4, 7, 4, 4, 4, 5, 0, 2, 7, 7, 7, 7, 6, 5, 1, 5, 1, 1, 1, 4, 6, 6,
   6, 7, 1, 6, 6, 4, 1, 5, 6, 2, 4, 7, 4, 5, 4, 1, 4, 2, 4, 4, 7, 4
 };
-const uint8_t pc_wiener_sub_classify_to_sixteen[NUM_PC_WIENER_FILTERS] = {
-  0,  1,  12, 2,  0, 0,  7,  0,  0,  0,  13, 13, 12, 0,  13, 13, 11, 6,  13, 2,
-  0,  0,  4,  0,  4, 0,  0,  2,  1,  4,  4,  2,  1,  13, 13, 0,  1,  0,  4,  0,
-  13, 13, 13, 13, 0, 0,  13, 13, 9,  9,  7,  2,  11, 0,  1,  0,  6,  13, 9,  1,
-  9,  9,  1,  9,  4, 0,  1,  2,  6,  7,  5,  11, 1,  13, 2,  3,  13, 0,  5,  1,
-  7,  5,  1,  2,  0, 5,  11, 5,  6,  4,  15, 3,  7,  4,  7,  7,  8,  11, 13, 0,
-  10, 10, 10, 5,  6, 6,  8,  1,  7,  0,  6,  11, 9,  9,  2,  0,  1,  2,  11, 11,
-  1,  9,  15, 2,  7, 4,  7,  5,  0,  4,  4,  1,  7,  13, 7,  5,  4,  11, 4,  1,
-  1,  12, 9,  4,  2, 13, 12, 4,  10, 13, 1,  15, 4,  9,  7,  2,  12, 5,  6,  4,
-  0,  11, 1,  1,  8, 0,  5,  7,  13, 13, 12, 1,  0,  0,  4,  0,  0,  9,  6,  12,
-  5,  0,  7,  0,  8, 9,  7,  9,  14, 1,  1,  14, 5,  8,  4,  5,  5,  5,  4,  13,
-  5,  9,  10, 3,  6, 1,  4,  5,  7,  9,  4,  15, 4,  7,  5,  4,  4,  9,  2,  2,
-  7,  12, 7,  7,  6, 5,  1,  5,  10, 10, 10, 10, 12, 6,  12, 7,  6,  6,  6,  4,
-  1,  5,  6,  2,  4, 11, 5,  5,  4,  9,  4,  2,  7,  4,  7,  4
-};
+static const uint8_t
+    pc_wiener_sub_classify_to_sixteen[NUM_PC_WIENER_FILTERS] = {
+      0,  1,  12, 2,  0,  0,  7,  0,  0,  0, 13, 13, 12, 0,  13, 13, 11, 6,
+      13, 2,  0,  0,  4,  0,  4,  0,  0,  2, 1,  4,  4,  2,  1,  13, 13, 0,
+      1,  0,  4,  0,  13, 13, 13, 13, 0,  0, 13, 13, 9,  9,  7,  2,  11, 0,
+      1,  0,  6,  13, 9,  1,  9,  9,  1,  9, 4,  0,  1,  2,  6,  7,  5,  11,
+      1,  13, 2,  3,  13, 0,  5,  1,  7,  5, 1,  2,  0,  5,  11, 5,  6,  4,
+      15, 3,  7,  4,  7,  7,  8,  11, 13, 0, 10, 10, 10, 5,  6,  6,  8,  1,
+      7,  0,  6,  11, 9,  9,  2,  0,  1,  2, 11, 11, 1,  9,  15, 2,  7,  4,
+      7,  5,  0,  4,  4,  1,  7,  13, 7,  5, 4,  11, 4,  1,  1,  12, 9,  4,
+      2,  13, 12, 4,  10, 13, 1,  15, 4,  9, 7,  2,  12, 5,  6,  4,  0,  11,
+      1,  1,  8,  0,  5,  7,  13, 13, 12, 1, 0,  0,  4,  0,  0,  9,  6,  12,
+      5,  0,  7,  0,  8,  9,  7,  9,  14, 1, 1,  14, 5,  8,  4,  5,  5,  5,
+      4,  13, 5,  9,  10, 3,  6,  1,  4,  5, 7,  9,  4,  15, 4,  7,  5,  4,
+      4,  9,  2,  2,  7,  12, 7,  7,  6,  5, 1,  5,  10, 10, 10, 10, 12, 6,
+      12, 7,  6,  6,  6,  4,  1,  5,  6,  2, 4,  11, 5,  5,  4,  9,  4,  2,
+      7,  4,  7,  4
+    };
 
-const uint8_t pc_wiener_lut_to_filter_index[PC_WIENER_LUT_SIZE] = {
+static const uint8_t pc_wiener_lut_to_filter_index[PC_WIENER_LUT_SIZE] = {
   83,  154, 254, 125, 125, 125, 253, 253, 77,  200, 207, 30,  30,  239, 239,
   239, 0,   98,  101, 229, 229, 231, 231, 231, 0,   34,  101, 100, 100, 229,
   229, 231, 15,  34,  98,  100, 100, 100, 164, 164, 15,  34,  98,  106, 100,

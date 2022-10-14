@@ -1429,3 +1429,71 @@ void fill_directional_feature_buffers_highbd_c(
   update_feature_sum_bufs_c(feature_sum_bufs, feature_line_bufs, feature_length,
                             buffer_row, col_begin, col_end, buffer_col);
 }
+
+void av1_fill_directional_feature_accumulators_c(
+    int dir_feature_accum[NUM_PC_WIENER_FEATURES][PC_WIENER_FEATURE_ACC_SIZE],
+    int *feature_sum_bufs[NUM_PC_WIENER_FEATURES], int width, int col_offset,
+    int feature_lead, int feature_lag) {
+  int col = 0;
+  const int feature_length = feature_lead + feature_lag + 1;
+  int col_base = col + col_offset + feature_lead;
+
+  // For width equals to zero case.
+  for (int k = 0; k < NUM_PC_WIENER_FEATURES; k++) {
+    dir_feature_accum[k][0] += feature_sum_bufs[k][col_base];
+  }
+
+  // For the remaining width.
+  col_base++;
+  for (col = 1; col < width; ++col, ++col_base) {
+    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
+    const int cl = col_base - feature_length;
+    // Currently, the buffer 'directional_feature_accumulator' is used to hold
+    // the accumulated (from the 0th to start of the block position) gradient
+    // values corresponds to each direction. These accumulated values are used
+    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
+    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
+    // samples. Here, cur_idx and prev_idx are used to update this accumulate
+    // buffer appropriately.
+    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
+    const int prev_idx =
+        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
+    for (int k = 0; k < NUM_PC_WIENER_FEATURES; ++k) {
+      const int cur_diff =
+          feature_sum_bufs[k][col_base] - feature_sum_bufs[k][cl];
+      dir_feature_accum[k][cur_idx] = dir_feature_accum[k][prev_idx] + cur_diff;
+    }
+  }
+}
+
+void av1_fill_tskip_feature_accumulator_c(
+    int16_t tskip_feature_accum[PC_WIENER_FEATURE_ACC_SIZE],
+    int8_t *tskip_sum_buf, int width, int col_offset, int tskip_lead,
+    int tskip_lag) {
+  const int tskip_length = tskip_lead + tskip_lag + 1;
+  int col = 0;
+  // Add tskip_lead to ensure buffer access is from >=0.
+  int col_base = col + col_offset + tskip_lead;
+  assert(col_base >= 0);
+  // For width equals to zero case.
+  tskip_feature_accum[0] += tskip_sum_buf[col_base];
+
+  // For the remaining width.
+  col_base++;
+  for (col = 1; col < width; ++col, ++col_base) {
+    // Use cur_idx and prev_idx to update accumulate buffer appropriately.
+    const int cl = col_base - tskip_length;
+    // Currently, the buffer 'directional_feature_accumulator' is used to hold
+    // the accumulated (from the 0th to start of the block position) gradient
+    // values corresponds to each direction. These accumulated values are used
+    // to derive a different filter index for each PC_WIENER_BLOCK_SIZE. Hence,
+    // the accumulated result is kept once for each PC_WIENER_BLOCK_SIZE
+    // samples. Here, cur_idx and prev_idx are used to update this accumulate
+    // buffer appropriately.
+    const int cur_idx = (col + PC_WIENER_BLOCK_SIZE - 1) / PC_WIENER_BLOCK_SIZE;
+    const int prev_idx =
+        (col + PC_WIENER_BLOCK_SIZE - 2) / PC_WIENER_BLOCK_SIZE;
+    const int cur_diff = tskip_sum_buf[col_base] - tskip_sum_buf[cl];
+    tskip_feature_accum[cur_idx] = tskip_feature_accum[prev_idx] + cur_diff;
+  }
+}
