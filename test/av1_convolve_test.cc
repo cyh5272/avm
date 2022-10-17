@@ -963,14 +963,15 @@ class AV1ConvolveNonSep2DHighbdTest
                     uint16_t *test, int dst_stride, int bit_depth,
                     int block_row_begin, int block_row_end, int block_col_begin,
                     int block_col_end, RestorationType rtype) {
-    const NonsepFilterConfig *filter_config;
+    const NonsepFilterConfig *filter_config[2];
     highbd_convolve_nonsep_2d_func ref_func;
+    const int num_planes = 2;
 
-    int num_planes = 1;
 #if CONFIG_PC_WIENER
     if (rtype == RESTORE_PC_WIENER) {
       ref_func = av1_convolve_symmetric_highbd_c;
-      filter_config = &UnconstrainedSumFilterConfig_;
+      filter_config[0] = &UnconstrainedSumFilterConfig_;
+      filter_config[1] = &PcWienerNonsepFilterConfigChroma_;
     }
 #endif  // CONFIG_PC_WIENER
 
@@ -980,22 +981,19 @@ class AV1ConvolveNonSep2DHighbdTest
     // 12/13-tap filtering whereas chroma is tested for 6-tap filtering.
     if (rtype == RESTORE_WIENER_NONSEP) {
       ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
-      filter_config = &UnitSumFilterConfig_;
-      num_planes = 2;
+      filter_config[0] = &UnitSumFilterConfig_;
+      filter_config[1] = &UnitSumFilterConfigChroma_;
     }
 #endif  // CONFIG_WIENER_NONSEP
 
     for (int plane = 0; plane < num_planes; plane++) {
-#if CONFIG_WIENER_NONSEP
-      if (plane && rtype == RESTORE_WIENER_NONSEP)
-        filter_config = &UnitSumFilterConfigChroma_;
-#endif  // CONFIG_WIENER_NONSEP
-      ref_func(input, input_stride, filter_config, filter, reference,
+      ref_func(input, input_stride, filter_config[plane], filter, reference,
                dst_stride, bit_depth, block_row_begin, block_row_end,
                block_col_begin, block_col_end);
-      GetParam().TestFunction()(input, input_stride, filter_config, filter,
-                                test, dst_stride, bit_depth, block_row_begin,
-                                block_row_end, block_col_begin, block_col_end);
+      GetParam().TestFunction()(input, input_stride, filter_config[plane],
+                                filter, test, dst_stride, bit_depth,
+                                block_row_begin, block_row_end, block_col_begin,
+                                block_col_end);
       AssertOutputBufferEq(reference, test, width, height);
     }
   }
@@ -1031,12 +1029,11 @@ class AV1ConvolveNonSep2DHighbdTest
     const int width = GetParam().Block().Width();
     const int height = GetParam().Block().Height();
     const int bit_depth = GetParam().BitDepth();
+    const int num_planes = 2;
 
     const uint16_t *input = FirstRandomInput16(GetParam());
     DECLARE_ALIGNED(32, uint16_t, test[MAX_SB_SQUARE]);
     DECLARE_ALIGNED(32, uint16_t, reference[MAX_SB_SQUARE]);
-
-    int num_planes = 1;
 
     ASSERT_TRUE(kInputPadding >= kMaxTapOffset)
         << "Not enough padding for 7x7 filters";
@@ -1044,12 +1041,13 @@ class AV1ConvolveNonSep2DHighbdTest
         input + kMaxTapOffset * width + kMaxTapOffset;
 
     // Calculate time taken for C function
-    const NonsepFilterConfig *filter_config;
+    const NonsepFilterConfig *filter_config[2];
     highbd_convolve_nonsep_2d_func ref_func;
 #if CONFIG_PC_WIENER
     if (rtype == RESTORE_PC_WIENER) {
       ref_func = av1_convolve_symmetric_highbd_c;
-      filter_config = &UnconstrainedSumFilterConfig_;
+      filter_config[0] = &UnconstrainedSumFilterConfig_;
+      filter_config[1] = &PcWienerNonsepFilterConfigChroma_;
     }
 #endif  // CONFIG_PC_WIENER
 
@@ -1059,20 +1057,17 @@ class AV1ConvolveNonSep2DHighbdTest
     // 12/13-tap filtering whereas chroma is tested for 6-tap filtering.
     if (rtype == RESTORE_WIENER_NONSEP) {
       ref_func = av1_convolve_symmetric_subtract_center_highbd_c;
-      filter_config = &UnitSumFilterConfig_;
-      num_planes = 2;
+      filter_config[0] = &UnitSumFilterConfig_;
+      filter_config[1] = &UnitSumFilterConfigChroma_;
     }
 #endif  // CONFIG_WIENER_NONSEP
+
     for (int plane = 0; plane < num_planes; plane++) {
-#if CONFIG_WIENER_NONSEP
-      if (plane && rtype == RESTORE_WIENER_NONSEP)
-        filter_config = &UnitSumFilterConfigChroma_;
-#endif  // CONFIG_WIENER_NONSEP
       // Calculate time taken by reference/c function
       aom_usec_timer timer;
       aom_usec_timer_start(&timer);
       for (int i = 0; i < kSpeedIterations; ++i) {
-        ref_func(centered_input, width, filter_config, filter, reference,
+        ref_func(centered_input, width, filter_config[plane], filter, reference,
                  kOutputStride, bit_depth, 0, height, 0, width);
       }
       aom_usec_timer_mark(&timer);
@@ -1081,9 +1076,9 @@ class AV1ConvolveNonSep2DHighbdTest
       // Calculate time taken by optimized/intrinsic function
       aom_usec_timer_start(&timer);
       for (int i = 0; i < kSpeedIterations; ++i) {
-        GetParam().TestFunction()(centered_input, width, filter_config, filter,
-                                  test, kOutputStride, bit_depth, 0, height, 0,
-                                  width);
+        GetParam().TestFunction()(centered_input, width, filter_config[plane],
+                                  filter, test, kOutputStride, bit_depth, 0,
+                                  height, 0, width);
       }
       aom_usec_timer_mark(&timer);
       auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
@@ -1154,12 +1149,28 @@ class AV1ConvolveNonSep2DHighbdTest
     { 0, -2, 10 }, { 0, 2, 10 }, { 0, -1, 11 }, { 0, 1, 11 },  { 0, 0, 12 },
   };
 
+  const int wienerns_wout_subtract_center_config_uv_from_uv_[13][3] = {
+    { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
+    { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
+    { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
+  };
+
   // Filters use all unique taps.
   const NonsepFilterConfig UnconstrainedSumFilterConfig_ = {
     kMaxPrecisionBeforeOverflow,
     2 * kNumSymmetricTaps + 1,
     0,
     NonsepConfig_,
+    NULL,
+    0,
+    0
+  };
+
+  const NonsepFilterConfig PcWienerNonsepFilterConfigChroma_ = {
+    kMaxPrecisionBeforeOverflow,
+    2 * kNumSymmetricTapsChroma + 1,
+    0,
+    wienerns_wout_subtract_center_config_uv_from_uv_,
     NULL,
     0,
     0
