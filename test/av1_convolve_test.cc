@@ -1297,21 +1297,30 @@ typedef void (*highbd_convolve_nonsep_dual_2d_func)(
 class AV1ConvolveNon_Sep_dual2DHighbdTest
     : public AV1ConvolveTest<highbd_convolve_nonsep_dual_2d_func> {
  public:
-  void RunTest() {
+  void RunTest(int is_subtract_center) {
     for (int i = 0; i < kTestIterations; i++) {
       SetFilterTaps();
-      TestConvolve(FilterTaps_);
+      TestConvolve(FilterTaps_, is_subtract_center);
     }
   }
-  void RunSpeedTest() { SpeedTestConvolve(FilterTaps_); };
+  void RunSpeedTest(int is_subtract_center) {
+    SpeedTestConvolve(FilterTaps_, is_subtract_center);
+  };
 
  private:
   libaom_test::ACMRandom rnd_;
   static constexpr int kMaxPrecisionBeforeOverflow = 12;
   static constexpr int kNumSymmetricTaps = 6;
+  // In dual filtering, 7 taps (6 symmetric + 1 center) are required for each of
+  // the buffer.
+  static constexpr int kNumSubtractCenterOffTaps = (2 * kNumSymmetricTaps) + 2;
   static constexpr int kMaxTapOffset = 2;  // Filters are 5x5.
   static constexpr int kSpeedIterations = 10000;
   static constexpr int kTestIterations = 100;
+
+  // Declare the filter taps for worst case (i.e., for subtract center off
+  // case).
+  int16_t FilterTaps_[kNumSubtractCenterOffTaps];
 
   // Fills the array p with signed integers.
   void Randomize(int16_t *p, int size, int max_bit_range) {
@@ -1322,7 +1331,8 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
   }
 
   void SetFilterTaps() {
-    Randomize(FilterTaps_, 2 * kNumSymmetricTaps, kMaxPrecisionBeforeOverflow);
+    Randomize(FilterTaps_, kNumSubtractCenterOffTaps,
+              kMaxPrecisionBeforeOverflow);
   }
 
   int RandBool() {
@@ -1341,30 +1351,39 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     }
   }
 
-  int16_t FilterTaps_[2 * kNumSymmetricTaps];
-
   void BitMatchTest(const uint16_t *dgd, const uint16_t *dgd_dual,
                     int dgd_stride, int width, int height,
                     const int16_t *filter, uint16_t *reference, uint16_t *test,
                     int dst_stride, int bit_depth, int block_row_begin,
-                    int block_row_end, int block_col_begin, int block_col_end) {
+                    int block_row_end, int block_col_begin, int block_col_end,
+                    int is_subtract_center) {
+    // Set filter_config and reference function appropriately.
+    highbd_convolve_nonsep_dual_2d_func ref_func;
+    const NonsepFilterConfig *filter_cfg;
+
+    filter_cfg = &DualFilterWithCenterConfig_;
+    ref_func = av1_convolve_symmetric_dual_subtract_center_highbd_c;
+
+    if (!is_subtract_center) {
+      ref_func = av1_convolve_symmetric_dual_highbd_c;
+      filter_cfg = &DualFilterWithoutCenterConfig_;
+    }
     // Reference function
-    av1_convolve_symmetric_dual_subtract_center_highbd_c(
-        dgd, dgd_stride, dgd_dual, dgd_stride, &UnitSumFilterConfigChroma_,
-        filter, reference, dst_stride, bit_depth, block_row_begin,
-        block_row_end, block_col_begin, block_col_end);
+    ref_func(dgd, dgd_stride, dgd_dual, dgd_stride, filter_cfg, filter,
+             reference, dst_stride, bit_depth, block_row_begin, block_row_end,
+             block_col_begin, block_col_end);
 
     // Test function
-    GetParam().TestFunction()(dgd, dgd_stride, dgd_dual, dgd_stride,
-                              &UnitSumFilterConfigChroma_, filter, test,
-                              dst_stride, bit_depth, block_row_begin,
-                              block_row_end, block_col_begin, block_col_end);
+    GetParam().TestFunction()(dgd, dgd_stride, dgd_dual, dgd_stride, filter_cfg,
+                              filter, test, dst_stride, bit_depth,
+                              block_row_begin, block_row_end, block_col_begin,
+                              block_col_end);
 
     // Compare the output of reference and test for bit match
     AssertOutputBufferEq(reference, test, width, height);
   }
 
-  void TestConvolve(const int16_t *filter) {
+  void TestConvolve(const int16_t *filter, int is_subtract_center) {
     const int width = GetParam().Block().Width();
     const int height = GetParam().Block().Height();
     const int bit_depth = GetParam().BitDepth();
@@ -1383,7 +1402,7 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     const int input_stride = width;
     BitMatchTest(centered_input1, centered_input2, input_stride, width, height,
                  filter, reference, test, kOutputStride, bit_depth, 0, height,
-                 0, width);
+                 0, width, is_subtract_center);
     // Extreme value test
     const uint16_t *extreme_input1 = FirstRandomInput16Extreme(GetParam());
     const uint16_t *extreme_input2 = FirstRandomInput16Extreme(GetParam());
@@ -1391,15 +1410,15 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
         extreme_input1 + kMaxTapOffset * width + kMaxTapOffset;
     const uint16_t *centered_extreme_input2 =
         extreme_input2 + kMaxTapOffset * width + kMaxTapOffset;
-    int16_t Extream_Tap_[2 * kNumSymmetricTaps];
-    RandomizeExtreamFilterTap(Extream_Tap_, 2 * kNumSymmetricTaps,
+    int16_t Extream_Tap_[kNumSubtractCenterOffTaps];
+    RandomizeExtreamFilterTap(Extream_Tap_, kNumSubtractCenterOffTaps,
                               kMaxPrecisionBeforeOverflow);
     BitMatchTest(centered_extreme_input1, centered_extreme_input2, input_stride,
                  width, height, Extream_Tap_, reference, test, kOutputStride,
-                 bit_depth, 0, height, 0, width);
+                 bit_depth, 0, height, 0, width, is_subtract_center);
   }
 
-  void SpeedTestConvolve(const int16_t *filter) {
+  void SpeedTestConvolve(const int16_t *filter, int is_subtract_center) {
     const int width = GetParam().Block().Width();
     const int height = GetParam().Block().Height();
     const int bit_depth = GetParam().BitDepth();
@@ -1416,14 +1435,25 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     const uint16_t *centered_input2 =
         dgd_dual + kMaxTapOffset * width + kMaxTapOffset;
 
+    // Set filter_config and reference function appropriately.
+    highbd_convolve_nonsep_dual_2d_func ref_func;
+    const NonsepFilterConfig *filter_cfg;
+
+    filter_cfg = &DualFilterWithCenterConfig_;
+    ref_func = av1_convolve_symmetric_dual_subtract_center_highbd_c;
+
+    if (!is_subtract_center) {
+      ref_func = av1_convolve_symmetric_dual_highbd_c;
+      filter_cfg = &DualFilterWithoutCenterConfig_;
+    }
+
     // Calculate time taken by reference/c function
     aom_usec_timer timer;
     aom_usec_timer_start(&timer);
     for (int i = 0; i < kSpeedIterations; ++i) {
-      av1_convolve_symmetric_dual_subtract_center_highbd_c(
-          centered_input1, width, centered_input2, width,
-          &UnitSumFilterConfigChroma_, filter, reference, kOutputStride,
-          bit_depth, 0, height, 0, width);
+      ref_func(centered_input1, width, centered_input2, width, filter_cfg,
+               filter, reference, kOutputStride, bit_depth, 0, height, 0,
+               width);
     }
     aom_usec_timer_mark(&timer);
     auto elapsed_time_c = aom_usec_timer_elapsed(&timer);
@@ -1432,8 +1462,8 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     aom_usec_timer_start(&timer);
     for (int i = 0; i < kSpeedIterations; ++i) {
       GetParam().TestFunction()(centered_input1, width, centered_input2, width,
-                                &UnitSumFilterConfigChroma_, filter, test,
-                                kOutputStride, bit_depth, 0, height, 0, width);
+                                filter_cfg, filter, test, kOutputStride,
+                                bit_depth, 0, height, 0, width);
     }
     aom_usec_timer_mark(&timer);
     auto elapsed_time_opt = aom_usec_timer_elapsed(&timer);
@@ -1461,7 +1491,21 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     { 2, 0, 10 }, { -2, 0, 10 }, { 0, 2, 11 }, { 0, -2, 11 },
   };
 
-  const NonsepFilterConfig UnitSumFilterConfigChroma_ = {
+  const int wienerns_wout_subtract_center_config_uv_from_uv[13][3] = {
+    { 1, 0, 0 },   { -1, 0, 0 }, { 0, 1, 1 },  { 0, -1, 1 }, { 1, 1, 2 },
+    { -1, -1, 2 }, { -1, 1, 3 }, { 1, -1, 3 }, { 2, 0, 4 },  { -2, 0, 4 },
+    { 0, 2, 5 },   { 0, -2, 5 }, { 0, 0, 6 },
+  };
+
+  // Adjust the beginning tap to account for the above change and add a tap at
+  // (0, 0).
+  const int wienerns_wout_subtract_center_config_uv_from_y[13][3] = {
+    { 1, 0, 7 },   { -1, 0, 7 },  { 0, 1, 8 },   { 0, -1, 8 }, { 1, 1, 9 },
+    { -1, -1, 9 }, { -1, 1, 10 }, { 1, -1, 10 }, { 2, 0, 11 }, { -2, 0, 11 },
+    { 0, 2, 12 },  { 0, -2, 12 }, { 0, 0, 13 },
+  };
+
+  const NonsepFilterConfig DualFilterWithCenterConfig_ = {
     kMaxPrecisionBeforeOverflow,  // prec_bits;
     sizeof(wienerns_config_uv_from_uv) /
         sizeof(wienerns_config_uv_from_uv[0]),  // num_pixels;
@@ -1472,16 +1516,45 @@ class AV1ConvolveNon_Sep_dual2DHighbdTest
     0,                                         // strict_bounds
     1                                          // subtract_center
   };
+
+  const NonsepFilterConfig DualFilterWithoutCenterConfig_ = {
+    kMaxPrecisionBeforeOverflow,  // prec_bits;
+    sizeof(wienerns_wout_subtract_center_config_uv_from_uv) /
+        sizeof(
+            wienerns_wout_subtract_center_config_uv_from_uv[0]),  // num_pixels;
+    sizeof(wienerns_wout_subtract_center_config_uv_from_y) /
+        sizeof(
+            wienerns_wout_subtract_center_config_uv_from_y[0]),  // num_pixels2
+    wienerns_wout_subtract_center_config_uv_from_uv,             // config
+    wienerns_wout_subtract_center_config_uv_from_y,              // config2
+    0,  // strict_bounds
+    0   // subtract_center
+  };
 };
 
-TEST_P(AV1ConvolveNon_Sep_dual2DHighbdTest, RunTest) { RunTest(); }
-TEST_P(AV1ConvolveNon_Sep_dual2DHighbdTest, DISABLED_Speed) { RunSpeedTest(); }
+TEST_P(AV1ConvolveNon_Sep_dual2DHighbdTest, RunTest) { RunTest(1); }
+TEST_P(AV1ConvolveNon_Sep_dual2DHighbdTest, DISABLED_Speed) { RunSpeedTest(1); }
 
 #if HAVE_AVX2
 INSTANTIATE_TEST_SUITE_P(
     AVX2, AV1ConvolveNon_Sep_dual2DHighbdTest,
     BuildHighbdParams(av1_convolve_symmetric_dual_subtract_center_highbd_avx2));
 #endif  // HAVE_AVX2
+
+/* Dual with subtract center off unit-test*/
+class AV1ConvolveDualWithoutsubtract2DHighbdTest
+    : public AV1ConvolveNon_Sep_dual2DHighbdTest {};
+
+TEST_P(AV1ConvolveDualWithoutsubtract2DHighbdTest, RunTest) { RunTest(0); }
+TEST_P(AV1ConvolveDualWithoutsubtract2DHighbdTest, DISABLED_Speed) {
+  RunSpeedTest(0);
+}
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1ConvolveDualWithoutsubtract2DHighbdTest,
+    BuildHighbdParams(av1_convolve_symmetric_dual_highbd_avx2));
+#endif
 
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 
