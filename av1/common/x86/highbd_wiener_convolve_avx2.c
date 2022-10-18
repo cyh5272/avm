@@ -928,6 +928,142 @@ void av1_convolve_symmetric_highbd_avx2(const uint16_t *dgd, int stride,
   }
 }
 
+// AVX2 intrinsic for convolve wiener non-separable dual loop restoration
+// filtering with subtract center off. Two buffers (dgd and dgd_dual) are
+// considered for dual filtering, where each buffer goes through 7-tap
+// filtering. The output for a particular pixel in a 4x4 block is calculated
+// with DIAMOND shaped filter considering a 5x5 grid surrounded by that pixel.
+// A total of 14 filter taps required and are expected to be passed as filter
+// taps required for dgd(first) buffer followed by dgd_dual(second) buffer
+// filter taps. The exact order of filter taps needed is shown below.
+// Filter Taps: fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9 fc10 fc11 fc12 fc13.
+// Here, 'fc0-fc6' and 'fc7-fc13' are corresponding to filter taps used for
+// dgd and dgd_dual buffers respectively. Also, 'fc0-fc5' and 'fc7-fc12' are the
+// symmetric taps and 'fc6' and 'fc13' are the center taps correspond to dgd and
+// dgd_dual buffers respectively.
+//
+// The following describes the algorithm briefly.
+// 7-tap filtering for dgd (first) buffer:
+// Load Source Data:
+// dgd_ra0 = a0 a1 a2 a3 a4 a5 a6 a7
+// dgd_rb0 = b0 b1 b2 b3 b4 b5 b6 b7
+// dgd_rc0 = c0 c1 c2 c3 c4 c5 c6 c7
+// dgd_rd0 = d0 d1 d2 d3 d4 d5 d6 d7
+// dgd_re0 = e0 e1 e2 e3 e4 e5 e6 e7
+// dgd_rf0 = f0 f1 f2 f3 f4 f5 f6 f7
+// dgd_rg0 = g0 g1 g2 g3 g4 g5 g6 g7
+// The output for a pixel located at c2 position is calculated as below.
+// dgd_output_c2 = ((a2+e2)*fc4 + (b1+d3)*fc2 + (b2+d2)*fc0 + (b3+d1)*fc3 +
+// (c0+c4)*fc5 + (c1+c3)*fc1 + c2*fc6(singleton_tap)
+//
+// 7-tap filtering for dgd_dual (second) buffer:
+// Load Source Data:
+// dgd_dual_ra0 = a0 a1 a2 a3 a4 a5 a6 a7
+// dgd_dual_rb0 = b0 b1 b2 b3 b4 b5 b6 b7
+// dgd_dual_rc0 = c0 c1 c2 c3 c4 c5 c6 c7
+// dgd_dual_rd0 = d0 d1 d2 d3 d4 d5 d6 d7
+// dgd_dual_re0 = e0 e1 e2 e3 e4 e5 e6 e7
+// dgd_dual_rf0 = f0 f1 f2 f3 f4 f5 f6 f7
+// dgd_dual_rg0 = g0 g1 g2 g3 g4 g5 g6 g7
+// dgd_dual_output_c2 = (a2+e2)*fc11 + (b1+d3)*fc9 + (b2+d2)*fc7 + (b3+d1)*fc10
+// + (c0+c4)*fc12 + (c1+c3)*fc8 + c2*fc13((singleton_tap_dual)
+// The final output corresponding to c2 is calculated as below.
+// output_c2 = dgd_output_c2 + dgd_dual_output_c2
+// The source registers are unpacked such that the output corresponding to 2
+// rows will be produced in a single register (i.e., processing 2 rows
+// simultaneously).
+//
+// Example:
+// The dgd(first) buffer output corresponding to fc4 of rows 0 and 1 is achieved
+// like below.
+// __m256i src_reg3 = a2 e2 a3 e3 a4 e4 a5 e5 | b2 f2 b3 f3 b4 f4 b5 f5
+// __m256i filter_4 = fc4 fc4 fc4 fc4 fc4 fc4 fc4 fc4 | fc4 fc4 fc4 fc4 fc4
+// fc4 fc4 fc4
+//  __m256i out_f4_01 = _mm256_madd_epi16(src_reg3, filter_4);
+//                   = (a2*fc4+e2*fc4) (a3*fc4+e3*fc4) .. | (b2*fc4+f2*fc4)
+//                   . .
+// Here, out_f4_01 contains partial output of rows 0 and 1 corresponding to
+// fc4.
+void av1_convolve_symmetric_dual_highbd_avx2(
+    const uint16_t *dgd, int dgd_stride, const uint16_t *dgd_dual,
+    int dgd_dual_stride, const NonsepFilterConfig *filter_config,
+    const int16_t *filter, uint16_t *dst, int dst_stride, int bit_depth,
+    int block_row_begin, int block_row_end, int block_col_begin,
+    int block_col_end) {
+  assert(!filter_config->subtract_center);
+
+  const int num_rows = block_row_end - block_row_begin;
+  const int num_cols = block_col_end - block_col_begin;
+  assert(num_rows >= 0 && num_cols >= 0);
+
+  const int num_sym_taps = filter_config->num_pixels / 2;
+  const int num_sym_taps_dual = filter_config->num_pixels2 / 2;
+  // SIMD is mainly implemented for diamond shape filter using 7-tap filtering
+  // for each of first(dgd) and second(dgd_dual) buffer for 4x4 block size. For
+  // any other cases invoke the C function.
+  if (num_rows != 4 || num_cols != 4 || num_sym_taps != 6 ||
+      num_sym_taps_dual != 6) {
+    av1_convolve_symmetric_dual_highbd_c(
+        dgd, dgd_stride, dgd_dual, dgd_dual_stride, filter_config, filter, dst,
+        dst_stride, bit_depth, block_row_begin, block_row_end, block_col_begin,
+        block_col_end);
+    return;
+  }
+
+  // Derive singleton_tap and singleton_tap_dual and repalce center tap filter
+  // values with the same.
+  int32_t singleton_tap = 1 << filter_config->prec_bits;
+  int32_t singleton_tap_dual = 0;
+  if (filter_config->num_pixels % 2) {
+    const int singleton_tap_index =
+        filter_config->config[filter_config->num_pixels - 1][NONSEP_BUF_POS];
+    singleton_tap += filter[singleton_tap_index];
+  }
+
+  if (filter_config->num_pixels2 % 2) {
+    const int last_config = filter_config->num_pixels2 - 1;
+    const int singleton_tap_index =
+        filter_config->config2[last_config][NONSEP_BUF_POS];
+    singleton_tap_dual += filter[singleton_tap_index];
+  }
+
+  // Prepare filter coefficients for dgd(first) buffer 7-tap filtering
+  // fc0 fc1 fc2 fc3 fc4 fc5 fc6(center_tap) x
+  __m128i filter_coeff = _mm_loadu_si128((__m128i const *)(filter));
+  // Replace the center_tap with derived singleton_tap.
+  const __m128i center_tap1 = _mm_set1_epi16(singleton_tap);
+  const __m128i filter_coeff_dgd =
+      _mm_blend_epi16(filter_coeff, center_tap1, 0x40);
+
+  // Prepare filter coefficients for dgd_dual(second) buffer 7-tap filtering
+  // fc7 fc8 fc9 fc10 fc11 fc12 fc13(center_tap) x
+  filter_coeff = _mm_loadu_si128((__m128i const *)(filter + 6));
+  filter_coeff = _mm_bsrli_si128(filter_coeff, 2);
+  // Replace the center_tap with derived singleton_tap_dual.
+  const __m128i center_tap2 = _mm_set1_epi16(singleton_tap_dual);
+  const __m128i filter_coeff_dgd_dual =
+      _mm_blend_epi16(filter_coeff, center_tap2, 0x40);
+
+  // Initialize the output registers with zero.
+  __m256i accum_out_r0r1 = _mm256_setzero_si256();
+  __m256i accum_out_r2r3 = _mm256_setzero_si256();
+
+  // 7-tap filtering for dgd (first) buffer.
+  apply_7tap_filtering_with_subtract_center_off(
+      dgd, dgd_stride, filter_coeff_dgd, &accum_out_r0r1, &accum_out_r2r3,
+      block_row_begin, block_col_begin);
+
+  // 7-tap filtering for dgd_dual (second) buffer.
+  apply_7tap_filtering_with_subtract_center_off(
+      dgd_dual, dgd_dual_stride, filter_coeff_dgd_dual, &accum_out_r0r1,
+      &accum_out_r2r3, block_row_begin, block_col_begin);
+
+  // Store the output after rounding and clipping.
+  round_and_store_avx2(dst, dst_stride, filter_config, bit_depth,
+                       accum_out_r0r1, accum_out_r2r3, block_row_begin,
+                       block_col_begin);
+}
+
 // TODO(Arun Negi): Difference of source and center pixel needs to go through
 // clip_base(). Implement clip_base() in intrinsic once the support is added.
 //
