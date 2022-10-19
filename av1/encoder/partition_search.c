@@ -1651,12 +1651,9 @@ static void update_partition_stats(MACROBLOCKD *const xd,
   if (is_square_block(bsize)) {
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
     if (has_rows && has_cols) {
-      int parent_block_width = block_size_wide[bsize];
 #if CONFIG_EXT_RECUR_PARTITIONS
-      const int min_bsize_1d =
-          AOMMIN(block_size_high[bsize], parent_block_width);
-      if (xd->tree_type == CHROMA_PART && ptree_luma &&
-          min_bsize_1d >= SHARED_PART_SIZE) {
+      if (should_chroma_track_luma_partition(xd->tree_type, ptree_luma,
+                                             bsize)) {
         const int ss_x = xd->plane[1].subsampling_x;
         const int ss_y = xd->plane[1].subsampling_y;
         PARTITION_TYPE derived_partition_mode =
@@ -1686,6 +1683,7 @@ static void update_partition_stats(MACROBLOCKD *const xd,
       }
 #else  // CONFIG_EXT_RECUR_PARTITIONS
     int luma_split_flag = 0;
+    int parent_block_width = block_size_wide[bsize];
     if (xd->tree_type == CHROMA_PART &&
         parent_block_width >= SHARED_PART_SIZE) {
       luma_split_flag = get_luma_split_flag(bsize, mi_params, mi_row, mi_col);
@@ -1706,10 +1704,7 @@ static void update_partition_stats(MACROBLOCKD *const xd,
     }
 #if CONFIG_EXT_RECUR_PARTITIONS
   } else {  // Rectangular blocks
-    int parent_block_width = block_size_wide[bsize];
-    const int min_bsize_1d = AOMMIN(block_size_high[bsize], parent_block_width);
-    if (xd->tree_type == CHROMA_PART && ptree_luma &&
-        min_bsize_1d >= SHARED_PART_SIZE) {
+    if (should_chroma_track_luma_partition(xd->tree_type, ptree_luma, bsize)) {
       const int ss_x = xd->plane[1].subsampling_x;
       const int ss_y = xd->plane[1].subsampling_y;
       PARTITION_TYPE derived_partition_mode =
@@ -1902,11 +1897,8 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
   }
 
 #if CONFIG_EXT_RECUR_PARTITIONS
-  const int min_bsize_1d =
-      AOMMIN(block_size_high[bsize], block_size_wide[bsize]);
-  const int track_ptree_luma = xd->tree_type && ptree_luma &&
-                               ptree_luma->partition == partition &&
-                               min_bsize_1d >= SHARED_PART_SIZE;
+  const int track_ptree_luma =
+      should_chroma_track_luma_partition(xd->tree_type, ptree_luma, bsize);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   switch (partition) {
     case PARTITION_NONE:
@@ -2694,6 +2686,7 @@ static void init_partition_search_state_params(
                                 is_bsize_geq(bsize, BLOCK_8X8) &&
                                 is_bsize_geq(BLOCK_64X64, bsize);
   const int pl = part_search_state->pl_ctx_idx;
+  const int plane_index = xd->tree_type == CHROMA_PART;
   if (is_square_block(bsize)) {
     if (limit_rect_split) {
       const PARTITION_TYPE parent_part =
@@ -2706,15 +2699,14 @@ static void init_partition_search_state_params(
           part_search_state->partition_cost_table[p] = INT_MAX;
         } else {
           part_search_state->partition_cost_table[p] =
-              mode_costs->limited_partition_cost[xd->tree_type == CHROMA_PART]
-                                                [dir][pl][symbol];
+              mode_costs->limited_partition_cost[plane_index][dir][pl][symbol];
         }
         part_search_state->partition_cost =
             part_search_state->partition_cost_table;
       }
     } else {
       part_search_state->partition_cost =
-          mode_costs->partition_cost[xd->tree_type == CHROMA_PART][pl];
+          mode_costs->partition_cost[plane_index][pl];
     }
   } else {
     for (PARTITION_TYPE p = PARTITION_NONE; p < EXT_PARTITION_TYPES; ++p) {
@@ -4879,13 +4871,10 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 #endif
 
   int luma_split_flag = 0;
-  const int parent_block_width = block_size_wide[bsize];
 #if CONFIG_EXT_RECUR_PARTITIONS
-  const int min_bsize_1d = AOMMIN(block_size_high[bsize], parent_block_width);
   int horz_3_allowed_sdp = 1;
   int vert_3_allowed_sdp = 1;
-  if (xd->tree_type == CHROMA_PART && min_bsize_1d >= SHARED_PART_SIZE &&
-      ptree_luma) {
+  if (should_chroma_track_luma_partition(xd->tree_type, ptree_luma, bsize)) {
     PARTITION_TYPE derived_partition_mode = sdp_chroma_part_from_luma(
         bsize, ptree_luma->partition, part_search_state.ss_x,
         part_search_state.ss_y);
@@ -4904,6 +4893,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   }
 #else   // CONFIG_EXT_RECUR_PARTITIONS
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
+  const int parent_block_width = block_size_wide[bsize];
   if (xd->tree_type == CHROMA_PART && parent_block_width >= SHARED_PART_SIZE) {
     luma_split_flag = get_luma_split_flag(bsize, mi_params, mi_row, mi_col);
   }
