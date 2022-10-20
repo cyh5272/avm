@@ -17,8 +17,9 @@ extern "C" {
 
 #include "av1/common/av1_common_int.h"
 
-int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd, const float *features,
-                       bool *prune_horz, bool *prune_vert);
+int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd, int qindex,
+                       const float *features, bool *prune_horz,
+                       bool *prune_vert);
 
 #ifdef __cplusplus
 }

@@ -3152,7 +3152,8 @@ static void rectangular_partition_search(
                                  mi_pos_rect);
     const bool is_hd = AOMMIN(cm->width, cm->height) >= 1080;
 
-    av1_erp_prune_rect(bsize, is_hd, ml_features, &prune_horz, &prune_vert);
+    av1_erp_prune_rect(bsize, is_hd, cm->quant_params.base_qindex, ml_features,
+                       &prune_horz, &prune_vert);
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
