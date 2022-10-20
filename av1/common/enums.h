@@ -29,6 +29,13 @@ extern "C" {
 
 #undef MAX_SB_SIZE
 
+#if CONFIG_WARP_REF_LIST
+// if set 1, row-mt does not work
+#define RESET_WARP_BANK_AT_TILE \
+  1  // 0 means warp parameter bank reset at the beginning of each sb-row; 1
+     // means warp parameter bank reset at the beginning of each tile
+#endif
+
 // Cross-Component Sample Offset (CCSO)
 #if CONFIG_CCSO
 #define CCSO_BLK_SIZE 7

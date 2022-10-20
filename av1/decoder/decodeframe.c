@@ -3489,6 +3489,11 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
   av1_reset_loop_filter_delta(xd, num_planes);
   av1_reset_loop_restoration(xd, num_planes);
 
+#if CONFIG_WARP_REF_LIST && RESET_WARP_BANK_AT_TILE
+  av1_zero(xd->warp_param_bank);
+  xd->warp_param_bank_pt = &td->warp_param_bank;
+#endif  // CONFIG_WARP_REF_LIST
+
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += cm->seq_params.mib_size) {
     av1_zero_left_context(xd);
@@ -3499,7 +3504,7 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
 #endif
 #endif  // CONFIG_REF_MV_BANK
 
-#if CONFIG_WARP_REF_LIST
+#if CONFIG_WARP_REF_LIST && !RESET_WARP_BANK_AT_TILE
     av1_zero(xd->warp_param_bank);
     xd->warp_param_bank_pt = &td->warp_param_bank;
 #endif  // CONFIG_WARP_REF_LIST
@@ -4000,6 +4005,11 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
   av1_reset_loop_filter_delta(xd, num_planes);
   av1_reset_loop_restoration(xd, num_planes);
 
+#if CONFIG_WARP_REF_LIST && RESET_WARP_BANK_AT_TILE
+  av1_zero(xd->warp_param_bank);
+  xd->warp_param_bank_pt = &td->warp_param_bank;
+#endif  // CONFIG_WARP_REF_LIST
+
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += cm->seq_params.mib_size) {
     av1_zero_left_context(xd);
@@ -4010,7 +4020,7 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
 #endif
 #endif  // CONFIG_REF_MV_BANK
 
-#if CONFIG_WARP_REF_LIST
+#if CONFIG_WARP_REF_LIST && !RESET_WARP_BANK_AT_TILE
     av1_zero(xd->warp_param_bank);
     xd->warp_param_bank_pt = &td->warp_param_bank;
 #endif  // CONFIG_WARP_REF_LIST
