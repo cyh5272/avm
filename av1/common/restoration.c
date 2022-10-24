@@ -1588,17 +1588,18 @@ static uint8_t get_pcwiener_index(int bit_depth, int32_t *multiplier, int col) {
   *multiplier = 1 << PC_WIENER_PREC_FEATURE;
   assert(lut_input == AOMMAX(AOMMIN(lut_input, PC_WIENER_LUT_SIZE - 1), 0));
 
-  const uint8_t filter_index = pc_wiener_lut_to_filter_index[lut_input];
-  assert(filter_index ==
-         AOMMAX(AOMMIN(filter_index, NUM_PC_WIENER_FILTERS - 1), 0));
-  return filter_index;
+  const uint8_t class_index = pc_wiener_lut_to_class_index[lut_input];
+  assert(class_index ==
+         AOMMAX(AOMMIN(class_index, NUM_PC_WIENER_LUT_CLASSES - 1), 0));
+  return class_index;
 }
 
-void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
-                            int stride, uint8_t *dst8, int dst_stride,
-                            const uint8_t *tskip, int tskip_stride,
-                            uint8_t *class_id, int class_id_stride, bool is_uv,
-                            int bit_depth, bool classify_only) {
+void apply_pc_wiener_highbd(
+    const uint8_t *dgd8, int width, int height, int stride, uint8_t *dst8,
+    int dst_stride, const uint8_t *tskip, int tskip_stride, uint8_t *class_id,
+    int class_id_stride, bool is_uv, int bit_depth, bool classify_only,
+    const int16_t (*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA],
+    const uint8_t *filter_selector) {
   const uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd8);
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
   const bool skip_filtering = classify_only;
@@ -1709,15 +1710,15 @@ void apply_pc_wiener_highbd(const uint8_t *dgd8, int width, int height,
 #endif  // PC_WIENER_BLOCK_SIZE > 1
 
       int32_t multiplier = 0;
-      const uint8_t filter_index =
-          get_pcwiener_index(bit_depth, &multiplier, j);
+      const uint8_t class_index = get_pcwiener_index(bit_depth, &multiplier, j);
 
       // Store classification.
       class_id[(i >> MI_SIZE_LOG2) * class_id_stride + (j >> MI_SIZE_LOG2)] =
-          filter_index;
+          class_index;
       if (skip_filtering) {
         continue;
       }
+      const uint8_t filter_index = filter_selector[class_index];
 
       const int16_t *filter = is_uv ? pcwiener_filters_chroma[filter_index]
                                     : pcwiener_filters_luma[filter_index];
@@ -1806,6 +1807,12 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
   }
   (void)tmpbuf;
   (void)bit_depth;
+  const int bank_index =
+      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
+  const int16_t(*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA] =
+      get_filter_bank(bank_index);
+  const uint8_t *filter_selector = get_filter_selector(bank_index);
+
   setup_qval_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
   for (int j = 0; j < stripe_width; j += procunit_width) {
     int w = AOMMIN(procunit_width, stripe_width - j);
@@ -1818,7 +1825,8 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
         src + j, w, stripe_height, src_stride, dst + j, dst_stride,
         rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
         rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
-        rui->plane != AOM_PLANE_Y, bit_depth, false);
+        rui->plane != AOM_PLANE_Y, bit_depth, false, pcwiener_filters_luma,
+        filter_selector);
   }
 }
 #endif  // CONFIG_PC_WIENER
@@ -1852,20 +1860,24 @@ void apply_wienerns_highbd(const uint8_t *dgd8, int width, int height,
 }
 
 #if CONFIG_COMBINE_PC_NS_WIENER
-const uint8_t *get_pc_wiener_sub_classifier(int num_classes) {
+const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index) {
+  const PcWienerSubClassifiers *sub_class = get_sub_classifiers(bank_index);
   switch (num_classes) {
-    case 2: return pc_wiener_sub_classify_to_two;
-    case 4: return pc_wiener_sub_classify_to_four;
-    default: return pc_wiener_sub_classify_to_one;
+    case 2: return sub_class->pc_wiener_sub_classify_to_2;
+    case 4: return sub_class->pc_wiener_sub_classify_to_4;
+    case 8: return sub_class->pc_wiener_sub_classify_to_8;
+    case 16: return sub_class->pc_wiener_sub_classify_to_16;
+    case 64: return sub_class->pc_wiener_sub_classify_to_64;
+    default: return pc_wiener_sub_classify_to_1;
   }
 }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 // Enables running of wienerns filters without the subtract-center option.
-#define ADD_CENTER_TAP_TO_WIENERNS 0
+#define ADD_CENTER_TAP_TO_WIENERNS 1
 // Enabling these will run non-SIMD av1_convolve_symmetric_dual_highbd_c().
-#define ADD_CENTER_TAP_TO_WIENERNS_CHROMA 0
-#define ADD_CENTER_TAP_TO_WIENERNS_CROSS 0
+#define ADD_CENTER_TAP_TO_WIENERNS_CHROMA 1
+#define ADD_CENTER_TAP_TO_WIENERNS_CROSS 1
 
 #if ADD_CENTER_TAP_TO_WIENERNS
 // Adjust wienerns config and filters to use the non-subtract-center path.
@@ -1958,7 +1970,7 @@ void apply_wienerns_class_id_highbd(
 #if CONFIG_COMBINE_PC_NS_WIENER
     ,
     const uint8_t *class_id, int class_id_stride, int class_id_restrict,
-    int num_classes
+    int num_classes, int bank_index
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 ) {
   (void)luma8;
@@ -1991,7 +2003,7 @@ void apply_wienerns_class_id_highbd(
   const int block_size = 4;
 #if CONFIG_COMBINE_PC_NS_WIENER
   const uint8_t *pc_wiener_sub_classify =
-      get_pc_wiener_sub_classifier(num_classes);
+      get_pc_wiener_sub_classifier(num_classes, bank_index);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   for (int r = 0; r < height; r += block_size) {
     const int h = AOMMIN(block_size, height - r);
@@ -2034,6 +2046,8 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   (void)bit_depth;
 
 #if CONFIG_COMBINE_PC_NS_WIENER
+  const int bank_index =
+      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
   if (rui->compute_classification && rui->wienerns_info.num_classes > 1) {
     // Replicate pc_wiener_stripe but only perform classification, i.e., no
     // filtering. Only needed in the decoding loop. Encoder side will buffer the
@@ -2045,7 +2059,7 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
           src + j, w, stripe_height, src_stride, dst + j, dst_stride,
           rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
           rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
-          rui->plane != AOM_PLANE_Y, bit_depth, true);
+          rui->plane != AOM_PLANE_Y, bit_depth, true, NULL, NULL);
     }
   }
 #else
@@ -2096,7 +2110,7 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
 #if CONFIG_COMBINE_PC_NS_WIENER
         ,
         rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
-        rui->class_id_restrict, rui->wienerns_info.num_classes
+        rui->class_id_restrict, rui->wienerns_info.num_classes, bank_index
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
     );
   }
