@@ -3300,8 +3300,10 @@ static int compute_quantized_wienerns_filter(
   const int total_dim_b = num_classes * WIENERNS_MAX;
   const int stride_b = WIENERNS_MAX;
 #if CONFIG_COMBINE_PC_NS_WIENER
+  const int bank_index =
+      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
   const uint8_t *pc_wiener_sub_classify =
-      get_pc_wiener_sub_classifier(num_classes);
+      get_pc_wiener_sub_classifier(num_classes, bank_index);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   double solver_x[WIENERNS_MAX_CLASSES * WIENERNS_MAX];
