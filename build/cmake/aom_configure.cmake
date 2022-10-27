@@ -29,7 +29,7 @@ if(DEFINED CONFIG_LOWBITDEPTH)
     high bit depth internal pipeline is always used.")
 endif()
 
-experiment_requires_tf_lite(CONFIG_EXT_RECUR_PARTITIONS)
+# experiment_requires_tf_lite(CONFIG_EXT_RECUR_PARTITIONS)
 
 # Generate the user config settings.
 list(APPEND aom_build_vars ${AOM_CONFIG_VARS} ${AOM_OPTION_VARS})
