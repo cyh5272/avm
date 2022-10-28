@@ -243,7 +243,7 @@ static INLINE int get_multiq_lr_level(int qindex) { return qindex > 200; }
 #endif  // CONFIG_MULTIQ_LR_SIGNALING
 
 #if CONFIG_COMBINE_PC_NS_WIENER
-const uint8_t *get_pc_wiener_sub_classifier(int num_classes);
+const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 // Max of SGRPROJ_TMPBUF_SIZE, DOMAINTXFMRF_TMPBUF_SIZE, WIENER_TMPBUF_SIZE
