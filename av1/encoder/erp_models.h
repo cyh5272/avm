@@ -16,7 +16,7 @@
 #include "config/aom_config.h"
 #include "av1/encoder/ml.h"
 
-#if ERP_USE_TFLITE
+#if CONFIG_ERP_TFLITE
 const unsigned char av1_erp_rect_BLOCK_128X128_tflite[] = {
   0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33, 0x14, 0x00, 0x20, 0x00, 0x1c,
   0x00, 0x18, 0x00, 0x14, 0x00, 0x10, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x08, 0x00,
@@ -7062,8 +7062,7 @@ static const NN_CONFIG av1_erp_rect_nn_config_BLOCK_32X16 = {
 #undef NUM_FEATURES_BLOCK_32X16
 #undef NUM_LAYER_0_UNITS_BLOCK_32X16
 #undef NUM_LOGITS_BLOCK_32X16
-
-#endif  // ERP_USE_TFLITE
+#endif  // CONFIG_ERP_TFLITE
 
 static const float av1_erp_rect_feature_mean_BLOCK_8X8[19] = {
   66618.195312f, 6278476.000000f, 351.715485f, 2541.013428f, 2427.998779f,
@@ -7263,7 +7262,7 @@ static const float av1_erp_rect_feature_std_BLOCK_128X128[19] = {
   3468594.500000f,  0.000001f,          0.000001f,
 };
 
-#if ERP_USE_TFLITE
+#if CONFIG_ERP_TFLITE
 const unsigned char av1_erp_rect_hd_BLOCK_128X128_tflite[] = {
   0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33, 0x14, 0x00, 0x20, 0x00, 0x1c,
   0x00, 0x18, 0x00, 0x14, 0x00, 0x10, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x08, 0x00,
@@ -14307,7 +14306,7 @@ static const NN_CONFIG av1_erp_rect_hd_nn_config_BLOCK_32X16 = {
 #undef NUM_FEATURES_BLOCK_32X16
 #undef NUM_LAYER_0_UNITS_BLOCK_32X16
 #undef NUM_LOGITS_BLOCK_32X16
-#endif  // ERP_USE_TFLITE
+#endif  // CONFIG_ERP_TFLITE
 
 static const float av1_erp_rect_hd_feature_mean_BLOCK_8X8[19] = {
   67459.164062f, 6334382.500000f, 353.629700f, 2570.381104f, 2425.343018f,

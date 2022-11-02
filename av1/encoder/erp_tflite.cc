@@ -9,18 +9,17 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include <vector>
-
-#define ERP_USE_TFLITE 0
-
-#if ERP_USE_TFLITE
-#include "av1/tflite_models/op_registrations.h"
-#include "common/tf_lite_includes.h"
-#endif  // ERP_USE_TFLITE
+#include "config/av1_rtcd.h"
 
 #include "av1/encoder/erp_tflite.h"
 #include "av1/encoder/erp_models.h"
 #include "av1/encoder/ml.h"
+
+#if CONFIG_ERP_TFLITE
+#include <vector>
+#include "av1/tflite_models/op_registrations.h"
+#include "common/tf_lite_includes.h"
+#endif  // CONFIG_ERP_TFLITE
 
 #if CONFIG_EXT_RECUR_PARTITIONS
 #define MAKE_ERP_MODEL_SWITCH_CASE(bsize)           \
@@ -43,7 +42,7 @@
     return is_hd ? av1_erp_rect_hd_feature_std_##bsize \
                  : av1_erp_rect_feature_std_##bsize;
 
-#if ERP_USE_TFLITE
+#if CONFIG_ERP_TFLITE
 static const unsigned char *get_model_data(BLOCK_SIZE bsize, bool is_hd) {
   switch (bsize) {
     MAKE_ERP_MODEL_SWITCH_CASE(BLOCK_128X128)
@@ -114,7 +113,7 @@ static const NN_CONFIG *get_dnn_model(BLOCK_SIZE bsize, bool is_hd) {
     default: assert(0 && "Invalid block size!\n"); return NULL;
   }
 }
-#endif  // ERP_USE_TFLITE
+#endif  // CONFIG_ERP_TFLITE
 
 static const float *get_mean(BLOCK_SIZE bsize, bool is_hd) {
   switch (bsize) {
@@ -183,7 +182,7 @@ static inline void normalize(float *features_dst, const float *features_src,
 extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
                                   const float *features, bool *prune_horz,
                                   bool *prune_vert) {
-#if ERP_USE_TFLITE
+#if CONFIG_ERP_TFLITE
   std::unique_ptr<tflite::Interpreter> interpreter =
       get_tflite_interpreter(bsize, is_hd);
 
@@ -214,7 +213,7 @@ extern "C" int av1_erp_prune_rect(BLOCK_SIZE bsize, bool is_hd,
   float output[3];
   const NN_CONFIG *nn_config = get_dnn_model(bsize, is_hd);
   av1_nn_predict(input, nn_config, 1, output);
-#endif  // ERP_USE_TFLITE
+#endif  // CONFIG_ERP_TFLITE
 
   float probs[3];
   av1_nn_softmax(output, probs, 3);
