@@ -4072,7 +4072,7 @@ static int check_frame_refs_short_signaling(AV1_COMMON *const cm) {
     }
   }
 
-#if 0  // For debug
+#if 0   // For debug
   printf("\nFrame=%d: \n", cm->current_frame.frame_number);
   printf("***frame_refs_short_signaling=%d\n", frame_refs_short_signaling);
   for (int ref_frame = LAST_FRAME; ref_frame <= ALTREF_FRAME; ++ref_frame) {

@@ -903,7 +903,7 @@ typedef struct {
   int inter_2way_txfm_partition_cost[2];
   //! inter_2way_rect_txfm_partition_cost
   int inter_2way_rect_txfm_partition_cost[2];
-#else  // CONFIG_NEW_TX_PARTITION
+#else   // CONFIG_NEW_TX_PARTITION
   //! tx_size_cost
   int tx_size_cost[TX_SIZES - 1][TX_SIZE_CONTEXTS][TX_SIZES];
   //! txfm_partition_cost

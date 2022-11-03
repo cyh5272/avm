@@ -77,8 +77,8 @@ extern "C" {
 #define RANKED_REF0_TO_PRUNE 3
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
 #define SAME_REF_COMPOUND_PRUNE \
-  1  // Set the number of reference pictures for the same reference mode of
-     // coumpound prediction
+  1     // Set the number of reference pictures for the same reference mode of
+        // coumpound prediction
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
 #define MAX_REFS_ARF 4
 #endif  // CONFIG_NEW_REF_SIGNALING
@@ -250,7 +250,7 @@ typedef struct frame_contexts {
   aom_cdf_prob inter_4way_txfm_partition_cdf[2][TXFM_PARTITION_INTER_CONTEXTS]
                                             [CDF_SIZE(4)];
   aom_cdf_prob inter_2way_txfm_partition_cdf[CDF_SIZE(2)];
-#else  // CONFIG_NEW_TX_PARTITION
+#else   // CONFIG_NEW_TX_PARTITION
   aom_cdf_prob txfm_partition_cdf[TXFM_PARTITION_CONTEXTS][CDF_SIZE(2)];
 #endif  // CONFIG_NEW_TX_PARTITION
   aom_cdf_prob comp_group_idx_cdf[COMP_GROUP_IDX_CONTEXTS][CDF_SIZE(2)];

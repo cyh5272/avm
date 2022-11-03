@@ -3636,7 +3636,7 @@ int64_t av1_uniform_txfm_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
                                   xd->left_txfm_context,
                                   mbmi->sb_type[PLANE_TYPE_Y], max_tx_size)
                             : tx_size_cost(x, bs, tx_size);
-#else  // CONFIG_NEW_TX_PARTITION
+#else   // CONFIG_NEW_TX_PARTITION
     const int ctx =
         txfm_partition_context(xd->above_txfm_context, xd->left_txfm_context,
                                mbmi->sb_type[PLANE_TYPE_Y], tx_size);

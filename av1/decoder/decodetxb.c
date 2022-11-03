@@ -661,12 +661,12 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       read_coeffs_reverse_2d(r, 1, *eob - 1 - 1, scan, bwl, levels, base_lf_cdf,
                              br_lf_cdf, plane, base_cdf, br_cdf);
       if (enable_ph) {
-        for (int si = *eob - 1; si > 0; si--) {
+        for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
               AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
           if (level) {
-            num_nz++;
+            ++num_nz;
             sum_abs1 += level;
           }
         }
@@ -683,11 +683,11 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       read_coeffs_reverse_2d(r, tx_size, 1, *eob - 1 - 1, scan, bwl, levels,
                              base_cdf, br_cdf);
       if (enable_ph) {
-        for (int si = *eob - 1; si > 0; si--) {
+        for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level = levels[get_padded_idx(pos, bwl)];
           if (level) {
-            num_nz++;
+            ++num_nz;
             sum_abs1 +=
                 AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
           }
@@ -707,12 +707,12 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       read_coeffs_reverse(r, tx_class, 1, *eob - 1 - 1, scan, bwl, levels,
                           base_lf_cdf, br_lf_cdf, plane, base_cdf, br_cdf);
       if (enable_ph) {
-        for (int si = *eob - 1; si > 0; si--) {
+        for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
               AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
           if (level) {
-            num_nz++;
+            ++num_nz;
             sum_abs1 += level;
           }
         }
@@ -729,12 +729,12 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       read_coeffs_reverse(r, tx_size, tx_class, 1, *eob - 1 - 1, scan, bwl,
                           levels, base_cdf, br_cdf);
       if (enable_ph) {
-        for (int si = *eob - 1; si > 0; si--) {
+        for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
               AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
           if (level) {
-            num_nz++;
+            ++num_nz;
             sum_abs1 += level;
           }
         }

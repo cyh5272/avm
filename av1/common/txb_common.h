@@ -522,6 +522,8 @@ typedef aom_cdf_prob (*base_lf_cdf_arr)[CDF_SIZE(LF_BASE_SYMBOLS)];
 typedef aom_cdf_prob (*base_cdf_arr)[CDF_SIZE(4)];
 typedef aom_cdf_prob (*br_cdf_arr)[CDF_SIZE(BR_CDF_SIZE)];
 #if CONFIG_PAR_HIDING
+// This function returns the base range context index/increment for the
+// coefficients with hidden parity.
 static INLINE int get_base_ctx_ph(const uint8_t *levels, int pos, int bwl,
                                   const TX_CLASS tx_class) {
   const int stats =
@@ -529,6 +531,8 @@ static INLINE int get_base_ctx_ph(const uint8_t *levels, int pos, int bwl,
   return AOMMIN((stats + 1) >> 1, 4);
 }
 
+// This function returns the low range context index/increment for the
+// coefficients with hidden parity.
 static AOM_FORCE_INLINE int get_par_br_ctx(const uint8_t *const levels,
                                            const int c,  // raster order
                                            const int bwl,

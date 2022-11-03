@@ -109,9 +109,9 @@ static INLINE int get_dqv(const int32_t *dequant, int coeff_idx,
   return dqv;
 }
 
-int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
-                       const int plane_type, int block, TX_SIZE tx_size,
-                       TX_TYPE tx_type) {
+void av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
+                        const int plane_type, int block, TX_SIZE tx_size,
+                        TX_TYPE tx_type) {
   MACROBLOCKD *xd = &mb->e_mbd;
   const struct macroblock_plane *const p = &mb->plane[plane_type];
   const int32_t *dequant = p->dequant_QTX;
@@ -124,7 +124,7 @@ int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
   const int eob = p->eobs[block];
 
   if (eob <= PHTHRESH) {
-    return 0;
+    return;
   }
 
   const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
@@ -142,11 +142,11 @@ int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
     tran_low_t abstcoeff = abs(tcoeff[tune_pos]);
     tran_low_t absqcoeff =
         abs(qcoeff[tune_pos]) + ((abstcoeff < absdqcoeff) ? -1 : 1);
-    absdqcoeff = (tran_low_t)(
-        ROUND_POWER_OF_TWO_64(
-            (tran_high_t)absqcoeff * get_dqv(dequant, tune_pos, iqmatrix),
-            QUANT_TABLE_BITS) >>
-        shift);
+    absdqcoeff = (tran_low_t)(ROUND_POWER_OF_TWO_64(
+                                  (tran_high_t)absqcoeff *
+                                      get_dqv(dequant, tune_pos, iqmatrix),
+                                  QUANT_TABLE_BITS) >>
+                              shift);
     tran_low_t dist_min = abs(abstcoeff - absdqcoeff);
     tran_low_t tune_absqcoeff = absqcoeff, tune_absdqcoeff = absdqcoeff;
 
@@ -159,11 +159,11 @@ int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
           (absqcoeff < MAX_BASE_BR_RANGE) ||
           ((absqcoeff == MAX_BASE_BR_RANGE) && (abstcoeff < absdqcoeff));
       absqcoeff += ((abstcoeff < absdqcoeff) ? -1 : 1);
-      absdqcoeff = (tran_low_t)(
-          ROUND_POWER_OF_TWO_64(
-              (tran_high_t)absqcoeff * get_dqv(dequant, pos, iqmatrix),
-              QUANT_TABLE_BITS) >>
-          shift);
+      absdqcoeff = (tran_low_t)(ROUND_POWER_OF_TWO_64(
+                                    (tran_high_t)absqcoeff *
+                                        get_dqv(dequant, pos, iqmatrix),
+                                    QUANT_TABLE_BITS) >>
+                                shift);
       tran_low_t absdist = abs(abstcoeff - absdqcoeff);
       if (absdist < dist_min && tunable) {
         dist_min = absdist;
@@ -191,8 +191,6 @@ int av1_ph_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
     p->txb_entropy_ctx[block] =
         av1_get_txb_entropy_context(qcoeff, scan_order, new_eob);
   }
-
-  return 1;
 }
 #endif  // CONFIG_PAR_HIDING
 

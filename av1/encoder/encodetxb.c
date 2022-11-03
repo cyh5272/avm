@@ -1550,7 +1550,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
   // c == 0 after previous loop
 #if CONFIG_PAR_HIDING
   int num_nz = 0;
-  for (c = eob - 1; c > 0; c--) {
+  for (c = eob - 1; c > 0; --c) {
     const int pos = scan[c];
     num_nz += !!qcoeff[pos];
   }
@@ -2168,9 +2168,10 @@ static INLINE void get_qc_dqc_low(tran_low_t abs_qc, int sign, int dqv,
   *qc_low = (-sign ^ abs_qc_low) + sign;
   assert((sign ? -abs_qc_low : abs_qc_low) == *qc_low);
 
-  tran_low_t abs_dqc_low = (tran_low_t)(
-      ROUND_POWER_OF_TWO_64((tran_high_t)abs_qc_low * dqv, QUANT_TABLE_BITS) >>
-      shift);
+  tran_low_t abs_dqc_low =
+      (tran_low_t)(ROUND_POWER_OF_TWO_64((tran_high_t)abs_qc_low * dqv,
+                                         QUANT_TABLE_BITS) >>
+                   shift);
 
   *dqc_low = (-sign ^ abs_dqc_low) + sign;
   assert((sign ? -abs_dqc_low : abs_dqc_low) == *dqc_low);
@@ -2455,11 +2456,8 @@ static AOM_FORCE_INLINE void update_coeff_eob(
 #endif  // CONFIG_ATC_COEFCODING
   } else {
 #if CONFIG_PAR_HIDING
-    int64_t rd_max = INT64_MAX >> 1;
-    int rate_max = INT32_MAX >> 1;
-    int64_t rdlow = rd_max, rdup = rd_max, rdeoblow = rd_max, rdeobup = rd_max;
-    int ratelow = rate_max, rateup = rate_max, rateeoblow = rate_max,
-        rateeobup = rate_max;
+    int64_t rdeoblow = INT64_MAX >> 1;
+    int rateeoblow = INT32_MAX >> 1;
 #endif  // CONFIG_PAR_HIDING
     int lower_level = 0;
     const tran_low_t abs_qc = abs(qc);
@@ -2511,10 +2509,10 @@ static AOM_FORCE_INLINE void update_coeff_eob(
       rd_low = RDCOST(rdmult, *accu_rate + rate_low, *accu_dist + dist_low);
     }
 #if CONFIG_PAR_HIDING
-    rateup = rate;
-    rdup = rd;
-    ratelow = rate_low;
-    rdlow = rd_low;
+    int rateup = rate;
+    int64_t rdup = rd;
+    int ratelow = rate_low;
+    int64_t rdlow = rd_low;
 #endif  // CONFIG_PAR_HIDING
     int lower_level_new_eob = 0;
     const int new_eob = si + 1;
@@ -2532,8 +2530,8 @@ static AOM_FORCE_INLINE void update_coeff_eob(
     int64_t dist_new_eob = dist;
     int64_t rd_new_eob = RDCOST(rdmult, rate_coeff_eob, dist_new_eob);
 #if CONFIG_PAR_HIDING
-    rateeobup = rate_coeff_eob;
-    rdeobup = rd_new_eob;
+    int rateeobup = rate_coeff_eob;
+    int64_t rdeobup = rd_new_eob;
 #endif  // CONFIG_PAR_HIDING
     if (abs_qc_low > 0) {
       const int rate_coeff_eob_low =
@@ -2679,14 +2677,14 @@ typedef struct {
   tran_low_t qcoeff;
   tran_low_t dqcoeff;
   int scan_idx;
-} tuneHide;
+} tune_cand;
 
 static AOM_FORCE_INLINE void cost_hide_par(
     const tran_low_t qcoeff, const tran_low_t dqcoeff, const tran_low_t tcoeff,
     const int shift, const LV_MAP_COEFF_COST *txb_costs, const int pos,
     const LV_MAP_COEFF_COST *txb_costs_ph, int dc_sign_ctx, TX_CLASS tx_class,
     uint8_t *levels, const int bwl, const int64_t rdmult,
-    const int32_t *dequant, const qm_val_t *iqmatrix, tuneHide *th,
+    const int32_t *dequant, const qm_val_t *iqmatrix, tune_cand *t_cand,
     int rate_cur) {
   const int dqv = get_dqv(dequant, pos, iqmatrix);
   tran_low_t abslevel = abs(qcoeff), abstqc = abs(tcoeff);
@@ -2715,24 +2713,21 @@ static AOM_FORCE_INLINE void cost_hide_par(
   int64_t cost_cand = RDCOST(rdmult, rate_cand, dist_cand);
   const int sign = tcoeff < 0 ? -1 : 1;
 
-  th->cost = cost_cand - cost;
-  th->qcoeff = abslevel_cand * sign;
-  th->dqcoeff = absdqc_cand * sign;
-  th->rate = rate_cand - rate;
-  th->scan_idx = 0;
+  t_cand->cost = cost_cand - cost;
+  t_cand->qcoeff = abslevel_cand * sign;
+  t_cand->dqcoeff = absdqc_cand * sign;
+  t_cand->rate = rate_cand - rate;
+  t_cand->scan_idx = 0;
 }
 
-static AOM_FORCE_INLINE bool region_nz_minus(const int eob, tran_low_t *qcoeff,
-                                             int ratesaving,
-                                             const int16_t *scan,
-                                             sbb_cand *sbbcand, tuneHide *th,
-                                             const int64_t rdmult) {
+static AOM_FORCE_INLINE bool region_nz_minus(
+    const int eob, tran_low_t *qcoeff, int ratesaving, const int16_t *scan,
+    sbb_cand *sbbcand, tune_cand *t_cand, const int64_t rdmult) {
   int64_t cost = INT64_MAX >> 1;
   int find_si = -1;
-  for (int scan_idx = eob - 1; scan_idx > 0; scan_idx--) {
+  for (int scan_idx = eob - 1; scan_idx > 0; --scan_idx) {
     int blkpos = scan[scan_idx];
-    bool not_upround = !sbbcand[scan_idx].upround;
-    if (abs(qcoeff[blkpos]) == 0 && not_upround &&
+    if (abs(qcoeff[blkpos]) == 0 && !sbbcand[scan_idx].upround &&
         sbbcand[scan_idx].tunable)  // from 0 to 1
     {
       if (sbbcand[scan_idx].delta_cost < cost) {
@@ -2744,23 +2739,24 @@ static AOM_FORCE_INLINE bool region_nz_minus(const int eob, tran_low_t *qcoeff,
   if (find_si == -1) {
     return false;
   }
-  th->qcoeff = sbbcand[find_si].qc;
-  th->dqcoeff = sbbcand[find_si].dqc;
-  th->rate = sbbcand[find_si].delta_rate + ratesaving;
-  th->cost = sbbcand[find_si].delta_cost + RDCOST(rdmult, ratesaving, 0);
-  th->scan_idx = find_si;
+  t_cand->qcoeff = sbbcand[find_si].qc;
+  t_cand->dqcoeff = sbbcand[find_si].dqc;
+  t_cand->rate = sbbcand[find_si].delta_rate + ratesaving;
+  t_cand->cost = sbbcand[find_si].delta_cost + RDCOST(rdmult, ratesaving, 0);
+  t_cand->scan_idx = find_si;
   return true;
 }
 
 static AOM_FORCE_INLINE bool region_nz_equal(const int eob, tran_low_t *qcoeff,
                                              const int ratesaving,
                                              const int16_t *scan,
-                                             sbb_cand *sbbcand, tuneHide *th,
+                                             sbb_cand *sbbcand,
+                                             tune_cand *t_cand,
                                              const int64_t rdmult) {
   int64_t cost = INT64_MAX >> 1, cost_up0 = INT64_MAX >> 1,
           cost_tune = INT64_MAX >> 1;
   int si = -1, si_up0 = -1, si_tune = -1;
-  for (int scan_idx = eob - 1; scan_idx > 0; scan_idx--) {
+  for (int scan_idx = eob - 1; scan_idx > 0; --scan_idx) {
     if (sbbcand[scan_idx].tunable) {
       if (!(abs(qcoeff[scan[scan_idx]]) == 1 && sbbcand[scan_idx].upround)) {
         if (sbbcand[scan_idx].delta_cost < cost) {
@@ -2794,13 +2790,13 @@ static AOM_FORCE_INLINE bool region_nz_equal(const int eob, tran_low_t *qcoeff,
   {
     return false;
   } else {
-    th->scan_idx = si_tune;
-    th->qcoeff = sbbcand[si_tune].qc;
-    th->dqcoeff = sbbcand[si_tune].dqc;
-    th->rate = sbbcand[si_tune].delta_rate;
-    th->cost = cost_tune;
+    t_cand->scan_idx = si_tune;
+    t_cand->qcoeff = sbbcand[si_tune].qc;
+    t_cand->dqcoeff = sbbcand[si_tune].dqc;
+    t_cand->rate = sbbcand[si_tune].delta_rate;
+    t_cand->cost = cost_tune;
     if (!disable) {
-      th->rate += ratesaving;
+      t_cand->rate += ratesaving;
     }
     return true;
   }
@@ -2808,11 +2804,12 @@ static AOM_FORCE_INLINE bool region_nz_equal(const int eob, tran_low_t *qcoeff,
 
 // tuning when nz > thresh
 static AOM_FORCE_INLINE bool region_nz_plus(const int eob, const int ratesaving,
-                                            sbb_cand *sbbcand, tuneHide *th,
+                                            sbb_cand *sbbcand,
+                                            tune_cand *t_cand,
                                             const int64_t rdmult) {
   int64_t cost = INT64_MAX >> 1;
   int find_si = -1;
-  for (int scan_idx = eob - 1; scan_idx > 0; scan_idx--) {
+  for (int scan_idx = eob - 1; scan_idx > 0; --scan_idx) {
     if (sbbcand[scan_idx].tunable && sbbcand[scan_idx].delta_cost < cost) {
       cost = sbbcand[scan_idx].delta_cost;
       find_si = scan_idx;
@@ -2822,11 +2819,11 @@ static AOM_FORCE_INLINE bool region_nz_plus(const int eob, const int ratesaving,
   if (find_si == -1) {
     return false;
   }
-  th->scan_idx = find_si;
-  th->qcoeff = sbbcand[find_si].qc;
-  th->dqcoeff = sbbcand[find_si].dqc;
-  th->rate = sbbcand[find_si].delta_rate + ratesaving;
-  th->cost = cost + RDCOST(rdmult, ratesaving, 0);
+  t_cand->scan_idx = find_si;
+  t_cand->qcoeff = sbbcand[find_si].qc;
+  t_cand->dqcoeff = sbbcand[find_si].dqc;
+  t_cand->rate = sbbcand[find_si].delta_rate + ratesaving;
+  t_cand->cost = cost + RDCOST(rdmult, ratesaving, 0);
   return true;
 }
 
@@ -2843,10 +2840,10 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
 #endif  // CONFIG_ATC_COEFCODING
 ) {
   int nzsbb = 0, sum_abs1 = 0;
-  for (int scan_idx = eob - 1; scan_idx > 0; scan_idx--) {
+  for (int scan_idx = eob - 1; scan_idx > 0; --scan_idx) {
     const int blkpos = scan[scan_idx];
     if (qcoeff[blkpos]) {
-      nzsbb++;
+      ++nzsbb;
       sum_abs1 += AOMMIN(abs(qcoeff[blkpos]), MAX_BASE_BR_RANGE);
     }
   }
@@ -2872,31 +2869,30 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
     return true;  // hide
   }
 
-  tuneHide th_candhidepos, th_candbetween;
-  th_candhidepos.cost = INT64_MAX;
-  th_candbetween.cost = INT64_MAX;
+  tune_cand t_cand_dc, t_cand_non_dc;
+  t_cand_dc.cost = INT64_MAX;
+  t_cand_non_dc.cost = INT64_MAX;
   // we change the quantized level's parity to check the rate change.
   if (nzsbb >= PHTHRESH) {
     cost_hide_par(qcoeff[hidepos], dqcoeff[hidepos], tcoeff[hidepos], shift,
                   txb_costs, hidepos, txb_costs_ph, dc_sign_ctx, tx_class,
-                  levels, bwl, rdmult, dequant, iqmatrix, &th_candhidepos,
-                  rate_cur);
+                  levels, bwl, rdmult, dequant, iqmatrix, &t_cand_dc, rate_cur);
   }
 
   // we change the level candidates to check the cost change.
   if (nzsbb == PHTHRESH - 1) {
-    region_nz_minus(eob, qcoeff, ratesaving, scan, sbbcand, &th_candbetween,
+    region_nz_minus(eob, qcoeff, ratesaving, scan, sbbcand, &t_cand_non_dc,
                     rdmult);
   }
   if (nzsbb == PHTHRESH) {
-    region_nz_equal(eob, qcoeff, ratesaving, scan, sbbcand, &th_candbetween,
+    region_nz_equal(eob, qcoeff, ratesaving, scan, sbbcand, &t_cand_non_dc,
                     rdmult);
   }
   if (nzsbb > PHTHRESH) {
-    region_nz_plus(eob, ratesaving, sbbcand, &th_candbetween, rdmult);
+    region_nz_plus(eob, ratesaving, sbbcand, &t_cand_non_dc, rdmult);
   }
-  tuneHide *best = th_candhidepos.cost < th_candbetween.cost ? &th_candhidepos
-                                                             : &th_candbetween;
+  tune_cand *best =
+      t_cand_dc.cost < t_cand_non_dc.cost ? &t_cand_dc : &t_cand_non_dc;
 
   if (nzsbb == PHTHRESH - 1 && best->cost > 0) {
     assert(nzsbb == PHTHRESH - 1);
@@ -2968,6 +2964,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   sbb_cand *sbbcand = aom_malloc(width * height * sizeof(sbb_cand));
   for (int scan_idx = 0; scan_idx < eob; scan_idx++) {
     sbbcand[scan_idx].tunable = false;
+    sbbcand[scan_idx].upround = false;
   }
 #endif  // CONFIG_PAR_HIDING
 

@@ -223,7 +223,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   // Rectangular blocks
   RESET_CDF_COUNTER(fc->inter_4way_txfm_partition_cdf[1], 4);
   RESET_CDF_COUNTER(fc->inter_2way_txfm_partition_cdf, 2);
-#else  // CONFIG_NEW_TX_PARTITION
+#else   // CONFIG_NEW_TX_PARTITION
   RESET_CDF_COUNTER(fc->txfm_partition_cdf, 2);
 #endif  // CONFIG_NEW_TX_PARTITION
   RESET_CDF_COUNTER(fc->comp_group_idx_cdf, 2);
