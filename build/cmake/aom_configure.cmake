@@ -29,7 +29,7 @@ if(DEFINED CONFIG_LOWBITDEPTH)
     high bit depth internal pipeline is always used.")
 endif()
 
-if (CONFIG_ERP_TFLITE)
+if(CONFIG_ERP_TFLITE)
   experiment_requires_tf_lite(CONFIG_EXT_RECUR_PARTITIONS)
 endif()
 
