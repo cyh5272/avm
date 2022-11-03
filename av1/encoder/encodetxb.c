@@ -2731,7 +2731,8 @@ static AOM_FORCE_INLINE bool region_nz_minus(const int eob, tran_low_t *qcoeff,
   int find_si = -1;
   for (int scan_idx = eob - 1; scan_idx > 0; scan_idx--) {
     int blkpos = scan[scan_idx];
-    if (abs(qcoeff[blkpos]) == 0 && !sbbcand[scan_idx].upround &&
+    bool not_upround = !sbbcand[scan_idx].upround;
+    if (abs(qcoeff[blkpos]) == 0 && not_upround &&
         sbbcand[scan_idx].tunable)  // from 0 to 1
     {
       if (sbbcand[scan_idx].delta_cost < cost) {
