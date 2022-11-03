@@ -139,6 +139,7 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
 # AV2 experiment flags.
 set_aom_config_var(CONFIG_EXT_RECUR_PARTITIONS 0 NUMBER
                    "AV2 Fully recursive partitions experiment flag")
+set_aom_config_var(CONFIG_ERP_TFLITE 0 NUMBER "Build ERP with TFLite")
 set_aom_config_var(CONFIG_FORWARDSKIP 1
                    "AV2 enable forward skip residual coding.")
 set_aom_config_var(CONFIG_COMPOUND_WARP_SAMPLES 1 NUMBER
