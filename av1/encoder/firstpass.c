@@ -358,15 +358,17 @@ static int firstpass_intra_prediction(
 #if CONFIG_C071_SUBBLK_WARPMV
   const int mi_width = mi_size_wide[bsize];
   const int mi_height = mi_size_high[bsize];
-  const int x_mis = AOMMIN(mi_width, mi_params->mi_cols - xd->mi_col);
-  const int y_mis = AOMMIN(mi_height, mi_params->mi_rows - xd->mi_row);
+  const int x_inside_boundary =
+      AOMMIN(mi_width, mi_params->mi_cols - xd->mi_col);
+  const int y_inside_boundary =
+      AOMMIN(mi_height, mi_params->mi_rows - xd->mi_row);
 #endif  // CONFIG_C071_SUBBLK_WARPMV
 
   aom_clear_system_state();
   set_mi_offsets(mi_params, xd, mb_row * mb_scale, mb_col * mb_scale
 #if CONFIG_C071_SUBBLK_WARPMV
                  ,
-                 x_mis, y_mis
+                 x_inside_boundary, y_inside_boundary
 #endif  // CONFIG_C071_SUBBLK_WARPMV
   );
   xd->plane[0].dst.buf = this_frame->y_buffer + y_offset;

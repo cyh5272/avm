@@ -264,7 +264,7 @@ static inline int check_mv_precision(const AV1_COMMON *cm,
                mbmi->mv[i].as_mv.col);
         return 0;
       }
-#endif
+#endif  // CONFIG_C071_SUBBLK_WARPMV
     }
   }
   return 1;

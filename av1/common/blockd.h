@@ -578,6 +578,10 @@ typedef struct MB_MODE_INFO {
 #if CONFIG_C071_SUBBLK_WARPMV
 /*! \brief Stores the subblock motion info of the current coding block
  */
+// Note that this can not be stored in MB_MODE_INFO, because The MB_MODE_INFO is
+// only physically stored for the first sunblock of a block, the info of the
+// rest subblocks in the same block are only pointed to the first subblock and
+// is not physically stored.
 typedef struct SUBMB_INFO {
   /*! \brief Stored subblock mv for reference. */
   int_mv mv[2];
@@ -1009,7 +1013,7 @@ typedef struct macroblockd {
 
 #if CONFIG_C071_SUBBLK_WARPMV
   /*!
-   * Appropriate offset inside cm->mi_params.mi_submv_grid based on current
+   * Appropriate offset inside cm->mi_params.submi_grid_base based on current
    * mi_row and mi_col.
    */
   SUBMB_INFO **submi;

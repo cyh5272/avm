@@ -1324,12 +1324,12 @@ void store_submi(const MACROBLOCKD *const xd, const AV1_COMMON *cm,
   const int bh = mi_size_high[bsize];
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-  const int x_mis = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
-  const int y_mis = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
+  const int x_inside_boundary = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
+  const int y_inside_boundary = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
   const int dst_stride = MAX_MIB_SIZE;
   const int src_stride = cm->mi_params.mi_stride;
-  for (int y = 0; y < y_mis; y++) {
-    for (int x = 0; x < x_mis; x++) {
+  for (int y = 0; y < y_inside_boundary; y++) {
+    for (int x = 0; x < x_inside_boundary; x++) {
       dst_submi[y * dst_stride + x] = *xd->submi[y * src_stride + x];
     }
   }
@@ -1341,12 +1341,12 @@ void update_submi(MACROBLOCKD *const xd, const AV1_COMMON *cm,
   const int bh = mi_size_high[bsize];
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
-  const int x_mis = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
-  const int y_mis = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
+  const int x_inside_boundary = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
+  const int y_inside_boundary = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
   const int src_stride = MAX_MIB_SIZE;
   const int dst_stride = cm->mi_params.mi_stride;
-  for (int y = 0; y < y_mis; y++) {
-    for (int x = 0; x < x_mis; x++) {
+  for (int y = 0; y < y_inside_boundary; y++) {
+    for (int x = 0; x < x_inside_boundary; x++) {
       *xd->submi[y * dst_stride + x] = src_submi[y * src_stride + x];
     }
   }

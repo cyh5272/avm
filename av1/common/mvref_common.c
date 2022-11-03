@@ -4151,11 +4151,11 @@ void span_submv(const AV1_COMMON *cm, SUBMB_INFO **submi, int mi_row,
                 int mi_col, BLOCK_SIZE bsize) {
   const int bw = mi_size_wide[bsize];
   const int bh = mi_size_high[bsize];
-  const int x_mis = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
-  const int y_mis = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
+  const int x_inside_boundary = AOMMIN(bw, cm->mi_params.mi_cols - mi_col);
+  const int y_inside_boundary = AOMMIN(bh, cm->mi_params.mi_rows - mi_row);
   const int stride = cm->mi_params.mi_stride;
-  for (int y = 0; y < y_mis; y++) {
-    for (int x = 0; x < x_mis; x++) {
+  for (int y = 0; y < y_inside_boundary; y++) {
+    for (int x = 0; x < x_inside_boundary; x++) {
       if (x == 0 && y == 0) continue;
       submi[y * stride + x]->mv[0] = submi[0]->mv[0];
       submi[y * stride + x]->mv[1] = submi[0]->mv[1];
