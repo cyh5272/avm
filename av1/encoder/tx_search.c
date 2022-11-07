@@ -1955,6 +1955,7 @@ static AOM_INLINE void get_mean_dev_features(int bd, const int16_t *data,
   }
 }
 
+#if !CONFIG_NEW_TX_PARTITION
 static int ml_predict_tx_split(MACROBLOCK *x, BLOCK_SIZE bsize, int blk_row,
                                int blk_col, TX_SIZE tx_size) {
   const NN_CONFIG *nn_config = av1_tx_split_nnconfig_map[tx_size];
@@ -1977,6 +1978,7 @@ static int ml_predict_tx_split(MACROBLOCK *x, BLOCK_SIZE bsize, int blk_row,
   int int_score = (int)(score * 10000);
   return clamp(int_score, -80000, 80000);
 }
+#endif  // !CONFIG_NEW_TX_PARTITION
 
 static INLINE uint16_t
 get_tx_mask(const AV1_COMP *cpi, MACROBLOCK *x, int plane, int block,
@@ -2987,6 +2989,92 @@ static AOM_INLINE void try_tx_block_split(
 #endif  // !CONFIG_NEW_TX_PARTITION
 
 #if CONFIG_NEW_TX_PARTITION
+static INLINE int valid_tx_part_types(TX_SIZE max_tx_size) {
+  if (max_tx_size == TX_4X4) return 1;
+  switch (max_tx_size) {
+    case TX_4X8:
+    case TX_8X4:
+    case TX_4X16:
+    case TX_16X4:
+    case TX_8X32:
+    case TX_32X8:
+    case TX_16X64:
+    case TX_64X16: return 2;
+    default: return 4;
+  }
+}
+
+static void ml_prune_tx_partitions(MACROBLOCK *x, BLOCK_SIZE bsize, int blk_row,
+                                   int blk_col, TX_SIZE tx_size,
+                                   int *skip_tx_part) {
+  const NN_CONFIG *nn_config = av1_tx_split_nnconfig_map[tx_size];
+  const int diff_stride = block_size_wide[bsize];
+  const int16_t *diff =
+      x->plane[0].src_diff + 4 * blk_row * diff_stride + 4 * blk_col;
+  const int bw = tx_size_wide[tx_size];
+  const int bh = tx_size_high[tx_size];
+  const int valid_tx_partitions = valid_tx_part_types(tx_size);
+  aom_clear_system_state();
+
+  float features[12] = { 0.0f };
+  get_mean_dev_features(x->e_mbd.bd, diff, diff_stride, bw, bh, features);
+
+  float scores[TX_PARTITION_TYPES] = { 0.0f };
+  float probs[TX_PARTITION_TYPES] = { 0.0f };
+  av1_nn_predict(features, nn_config, 1, scores);
+  av1_nn_softmax(scores, probs, valid_tx_partitions);
+
+  float max_prob = probs[0];
+  int idx_max_prob = 0;
+  for (int i = 0; i < valid_tx_partitions; ++i) {
+    if (probs[i] > max_prob) {
+      max_prob = probs[i];
+      idx_max_prob = i;
+    }
+    if (probs[i] < 0.05) {
+      skip_tx_part[i] = 1;
+    }
+  }
+
+  if (valid_tx_partitions == 2) {
+    if (max_prob > 0.9) {
+      const int is_tall_block = tx_size_high[tx_size] > tx_size_wide[tx_size];
+      TX_PARTITION_TYPE alter_tx_part =
+          is_tall_block ? TX_PARTITION_HORZ : TX_PARTITION_VERT;
+      if (idx_max_prob == 0)
+        skip_tx_part[alter_tx_part] = 1;
+      else
+        skip_tx_part[TX_PARTITION_NONE] = 1;
+    }
+  } else {
+    assert(valid_tx_partitions == 4);
+
+    float sec_max_prob = 0.0f;
+    int idx_sec_max_prob = 0;
+    for (int i = 0; i < valid_tx_partitions; ++i) {
+      if (i == idx_max_prob) continue;
+      if (probs[i] > sec_max_prob) {
+        sec_max_prob = probs[i];
+        idx_sec_max_prob = i;
+      }
+    }
+
+    if (max_prob > 0.9) {
+      for (int i = 0; i < valid_tx_partitions; ++i) {
+        if (i == idx_max_prob) continue;
+        skip_tx_part[i] = 1;
+      }
+    } else if ((max_prob + sec_max_prob) > 0.9) {
+      for (int i = 0; i < valid_tx_partitions; ++i) {
+        if (i == idx_max_prob || i == idx_sec_max_prob) continue;
+        skip_tx_part[i] = 1;
+      }
+    }
+  }
+
+  aom_clear_system_state();
+}
+
 // Search for the best tx partition type for a given luma block.
 static void select_tx_partition_type(
     const AV1_COMP *cpi, MACROBLOCK *x, int blk_row, int blk_col, int block,
@@ -3011,9 +3099,6 @@ static void select_tx_partition_type(
   const int mi_width = mi_size_wide[plane_bsize];
   const int mi_height = mi_size_high[plane_bsize];
   const int is_rect = is_rect_tx(max_tx_size);
-  const int txw = tx_size_wide[max_tx_size];
-  const int txh = tx_size_high[max_tx_size];
-  const int is_vert_rect = (txh > txw);
   assert(max_tx_size < TX_SIZES_ALL);
   TX_SIZE sub_txs[MAX_TX_PARTITIONS] = { 0 };
 
@@ -3024,30 +3109,30 @@ static void select_tx_partition_type(
   uint8_t full_blk_skip[MAX_TX_PARTITIONS] = { 0 };
 
   // TODO(sarahparker) Add back all of the tx search speed features.
-  const int threshold = cpi->sf.tx_sf.tx_type_search.ml_tx_split_thresh;
-  const int threshold_horzvert =
-      cpi->sf.tx_sf.tx_type_search.ml_tx_split_horzvert_thresh;
-  const int try_ml_predict_tx_split =
-      x->e_mbd.bd == 8 && max_tx_size > TX_4X4 && threshold >= 0;
-  int split_score = INT_MAX;
+  const int try_ml_predict_tx_split = max_tx_size > TX_4X4;
+  int skip_tx_part[TX_PARTITION_TYPES] = { 0 };
   if (try_ml_predict_tx_split) {
-    split_score =
-        ml_predict_tx_split(x, plane_bsize, blk_row, blk_col, max_tx_size);
+    ml_prune_tx_partitions(x, plane_bsize, blk_row, blk_col, max_tx_size,
+                           skip_tx_part);
   }
   for (TX_PARTITION_TYPE type = 0; type < TX_PARTITION_TYPES; ++type) {
     // Skip any illegal partitions for this block size
     if (!use_tx_partition(type, max_tx_size)) continue;
     // int ml_tx_split_horzvert_thresh;
     // ML based speed feature to skip searching for split transform blocks.
-    if (try_ml_predict_tx_split) {
-      if (((!is_rect && type == TX_PARTITION_SPLIT) ||
-           (is_rect && is_vert_rect && type == TX_PARTITION_HORZ) ||
-           (is_rect && !is_vert_rect && type == TX_PARTITION_VERT))) {
-        if (split_score < -threshold) continue;
-      }
-      if ((type == TX_PARTITION_HORZ || type == TX_PARTITION_VERT) &&
-          split_score < -threshold_horzvert)
-        continue;
+    // For reference: old logic for tx split pruning
+    // if (try_ml_predict_tx_split) {
+    //   if (((!is_rect && type == TX_PARTITION_SPLIT) ||
+    //        (is_rect && is_vert_rect && type == TX_PARTITION_HORZ) ||
+    //        (is_rect && !is_vert_rect && type == TX_PARTITION_VERT))) {
+    //     if (split_score < -threshold) continue;
+    //   }
+    //   if ((type == TX_PARTITION_HORZ || type == TX_PARTITION_VERT) &&
+    //       split_score < -threshold_horzvert)
+    //     continue;
+    // }
+    if (type != TX_PARTITION_NONE) {
+      if (skip_tx_part[type]) continue;
     }
 
     RD_STATS partition_rd_stats;
@@ -3138,6 +3223,13 @@ static void select_tx_partition_type(
       memcpy(rd_stats, &partition_rd_stats, sizeof(*rd_stats));
       memcpy(full_blk_skip, this_blk_skip,
              sizeof(*this_blk_skip) * MAX_TX_PARTITIONS);
+    }
+
+    // Early termination based on rd of NONE mode
+    if (type == TX_PARTITION_NONE && tmp_rd != INT64_MAX) {
+      if (cpi->sf.tx_sf.txb_split_cap) {
+        if (p->eobs[block] == 0) break;
+      }
     }
   }
 
