@@ -1319,10 +1319,10 @@ static AOM_INLINE void av1_enc_setup_tip_frame(AV1_COMP *cpi) {
 #if CONFIG_PAR_HIDING
 static void av1_enc_setup_ph_frame(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
-  if (cm->features.coded_lossless || !cm->seq_params.enable_ph)
-    cm->features.allow_ph = false;
+  if (cm->features.coded_lossless || !cm->seq_params.enable_parity_hiding)
+    cm->features.allow_parity_hiding = false;
   else
-    cm->features.allow_ph = true;
+    cm->features.allow_parity_hiding = true;
 }
 #endif  // CONFIG_PAR_HIDING
 

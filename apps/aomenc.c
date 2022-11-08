@@ -468,7 +468,7 @@ const arg_def_t *av1_key_val_args[] = {
   &g_av1_codec_arg_defs.enable_joint_mvd,
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_PAR_HIDING
-  &g_av1_codec_arg_defs.enable_ph,
+  &g_av1_codec_arg_defs.enable_parity_hiding,
 #endif  // CONFIG_PAR_HIDING
   NULL,
 };
@@ -672,7 +672,7 @@ static void init_config(cfg_options_t *config) {
   config->enable_refmvbank = 1;
 #endif
 #if CONFIG_PAR_HIDING
-  config->enable_ph = 1;
+  config->enable_parity_hiding = 1;
 #endif  // CONFIG_PAR_HIDING
 }
 
@@ -1564,7 +1564,7 @@ static void show_stream_config(struct stream_state *stream,
           "IntraBC (%d)\n",
           encoder_cfg->enable_palette,
 #if CONFIG_PAR_HIDING
-          encoder_cfg->enable_ph,
+          encoder_cfg->enable_parity_hiding,
 #endif  // CONFIG_PAR_HIDING
 #if CONFIG_IBC_SR_EXT
           encoder_cfg->enable_intrabc_ext,

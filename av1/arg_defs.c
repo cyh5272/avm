@@ -724,9 +724,9 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
                               "1: true)"),
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  .enable_ph = ARG_DEF(NULL, "enable-ph", 1,
-                       "Enable parity hiding "
-                       "(0:false), 1:true (default)"),
+  .enable_parity_hiding = ARG_DEF(NULL, "enable-parity-hiding", 1,
+                                  "Enable parity hiding "
+                                  "(0:false), 1:true (default)"),
 #endif  // CONFIG_PAR_HIDING
   .frame_hash_metadata = ARG_DEF_ENUM(
       NULL, "frame-hash", 1,

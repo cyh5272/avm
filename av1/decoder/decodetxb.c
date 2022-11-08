@@ -358,11 +358,13 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
 #endif  // CONFIG_FORWARDSKIP
 
 #if CONFIG_PAR_HIDING
-static INLINE tran_low_t read_coeff_hiden(aom_reader *r, TX_CLASS tx_class,
-                                          const int16_t *scan, int bwl,
-                                          uint8_t *levels, int parity,
-                                          base_cdf_arr base_cdf_ph,
-                                          br_cdf_arr br_cdf_ph) {
+// This function returns the partial absolute level of the coefficient
+// with hidden parity.
+static INLINE tran_low_t read_coeff_hidden(aom_reader *r, TX_CLASS tx_class,
+                                           const int16_t *scan, int bwl,
+                                           uint8_t *levels, int parity,
+                                           base_cdf_arr base_cdf_ph,
+                                           br_cdf_arr br_cdf_ph) {
   int q_index;
   const int pos = scan[0];
   int ctx_idx = get_base_ctx_ph(levels, pos, bwl, tx_class);
@@ -637,8 +639,9 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     levels[get_padded_idx(pos, bwl)] = level;
   }
 #if CONFIG_PAR_HIDING
-  bool enable_ph = cm->features.allow_ph && !xd->lossless[mbmi->segment_id] &&
-                   plane == PLANE_TYPE_Y && get_primary_tx_type(tx_type) < IDTX;
+  bool enable_parity_hiding =
+      cm->features.allow_parity_hiding && !xd->lossless[mbmi->segment_id] &&
+      plane == PLANE_TYPE_Y && get_primary_tx_type(tx_type) < IDTX;
   int num_nz = 0, sum_abs1 = 0;
   bool is_hidden = false;
 #endif  // CONFIG_PAR_HIDING
@@ -658,9 +661,9 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #if CONFIG_PAR_HIDING
     if (tx_class == TX_CLASS_2D) {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse_2d(r, 1, *eob - 1 - 1, scan, bwl, levels, base_lf_cdf,
+      read_coeffs_reverse_2d(r, 1, *eob - 2, scan, bwl, levels, base_lf_cdf,
                              br_lf_cdf, plane, base_cdf, br_cdf);
-      if (enable_ph) {
+      if (enable_parity_hiding) {
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
@@ -673,16 +676,16 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         is_hidden = num_nz >= PHTHRESH;
       }
       if (is_hidden) {
-        read_coeff_hiden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
-                         ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
+        read_coeff_hidden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
+                          ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
       } else {
         read_coeffs_reverse(r, tx_class, 0, 0, scan, bwl, levels, base_lf_cdf,
                             br_lf_cdf, plane, base_cdf, br_cdf);
       }
 #else
-      read_coeffs_reverse_2d(r, tx_size, 1, *eob - 1 - 1, scan, bwl, levels,
+      read_coeffs_reverse_2d(r, tx_size, 1, *eob - 2, scan, bwl, levels,
                              base_cdf, br_cdf);
-      if (enable_ph) {
+      if (enable_parity_hiding) {
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level = levels[get_padded_idx(pos, bwl)];
@@ -695,8 +698,8 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         is_hidden = num_nz >= PHTHRESH;
       }
       if (is_hidden) {
-        read_coeff_hiden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
-                         ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
+        read_coeff_hidden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
+                          ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
       } else {
         read_coeffs_reverse(r, tx_size, tx_class, 0, 0, scan, bwl, levels,
                             base_cdf, br_cdf);
@@ -704,9 +707,9 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_ATC_COEFCODING
     } else {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse(r, tx_class, 1, *eob - 1 - 1, scan, bwl, levels,
+      read_coeffs_reverse(r, tx_class, 1, *eob - 2, scan, bwl, levels,
                           base_lf_cdf, br_lf_cdf, plane, base_cdf, br_cdf);
-      if (enable_ph) {
+      if (enable_parity_hiding) {
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
@@ -719,16 +722,16 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         is_hidden = num_nz >= PHTHRESH;
       }
       if (is_hidden) {
-        read_coeff_hiden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
-                         ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
+        read_coeff_hidden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
+                          ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
       } else {
         read_coeffs_reverse(r, tx_class, 0, 0, scan, bwl, levels, base_lf_cdf,
                             br_lf_cdf, plane, base_cdf, br_cdf);
       }
 #else
-      read_coeffs_reverse(r, tx_size, tx_class, 1, *eob - 1 - 1, scan, bwl,
-                          levels, base_cdf, br_cdf);
-      if (enable_ph) {
+      read_coeffs_reverse(r, tx_size, tx_class, 1, *eob - 2, scan, bwl, levels,
+                          base_cdf, br_cdf);
+      if (enable_parity_hiding) {
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
@@ -741,8 +744,8 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         is_hidden = num_nz >= PHTHRESH;
       }
       if (is_hidden) {
-        read_coeff_hiden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
-                         ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
+        read_coeff_hidden(r, tx_class, scan, bwl, levels, (sum_abs1 & 1),
+                          ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
       } else {
         read_coeffs_reverse(r, tx_size, tx_class, 0, 0, scan, bwl, levels,
                             base_cdf, br_cdf);
@@ -752,23 +755,23 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #else
     if (tx_class == TX_CLASS_2D) {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse_2d(r, 1, *eob - 1 - 1, scan, bwl, levels, base_lf_cdf,
+      read_coeffs_reverse_2d(r, 1, *eob - 2, scan, bwl, levels, base_lf_cdf,
                              br_lf_cdf, plane, base_cdf, br_cdf);
       read_coeffs_reverse(r, tx_class, 0, 0, scan, bwl, levels, base_lf_cdf,
                           br_lf_cdf, plane, base_cdf, br_cdf);
 #else
-      read_coeffs_reverse_2d(r, tx_size, 1, *eob - 1 - 1, scan, bwl, levels,
+      read_coeffs_reverse_2d(r, tx_size, 1, *eob - 2, scan, bwl, levels,
                              base_cdf, br_cdf);
       read_coeffs_reverse(r, tx_size, tx_class, 0, 0, scan, bwl, levels,
                           base_cdf, br_cdf);
 #endif  // CONFIG_ATC_COEFCODING
     } else {
 #if CONFIG_ATC_COEFCODING
-      read_coeffs_reverse(r, tx_class, 0, *eob - 1 - 1, scan, bwl, levels,
+      read_coeffs_reverse(r, tx_class, 0, *eob - 2, scan, bwl, levels,
                           base_lf_cdf, br_lf_cdf, plane, base_cdf, br_cdf);
 #else
-      read_coeffs_reverse(r, tx_size, tx_class, 0, *eob - 1 - 1, scan, bwl,
-                          levels, base_cdf, br_cdf);
+      read_coeffs_reverse(r, tx_size, tx_class, 0, *eob - 2, scan, bwl, levels,
+                          base_cdf, br_cdf);
 #endif  // CONFIG_ATC_COEFCODING
     }
 #endif  // CONFIG_PAR_HIDING

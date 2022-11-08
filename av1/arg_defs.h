@@ -262,7 +262,7 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  arg_def_t enable_ph;
+  arg_def_t enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
 #endif  // CONFIG_AV1_ENCODER
   arg_def_t frame_hash_metadata;

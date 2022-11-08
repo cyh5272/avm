@@ -3903,7 +3903,7 @@ static AOM_INLINE void write_sequence_header_beyond_av1(
 #endif  // CONFIG_ADAPTIVE_DS_FILTER
 
 #if CONFIG_PAR_HIDING
-  aom_wb_write_bit(wb, seq_params->enable_ph);
+  aom_wb_write_bit(wb, seq_params->enable_parity_hiding);
 #endif  // CONFIG_PAR_HIDING
 }
 
@@ -4498,9 +4498,9 @@ static AOM_INLINE void write_uncompressed_header_obu(
 
 #if CONFIG_PAR_HIDING
   if (features->coded_lossless)
-    assert(features->allow_ph == false);
+    assert(features->allow_parity_hiding == false);
   else
-    aom_wb_write_bit(wb, features->allow_ph);
+    aom_wb_write_bit(wb, features->allow_parity_hiding);
 #endif  // CONFIG_PAR_HIDING
 
   // Write TX mode

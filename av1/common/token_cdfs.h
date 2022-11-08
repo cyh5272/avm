@@ -6551,7 +6551,7 @@ static const aom_cdf_prob av1_default_coeff_base_eob_multi_cdfs
 #if CONFIG_PAR_HIDING
 static const aom_cdf_prob
     av1_default_coeff_base_ph_cdfs[TOKEN_CDF_Q_CTXS][COEFF_BASE_PH_CONTEXTS]
-                                  [CDF_SIZE(4)] = {
+                                  [CDF_SIZE(NUM_BASE_LEVELS + 2)] = {
                                     { { AOM_CDF4(8192, 16384, 24576) },
                                       { AOM_CDF4(8192, 16384, 24576) },
                                       { AOM_CDF4(8192, 16384, 24576) },
@@ -6576,7 +6576,7 @@ static const aom_cdf_prob
 
 static const aom_cdf_prob
     av1_default_coeff_br_ph_cdfs[TOKEN_CDF_Q_CTXS][COEFF_BR_PH_CONTEXTS]
-                                [CDF_SIZE(4)] = {
+                                [CDF_SIZE(BR_CDF_SIZE)] = {
                                   { { AOM_CDF4(8192, 16384, 24576) },
                                     { AOM_CDF4(8192, 16384, 24576) },
                                     { AOM_CDF4(8192, 16384, 24576) },

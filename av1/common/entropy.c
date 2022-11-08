@@ -339,7 +339,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 
 #endif  // CONFIG_FLEX_MVRES
 #if CONFIG_PAR_HIDING
-  RESET_CDF_COUNTER(fc->coeff_base_ph_cdf, 4);
-  RESET_CDF_COUNTER(fc->coeff_br_ph_cdf, 4);
+  RESET_CDF_COUNTER(fc->coeff_base_ph_cdf, NUM_BASE_LEVELS + 2);
+  RESET_CDF_COUNTER(fc->coeff_br_ph_cdf, BR_CDF_SIZE);
 #endif  // CONFIG_PAR_HIDING
 }

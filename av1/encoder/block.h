@@ -167,9 +167,10 @@ typedef struct {
 #endif  // CONFIG_ATC_COEFCODING
 #if CONFIG_PAR_HIDING
   //! Cost for encoding the base level of a parity-hidden coefficient
-  int base_ph[COEFF_BASE_PH_CONTEXTS][4];
+  int base_ph_cost[COEFF_BASE_PH_CONTEXTS][4];
   //! Cost for encoding an increment to the parity-hidden coefficient
-  int br_ph[COEFF_BR_PH_CONTEXTS][COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
+  int lps_ph_cost[COEFF_BR_PH_CONTEXTS]
+                 [COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
 #endif
   /*! \brief Cost for encoding the base_eob of a level.
    *

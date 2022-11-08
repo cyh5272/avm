@@ -875,7 +875,7 @@ typedef struct {
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_PAR_HIDING
   // Indicates if parity hiding should be enabled
-  bool enable_ph;
+  bool enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
   // Indicates what frame hash metadata to write
   unsigned int frame_hash_metadata;

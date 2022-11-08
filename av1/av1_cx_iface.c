@@ -214,7 +214,7 @@ struct av1_extracfg {
   int enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  int enable_ph;
+  int enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
 };
 
@@ -521,7 +521,7 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable_refmvbank
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  1,    // enable_ph
+  1,    // enable_parity_hiding
 #endif  // CONFIG_PAR_HIDING
 };
 
@@ -959,7 +959,7 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_refmvbank = extra_cfg->enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  cfg->enable_ph = extra_cfg->enable_ph;
+  cfg->enable_parity_hiding = extra_cfg->enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
 }
 
@@ -1053,7 +1053,7 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
   extra_cfg->enable_refmvbank = cfg->enable_refmvbank;
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  extra_cfg->enable_ph = cfg->enable_ph;
+  extra_cfg->enable_parity_hiding = cfg->enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
 }
 
@@ -1299,7 +1299,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
                                      : AOM_OPFL_REFINE_NONE;
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 #if CONFIG_PAR_HIDING
-  tool_cfg->enable_ph = extra_cfg->enable_ph;
+  tool_cfg->enable_parity_hiding = extra_cfg->enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
   // Set Quantization related configuration.
   q_cfg->using_qm = extra_cfg->enable_qm;
@@ -3836,9 +3836,9 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
     extra_cfg.enable_refmvbank = arg_parse_int_helper(&arg, err_string);
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_ph, argv,
-                              err_string)) {
-    extra_cfg.enable_ph = arg_parse_uint_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_parity_hiding,
+                              argv, err_string)) {
+    extra_cfg.enable_parity_hiding = arg_parse_uint_helper(&arg, err_string);
 #endif  // CONFIG_PAR_HIDING
   } else {
     match = 0;

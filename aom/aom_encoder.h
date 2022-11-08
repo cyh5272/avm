@@ -484,7 +484,7 @@ typedef struct cfg_options {
   /*!\brief enable parity hiding for coefficients coding
    *
    */
-  unsigned int enable_ph;
+  unsigned int enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
 } cfg_options_t;
 

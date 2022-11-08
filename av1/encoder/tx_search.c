@@ -1139,11 +1139,13 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       }
 #if CONFIG_PAR_HIDING
       else {
-        bool trellis_ph =
-            cm->features.allow_ph && !xd->lossless[mbmi->segment_id] &&
-            plane == PLANE_TYPE_Y && get_primary_tx_type(best_tx_type) < IDTX;
-        if (trellis_ph)
-          av1_ph_trellis_off(cpi, x, plane, block, tx_size, best_tx_type);
+        bool enable_parity_hiding = cm->features.allow_parity_hiding &&
+                                    !xd->lossless[mbmi->segment_id] &&
+                                    plane == PLANE_TYPE_Y &&
+                                    get_primary_tx_type(best_tx_type) < IDTX;
+        if (enable_parity_hiding)
+          parity_hiding_trellis_off(cpi, x, plane, block, tx_size,
+                                    best_tx_type);
       }
 #endif
     }
@@ -2612,11 +2614,12 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
                        &rate_cost);
       } else {
 #if CONFIG_PAR_HIDING
-        bool trellis_ph =
-            cm->features.allow_ph && !xd->lossless[mbmi->segment_id] &&
-            plane == PLANE_TYPE_Y && get_primary_tx_type(tx_type) < IDTX;
-        if (trellis_ph)
-          av1_ph_trellis_off(cpi, x, plane, block, tx_size, tx_type);
+        bool enable_parity_hiding = cm->features.allow_parity_hiding &&
+                                    !xd->lossless[mbmi->segment_id] &&
+                                    plane == PLANE_TYPE_Y &&
+                                    get_primary_tx_type(tx_type) < IDTX;
+        if (enable_parity_hiding)
+          parity_hiding_trellis_off(cpi, x, plane, block, tx_size, tx_type);
 #endif
 
         rate_cost = cost_coeffs(
