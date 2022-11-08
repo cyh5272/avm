@@ -330,6 +330,47 @@ static AOM_INLINE void derive_ref_mv_candidate_from_tip_mode(
 }
 #endif  // CONFIG_TIP
 
+#if CONFIG_C076_INTER_MOD_CTX
+static AOM_INLINE void add_ref_mv_candidate_ctx(
+    const MB_MODE_INFO *const candidate, uint8_t *ref_match_count,
+    uint8_t *newmv_count, const AV1_COMMON *cm, const MV_REFERENCE_FRAME rf[2],
+    const MB_MODE_INFO *mbmi) {
+  if (!is_inter_block(candidate, SHARED_PART)) return;
+#if CONFIG_TIP
+  const TIP *tip_ref = &cm->tip_ref;
+#endif  // CONFIG_TIP
+  if (mbmi->skip_mode) return;
+  if (rf[1] == NONE_FRAME) {
+    // single reference frame
+    for (int ref = 0; ref < 2; ++ref) {
+      if (candidate->ref_frame[ref] == rf[0]) {
+        if (have_newmv_in_inter_mode(candidate->mode)) ++*newmv_count;
+        ++*ref_match_count;
+      }
+    }
+  } else {
+#if CONFIG_TIP
+    if (is_tip_ref_frame(candidate->ref_frame[0]) &&
+        candidate->ref_frame[1] == NONE_FRAME &&
+        rf[0] == tip_ref->ref_frame[0] && rf[1] == tip_ref->ref_frame[1] &&
+        cm->features.tip_frame_mode) {
+      if (have_newmv_in_inter_mode(candidate->mode)) ++*newmv_count;
+      ++*ref_match_count;
+    } else {
+#endif  // CONFIG_TIP
+      // compound reference frame
+      if (candidate->ref_frame[0] == rf[0] &&
+          candidate->ref_frame[1] == rf[1]) {
+        if (have_newmv_in_inter_mode(candidate->mode)) ++*newmv_count;
+        ++*ref_match_count;
+      }
+    }
+#if CONFIG_TIP
+  }
+#endif  // CONFIG_TIP
+}
+#endif  // CONFIG_C076_INTER_MOD_CTX
+
 static AOM_INLINE void add_ref_mv_candidate(
 #if CONFIG_TIP
 #if !CONFIG_SMVP_IMPROVEMENT
@@ -1034,6 +1075,25 @@ static AOM_INLINE void scan_col_mbmi(
     i += len;
   }
 }
+
+#if CONFIG_C076_INTER_MOD_CTX
+static AOM_INLINE void scan_blk_mbmi_ctx(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, const int mi_row,
+    const int mi_col, const MV_REFERENCE_FRAME rf[2], int row_offset,
+    int col_offset, uint8_t *ref_match_count, uint8_t *newmv_count) {
+  const TileInfo *const tile = &xd->tile;
+  POSITION mi_pos;
+
+  mi_pos.row = row_offset;
+  mi_pos.col = col_offset;
+  if (is_inside(tile, mi_col, mi_row, &mi_pos)) {
+    const MB_MODE_INFO *const candidate =
+        xd->mi[mi_pos.row * xd->mi_stride + mi_pos.col];
+    add_ref_mv_candidate_ctx(candidate, ref_match_count, newmv_count, cm, rf,
+                             xd->mi[0]);
+  }
+}
+#endif  // CONFIG_C076_INTER_MOD_CTX
 
 static AOM_INLINE void scan_blk_mbmi(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, const int mi_row,
@@ -2533,6 +2593,47 @@ void av1_initialize_warp_wrl_list(
   }
 }
 #endif  // CONFIG_WARP_REF_LIST
+
+#if CONFIG_C076_INTER_MOD_CTX
+void find_mode_ctx(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                   int16_t *mode_context, MV_REFERENCE_FRAME ref_frame) {
+  const int mi_row = xd->mi_row;
+  const int mi_col = xd->mi_col;
+  MV_REFERENCE_FRAME rf[2];
+
+  av1_set_ref_frame(rf, ref_frame);
+  mode_context[ref_frame] = 0;
+
+  uint8_t col_match_count = 0;
+  uint8_t row_match_count = 0;
+  uint8_t newmv_count = 0;
+
+  if (xd->left_available) {
+    scan_blk_mbmi_ctx(cm, xd, mi_row, mi_col, rf, (xd->height - 1), -1,
+                      &col_match_count, &newmv_count);
+  }
+  if (xd->up_available) {
+    scan_blk_mbmi_ctx(cm, xd, mi_row, mi_col, rf, -1, (xd->width - 1),
+                      &row_match_count, &newmv_count);
+  }
+  if (xd->left_available) {
+    scan_blk_mbmi_ctx(cm, xd, mi_row, mi_col, rf, 0, -1, &col_match_count,
+                      &newmv_count);
+  }
+  if (xd->up_available) {
+    scan_blk_mbmi_ctx(cm, xd, mi_row, mi_col, rf, -1, 0, &row_match_count,
+                      &newmv_count);
+  }
+
+  const uint8_t nearest_match = (row_match_count > 0) + (col_match_count > 0);
+
+  // These contexts are independent of the outer area search
+  int new_ctx = 2 * nearest_match + (newmv_count > 0);
+  int ref_ctx = 2 * nearest_match + (newmv_count < 3);
+  mode_context[ref_frame] |= new_ctx;
+  mode_context[ref_frame] |= (ref_ctx << REFMV_OFFSET);
+}
+#endif  // CONFIG_C076_INTER_MOD_CTX
 
 void av1_find_mv_refs(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, MB_MODE_INFO *mi,

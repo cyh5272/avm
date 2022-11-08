@@ -343,11 +343,13 @@ static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
 }
 #endif  // CONFIG_NEW_REF_SIGNALING
 
+#if !CONFIG_C076_INTER_MOD_CTX
 static uint16_t compound_mode_ctx_map[3][COMP_NEWMV_CTXS] = {
   { 0, 1, 1, 1, 1 },
   { 1, 2, 3, 4, 4 },
   { 4, 4, 5, 6, 7 },
 };
+#endif  // !CONFIG_C076_INTER_MOD_CTX
 
 static INLINE int16_t av1_mode_context_pristine(
     const int16_t *const mode_context, const MV_REFERENCE_FRAME *const rf) {
@@ -362,11 +364,15 @@ static INLINE int16_t av1_mode_context_analyzer(
   if (!is_inter_ref_frame(rf[1])) return mode_context[ref_frame];
 
   const int16_t newmv_ctx = mode_context[ref_frame] & NEWMV_CTX_MASK;
+#if CONFIG_C076_INTER_MOD_CTX
+  const int16_t comp_ctx = newmv_ctx;
+#else
   const int16_t refmv_ctx =
       (mode_context[ref_frame] >> REFMV_OFFSET) & REFMV_CTX_MASK;
 
   const int16_t comp_ctx = compound_mode_ctx_map[refmv_ctx >> 1][AOMMIN(
       newmv_ctx, COMP_NEWMV_CTXS - 1)];
+#endif  // CONFIG_C076_INTER_MOD_CTX
   return comp_ctx;
 }
 
@@ -452,6 +458,10 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
 // The global_mvs output parameter points to an array of REF_FRAMES elements.
 // The caller may pass a null global_mvs if it does not need the global_mvs
 // output.
+#if CONFIG_C076_INTER_MOD_CTX
+void find_mode_ctx(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                   int16_t *mode_context, MV_REFERENCE_FRAME ref_frame);
+#endif  // CONFIG_C076_INTER_MOD_CTX
 void av1_find_mv_refs(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, MB_MODE_INFO *mi,
     MV_REFERENCE_FRAME ref_frame, uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
