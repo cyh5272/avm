@@ -188,11 +188,18 @@ void av1_get_ref_frames(AV1_COMMON *const cm, int cur_frame_disp,
 
 #if CONFIG_TIP
 static INLINE int get_tip_ctx(const MACROBLOCKD *xd) {
-  int ctx;
+  int ctx = 0;
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int has_above = (above_mbmi != NULL);
+  const int has_left = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
   const int has_above = xd->up_available;
   const int has_left = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   if (has_above && has_left) {
     ctx = is_tip_ref_frame(above_mbmi->ref_frame[0]) +
@@ -303,8 +310,13 @@ static INLINE int get_comp_group_idx_context(const AV1_COMMON *cm,
                                   cur_frame_index, bck_frame_index));
   const int offset = (fwd == bck);
 
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
   int above_ctx = 0, left_ctx = 0;
 
   if (above_mi) {
@@ -336,16 +348,26 @@ static INLINE aom_cdf_prob *av1_get_pred_cdf_seg_id(
 }
 
 static INLINE int av1_get_skip_mode_context(const MACROBLOCKD *xd) {
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
   const int above_skip_mode = above_mi ? above_mi->skip_mode : 0;
   const int left_skip_mode = left_mi ? left_mi->skip_mode : 0;
   return above_skip_mode + left_skip_mode;
 }
 
 static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
   const int above_skip_txfm =
       above_mi ? above_mi->skip_txfm[xd->tree_type == CHROMA_PART] : 0;
   const int left_skip_txfm =
@@ -360,6 +382,24 @@ static INLINE int av1_get_skip_txfm_context(const MACROBLOCKD *xd) {
   return above_skip_txfm + left_skip_txfm;
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 }
+
+#if CONFIG_NEW_CONTEXT_MODELING
+static INLINE int get_intrabc_ctx(const MACROBLOCKD *xd) {
+  const MB_MODE_INFO *const neighbor1_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const neighbor2_mi = xd->neighbors[1];
+
+  int ctx = 0;
+  if (neighbor1_mi && neighbor2_mi) {
+    ctx = is_intrabc_block(neighbor1_mi, xd->tree_type) +
+          is_intrabc_block(neighbor2_mi, xd->tree_type);
+  } else if (neighbor1_mi || neighbor2_mi) {
+    const MB_MODE_INFO *neighbor = neighbor1_mi ? neighbor1_mi : neighbor2_mi;
+    ctx = is_intrabc_block(neighbor, xd->tree_type);
+  }
+
+  return ctx;
+}
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
 int av1_get_pred_context_switchable_interp(const MACROBLOCKD *xd, int dir);
 
@@ -376,8 +416,13 @@ static INLINE int av1_get_palette_bsize_ctx(BLOCK_SIZE bsize) {
 }
 
 static INLINE int av1_get_palette_mode_ctx(const MACROBLOCKD *xd) {
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
   int ctx = 0;
   if (above_mi) ctx += (above_mi->palette_mode_info.palette_size[0] > 0);
   if (left_mi) ctx += (left_mi->palette_mode_info.palette_size[0] > 0);
@@ -573,15 +618,21 @@ static INLINE aom_cdf_prob *av1_get_pred_cdf_single_ref_p6(
 // The prediction flags in these dummy entries are initialized to 0.
 static INLINE int get_tx_size_context(const MACROBLOCKD *xd) {
   const MB_MODE_INFO *mbmi = xd->mi[0];
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int has_above = (above_mbmi != NULL);
+  const int has_left = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
+  const int has_above = xd->up_available;
+  const int has_left = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
   const TX_SIZE max_tx_size =
       max_txsize_rect_lookup[mbmi->sb_type[PLANE_TYPE_Y]];
   const int max_tx_wide = tx_size_wide[max_tx_size];
   const int max_tx_high = tx_size_high[max_tx_size];
-  const int has_above = xd->up_available;
-  const int has_left = xd->left_available;
-
   int above = xd->above_txfm_context[0] >= max_tx_wide;
   int left = xd->left_txfm_context[0] >= max_tx_high;
 

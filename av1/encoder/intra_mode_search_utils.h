@@ -216,8 +216,13 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
           use_filter_intra) <= 1);
 #if CONFIG_FORWARDSKIP
   const int use_fsc = mbmi->fsc_mode[PLANE_TYPE_Y];
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 #endif  // CONFIG_FORWARDSKIP
   const int try_palette =
       av1_allow_palette(cpi->common.features.allow_screen_content_tools,
@@ -277,8 +282,14 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
     }
   }
 #endif  // !CONFIG_AIMC
-  if (av1_allow_intrabc(&cpi->common) && xd->tree_type != CHROMA_PART)
+  if (av1_allow_intrabc(&cpi->common) && xd->tree_type != CHROMA_PART) {
+#if CONFIG_NEW_CONTEXT_MODELING
+    const int intrabc_ctx = get_intrabc_ctx(xd);
+    total_rate += mode_costs->intrabc_cost[intrabc_ctx][use_intrabc];
+#else
     total_rate += mode_costs->intrabc_cost[use_intrabc];
+#endif  // CONFIG_NEW_CONTEXT_MODELING
+  }
   return total_rate;
 }
 

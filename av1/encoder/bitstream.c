@@ -1638,8 +1638,13 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   const PREDICTION_MODE mode = mbmi->mode;
 #if CONFIG_FORWARDSKIP
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
   const MB_MODE_INFO *const above_mi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 #endif  // CONFIG_FORWARDSKIP
   const BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
 #if !CONFIG_AIMC
@@ -1660,8 +1665,13 @@ static AOM_INLINE void write_intra_prediction_modes(AV1_COMP *cpi,
 #else
     if (is_keyframe) {
 #if !CONFIG_FORWARDSKIP
+#if CONFIG_NEW_CONTEXT_MODELING
+      const MB_MODE_INFO *const above_mi = xd->neighbors[0];
+      const MB_MODE_INFO *const left_mi = xd->neighbors[1];
+#else
       const MB_MODE_INFO *const above_mi = xd->above_mbmi;
       const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 #endif  // CONFIG_FORWARDSKIP
       write_intra_y_mode_kf(ec_ctx, mbmi, above_mi, left_mi, mode, w);
     } else {
@@ -2142,7 +2152,13 @@ static AOM_INLINE void write_intrabc_info(
   int use_intrabc = is_intrabc_block(mbmi, xd->tree_type);
   if (xd->tree_type == CHROMA_PART) assert(use_intrabc == 0);
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
+#if CONFIG_NEW_CONTEXT_MODELING
+  const int intrabc_ctx = get_intrabc_ctx(xd);
+  aom_write_symbol(w, use_intrabc, ec_ctx->intrabc_cdf[intrabc_ctx], 2);
+#else
   aom_write_symbol(w, use_intrabc, ec_ctx->intrabc_cdf, 2);
+#endif  // CONFIG_NEW_CONTEXT_MODELING
+
   if (use_intrabc) {
     assert(mbmi->mode == DC_PRED);
     assert(mbmi->motion_mode == SIMPLE_TRANSLATION);

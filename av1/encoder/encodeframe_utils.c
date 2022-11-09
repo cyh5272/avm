@@ -438,8 +438,13 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
   if (xd->tree_type != CHROMA_PART) {
 #if !CONFIG_AIMC || CONFIG_FORWARDSKIP
     const int intraonly = frame_is_intra_only(cm);
+#if CONFIG_NEW_CONTEXT_MODELING
+    const MB_MODE_INFO *above_mi = xd->neighbors[0];
+    const MB_MODE_INFO *left_mi = xd->neighbors[1];
+#else
     const MB_MODE_INFO *above_mi = xd->above_mbmi;
     const MB_MODE_INFO *left_mi = xd->left_mbmi;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 #endif  // !CONFIG_AIMC || CONFIG_FORWARDSKIP
 #if CONFIG_AIMC
     const int context = get_y_mode_idx_ctx(xd);

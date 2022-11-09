@@ -1063,10 +1063,18 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   }
   if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
     const int use_intrabc = is_intrabc_block(mbmi, xd->tree_type);
+#if CONFIG_NEW_CONTEXT_MODELING
+    const int intrabc_ctx = get_intrabc_ctx(xd);
+    update_cdf(fc->intrabc_cdf[intrabc_ctx], use_intrabc, 2);
+#if CONFIG_ENTROPY_STATS
+    ++td->counts->intrabc[intrabc_ctx][use_intrabc];
+#endif  // CONFIG_ENTROPY_STATS
+#else
     update_cdf(fc->intrabc_cdf, use_intrabc, 2);
 #if CONFIG_ENTROPY_STATS
     ++td->counts->intrabc[use_intrabc];
 #endif  // CONFIG_ENTROPY_STATS
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 #if CONFIG_BVCOST_UPDATE
     if (use_intrabc) {
       const int_mv ref_mv = mbmi_ext->ref_mv_stack[INTRA_FRAME][0].this_mv;

@@ -560,10 +560,17 @@ int av1_get_palette_cache(const MACROBLOCKD *const xd, int plane,
 // 2 - intra/--, --/intra
 // 3 - intra/intra
 int av1_get_intra_inter_context(const MACROBLOCKD *xd) {
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int has_above = (above_mbmi != NULL);
+  const int has_left = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
   const int has_above = xd->up_available;
   const int has_left = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   if (has_above && has_left) {  // both edges available
     const int above_intra = !is_inter_block(above_mbmi, xd->tree_type);
@@ -590,10 +597,17 @@ int av1_get_reference_mode_context(const AV1_COMMON *cm,
                                    const MACROBLOCKD *xd) {
   (void)cm;
   int ctx;
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int has_above = (above_mbmi != NULL);
+  const int has_left = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
   const int has_above = xd->up_available;
   const int has_left = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   // Note:
   // The mode info data structure has a one element border above and to the
@@ -657,10 +671,17 @@ int av1_get_ref_pred_context(const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref,
 #else
 int av1_get_comp_reference_type_context(const MACROBLOCKD *xd) {
   int pred_context;
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int above_in_image = (above_mbmi != NULL);
+  const int left_in_image = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
   const int above_in_image = xd->up_available;
   const int left_in_image = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   if (above_in_image && left_in_image) {  // both edges available
     const int above_intra = !is_inter_block(above_mbmi, xd->tree_type);

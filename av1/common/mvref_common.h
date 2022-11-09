@@ -430,11 +430,17 @@ static INLINE void av1_collect_neighbors_ref_counts(MACROBLOCKD *const xd) {
   av1_zero(xd->neighbors_ref_counts);
 
   uint8_t *const ref_counts = xd->neighbors_ref_counts;
-
+#if CONFIG_NEW_CONTEXT_MODELING
+  const MB_MODE_INFO *const above_mbmi = xd->neighbors[0];
+  const MB_MODE_INFO *const left_mbmi = xd->neighbors[1];
+  const int above_in_image = (above_mbmi != NULL);
+  const int left_in_image = (left_mbmi != NULL);
+#else
   const MB_MODE_INFO *const above_mbmi = xd->above_mbmi;
   const MB_MODE_INFO *const left_mbmi = xd->left_mbmi;
   const int above_in_image = xd->up_available;
   const int left_in_image = xd->left_available;
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   // Above neighbor
   if (above_in_image &&

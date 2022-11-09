@@ -2011,6 +2011,36 @@ static INLINE void set_plane_n4(MACROBLOCKD *const xd, int bw, int bh,
   }
 }
 
+#if CONFIG_NEW_CONTEXT_MODELING
+static INLINE void fetch_spatial_neighbors(MACROBLOCKD *xd) {
+  // Scan from bottom left->above right->left->above
+  for (int i = 0; i < MAX_NUM_NEIGHBORS; ++i) {
+    xd->neighbors[i] = NULL;
+  }
+
+  int index = 0;
+  if (xd->bottom_left_mbmi) {
+    xd->neighbors[index++] = xd->bottom_left_mbmi;
+    if (index >= MAX_NUM_NEIGHBORS) return;
+  }
+
+  if (xd->above_right_mbmi) {
+    xd->neighbors[index++] = xd->above_right_mbmi;
+    if (index >= MAX_NUM_NEIGHBORS) return;
+  }
+
+  if (xd->left_mbmi) {
+    xd->neighbors[index++] = xd->left_mbmi;
+    if (index >= MAX_NUM_NEIGHBORS) return;
+  }
+
+  if (xd->above_mbmi) {
+    xd->neighbors[index++] = xd->above_mbmi;
+    if (index >= MAX_NUM_NEIGHBORS) return;
+  }
+}
+#endif  // CONFIG_NEW_CONTEXT_MODELING
+
 static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
                                   int mi_row, int bh, int mi_col, int bw,
                                   int mi_rows, int mi_cols) {
@@ -2047,7 +2077,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
     xd->left_mbmi = NULL;
   }
 
-#if CONFIG_AIMC
+#if CONFIG_AIMC || CONFIG_NEW_CONTEXT_MODELING
   if (xd->up_available) {
     xd->above_right_mbmi = xd->mi[-xd->mi_stride + bw - 1];
   } else {
@@ -2058,7 +2088,11 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
   } else {
     xd->bottom_left_mbmi = NULL;
   }
-#endif  // CONFIG_AIMC
+#endif  // CONFIG_AIMC || CONFIG_NEW_CONTEXT_MODELING
+
+#if CONFIG_NEW_CONTEXT_MODELING
+  fetch_spatial_neighbors(xd);
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   const int chroma_ref = ((mi_row & 0x01) || !(bh & 0x01) || !ss_y) &&
                          ((mi_col & 0x01) || !(bw & 0x01) || !ss_x);
