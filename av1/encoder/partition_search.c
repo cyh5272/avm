@@ -2091,6 +2091,13 @@ static PARTITION_TYPE get_preset_partition(const AV1_COMMON *cm, int plane_type,
                                            int mi_row, int mi_col,
                                            BLOCK_SIZE bsize,
                                            PARTITION_TREE *ptree) {
+#if CONFIG_EXT_RECUR_PARTITIONS
+  PARTITION_TYPE implied_partition;
+  const bool is_part_implied = is_partition_implied(
+      &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
+  if (is_part_implied) return implied_partition;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+
   if (ptree) return ptree->partition;
   if (bsize >= BLOCK_8X8) {
     return get_partition(cm, plane_type, mi_row, mi_col, bsize);
