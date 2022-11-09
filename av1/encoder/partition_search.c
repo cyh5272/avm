@@ -1633,7 +1633,6 @@ static void update_partition_stats(MACROBLOCKD *const xd,
                                    const int mi_col, BLOCK_SIZE bsize,
                                    const int ctx) {
   const int plane_index = xd->tree_type == CHROMA_PART;
-  if (bsize == BLOCK_8X8 && plane_index > 0) return;
 
 #if CONFIG_EXT_RECUR_PARTITIONS
   if (should_chroma_track_luma_partition(xd->tree_type, ptree_luma, bsize)) {
@@ -1714,22 +1713,29 @@ static void update_partition_stats(MACROBLOCKD *const xd,
     }
   }
 #else  // CONFIG_EXT_RECUR_PARTITIONS
-  int luma_split_flag = 0;
-  int parent_block_width = block_size_wide[bsize];
-  if (xd->tree_type == CHROMA_PART && parent_block_width >= SHARED_PART_SIZE) {
-    luma_split_flag = get_luma_split_flag(bsize, mi_params, mi_row, mi_col);
-  }
-  if (luma_split_flag <= 3) {
-#if CONFIG_ENTROPY_STATS
-    counts->partition[plane_index][ctx][partition]++;
-#endif  // CONFIG_ENTROPY_STATS
-    if (allow_update_cdf) {
-      update_cdf(fc->partition_cdf[plane_index][ctx], partition,
-                 partition_cdf_length(bsize));
+  const int hbs_w = mi_size_wide[bsize] / 2;
+  const int hbs_h = mi_size_high[bsize] / 2;
+  const int has_rows = (mi_row + hbs_h) < mi_params->mi_rows;
+  const int has_cols = (mi_col + hbs_w) < mi_params->mi_cols;
+  if (has_rows && has_cols) {
+    int luma_split_flag = 0;
+    int parent_block_width = block_size_wide[bsize];
+    if (xd->tree_type == CHROMA_PART &&
+        parent_block_width >= SHARED_PART_SIZE) {
+      luma_split_flag = get_luma_split_flag(bsize, mi_params, mi_row, mi_col);
     }
-  } else {
-    // if luma blocks uses smaller blocks, then chroma will also split
-    assert(partition == PARTITION_SPLIT);
+    if (luma_split_flag <= 3) {
+#if CONFIG_ENTROPY_STATS
+      counts->partition[plane_index][ctx][partition]++;
+#endif  // CONFIG_ENTROPY_STATS
+      if (allow_update_cdf) {
+        update_cdf(fc->partition_cdf[plane_index][ctx], partition,
+                   partition_cdf_length(bsize));
+      }
+    } else {
+      // if luma blocks uses smaller blocks, then chroma will also split
+      assert(partition == PARTITION_SPLIT);
+    }
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 }
