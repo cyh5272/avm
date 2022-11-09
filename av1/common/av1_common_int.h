@@ -2464,11 +2464,11 @@ static AOM_INLINE bool should_chroma_track_luma_partition(
   return true;
 }
 
-// Returns true if partition is implied (e.g. for blocks near bottom/right
-// border) and not signaled in the bistream. And when it returns true, it also
+// Returns true if partition is implied for blocks near bottom/right
+// border, and not signaled in the bistream. And when it returns true, it also
 // sets `implied_partition` appropriately.
 // Note: `implied_partition` can be passed NULL.
-static AOM_INLINE bool is_partition_implied(
+static AOM_INLINE bool is_partition_implied_at_boundary(
     const CommonModeInfoParams *const mi_params, int mi_row, int mi_col,
     BLOCK_SIZE bsize, PARTITION_TYPE *implied_partition) {
   bool is_implied = false;
@@ -2479,7 +2479,7 @@ static AOM_INLINE bool is_partition_implied(
   const int has_rows = (mi_row + hbs_h) < mi_params->mi_rows;
   const int has_cols = (mi_col + hbs_w) < mi_params->mi_cols;
 
-  if (has_rows && has_cols) return false;
+  if (has_rows && has_cols) return false;  // Not at boundary.
   assert(!has_rows || !has_cols);
 
   if (is_square_block(bsize)) {

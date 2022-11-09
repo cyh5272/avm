@@ -1840,7 +1840,7 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   }
 
   PARTITION_TYPE implied_partition;
-  const bool is_part_implied = is_partition_implied(
+  const bool is_part_implied = is_partition_implied_at_boundary(
       &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
   if (is_part_implied) return implied_partition;
   assert(has_rows && has_cols);

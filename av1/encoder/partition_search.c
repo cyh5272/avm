@@ -1647,8 +1647,8 @@ static void update_partition_stats(MACROBLOCKD *const xd,
   }
 
   PARTITION_TYPE implied_partition;
-  const bool is_part_implied = is_partition_implied(mi_params, mi_row, mi_col,
-                                                    bsize, &implied_partition);
+  const bool is_part_implied = is_partition_implied_at_boundary(
+      mi_params, mi_row, mi_col, bsize, &implied_partition);
   if (is_part_implied) {
     assert(partition == implied_partition &&
            "Partition doesn't match the implied partition at boundary.");
@@ -2099,7 +2099,7 @@ static PARTITION_TYPE get_preset_partition(const AV1_COMMON *cm, int plane_type,
                                            PARTITION_TREE *ptree) {
 #if CONFIG_EXT_RECUR_PARTITIONS
   PARTITION_TYPE implied_partition;
-  const bool is_part_implied = is_partition_implied(
+  const bool is_part_implied = is_partition_implied_at_boundary(
       &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
   if (is_part_implied) return implied_partition;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -2579,8 +2579,8 @@ static AOM_INLINE void init_allowed_partitions(
 
   // Boundary Handling
   PARTITION_TYPE implied_partition;
-  const bool is_part_implied = is_partition_implied(mi_params, mi_row, mi_col,
-                                                    bsize, &implied_partition);
+  const bool is_part_implied = is_partition_implied_at_boundary(
+      mi_params, mi_row, mi_col, bsize, &implied_partition);
   if (is_part_implied) {
     part_search_state->partition_none_allowed = false;
     if (implied_partition == PARTITION_HORZ) {
@@ -2803,9 +2803,9 @@ static void set_partition_cost_for_edge_blk(
     PartitionSearchState *part_search_state) {
 #if CONFIG_EXT_RECUR_PARTITIONS
   const PartitionBlkParams *blk_params = &part_search_state->part_blk_params;
-  const bool is_part_implied =
-      is_partition_implied(&cm->mi_params, blk_params->mi_row,
-                           blk_params->mi_col, blk_params->bsize, NULL);
+  const bool is_part_implied = is_partition_implied_at_boundary(
+      &cm->mi_params, blk_params->mi_row, blk_params->mi_col, blk_params->bsize,
+      NULL);
   if (is_part_implied) {
     for (int i = 0; i < PARTITION_TYPES; ++i) {
       part_search_state->tmp_partition_cost[i] = 0;
@@ -5016,8 +5016,8 @@ BEGIN_PARTITION_SEARCH:
 #endif  // !CONFIG_EXT_RECUR_PARTITIONS
 
 #if CONFIG_EXT_RECUR_PARTITIONS
-  const int ext_partition_allowed =
-      !is_partition_implied(&cm->mi_params, mi_row, mi_col, bsize, NULL);
+  const int ext_partition_allowed = !is_partition_implied_at_boundary(
+      &cm->mi_params, mi_row, mi_col, bsize, NULL);
   const int partition_3_allowed =
       ext_partition_allowed && bsize != BLOCK_128X128;
   const int is_wide_block = block_size_wide[bsize] > block_size_high[bsize];
