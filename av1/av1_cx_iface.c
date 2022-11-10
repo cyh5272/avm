@@ -4100,6 +4100,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #if CONFIG_TIP
         1,
 #endif  // CONFIG_TIP
+#if CONFIG_BAWP
+        1,
+#endif  // CONFIG_BAWP
 #if CONFIG_FORWARDSKIP
         1,
 #endif  // CONFIG_FORWARDSKIP
