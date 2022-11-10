@@ -453,10 +453,10 @@ typedef struct MB_MODE_INFO {
   /*! \brief The block level bawp enabling flag*/
   int8_t bawp_flag;
   /*! \brief The bawp parameters weight*/
-  int16_t bawp_alpha[3][2];  //[yuv][ref0/1]
+  int16_t bawp_alpha[3][2];  //[yuv][ref0/1], current only [0][0] is used.
   /*! \brief The bawp parameters offset*/
-  int32_t bawp_beta[3][2];  //[yuv][ref0/1]
-#endif
+  int32_t bawp_beta[3][2];  //[yuv][ref0/1], current only [0][0] is used.
+#endif                      // CONFIG_BAWP
   /**@}*/
 
   /*****************************************************************************
@@ -2174,7 +2174,7 @@ static INLINE int is_interintra_allowed(const MB_MODE_INFO *mbmi) {
          is_interintra_allowed_ref(mbmi->ref_frame)
 #if CONFIG_BAWP
          && mbmi->bawp_flag != 1
-#endif
+#endif  // CONFIG_BAWP
       ;
 }
 
@@ -2245,7 +2245,7 @@ static INLINE int av1_allow_bawp(const MB_MODE_INFO *mbmi) {
   else
     return 0;
 }
-#endif
+#endif  // CONFIG_BAWP
 
 static INLINE int av1_allow_palette(int allow_screen_content_tools,
                                     BLOCK_SIZE sb_type) {

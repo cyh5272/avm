@@ -1195,7 +1195,7 @@ static const aom_cdf_prob default_obmc_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)] = {
 
 #if CONFIG_BAWP
 static const aom_cdf_prob default_bawp_cdf[CDF_SIZE(2)] = { AOM_CDF2(23664) };
-#endif
+#endif  // CONFIG_BAWP
 
 #if CONFIG_CONTEXT_DERIVATION
 #if CONFIG_NEW_CONTEXT_MODELING
@@ -2370,7 +2370,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
 #endif  // CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
 #if CONFIG_BAWP
   av1_copy(fc->bawp_cdf, default_bawp_cdf);
-#endif
+#endif  // CONFIG_BAWP
 #if CONFIG_OPTFLOW_REFINEMENT
   av1_copy(fc->use_optflow_cdf, default_use_optflow_cdf);
 #endif  // CONFIG_OPTFLOW_REFINEMENT

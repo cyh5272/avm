@@ -3099,7 +3099,7 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
 
 #if CONFIG_BAWP
   if (mbmi->bawp_flag == 1) return allowed_motion_modes;
-#endif
+#endif  // CONFIG_BAWP
 
   bool interintra_allowed =
       cm->current_frame.reference_mode != COMPOUND_REFERENCE &&
@@ -3243,7 +3243,7 @@ static INLINE MOTION_MODE motion_mode_allowed(const AV1_COMMON *cm,
   }
 #if CONFIG_BAWP
   if (mbmi->bawp_flag == 1) return SIMPLE_TRANSLATION;
-#endif
+#endif  // CONFIG_BAWP
 
 #if CONFIG_TIP
   if (is_tip_ref_frame(mbmi->ref_frame[0])) return SIMPLE_TRANSLATION;

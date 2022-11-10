@@ -1355,7 +1355,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #if CONFIG_BAWP
       if (cm->features.enable_bawp && av1_allow_bawp(mbmi))
         update_cdf(fc->bawp_cdf, mbmi->bawp_flag == 1, 2);
-#endif
+#endif  // CONFIG_BAWP
 #if CONFIG_EXTENDED_WARP_PREDICTION
       const int allowed_motion_modes = motion_mode_allowed(
           cm, xd, mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]], mbmi);

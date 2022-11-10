@@ -1428,11 +1428,9 @@ void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
     nor += der / 16;
     der += der / 16;
 
-#if 1  // debug_point, when 0, beta only.
     if (nor && der)
       mbmi->bawp_alpha[plane][ref] = resolve_divisor_32_CfL(nor, der, shift);
     else
-#endif
       mbmi->bawp_alpha[plane][ref] = 1 << shift;
     mbmi->bawp_beta[plane][ref] =
         ((sum_y << shift) - sum_x * mbmi->bawp_alpha[plane][ref]) / count;
@@ -1495,7 +1493,7 @@ void av1_build_one_bawp_inter_predictor(
     // the picture boundary limitation to be checked.
     struct macroblockd_plane *const pd = &xd->plane[plane];
     const int ref_stride = pd->pre[ref].stride;
-    const uint16_t *ref_buf = pd->pre[ref].buf + y_off * ref_stride + x_off;
+    uint16_t *ref_buf = pd->pre[ref].buf + y_off * ref_stride + x_off;
     uint16_t *ref_top = ref_buf - BAWP_REF_LINES * ref_stride;
     uint16_t *ref_left = ref_buf - BAWP_REF_LINES;
 
@@ -1512,7 +1510,7 @@ void av1_build_one_bawp_inter_predictor(
     }
   }
 }
-#endif
+#endif  // CONFIG_BAWP
 
 // True if the following hold:
 //  1. Not intrabc and not build_for_obmc
@@ -1622,8 +1620,8 @@ static void build_inter_predictors_8x8_and_bigger(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, MB_MODE_INFO *mi,
 #if CONFIG_BAWP
     const BUFFER_SET *dst_orig,
-#endif
-    int build_for_obmc, int bw, int bh, int mi_x, int mi_y, uint8_t **mc_buf,
+#endif  // CONFIG_BAWP
+    int build_for_obmc, int bw, int bh, int mi_x, int mi_y, uint16_t **mc_buf,
     CalcSubpelParamsFunc calc_subpel_params_func) {
   const int is_compound = has_second_ref(mi);
   const int is_intrabc = is_intrabc_block(mi, xd->tree_type);
@@ -1778,7 +1776,7 @@ static void build_inter_predictors_8x8_and_bigger(
           bh, mi_x, mi_y, ref, plane, mc_buf, calc_subpel_params_func);
       continue;
     }
-#endif
+#endif  // CONFIG_BAWP
     av1_build_one_inter_predictor(dst, dst_buf->stride, &mv, &inter_pred_params,
                                   xd, mi_x, mi_y, ref, mc_buf,
                                   calc_subpel_params_func);
@@ -1791,7 +1789,7 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                 const BUFFER_SET *dst_orig,
 #endif
                                 int build_for_obmc, int bw, int bh, int mi_x,
-                                int mi_y, uint8_t **mc_buf,
+                                int mi_y, uint16_t **mc_buf,
                                 CalcSubpelParamsFunc calc_subpel_params_func) {
   if (is_sub8x8_inter(xd, plane, mi->sb_type[PLANE_TYPE_Y],
                       is_intrabc_block(mi, xd->tree_type), build_for_obmc)) {
