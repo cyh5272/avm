@@ -5358,7 +5358,7 @@ void av1_read_color_config(struct aom_read_bit_buffer *rb,
           if (seq_params->subsampling_x)
             seq_params->subsampling_y = aom_rb_read_bit(rb);  // 422 or 420
           else
-            seq_params->subsampling_y = 0;                    // 444
+            seq_params->subsampling_y = 0;  // 444
         } else {
           // 422
           seq_params->subsampling_x = 1;
@@ -6102,7 +6102,7 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   if (current_frame->frame_type == KEY_FRAME) {
     if (!cm->show_frame) {  // unshown keyframe (forward keyframe)
       current_frame->refresh_frame_flags = aom_rb_read_literal(rb, REF_FRAMES);
-    } else {                // shown keyframe
+    } else {  // shown keyframe
       current_frame->refresh_frame_flags = (1 << REF_FRAMES) - 1;
     }
 
@@ -6254,9 +6254,9 @@ static int read_uncompressed_header(AV1Decoder *pbi,
             aom_rb_read_primitive_quniform(
                 rb, MAX_MAX_DRL_BITS - MIN_MAX_DRL_BITS + 1) +
             MIN_MAX_DRL_BITS;
-#endif                                  // CONFIG_BVP_IMPROVEMENT
+#endif  // CONFIG_BVP_IMPROVEMENT
       }
-#endif                                  // CONFIG_IBC_SR_EXT
+#endif  // CONFIG_IBC_SR_EXT
 
     } else if (pbi->need_resync != 1) { /* Skip if need resync */
 #if CONFIG_NEW_REF_SIGNALING
@@ -7058,7 +7058,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
                                                cm->use_quadtree, cm->use_cnn,
                                                cm->cnn_indices);
       }
-#else   // CONFIG_CNN_GUIDED_QUADTREE
+#else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
                                cm->cnn_indices);
 #endif
@@ -7096,7 +7096,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
                                                cm->use_quadtree, cm->use_cnn,
                                                cm->cnn_indices);
       }
-#else   // CONFIG_CNN_GUIDED_QUADTREE
+#else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
                                cm->cnn_indices);
 #endif
