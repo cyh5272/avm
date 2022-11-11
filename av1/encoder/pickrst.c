@@ -192,7 +192,7 @@ typedef struct RstUnitStats {
   int64_t real_sse;
   int ru_idx;  // debug.
 } RstUnitStats;
-#endif         // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_WIENER_NONSEP
 
 #if CONFIG_RST_MERGECOEFFS
 typedef struct RstUnitSnapshot {
