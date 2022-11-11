@@ -157,10 +157,11 @@ typedef struct {
   SgrprojInfoBank sgrproj_bank;
 #if CONFIG_WIENER_NONSEP
   WienerNonsepInfoBank wienerns_bank;
-  // Vector stroing statistics for all RUs.
+
+  // Vector storing statistics for all RUs.
   Vector *wienerns_stats;
 
-  // If !=0 search_wienerns computes statistics and quick returns.
+  // If !=0 search_wienerns computes statistics and quick-returns.
   int compute_stats_and_return;
 
   // Helps convert tile-localized RU indices to frame RU indices.
@@ -3428,18 +3429,11 @@ static int compute_quantized_wienerns_filter(
   const int stride_A = WIENERNS_MAX * WIENERNS_MAX;
   const int total_dim_b = num_classes * WIENERNS_MAX;
   const int stride_b = WIENERNS_MAX;
-#if CONFIG_COMBINE_PC_NS_WIENER
-  const int bank_index =
-      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
-  const uint8_t *pc_wiener_sub_classify =
-      get_pc_wiener_sub_classifier(num_classes, bank_index);
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
 
   double solver_x[WIENERNS_MAX_CLASSES * WIENERNS_MAX];
   int is_uv = (rui->plane != AOM_PLANE_Y);
   const int num_feat = nsfilter_params->ncoeffs;
 
-  // calculate real_sse
   int ret = 0;
   WienerNonsepInfo best = { 0 };
   best.num_classes = num_classes;
