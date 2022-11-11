@@ -2052,35 +2052,96 @@ static void build_one_split_tree(AV1_COMMON *const cm, int mi_row, int mi_col,
   assert(block_size_high[bsize] == block_size_wide[bsize]);
   if (mi_row >= cm->mi_params.mi_rows || mi_col >= cm->mi_params.mi_cols)
     return;
-  if (bsize == BLOCK_4X4 || bsize == final_bsize) {
+  if (bsize == BLOCK_4X4) {
     ptree->partition = PARTITION_NONE;
     return;
   }
 
+  // Handle boundary for first partition.
+  PARTITION_TYPE implied_first_partition;
+  const bool is_first_part_implied = is_partition_implied_at_boundary(
+      &cm->mi_params, mi_row, mi_col, bsize, &implied_first_partition);
+
+  if (!is_first_part_implied &&
+      (block_size_wide[bsize] <= block_size_wide[final_bsize]) &&
+      (block_size_high[bsize] <= block_size_high[final_bsize])) {
+    ptree->partition = PARTITION_NONE;
+    return;
+  }
+
+  // In general, we simulate SPLIT partition as HORZ followed by VERT partition.
+  // But in case first partition is implied to be VERT, we are forced to use
+  // VERT followed by HORZ.
+  const PARTITION_TYPE first_partition =
+      is_first_part_implied ? implied_first_partition : PARTITION_HORZ;
+  const PARTITION_TYPE second_partition =
+      (first_partition == PARTITION_HORZ) ? PARTITION_VERT : PARTITION_HORZ;
+
   const int hbs_w = mi_size_wide[bsize] >> 1;
   const int hbs_h = mi_size_high[bsize] >> 1;
+
+#ifndef NDEBUG
+  // Boundary sanity checks for 2nd partitions.
+  {
+    PARTITION_TYPE implied_second_first_partition;
+    const bool is_second_first_part_implied = is_partition_implied_at_boundary(
+        &cm->mi_params, mi_row, mi_col, subsize_lookup[first_partition][bsize],
+        &implied_second_first_partition);
+    assert(IMPLIES(is_second_first_part_implied,
+                   implied_second_first_partition == second_partition));
+  }
+
+  {
+    const int mi_row_second_second =
+        (second_partition == PARTITION_HORZ) ? mi_row + hbs_h : mi_row;
+    const int mi_col_second_second =
+        (second_partition == PARTITION_VERT) ? mi_col + hbs_w : mi_col;
+    PARTITION_TYPE implied_second_second_partition;
+    const bool is_second_second_part_implied = is_partition_implied_at_boundary(
+        &cm->mi_params, mi_row_second_second, mi_col_second_second,
+        subsize_lookup[first_partition][bsize],
+        &implied_second_second_partition);
+    assert(IMPLIES(is_second_second_part_implied,
+                   implied_second_second_partition == second_partition));
+  }
+#endif  // NDEBUG
+
   const BLOCK_SIZE subsize = subsize_lookup[PARTITION_SPLIT][bsize];
 
-  ptree->partition = PARTITION_HORZ;
+  ptree->partition = first_partition;
   ptree->sub_tree[0] = av1_alloc_ptree_node(ptree, 0);
   ptree->sub_tree[1] = av1_alloc_ptree_node(ptree, 1);
 
-  ptree->sub_tree[0]->partition = PARTITION_VERT;
+  ptree->sub_tree[0]->partition = second_partition;
   ptree->sub_tree[0]->sub_tree[0] = av1_alloc_ptree_node(ptree, 0);
   ptree->sub_tree[0]->sub_tree[1] = av1_alloc_ptree_node(ptree, 1);
 
-  ptree->sub_tree[1]->partition = PARTITION_VERT;
+  ptree->sub_tree[1]->partition = second_partition;
   ptree->sub_tree[1]->sub_tree[0] = av1_alloc_ptree_node(ptree, 0);
   ptree->sub_tree[1]->sub_tree[1] = av1_alloc_ptree_node(ptree, 1);
 
-  build_one_split_tree(cm, mi_row, mi_col, subsize, final_bsize,
-                       ptree->sub_tree[0]->sub_tree[0]);
-  build_one_split_tree(cm, mi_row, mi_col + hbs_w, subsize, final_bsize,
-                       ptree->sub_tree[0]->sub_tree[1]);
-  build_one_split_tree(cm, mi_row + hbs_h, mi_col, subsize, final_bsize,
-                       ptree->sub_tree[1]->sub_tree[0]);
-  build_one_split_tree(cm, mi_row + hbs_h, mi_col + hbs_w, subsize, final_bsize,
-                       ptree->sub_tree[1]->sub_tree[1]);
+  if (first_partition == PARTITION_HORZ) {
+    assert(second_partition == PARTITION_VERT);
+    build_one_split_tree(cm, mi_row, mi_col, subsize, final_bsize,
+                         ptree->sub_tree[0]->sub_tree[0]);
+    build_one_split_tree(cm, mi_row, mi_col + hbs_w, subsize, final_bsize,
+                         ptree->sub_tree[0]->sub_tree[1]);
+    build_one_split_tree(cm, mi_row + hbs_h, mi_col, subsize, final_bsize,
+                         ptree->sub_tree[1]->sub_tree[0]);
+    build_one_split_tree(cm, mi_row + hbs_h, mi_col + hbs_w, subsize,
+                         final_bsize, ptree->sub_tree[1]->sub_tree[1]);
+  } else {
+    assert(first_partition == PARTITION_VERT);
+    assert(second_partition == PARTITION_HORZ);
+    build_one_split_tree(cm, mi_row, mi_col, subsize, final_bsize,
+                         ptree->sub_tree[0]->sub_tree[0]);
+    build_one_split_tree(cm, mi_row + hbs_h, mi_col, subsize, final_bsize,
+                         ptree->sub_tree[0]->sub_tree[1]);
+    build_one_split_tree(cm, mi_row, mi_col + hbs_w, subsize, final_bsize,
+                         ptree->sub_tree[1]->sub_tree[0]);
+    build_one_split_tree(cm, mi_row + hbs_h, mi_col + hbs_w, subsize,
+                         final_bsize, ptree->sub_tree[1]->sub_tree[1]);
+  }
 }
 
 void av1_build_partition_tree_fixed_partitioning(AV1_COMMON *const cm,
@@ -2097,14 +2158,17 @@ static PARTITION_TYPE get_preset_partition(const AV1_COMMON *cm, int plane_type,
                                            int mi_row, int mi_col,
                                            BLOCK_SIZE bsize,
                                            PARTITION_TREE *ptree) {
+  if (ptree) {
+#ifndef NDEBUG
 #if CONFIG_EXT_RECUR_PARTITIONS
-  PARTITION_TYPE implied_partition;
-  const bool is_part_implied = is_partition_implied_at_boundary(
-      &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
-  if (is_part_implied) return implied_partition;
+    PARTITION_TYPE implied_partition;
+    const bool is_part_implied = is_partition_implied_at_boundary(
+        &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
+    assert(IMPLIES(is_part_implied, ptree->partition == implied_partition));
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-
-  if (ptree) return ptree->partition;
+#endif  // NDEBUG
+    return ptree->partition;
+  }
   if (bsize >= BLOCK_8X8) {
     return get_partition(cm, plane_type, mi_row, mi_col, bsize);
   }
