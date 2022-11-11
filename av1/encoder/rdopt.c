@@ -2753,6 +2753,11 @@ static int64_t motion_mode_rd(
       const ModeCosts *mode_costs = &x->mode_costs;
       if (!is_warp_mode(mbmi->motion_mode)) rd_stats->rate += switchable_rate;
 
+#if CONFIG_BAWP
+      if (cm->features.enable_bawp && av1_allow_bawp(mbmi))
+        rd_stats->rate += mode_costs->bawp_flg_cost[mbmi->bawp_flag == 1];
+#endif
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
       MOTION_MODE motion_mode = mbmi->motion_mode;
       bool continue_motion_mode_signaling = true;
@@ -2822,10 +2827,7 @@ static int64_t motion_mode_rd(
           mode_costs->interintra_cost[size_group_lookup[bsize]]
                                      [mbmi->ref_frame[1] == INTRA_FRAME];
     }
-#if CONFIG_BAWP
-    if (cm->features.enable_bawp && av1_allow_bawp(mbmi))
-      rd_stats->rate += mode_costs->bawp_flg_cost[mbmi->bawp_flag == 1];
-#endif
+
     if ((last_motion_mode_allowed > SIMPLE_TRANSLATION) &&
         (mbmi->ref_frame[1] != INTRA_FRAME)) {
       if (last_motion_mode_allowed == WARPED_CAUSAL) {
