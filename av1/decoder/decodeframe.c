@@ -1829,6 +1829,8 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
 #if CONFIG_EXT_RECUR_PARTITIONS
+  (void)has_rows;
+  (void)has_cols;
   const int plane = xd->tree_type == CHROMA_PART;
   if (plane == 1 && bsize == BLOCK_8X8) {
     return PARTITION_NONE;
@@ -1843,9 +1845,6 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   const bool is_part_implied = is_partition_implied_at_boundary(
       &cm->mi_params, mi_row, mi_col, bsize, &implied_partition);
   if (is_part_implied) return implied_partition;
-  assert(has_rows && has_cols);
-  (void)has_rows;
-  (void)has_cols;
 
   const PARTITION_TYPE parent_partition =
       ptree->parent ? ptree->parent->partition : PARTITION_INVALID;
