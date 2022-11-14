@@ -2490,7 +2490,6 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv, int ql,
     ref_for_class[c_id] = ref;
   }
 #else
-  const int ref = 0;
   (void)xd;
 #endif  // CONFIG_RST_MERGECOEFFS
   const WienernsFilterParameters *nsfilter_params =
