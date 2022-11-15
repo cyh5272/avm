@@ -488,8 +488,8 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #else
     if (intraonly) {
 #if CONFIG_ENTROPY_STATS
-      const PREDICTION_MODE above = av1_above_block_mode(above_mi);
-      const PREDICTION_MODE left = av1_left_block_mode(left_mi);
+      const PREDICTION_MODE above = av1_get_block_mode(above_mi);
+      const PREDICTION_MODE left = av1_get_block_mode(left_mi);
       const int above_ctx = intra_mode_context[above];
       const int left_ctx = intra_mode_context[left];
       ++counts->kf_y_mode[above_ctx][left_ctx][y_mode];

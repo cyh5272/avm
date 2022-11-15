@@ -1456,8 +1456,8 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   const MB_MODE_INFO *above_mi = xd->above_mbmi;
   const MB_MODE_INFO *left_mi = xd->left_mbmi;
 #endif  // CONFIG_NEW_CONTEXT_MODELING
-  const PREDICTION_MODE A = av1_above_block_mode(above_mi);
-  const PREDICTION_MODE L = av1_left_block_mode(left_mi);
+  const PREDICTION_MODE A = av1_get_block_mode(above_mi);
+  const PREDICTION_MODE L = av1_get_block_mode(left_mi);
   const int above_ctx = intra_mode_context[A];
   const int left_ctx = intra_mode_context[L];
   bmode_costs = x->mode_costs.y_mode_costs[above_ctx][left_ctx];

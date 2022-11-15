@@ -702,9 +702,7 @@ static INLINE MV_REFERENCE_FRAME comp_ref1(int ref_idx) {
 #if CONFIG_AIMC
 PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi);
 #else
-PREDICTION_MODE av1_left_block_mode(const MB_MODE_INFO *left_mi);
-
-PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi);
+PREDICTION_MODE av1_get_block_mode(const MB_MODE_INFO *mi);
 #endif  // CONFIG_AIMC
 
 static INLINE int is_global_mv_block(const MB_MODE_INFO *const mbmi,

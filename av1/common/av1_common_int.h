@@ -2165,8 +2165,8 @@ static INLINE aom_cdf_prob *get_fsc_mode_cdf(FRAME_CONTEXT *tile_ctx,
 static INLINE aom_cdf_prob *get_y_mode_cdf(FRAME_CONTEXT *tile_ctx,
                                            const MB_MODE_INFO *above_mi,
                                            const MB_MODE_INFO *left_mi) {
-  const PREDICTION_MODE above = av1_above_block_mode(above_mi);
-  const PREDICTION_MODE left = av1_left_block_mode(left_mi);
+  const PREDICTION_MODE above = av1_get_block_mode(above_mi);
+  const PREDICTION_MODE left = av1_get_block_mode(left_mi);
   const int above_ctx = intra_mode_context[above];
   const int left_ctx = intra_mode_context[left];
   return tile_ctx->kf_y_cdf[above_ctx][left_ctx];
