@@ -457,6 +457,11 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
   }
   seq->enable_tip_hole_fill = seq->enable_tip;
 #endif  // CONFIG_TIP
+#if CONFIG_EXT_RECUR_PARTITIONS
+  seq->disable_3way_part_64xn = oxcf->part_cfg.disable_3way_part_64xn;
+  seq->disable_3way_part_32xn = oxcf->part_cfg.disable_3way_part_32xn;
+  seq->disable_3way_part_16xn = oxcf->part_cfg.disable_3way_part_16xn;
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
   seq->enable_masked_compound = oxcf->comp_type_cfg.enable_masked_comp;
