@@ -455,20 +455,25 @@ void av1_copy_frame_mvs(const AV1_COMMON *const cm,
                         const MB_MODE_INFO *const mi, int mi_row, int mi_col,
                         int x_inside_boundary, int y_inside_boundary);
 
+#if CONFIG_C076_INTER_MOD_CTX
+// Scans neighboring blocks for inter mode contexts
+void av1_find_mode_ctx(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                       int16_t *mode_context, MV_REFERENCE_FRAME ref_frame);
+#endif  // CONFIG_C076_INTER_MOD_CTX
+
 // The global_mvs output parameter points to an array of REF_FRAMES elements.
 // The caller may pass a null global_mvs if it does not need the global_mvs
 // output.
-#if CONFIG_C076_INTER_MOD_CTX
-void find_mode_ctx(const AV1_COMMON *cm, const MACROBLOCKD *xd,
-                   int16_t *mode_context, MV_REFERENCE_FRAME ref_frame);
-#endif  // CONFIG_C076_INTER_MOD_CTX
 void av1_find_mv_refs(
     const AV1_COMMON *cm, const MACROBLOCKD *xd, MB_MODE_INFO *mi,
     MV_REFERENCE_FRAME ref_frame, uint8_t ref_mv_count[MODE_CTX_REF_FRAMES],
     CANDIDATE_MV ref_mv_stack[][MAX_REF_MV_STACK_SIZE],
     uint16_t ref_mv_weight[][MAX_REF_MV_STACK_SIZE],
-    int_mv mv_ref_list[][MAX_MV_REF_CANDIDATES], int_mv *global_mvs,
+    int_mv mv_ref_list[][MAX_MV_REF_CANDIDATES], int_mv *global_mvs
+#if !CONFIG_C076_INTER_MOD_CTX
+    ,
     int16_t *mode_context
+#endif  //! CONFIG_C076_INTER_MOD_CTX
 #if CONFIG_WARP_REF_LIST
     ,
     WARP_CANDIDATE warp_param_stack[][MAX_WARP_REF_CANDIDATES],

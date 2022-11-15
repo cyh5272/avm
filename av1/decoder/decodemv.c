@@ -1234,11 +1234,9 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     set_most_probable_mv_precision(cm, mbmi, bsize);
 #endif
 
-#if CONFIG_C076_INTER_MOD_CTX
-    int16_t dummy_inter_mode_ctx[MODE_CTX_REF_FRAMES];
-#else
+#if !CONFIG_C076_INTER_MOD_CTX
     int16_t inter_mode_ctx[MODE_CTX_REF_FRAMES];
-#endif  // CONFIG_C076_INTER_MOD_CTX
+#endif  // !CONFIG_C076_INTER_MOD_CTX
 
     // TODO(kslu): Rework av1_find_mv_refs to avoid having this big array
     // ref_mvs
@@ -1255,12 +1253,11 @@ static void read_intrabc_info(AV1_COMMON *const cm, DecoderCodingBlock *dcb,
 #endif  // CONFIG_BVP_IMPROVEMENT
 
     av1_find_mv_refs(cm, xd, mbmi, INTRA_FRAME, dcb->ref_mv_count,
-                     xd->ref_mv_stack, xd->weight, ref_mvs, /*global_mvs=*/NULL,
-#if CONFIG_C076_INTER_MOD_CTX
-                     dummy_inter_mode_ctx
-#else
+                     xd->ref_mv_stack, xd->weight, ref_mvs, /*global_mvs=*/NULL
+#if !CONFIG_C076_INTER_MOD_CTX
+                     ,
                      inter_mode_ctx
-#endif  // CONFIG_C076_INTER_MOD_CTX
+#endif  // !CONFIG_C076_INTER_MOD_CTX
 #if CONFIG_WARP_REF_LIST
                      ,
                      NULL, 0, NULL
@@ -2548,17 +2545,12 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
                                xd->valid_num_warp_candidates);
 #endif  // CONFIG_WARP_REF_LIST
 
-#if CONFIG_C076_INTER_MOD_CTX
-  int16_t dummy_inter_mode_ctx[MODE_CTX_REF_FRAMES];
-#endif  // CONFIG_C076_INTER_MOD_CTX
-
   av1_find_mv_refs(cm, xd, mbmi, ref_frame, dcb->ref_mv_count, xd->ref_mv_stack,
-                   xd->weight, ref_mvs, /*global_mvs=*/NULL,
-#if CONFIG_C076_INTER_MOD_CTX
-                   dummy_inter_mode_ctx
-#else
+                   xd->weight, ref_mvs, /*global_mvs=*/NULL
+#if !CONFIG_C076_INTER_MOD_CTX
+                   ,
                    inter_mode_ctx
-#endif  // CONFIG_C076_INTER_MOD_CTX
+#endif  // !CONFIG_C076_INTER_MOD_CTX
 #if CONFIG_WARP_REF_LIST
                    ,
                    xd->warp_param_stack,
@@ -2569,7 +2561,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
   );
 
 #if CONFIG_C076_INTER_MOD_CTX
-  find_mode_ctx(cm, xd, inter_mode_ctx, ref_frame);
+  av1_find_mode_ctx(cm, xd, inter_mode_ctx, ref_frame);
 #endif  // CONFIG_C076_INTER_MOD_CTX
 
   mbmi->ref_mv_idx = 0;

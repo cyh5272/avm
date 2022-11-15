@@ -248,7 +248,7 @@ set_aom_config_var(CONFIG_C071_SUBBLK_WARPMV 1
 
 set_aom_config_var(CONFIG_C076_INTER_MOD_CTX 1
                    "AV2 experiment flag to simplify inter mode contexts")
-                   
+
 set_aom_config_var(CONFIG_NEW_CONTEXT_MODELING 1
                    "Enable to improve the context modeling")
 
