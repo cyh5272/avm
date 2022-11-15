@@ -41,9 +41,7 @@ extern "C" {
 
 #define INTERINTRA_WEDGE_SIGN 0
 
-#if CONFIG_NEW_CONTEXT_MODELING
 #define MAX_NUM_NEIGHBORS 2
-#endif  // CONFIG_NEW_CONTEXT_MODELING
 
 /*!\cond */
 
@@ -1060,14 +1058,11 @@ typedef struct macroblockd {
    */
   MB_MODE_INFO *above_right_mbmi;
 #endif  // CONFIG_AIMC || CONFIG_NEW_CONTEXT_MODELING
-#if CONFIG_NEW_CONTEXT_MODELING
   /*!
    * Neighboring blocks' mbmi
-   * Scan from bottom left->above right->left->above
-   * if no available mbmi from the scan order, set to be NULL.
+   * if no available mbmi, set to be NULL.
    */
   MB_MODE_INFO *neighbors[MAX_NUM_NEIGHBORS];
-#endif  //  CONFIG_NEW_CONTEXT_MODELING
   /*!
    * Above chroma reference block if is_chroma_ref == true for the current block
    * and chroma_up_available == true; otherwise NULL.

@@ -1390,15 +1390,6 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
                                        DecoderCodingBlock *dcb, aom_reader *r) {
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
-#if !CONFIG_AIMC || CONFIG_FORWARDSKIP
-#if CONFIG_NEW_CONTEXT_MODELING
-  const MB_MODE_INFO *above_mi = xd->neighbors[0];
-  const MB_MODE_INFO *left_mi = xd->neighbors[1];
-#else
-  const MB_MODE_INFO *above_mi = xd->above_mbmi;
-  const MB_MODE_INFO *left_mi = xd->left_mbmi;
-#endif  // CONFIG_NEW_CONTEXT_MODELING
-#endif  // !CONFIG_AIMC
   const BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
   struct segmentation *const seg = &cm->seg;
 
@@ -1459,19 +1450,18 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
     read_intra_luma_mode(xd, r);
 #if CONFIG_FORWARDSKIP
     if (allow_fsc_intra(cm, xd, bsize, mbmi)) {
-      aom_cdf_prob *fsc_cdf =
-          get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, 1);
+      aom_cdf_prob *fsc_cdf = get_fsc_mode_cdf(xd, bsize, 1);
       mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = read_fsc_mode(r, fsc_cdf);
     } else {
       mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
     }
 #endif  // CONFIG_FORWARDSKIP
 #else
-    mbmi->mode = read_intra_mode(r, get_y_mode_cdf(ec_ctx, above_mi, left_mi));
+    mbmi->mode = read_intra_mode(
+        r, get_y_mode_cdf(ec_ctx, xd->neighbors[0], xd->neighbors[1]));
 #if CONFIG_FORWARDSKIP
     if (allow_fsc_intra(cm, xd, bsize, mbmi)) {
-      aom_cdf_prob *fsc_cdf =
-          get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, 1);
+      aom_cdf_prob *fsc_cdf = get_fsc_mode_cdf(xd, bsize, 1);
       mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = read_fsc_mode(r, fsc_cdf);
     } else {
       mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
@@ -2035,15 +2025,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   read_intra_luma_mode(xd, r);
 #if CONFIG_FORWARDSKIP
   if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
-#if CONFIG_NEW_CONTEXT_MODELING
-    const MB_MODE_INFO *above_mi = xd->neighbors[0];
-    const MB_MODE_INFO *left_mi = xd->neighbors[1];
-#else
-    const MB_MODE_INFO *above_mi = xd->above_mbmi;
-    const MB_MODE_INFO *left_mi = xd->left_mbmi;
-#endif  // CONFIG_NEW_CONTEXT_MODELING
-    aom_cdf_prob *fsc_cdf =
-        get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, 0);
+    aom_cdf_prob *fsc_cdf = get_fsc_mode_cdf(xd, bsize, 0);
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = read_fsc_mode(r, fsc_cdf);
   } else {
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = 0;
@@ -2055,15 +2037,7 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
 
 #if CONFIG_FORWARDSKIP
   if (allow_fsc_intra(cm, xd, bsize, mbmi) && xd->tree_type != CHROMA_PART) {
-#if CONFIG_NEW_CONTEXT_MODELING
-    const MB_MODE_INFO *above_mi = xd->neighbors[0];
-    const MB_MODE_INFO *left_mi = xd->neighbors[1];
-#else
-    const MB_MODE_INFO *above_mi = xd->above_mbmi;
-    const MB_MODE_INFO *left_mi = xd->left_mbmi;
-#endif  // CONFIG_NEW_CONTEXT_MODELING
-    aom_cdf_prob *fsc_cdf =
-        get_fsc_mode_cdf(ec_ctx, above_mi, left_mi, bsize, 0);
+    aom_cdf_prob *fsc_cdf = get_fsc_mode_cdf(xd, bsize, 0);
     mbmi->fsc_mode[xd->tree_type == CHROMA_PART] = read_fsc_mode(r, fsc_cdf);
     if (mbmi->fsc_mode[xd->tree_type == CHROMA_PART]) {
       mbmi->angle_delta[PLANE_TYPE_Y] = 0;

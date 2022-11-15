@@ -2011,7 +2011,6 @@ static INLINE void set_plane_n4(MACROBLOCKD *const xd, int bw, int bh,
   }
 }
 
-#if CONFIG_NEW_CONTEXT_MODELING
 static INLINE void fetch_spatial_neighbors(MACROBLOCKD *xd) {
   // Scan from bottom left->above right->left->above
   for (int i = 0; i < MAX_NUM_NEIGHBORS; ++i) {
@@ -2019,6 +2018,7 @@ static INLINE void fetch_spatial_neighbors(MACROBLOCKD *xd) {
   }
 
   int index = 0;
+#if CONFIG_NEW_CONTEXT_MODELING
   if (xd->bottom_left_mbmi) {
     xd->neighbors[index++] = xd->bottom_left_mbmi;
     if (index >= MAX_NUM_NEIGHBORS) return;
@@ -2028,6 +2028,7 @@ static INLINE void fetch_spatial_neighbors(MACROBLOCKD *xd) {
     xd->neighbors[index++] = xd->above_right_mbmi;
     if (index >= MAX_NUM_NEIGHBORS) return;
   }
+#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   if (xd->left_mbmi) {
     xd->neighbors[index++] = xd->left_mbmi;
@@ -2039,7 +2040,6 @@ static INLINE void fetch_spatial_neighbors(MACROBLOCKD *xd) {
     if (index >= MAX_NUM_NEIGHBORS) return;
   }
 }
-#endif  // CONFIG_NEW_CONTEXT_MODELING
 
 static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
                                   int mi_row, int bh, int mi_col, int bw,
@@ -2090,9 +2090,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
   }
 #endif  // CONFIG_AIMC || CONFIG_NEW_CONTEXT_MODELING
 
-#if CONFIG_NEW_CONTEXT_MODELING
   fetch_spatial_neighbors(xd);
-#endif  // CONFIG_NEW_CONTEXT_MODELING
 
   const int chroma_ref = ((mi_row & 0x01) || !(bh & 0x01) || !ss_y) &&
                          ((mi_col & 0x01) || !(bw & 0x01) || !ss_x);
@@ -2147,29 +2145,45 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
 }
 
 #if CONFIG_FORWARDSKIP
-static INLINE aom_cdf_prob *get_fsc_mode_cdf(FRAME_CONTEXT *tile_ctx,
-                                             const MB_MODE_INFO *above_mi,
-                                             const MB_MODE_INFO *left_mi,
+static INLINE int get_fsc_mode_ctx(const MACROBLOCKD *xd, const int is_key) {
+  int ctx = 0;
+  if (is_key) {
+    for (int i = 0; i < MAX_NUM_NEIGHBORS; ++i) {
+      const MB_MODE_INFO *const neighbor = xd->neighbors[i];
+      if (neighbor != NULL) {
+        ctx += neighbor->fsc_mode[PLANE_TYPE_Y];
+      }
+    }
+  } else {
+    ctx = 3;
+  }
+
+  return ctx;
+}
+
+static INLINE aom_cdf_prob *get_fsc_mode_cdf(const MACROBLOCKD *xd,
                                              const BLOCK_SIZE bsize,
                                              const int is_key) {
+  FRAME_CONTEXT *tile_ctx = xd->tile_ctx;
   const uint8_t fsc_size_group = fsc_bsize_groups[bsize];
   assert(fsc_size_group < FSC_BSIZE_CONTEXTS);
-  const uint8_t fsc_above = (above_mi) ? above_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-  const uint8_t fsc_left = (left_mi) ? left_mi->fsc_mode[PLANE_TYPE_Y] : 0;
-  const int fsc_ctx = is_key ? fsc_above + fsc_left : 3;
-  return tile_ctx->fsc_mode_cdf[fsc_ctx][fsc_size_group];
+  const int ctx = get_fsc_mode_ctx(xd, is_key);
+  return tile_ctx->fsc_mode_cdf[ctx][fsc_size_group];
 }
 #endif  // CONFIG_FORWARDSKIP
 
 #if !CONFIG_AIMC
+static INLINE int get_y_mode_ctx(const MB_MODE_INFO *neighbor) {
+  const PREDICTION_MODE neighbor_mode = av1_get_block_mode(neighbor);
+  return intra_mode_context[neighbor_mode];
+}
+
 static INLINE aom_cdf_prob *get_y_mode_cdf(FRAME_CONTEXT *tile_ctx,
-                                           const MB_MODE_INFO *above_mi,
-                                           const MB_MODE_INFO *left_mi) {
-  const PREDICTION_MODE above = av1_get_block_mode(above_mi);
-  const PREDICTION_MODE left = av1_get_block_mode(left_mi);
-  const int above_ctx = intra_mode_context[above];
-  const int left_ctx = intra_mode_context[left];
-  return tile_ctx->kf_y_cdf[above_ctx][left_ctx];
+                                           const MB_MODE_INFO *neighbor0,
+                                           const MB_MODE_INFO *neighbor1) {
+  const int neighbor0_ctx = get_y_mode_ctx(neighbor0);
+  const int neighbor1_ctx = get_y_mode_ctx(neighbor1);
+  return tile_ctx->kf_y_cdf[neighbor0_ctx][neighbor1_ctx];
 }
 #endif  // !CONFIG_AIMC
 
