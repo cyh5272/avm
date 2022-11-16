@@ -728,7 +728,8 @@ void av1_foreach_rest_unit_in_rutile(
     AV1PixelRect *tile_rect, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
     const RusPerTileHelper *rus_per_tile_helper);
 
-AV1PixelRect av1_whole_frame_rect(const struct AV1Common *cm, int is_uv);
+AV1PixelRect av1_whole_frame_rect(const struct AV1Common *cm, int is_uv,
+                                  int after_cdef);
 AV1PixelRect av1_get_rutile_rect(const struct AV1Common *cm, int is_uv,
                                  int ru_start_row, int ru_end_row,
                                  int ru_start_col, int ru_end_col,
