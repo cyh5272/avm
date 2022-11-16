@@ -843,25 +843,26 @@ static const aom_cdf_prob
       { AOM_CDF2(27632) },  // Not used
       { AOM_CDF2(19443) },  // Not used
       // 16x8, 8x16
-      { AOM_CDF2(20645) }, { AOM_CDF2(13282) }, { AOM_CDF2(17766) },
-      {
-          AOM_CDF2(13067),
-          // 32x16, 16x32
-          { AOM_CDF2(14234) },
-          { AOM_CDF2(7421) },
-          { AOM_CDF2(8692) },
-          { AOM_CDF2(5458) },
-          // 64x32, 32x64
-          { AOM_CDF2(14706) },
-          { AOM_CDF2(6131) },
-          { AOM_CDF2(6588) },
-          { AOM_CDF2(8175) },
-          // 128x64, 64x128
-          { AOM_CDF2(15208) },  // Not used
-          { AOM_CDF2(6597) },   // Not used
-          { AOM_CDF2(9068) },   // Not used
-          { AOM_CDF2(10923) },  // Not used
-      };
+      { AOM_CDF2(20645) },
+      { AOM_CDF2(13282) },
+      { AOM_CDF2(17766) },
+      { AOM_CDF2(13067) },
+      // 32x16, 16x32
+      { AOM_CDF2(14234) },
+      { AOM_CDF2(7421) },
+      { AOM_CDF2(8692) },
+      { AOM_CDF2(5458) },
+      // 64x32, 32x64
+      { AOM_CDF2(14706) },
+      { AOM_CDF2(6131) },
+      { AOM_CDF2(6588) },
+      { AOM_CDF2(8175) },
+      // 128x64, 64x128
+      { AOM_CDF2(15208) },  // Not used
+      { AOM_CDF2(6597) },   // Not used
+      { AOM_CDF2(9068) },   // Not used
+      { AOM_CDF2(10923) },  // Not used
+    };
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
 static const aom_cdf_prob default_intra_ext_tx_cdf
