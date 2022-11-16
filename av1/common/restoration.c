@@ -347,7 +347,7 @@ AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
   int ss_y = is_uv && cm->seq_params.subsampling_y;
 
   rect.top = 0;
-  rect.bottom = ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y);
+  rect.bottom = ROUND_POWER_OF_TWO(cm->height, ss_y);
   rect.left = 0;
   rect.right = ROUND_POWER_OF_TWO(cm->superres_upscaled_width, ss_x);
   return rect;
@@ -437,6 +437,8 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   CHECK_MEM_ERROR(cm, rsi->unit_info,
                   (RestorationUnitInfo *)aom_memalign(
                       16, sizeof(*rsi->unit_info) * nunits));
+  rsi->boundaries.stripe_boundary_above = NULL;
+  rsi->boundaries.stripe_boundary_below = NULL;
 }
 
 void av1_free_restoration_struct(RestorationInfo *rst_info) {
@@ -2822,11 +2824,7 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
                               : mi_size_x;
   const int mi_to_num_y = mi_size_y;
   const int denom_x = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
-#if CONFIG_EXT_SUPERRES
-  const int denom_y = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
-#else   // CONFIG_EXT_SUPERRES
   const int denom_y = size;
-#endif  // CONFIG_EXT_SUPERRES
 
   const int rnd_x = denom_x - 1;
   const int rnd_y = denom_y - 1;
