@@ -297,7 +297,6 @@ typedef char PARTITION_CONTEXT;
 #define PARTITION_CONTEXTS (PARTITION_BLOCK_SIZES * PARTITION_PLOFFSET)
 
 #if CONFIG_EXT_RECUR_PARTITIONS
-#define ERP_LIMIT_PARTITION3_128 1
 // If the parent block is PARTITION_3, then we might have a smaller set of
 // partitions
 #define NUM_LIMITED_PARTITION_PARENTS (2)
