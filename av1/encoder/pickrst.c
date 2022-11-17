@@ -193,7 +193,7 @@ typedef struct RstUnitStats {
   int64_t real_sse;
   int ru_idx;  // debug.
 } RstUnitStats;
-#endif  // CONFIG_WIENER_NONSEP
+#endif         // CONFIG_WIENER_NONSEP
 
 #if CONFIG_RST_MERGECOEFFS
 typedef struct RstUnitSnapshot {
@@ -4747,7 +4747,7 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
              PC_WIENER_ONLY_CLASSIFY_CHROMA)) {
           rsc.is_buffered = true;  // Buffer is set.
         }
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
+#endif                             // CONFIG_COMBINE_PC_NS_WIENER
 
         if (r == 0 || cost < best_cost) {
           best_cost = cost;
