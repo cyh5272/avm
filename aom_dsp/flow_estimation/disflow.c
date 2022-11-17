@@ -38,7 +38,7 @@
 // eg. DOWNSAMPLE_SHIFT = 2 (DOWNSAMPLE_FACTOR == 4) means we calculate
 // one flow point for each 4x4 pixel region of the frame
 // Must be a power of 2
-#define DOWNSAMPLE_SHIFT 2
+#define DOWNSAMPLE_SHIFT 3
 #define DOWNSAMPLE_FACTOR (1 << DOWNSAMPLE_SHIFT)
 // Number of outermost flow field entries (on each edge) which can't be
 // computed, because the patch they correspond to extends outside of the
@@ -115,9 +115,11 @@ static int determine_disflow_correspondence(int *frm_corners,
     // Split the pixel coordinates into integer flow field coordinates and
     // an offset for interpolation
     int flow_x = x >> DOWNSAMPLE_SHIFT;
-    int flow_sub_x = x & (DOWNSAMPLE_FACTOR - 1);
+    double flow_sub_x =
+        (x & (DOWNSAMPLE_FACTOR - 1)) / (double)DOWNSAMPLE_FACTOR;
     int flow_y = y >> DOWNSAMPLE_SHIFT;
-    int flow_sub_y = y & (DOWNSAMPLE_FACTOR - 1);
+    double flow_sub_y =
+        (y & (DOWNSAMPLE_FACTOR - 1)) / (double)DOWNSAMPLE_FACTOR;
 
     // Make sure that bicubic interpolation won't read outside of the flow field
     if (flow_x < 1 || (flow_x + 2) >= width) continue;
@@ -425,12 +427,8 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
                             cur_flow_stride);
 
     if (level > 0) {
-      int h_upscale = frm_pyr->heights[level - 1];
-      int w_upscale = frm_pyr->widths[level - 1];
-      // int s_upscale = frm_pyr->strides[level - 1];
-
-      int upscale_flow_width = w_upscale >> DOWNSAMPLE_SHIFT;
-      int upscale_flow_height = h_upscale >> DOWNSAMPLE_SHIFT;
+      int upscale_flow_width = cur_flow_width << 1;
+      int upscale_flow_height = cur_flow_height << 1;
       int upscale_stride = flow->stride;
 
       av1_upscale_plane_double_prec(
@@ -449,6 +447,28 @@ static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
           int index = i * upscale_stride + j;
           flow_u[index] = u_upscale[index] * 2.0;
           flow_v[index] = v_upscale[index] * 2.0;
+        }
+      }
+
+      // If we didn't fill in the rightmost column or bottommost row during
+      // upsampling (in order to keep the ratio to exactly 2), fill them
+      // in here by copying the next closest column/row
+
+      // Rightmost column
+      if (frm_pyr->widths[level - 1] > upscale_flow_width) {
+        for (int i = 0; i < upscale_flow_height; i++) {
+          int index = i * upscale_stride + upscale_flow_width;
+          flow_u[index] = flow_u[index - 1];
+          flow_v[index] = flow_v[index - 1];
+        }
+      }
+
+      // Bottommost row
+      if (frm_pyr->heights[level - 1] > upscale_flow_height) {
+        for (int j = 0; j < frm_pyr->widths[level - 1]; j++) {
+          int index = upscale_flow_height * upscale_stride + j;
+          flow_u[index] = flow_u[index - upscale_stride];
+          flow_v[index] = flow_v[index - upscale_stride];
         }
       }
     }

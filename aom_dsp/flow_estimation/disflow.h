@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 // Number of pyramid levels in disflow computation
-#define DISFLOW_PYRAMID_LEVELS 2
+#define DISFLOW_PYRAMID_LEVELS 12
 
 FlowField *aom_alloc_flow_field(int width, int height, int stride);
 void aom_free_flow_field(FlowField *flow);

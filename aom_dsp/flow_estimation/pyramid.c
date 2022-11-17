@@ -104,11 +104,10 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
   assert((frm_width >> n_levels) >= 0);
   assert((frm_height >> n_levels) >= 0);
 
-  int cur_width, cur_height, cur_stride, cur_loc;
-  cur_width = frm_pyr->widths[0];
-  cur_height = frm_pyr->heights[0];
-  cur_stride = frm_pyr->strides[0];
-  cur_loc = frm_pyr->level_loc[0];
+  int cur_width = frm_pyr->widths[0];
+  int cur_height = frm_pyr->heights[0];
+  int cur_stride = frm_pyr->strides[0];
+  uint8_t *cur_buffer = frm_pyr->level_buffer + frm_pyr->level_loc[0];
 
   assert(frm_width == frm_pyr->widths[0]);
   assert(frm_height == frm_pyr->heights[0]);
@@ -116,7 +115,7 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
   // Fill out the initial pyramid level
   // For frames stored in 16-bit buffers, we need to downconvert to 8 bits
   uint16_t *frm_buffer = frm->y_buffer;
-  uint8_t *pyr_buffer = frm_pyr->level_buffer + cur_loc;
+  uint8_t *pyr_buffer = cur_buffer;
   for (int y = 0; y < frm_height; y++) {
     uint16_t *frm_row = frm_buffer + y * frm_stride;
     uint8_t *pyr_row = pyr_buffer + y * cur_stride;
@@ -125,25 +124,37 @@ static INLINE void fill_pyramid(YV12_BUFFER_CONFIG *frm, int bit_depth,
     }
   }
 
-  fill_border(frm_pyr->level_buffer + cur_loc, cur_width, cur_height,
-              cur_stride);
+  fill_border(cur_buffer, cur_width, cur_height, cur_stride);
 
   // Start at the finest level and resize down to the coarsest level
   for (int level = 1; level < n_levels; ++level) {
-    cur_width = frm_pyr->widths[level];
-    cur_height = frm_pyr->heights[level];
-    cur_stride = frm_pyr->strides[level];
-    cur_loc = frm_pyr->level_loc[level];
+    int next_width = frm_pyr->widths[level];
+    int next_height = frm_pyr->heights[level];
+    int next_stride = frm_pyr->strides[level];
+    uint8_t *next_buffer = frm_pyr->level_buffer + frm_pyr->level_loc[level];
 
-    // TODO(rachelbarker): Implement a special downsample-by-2 function
-    // to make this more efficient
-    av1_resize_plane(frm_pyr->level_buffer + frm_pyr->level_loc[level - 1],
-                     frm_pyr->heights[level - 1], frm_pyr->widths[level - 1],
-                     frm_pyr->strides[level - 1],
-                     frm_pyr->level_buffer + cur_loc, cur_height, cur_width,
-                     cur_stride);
-    fill_border(frm_pyr->level_buffer + cur_loc, cur_width, cur_height,
-                cur_stride);
+    // Compute the next pyramid level by downsampling the current level.
+    //
+    // We downsample by a factor of exactly 2, clipping the rightmost and
+    // bottommost pixel off of the current level if needed. We do this for
+    // two main reasons:
+    //
+    // 1) In the disflow code, when stepping from a higher pyramid level to a
+    //    lower pyramid level, we need to not just interpolate the flow field
+    //    but also to scale each flow vector by the upsampling ratio.
+    //    So it is much more convenient if this ratio is simply 2.
+    //
+    // 2) Up/downsampling by a factor of 2 can be implemented much more
+    //    efficiently than up/downsampling by a generic ratio.
+    //    TODO(rachelbarker): Implement optimized downsample-by-2 function
+    av1_resize_plane(cur_buffer, next_height << 1, next_width << 1, cur_stride,
+                     next_buffer, next_height, next_width, next_stride);
+    fill_border(next_buffer, next_width, next_height, next_stride);
+
+    cur_width = next_width;
+    cur_height = next_height;
+    cur_stride = next_stride;
+    cur_buffer = next_buffer;
   }
 }
 

@@ -22,7 +22,7 @@ extern "C" {
 // Maximum number of pyramid levels
 #if CONFIG_GM_USE_DISFLOW
 // Disflow requires two pyramid levels
-#define MAX_PYRAMID_LEVELS 2
+#define MAX_PYRAMID_LEVELS 12
 #else
 // Feature based code only requires one pyramid level
 #define MAX_PYRAMID_LEVELS 1
