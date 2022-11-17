@@ -1964,8 +1964,8 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
                                         const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile,
                                         RestorationUnitInfo *rui,
-                                        int wiener_win,
-                                        int reduced_wiener_win) {
+                                        int wiener_win, int reduced_wiener_win,
+                                        const WienerInfoBank *ref_wiener_bank) {
   const int plane_off = (WIENER_WIN - reduced_wiener_win) >> 1;
 #if CONFIG_RST_MERGECOEFFS
   int64_t err = calc_finer_tile_search_error(rsc, limits, tile, rui);
@@ -1978,10 +1978,10 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
   const MACROBLOCK *const x = rsc->x;
 #if CONFIG_RST_MERGECOEFFS
   int64_t bits = count_wiener_bits_set(wiener_win, &x->mode_costs, plane_wiener,
-                                       &rsc->wiener_bank);
+                                       ref_wiener_bank);
 #else
   int64_t bits = count_wiener_bits(wiener_win, &x->mode_costs, plane_wiener,
-                                   &rsc->wiener_bank);
+                                   ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
   double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, err,
                                                rsc->cm->seq_params.bit_depth);
@@ -2002,12 +2002,12 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
           plane_wiener->hfilter[WIENER_HALFWIN] += 2 * s;
 #if CONFIG_RST_MERGECOEFFS
           int64_t err2 = calc_finer_tile_search_error(rsc, limits, tile, rui);
-          int64_t bits2 = count_wiener_bits_set(
-              wiener_win, &x->mode_costs, plane_wiener, &rsc->wiener_bank);
+          int64_t bits2 = count_wiener_bits_set(wiener_win, &x->mode_costs,
+                                                plane_wiener, ref_wiener_bank);
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
           int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
-                                            plane_wiener, &rsc->wiener_bank);
+                                            plane_wiener, ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
@@ -2033,12 +2033,12 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
           plane_wiener->hfilter[WIENER_HALFWIN] -= 2 * s;
 #if CONFIG_RST_MERGECOEFFS
           int64_t err2 = calc_finer_tile_search_error(rsc, limits, tile, rui);
-          int64_t bits2 = count_wiener_bits_set(
-              wiener_win, &x->mode_costs, plane_wiener, &rsc->wiener_bank);
+          int64_t bits2 = count_wiener_bits_set(wiener_win, &x->mode_costs,
+                                                plane_wiener, ref_wiener_bank);
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
           int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
-                                            plane_wiener, &rsc->wiener_bank);
+                                            plane_wiener, ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
@@ -2065,12 +2065,12 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
           plane_wiener->vfilter[WIENER_HALFWIN] += 2 * s;
 #if CONFIG_RST_MERGECOEFFS
           int64_t err2 = calc_finer_tile_search_error(rsc, limits, tile, rui);
-          int64_t bits2 = count_wiener_bits_set(
-              wiener_win, &x->mode_costs, plane_wiener, &rsc->wiener_bank);
+          int64_t bits2 = count_wiener_bits_set(wiener_win, &x->mode_costs,
+                                                plane_wiener, ref_wiener_bank);
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
           int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
-                                            plane_wiener, &rsc->wiener_bank);
+                                            plane_wiener, ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
@@ -2096,12 +2096,12 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
           plane_wiener->vfilter[WIENER_HALFWIN] -= 2 * s;
 #if CONFIG_RST_MERGECOEFFS
           int64_t err2 = calc_finer_tile_search_error(rsc, limits, tile, rui);
-          int64_t bits2 = count_wiener_bits_set(
-              wiener_win, &x->mode_costs, plane_wiener, &rsc->wiener_bank);
+          int64_t bits2 = count_wiener_bits_set(wiener_win, &x->mode_costs,
+                                                plane_wiener, ref_wiener_bank);
 #else   // CONFIG_RST_MERGECOEFFS
           int64_t err2 = try_restoration_unit(rsc, limits, tile, rui);
           int64_t bits2 = count_wiener_bits(wiener_win, &x->mode_costs,
-                                            plane_wiener, &rsc->wiener_bank);
+                                            plane_wiener, ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
           double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
@@ -2125,7 +2125,7 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #if CONFIG_RST_MERGECOEFFS
   // Set bank_ref correctly
   (void)count_wiener_bits_set(wiener_win, &x->mode_costs, plane_wiener,
-                              &rsc->wiener_bank);
+                              ref_wiener_bank);
 #endif  // CONFIG_RST_MERGECOEFFS
   return err;
 }
@@ -2217,8 +2217,9 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
 
   aom_clear_system_state();
 
-  rusi->sse[RESTORE_WIENER] = finer_tile_search_wiener(
-      rsc, limits, tile_rect, &rui, wiener_win, reduced_wiener_win);
+  rusi->sse[RESTORE_WIENER] =
+      finer_tile_search_wiener(rsc, limits, tile_rect, &rui, wiener_win,
+                               reduced_wiener_win, &rsc->wiener_bank);
   rusi->wiener_info = rui.wiener_info;
 
   if (reduced_wiener_win != WIENER_WIN) {
@@ -2318,7 +2319,7 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     const WienerInfo *ref_wiener_info_cand =
         av1_constref_from_wiener_bank(&rsc->wiener_bank, bank_ref_cand);
     WienerInfo ref_wiener_info_tmp = *ref_wiener_info_cand;
-
+    const WienerInfoBank *begin_wiener_bank = NULL;
     // Iterate once to get the begin unit of the run
     int begin_idx_cand = -1;
     VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
@@ -2331,10 +2332,14 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
         if (check_wiener_bank_eq(&old_unit->ref_wiener_bank,
                                  ref_wiener_info_cand) == -1) {
           begin_idx_cand = old_unit->rest_unit_idx;
+          begin_wiener_bank = &old_unit->ref_wiener_bank;
         }
       }
     }
     if (begin_idx_cand == -1) continue;
+    assert(begin_wiener_bank != NULL);
+    begin_wiener_bank =
+        begin_wiener_bank == NULL ? &rsc->wiener_bank : begin_wiener_bank;
 
     Vector *current_unit_indices = rsc->unit_indices;
     aom_vector_clear(current_unit_indices);
@@ -2402,7 +2407,7 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
     finalize_sym_filter(reduced_wiener_win, hfilter_merge,
                         rui_temp_cand.wiener_info.hfilter);
     finer_tile_search_wiener(rsc, NULL, tile_rect, &rui_temp_cand, wiener_win,
-                             reduced_wiener_win);
+                             reduced_wiener_win, begin_wiener_bank);
     aom_vector_clear(current_unit_indices);
     if (compute_score(reduced_wiener_win, M_AVG, H_AVG,
                       rui_temp_cand.wiener_info.vfilter,
@@ -2753,13 +2758,11 @@ static int16_t quantize(double x, int16_t minv, int16_t n, int prec_bits) {
 // After Q_WRAPPER_MAX_ITER iterations one can reduce the finer_tile iterations.
 #define FINER_TILE_SEARCH_WIENERNS_ITER_STEP (USE_Q_WRAPPER ? 5 : 12)
 
-// TODO: bits calculations for merge cases, tile_rect = NULL, are wrong. Need to
-//  use the merge leader's bank rather than rsc->wienerns_bank.
 static int64_t finer_tile_search_wienerns(
     RestSearchCtxt *rsc, const RestorationTileLimits *limits,
     const AV1PixelRect *tile_rect, RestorationUnitInfo *rui,
     const WienernsFilterParameters *nsfilter_params, int ext_search,
-    int class_id) {
+    const WienerNonsepInfoBank *ref_wienerns_bank, int class_id) {
   assert(rsc->plane == rui->plane);
   const MACROBLOCK *const x = rsc->x;
   WienerNonsepInfo curr = rui->wienerns_info;
@@ -2780,11 +2783,11 @@ static int64_t finer_tile_search_wienerns(
   // classes outside class_id are not needed for decisions in this fn.
   int64_t best_bits =
       count_wienerns_bits_set(rsc->plane, &x->mode_costs, &curr,
-                              &rsc->wienerns_bank, nsfilter_params, class_id);
+                              ref_wienerns_bank, nsfilter_params, class_id);
 #else
   int64_t best_bits =
-      count_wienerns_bits(rsc->plane, &x->mode_costs, &curr,
-                          &rsc->wienerns_bank, nsfilter_params, class_id);
+      count_wienerns_bits(rsc->plane, &x->mode_costs, &curr, ref_wienerns_bank,
+                          nsfilter_params, class_id);
 #endif  // CONFIG_RST_MERGECOEFFS
   double best_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult, best_bits >> 4, best_err, rsc->cm->seq_params.bit_depth);
@@ -2826,11 +2829,11 @@ static int64_t finer_tile_search_wienerns(
 #if CONFIG_RST_MERGECOEFFS
           const int64_t bits = count_wienerns_bits_set(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
-              &rsc->wienerns_bank, nsfilter_params, c_id);
+              ref_wienerns_bank, nsfilter_params, c_id);
 #else
           const int64_t bits = count_wienerns_bits(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
-              &rsc->wienerns_bank, nsfilter_params, c_id);
+              ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
           const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -2852,7 +2855,7 @@ static int64_t finer_tile_search_wienerns(
       copy_nsfilter_taps_for_class(&curr, &rui->wienerns_info, c_id);
     }
     // Re-establish dst.
-    if (curr.num_classes > 1 && rui->class_id_restrict != -1) {
+    if (c_id_end - c_id_begin > 1 && rui->class_id_restrict != -1) {
       copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
     }
@@ -2875,12 +2878,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -2904,12 +2907,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -2937,12 +2940,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -2974,12 +2977,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -3002,12 +3005,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -3033,12 +3036,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -3068,12 +3071,12 @@ static int64_t finer_tile_search_wienerns(
             calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
 #if CONFIG_RST_MERGECOEFFS
         const int64_t bits = count_wienerns_bits_set(
-            rsc->plane, &x->mode_costs, &rui->wienerns_info,
-            &rsc->wienerns_bank, nsfilter_params, c_id);
+            rsc->plane, &x->mode_costs, &rui->wienerns_info, ref_wienerns_bank,
+            nsfilter_params, c_id);
 #else
         const int64_t bits =
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, c_id);
+                                ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
         const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
             x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -3088,7 +3091,7 @@ static int64_t finer_tile_search_wienerns(
       }
     }
     // Re-establish dst.
-    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1) {
+    if (c_id_end - c_id_begin > 1 && rui->class_id_restrict != -1) {
       copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
     }
@@ -3135,11 +3138,11 @@ static int64_t finer_tile_search_wienerns(
 #if CONFIG_RST_MERGECOEFFS
           const int64_t bits = count_wienerns_bits_set(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
-              &rsc->wienerns_bank, nsfilter_params, c_id);
+              ref_wienerns_bank, nsfilter_params, c_id);
 #else
           const int64_t bits = count_wienerns_bits(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
-              &rsc->wienerns_bank, nsfilter_params, c_id);
+              ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_RST_MERGECOEFFS
           const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
               x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
@@ -3162,7 +3165,7 @@ static int64_t finer_tile_search_wienerns(
       copy_nsfilter_taps_for_class(&curr, &rui->wienerns_info, c_id);
     }
     // Re-establish dst.
-    if (rui->wienerns_info.num_classes > 1 && rui->class_id_restrict != -1) {
+    if (c_id_end - c_id_begin > 1 && rui->class_id_restrict != -1) {
       copy_nsfilter_taps_for_class(&rui->wienerns_info, &best, c_id);
       calc_finer_tile_search_error(rsc, limits, tile_rect, rui);
     }
@@ -3173,7 +3176,7 @@ static int64_t finer_tile_search_wienerns(
   // printf("Err post = %"PRId64", cost = %f\n", best_err, best_cost);
 #if CONFIG_RST_MERGECOEFFS
   (void)count_wienerns_bits_set(rsc->plane, &x->mode_costs, &rui->wienerns_info,
-                                &rsc->wienerns_bank, nsfilter_params, class_id);
+                                ref_wienerns_bank, nsfilter_params, class_id);
 #endif  // CONFIG_RST_MERGECOEFFS
   return best_err;
 }
@@ -3442,6 +3445,10 @@ static int compute_quantized_wienerns_filter(
   // double e[WIENERNS_MAX];
   const int rodd = is_uv ? 0 : (num_feat & 1);
   const int max_reduce_steps_search = 4 + rodd;
+  // TODO: In order for below reduction to work well the less important taps
+  //  should be at the end. Better way is to define an order of reduction in
+  //  conjunction with the filter config, e.g., wienerns_config_y, and process
+  //  through that.
   for (int reduce = 0; reduce <= max_reduce_steps_search;
        reduce += (reduce ? 2 : 2 - rodd)) {
     memset(solver_x, 0, sizeof(*solver_x) * total_dim_b);
@@ -3535,7 +3542,8 @@ static int compute_quantized_wienerns_filter(
 int get_merge_begin_index(const RestSearchCtxt *rsc,
                           const WienernsFilterParameters *nsfilter_params,
                           const WienerNonsepInfo *token_wienerns_info,
-                          Vector *current_unit_stack, int class_id) {
+                          Vector *current_unit_stack,
+                          WienerNonsepInfoBank **begin_bank, int class_id) {
   int begin_idx = -1;
   const int last_idx =
       ((RstUnitSnapshot *)aom_vector_back(current_unit_stack))->rest_unit_idx;
@@ -3554,6 +3562,8 @@ int get_merge_begin_index(const RestSearchCtxt *rsc,
                                  class_id, equal_ref_for_class) == -1) {
         // Head merge point for this filter.
         begin_idx = old_unit->rest_unit_idx;
+        // Set merge-leader's bank.
+        *begin_bank = &old_unit->ref_wienerns_bank;
       }
     }
   }
@@ -3613,8 +3623,6 @@ double set_cand_merge_sse_and_bits(
                            nsfilter_params->ncoeffs, class_id))
       continue;
 
-    // TODO: In search_wienerns we run finer_tile before this. That calculates
-    //  sses already.
     old_unit->merge_sse_cand =
         try_restoration_unit(rsc, &old_unit->limits, tile_rect, rui_merge_cand);
     // First unit in stack has larger unit_bits because the
@@ -3808,8 +3816,9 @@ static void search_wienerns(const RestorationTileLimits *limits,
     return;
   }
   aom_clear_system_state();
-  rusi->sse[RESTORE_WIENER_NONSEP] = finer_tile_search_wienerns(
-      rsc, limits, tile_rect, &rui, nsfilter_params, 1, ALL_WIENERNS_CLASSES);
+  rusi->sse[RESTORE_WIENER_NONSEP] =
+      finer_tile_search_wienerns(rsc, limits, tile_rect, &rui, nsfilter_params,
+                                 1, &rsc->wienerns_bank, ALL_WIENERNS_CLASSES);
   // NOTE: replace with:
   //  calc_finer_tile_search_error(rsc, limits, tile_rect, &rui);
   //  if finer search was already done in compute_quantized_wienerns_filter()
@@ -3819,6 +3828,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
 #if CONFIG_RST_MERGECOEFFS
   // TODO(oguleryuz): RUs that don't have a certain class_id should match
   //  others that do.
+  if (num_classes > 1) {
+    rui.class_id_restrict = -1;
+    calc_finer_tile_search_error(rsc, limits, tile_rect, &rui);
+  }
   double solver_A_AVG[WIENERNS_MAX * WIENERNS_MAX];
   const int class_dim_A = WIENERNS_MAX * WIENERNS_MAX;
   double solver_b_AVG[WIENERNS_MAX];
@@ -3944,11 +3957,16 @@ static void search_wienerns(const RestorationTileLimits *limits,
                                                          bank_ref_cand, c_id));
       token_wienerns_info_cand.bank_ref_for_class[c_id] = bank_ref_cand;
 
+      // Keep track of would be merge leader's bank.
+      WienerNonsepInfoBank *begin_wienerns_bank = NULL;
       // Get the begin unit of the run using the candidate taps.
       int begin_idx_cand =
           get_merge_begin_index(rsc, nsfilter_params, &token_wienerns_info_cand,
-                                current_unit_stack, c_id);
+                                current_unit_stack, &begin_wienerns_bank, c_id);
       if (begin_idx_cand == -1) continue;
+      assert(begin_wienerns_bank != NULL);
+      begin_wienerns_bank = begin_wienerns_bank != NULL ? &rsc->wienerns_bank
+                                                        : begin_wienerns_bank;
 
       // Populate current_unit_indices with the indices of RUs using this
       // filter.
@@ -4010,10 +4028,10 @@ static void search_wienerns(const RestorationTileLimits *limits,
 
       aom_clear_system_state();
 
-      // After this call rsc will have updated buffers using the found candidate
-      // filter. We will reset below if not merging.
+      // After this call rsc will have updated buffers. We will reset below if
+      // not merging.
       finer_tile_search_wienerns(rsc, NULL, tile_rect, &rui_merge_cand,
-                                 nsfilter_params, 1, c_id);
+                                 nsfilter_params, 1, begin_wienerns_bank, c_id);
 
       // Iterate through vector to set candidate merge sse and bits on
       // current_unit_stack.
