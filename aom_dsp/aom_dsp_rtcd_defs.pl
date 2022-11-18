@@ -146,6 +146,11 @@ specialize qw/aom_highbd_dc_128_predictor_32x16 sse2/;
 specialize qw/aom_highbd_dc_left_predictor_32x32 sse2/;
 specialize qw/aom_highbd_dc_top_predictor_32x32 sse2/;
 specialize qw/aom_highbd_dc_128_predictor_32x32 sse2/;
+
+if (aom_config("CONFIG_FOCALPT_INTRA") eq "yes") {
+  add_proto qw/void aom_highbd_focalpt_predictor/, "uint16_t *dst, int stride, int width, int height, const uint16_t *above, const uint16_t *left, int bd, int b, int a";
+}
+
 #
 # Sub Pixel Filters
 #
