@@ -340,16 +340,22 @@ const sgr_params_type av1_sgr_params[SGRPROJ_PARAMS] = {
   { { 2, 0 }, { 56, -1 } },    { { 2, 0 }, { 22, -1 } },
 };
 
-AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
+AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv,
+                                  int after_cdef) {
   AV1PixelRect rect;
 
   int ss_x = is_uv && cm->seq_params.subsampling_x;
   int ss_y = is_uv && cm->seq_params.subsampling_y;
 
   rect.top = 0;
-  rect.bottom = ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y);
   rect.left = 0;
-  rect.right = ROUND_POWER_OF_TWO(cm->superres_upscaled_width, ss_x);
+  if (after_cdef) {
+    rect.bottom = ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y);
+    rect.right = ROUND_POWER_OF_TWO(cm->superres_upscaled_width, ss_x);
+  } else {
+    rect.bottom = ROUND_POWER_OF_TWO(cm->height, ss_y);
+    rect.right = ROUND_POWER_OF_TWO(cm->width, ss_x);
+  }
   return rect;
 }
 
@@ -411,7 +417,7 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   // top-left and we can use av1_get_tile_rect(). With CONFIG_MAX_TILE, we have
   // to do the computation ourselves, iterating over the tiles and keeping
   // track of the largest width and height, then upscaling.
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv, 1);
   const int max_tile_w = tile_rect.right - tile_rect.left;
   const int max_tile_h = tile_rect.bottom - tile_rect.top;
 
@@ -437,6 +443,9 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   CHECK_MEM_ERROR(cm, rsi->unit_info,
                   (RestorationUnitInfo *)aom_memalign(
                       16, sizeof(*rsi->unit_info) * nunits));
+
+  rsi->boundaries.stripe_boundary_above = NULL;
+  rsi->boundaries.stripe_boundary_below = NULL;
 }
 
 void av1_free_restoration_struct(RestorationInfo *rst_info) {
@@ -2495,7 +2504,7 @@ void av1_loop_restoration_filter_frame_init(AV1LrStruct *lr_ctxt,
     lr_plane_ctxt->dst8 = lr_ctxt->dst->buffers[plane];
     lr_plane_ctxt->data_stride = frame->strides[is_uv];
     lr_plane_ctxt->dst_stride = lr_ctxt->dst->strides[is_uv];
-    lr_plane_ctxt->tile_rect = av1_whole_frame_rect(cm, is_uv);
+    lr_plane_ctxt->tile_rect = av1_whole_frame_rect(cm, is_uv, 1);
     lr_plane_ctxt->tile_stripe0 = 0;
   }
 }
@@ -2782,7 +2791,7 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
 
   const int is_uv = plane > 0;
 
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv, 1);
   const int tile_w = tile_rect.right - tile_rect.left;
   const int tile_h = tile_rect.bottom - tile_rect.top;
 
@@ -2820,11 +2829,14 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
   const int mi_to_num_x = av1_superres_scaled(cm)
                               ? mi_size_x * cm->superres_scale_denominator
                               : mi_size_x;
-  const int mi_to_num_y = mi_size_y;
   const int denom_x = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
 #if CONFIG_EXT_SUPERRES
+  const int mi_to_num_y = av1_superres_scaled(cm)
+                              ? mi_size_y * cm->superres_scale_denominator
+                              : mi_size_y;
   const int denom_y = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
 #else   // CONFIG_EXT_SUPERRES
+  const int mi_to_num_y = mi_size_y;
   const int denom_y = size;
 #endif  // CONFIG_EXT_SUPERRES
 
@@ -3009,7 +3021,7 @@ static void save_tile_row_boundary_lines(const YV12_BUFFER_CONFIG *frame,
 
   // Get the tile rectangle, with height rounded up to the next multiple of 8
   // luma pixels (only relevant for the bottom tile of the frame)
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv, after_cdef);
   const int stripe0 = 0;
 
   RestorationStripeBoundaries *boundaries = &cm->rst_info[plane].boundaries;

@@ -437,7 +437,7 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
   rsc->src_buffer = src->buffers[plane];
   rsc->dgd_stride = dgd->strides[is_uv];
   rsc->dgd_buffer = dgd->buffers[plane];
-  rsc->tile_rect = av1_whole_frame_rect(cm, is_uv);
+  rsc->tile_rect = av1_whole_frame_rect(cm, is_uv, 1);
   assert(src->crop_widths[is_uv] == dgd->crop_widths[is_uv]);
   assert(src->crop_heights[is_uv] == dgd->crop_heights[is_uv]);
 #if CONFIG_RST_MERGECOEFFS
