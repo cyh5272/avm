@@ -142,6 +142,8 @@ set_aom_config_var(
   "AV2 enable adaptive transform coefficient coding improvement.")
 set_aom_config_var(CONFIG_ATC_NEWTXSETS 1
                    "AV2 enable adaptive transform coding and new TX sets.")
+set_aom_config_var(CONFIG_FOCALPT_INTRA 0
+                   "AV2 Focal-pt intra prediction experiment.")
 set_aom_config_var(CONFIG_DEBLOCK_SUB_PREDICTIONS 0
                    "AV2 deblocking sub-predictions experiment.")
 set_aom_config_var(CONFIG_ACROSS_SCALE_TPL_MVS 0
