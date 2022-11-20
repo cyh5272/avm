@@ -150,6 +150,8 @@ typedef struct {
   int64_t sse;
   int64_t bits;
   int tile_y0, tile_stripe0;
+  // Helps convert tile-localized RU indices to frame RU indices.
+  int ru_idx_base;
 
   // sgrproj and wiener are initialised by rsc_on_tile when starting the first
   // tile in the frame.
@@ -164,8 +166,6 @@ typedef struct {
   // If !=0 search_wienerns computes statistics and quick-returns.
   int compute_stats_and_return;
 
-  // Helps convert tile-localized RU indices to frame RU indices.
-  int ru_idx_base;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint8_t *luma;
   int luma_stride;
@@ -1036,10 +1036,12 @@ int get_sgrproj_best_ref(const ModeCosts *mode_costs, const SgrprojInfo *info,
 
 static AOM_INLINE void search_sgrproj(const RestorationTileLimits *limits,
                                       const AV1PixelRect *tile,
-                                      int rest_unit_idx, void *priv,
+                                      int rest_unit_idx,
+                                      int rest_unit_idx_in_rutile, void *priv,
                                       int32_t *tmpbuf,
                                       RestorationLineBuffers *rlbs) {
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
 
@@ -1707,11 +1709,13 @@ static int count_pc_wiener_bits() {
 
 static AOM_INLINE void search_pc_wiener(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
-                                        int rest_unit_idx, void *priv,
+                                        int rest_unit_idx,
+                                        int rest_unit_idx_in_rutile, void *priv,
                                         int32_t *tmpbuf,
                                         RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -2132,11 +2136,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 
 static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
                                      const AV1PixelRect *tile_rect,
-                                     int rest_unit_idx, void *priv,
+                                     int rest_unit_idx,
+                                     int rest_unit_idx_in_rutile, void *priv,
                                      int32_t *tmpbuf,
                                      RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
 
@@ -2566,12 +2572,14 @@ static AOM_INLINE void search_wiener(const RestorationTileLimits *limits,
 
 static AOM_INLINE void search_norestore(const RestorationTileLimits *limits,
                                         const AV1PixelRect *tile_rect,
-                                        int rest_unit_idx, void *priv,
+                                        int rest_unit_idx,
+                                        int rest_unit_idx_in_rutile, void *priv,
                                         int32_t *tmpbuf,
                                         RestorationLineBuffers *rlbs) {
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
 
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
@@ -3739,10 +3747,12 @@ double accumulate_merge_stats(const RestSearchCtxt *rsc,
 
 static void search_wienerns(const RestorationTileLimits *limits,
                             const AV1PixelRect *tile_rect, int rest_unit_idx,
-                            void *priv, int32_t *tmpbuf,
-                            RestorationLineBuffers *rlbs) {
+                            int rest_unit_idx_in_rutile, void *priv,
+                            int32_t *tmpbuf, RestorationLineBuffers *rlbs) {
   (void)tmpbuf;
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
+
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   RestUnitSearchInfo *rusi = &rsc->rusi[rest_unit_idx];
 
@@ -3803,7 +3813,7 @@ static void search_wienerns(const RestorationTileLimits *limits,
     return;
   }
   const RstUnitStats *unit_stats = (const RstUnitStats *)aom_vector_const_get(
-      rsc->wienerns_stats, rsc->ru_idx_base + rest_unit_idx);
+      rsc->wienerns_stats, rsc->ru_idx_base + rest_unit_idx_in_rutile);
   assert(unit_stats->ru_idx == rest_unit_idx);
 
   if (!compute_quantized_wienerns_filter(
@@ -4294,12 +4304,13 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
 
 static void search_switchable(const RestorationTileLimits *limits,
                               const AV1PixelRect *tile_rect, int rest_unit_idx,
-                              void *priv, int32_t *tmpbuf,
-                              RestorationLineBuffers *rlbs) {
+                              int rest_unit_idx_in_rutile, void *priv,
+                              int32_t *tmpbuf, RestorationLineBuffers *rlbs) {
   (void)limits;
   (void)tile_rect;
   (void)tmpbuf;
   (void)rlbs;
+  (void)rest_unit_idx_in_rutile;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
 
   const MACROBLOCK *const x = rsc->x;
@@ -4478,9 +4489,7 @@ static double search_rest_type(RestSearchCtxt *rsc,
   };
   int64_t total_bits = 0;
   int64_t total_sse = 0;
-#if CONFIG_WIENER_NONSEP
   rsc->ru_idx_base = 0;
-#endif  // CONFIG_WIENER_NONSEP
   const int is_uv = rsc->plane > 0;
   for (int tile_row = 0; tile_row < rus_per_tile_helper->tile_rows;
        tile_row++) {
@@ -4507,9 +4516,8 @@ static double search_rest_type(RestSearchCtxt *rsc,
           rsc->cm, rsc->plane, unit_idx0, ru_end_col - ru_start_col,
           ru_end_row - ru_start_row, funs[rtype], rsc, &rutile_rect,
           rsc->cm->rst_tmpbuf, NULL, rus_per_tile_helper);
-#if CONFIG_WIENER_NONSEP
-      rsc->ru_idx_base = rsc->wienerns_stats->element_size;
-#endif  // CONFIG_WIENER_NONSEP
+      rsc->ru_idx_base +=
+          (ru_end_col - ru_start_col) * (ru_end_row - ru_start_row);
 #if CONFIG_RST_MERGECOEFFS
       aom_vector_clear(rsc->unit_stack);
       aom_vector_clear(rsc->unit_indices);
