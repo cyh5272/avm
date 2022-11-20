@@ -527,7 +527,8 @@ typedef struct {
 
 typedef void (*rest_unit_visitor_t)(const RestorationTileLimits *limits,
                                     const AV1PixelRect *tile_rect,
-                                    int rest_unit_idx, void *priv,
+                                    int rest_unit_idx,
+                                    int rest_unit_idx_in_rutile, void *priv,
                                     int32_t *tmpbuf,
                                     RestorationLineBuffers *rlbs);
 

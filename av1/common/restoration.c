@@ -2405,8 +2405,10 @@ void av1_loop_restoration_filter_unit(
 
 static void filter_frame_on_unit(const RestorationTileLimits *limits,
                                  const AV1PixelRect *tile_rect,
-                                 int rest_unit_idx, void *priv, int32_t *tmpbuf,
+                                 int rest_unit_idx, int rest_unit_idx_in_rutile,
+                                 void *priv, int32_t *tmpbuf,
                                  RestorationLineBuffers *rlbs) {
+  (void)rest_unit_idx_in_rutile;
   FilterFrameCtxt *ctxt = (FilterFrameCtxt *)priv;
   const RestorationInfo *rsi = ctxt->rsi;
 
@@ -2665,6 +2667,7 @@ void av1_foreach_rest_unit_in_row(
     // If the tile is the full frame, then unit_stride will be the same as
     // hunits_per_tile, but not always.
     const int unit_idx = unit_idx0 + row_number * unit_stride + j;
+    const int unit_idx_in_rutile = row_number * hunits_per_tile + j;
 
     // No sync for even numbered rows
     // For odd numbered rows, Loop Restoration of current block requires the LR
@@ -2676,7 +2679,8 @@ void av1_foreach_rest_unit_in_row(
       // bottom-right sync
       on_sync_read(lr_sync, row_number + 2, j, plane);
 
-    on_rest_unit(limits, tile_rect, unit_idx, priv, tmpbuf, rlbs);
+    on_rest_unit(limits, tile_rect, unit_idx, unit_idx_in_rutile, priv, tmpbuf,
+                 rlbs);
 
     on_sync_write(lr_sync, row_number, j, hunits_per_tile, plane);
 
