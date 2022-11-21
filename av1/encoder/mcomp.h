@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2021, Alliance for Open Media. All rights reserved
  *
@@ -636,6 +635,7 @@ int av1_get_ref_mvpred_var_cost(const struct AV1_COMP *cpi,
                                 const MACROBLOCKD *xd,
                                 const FULLPEL_MOTION_SEARCH_PARAMS *ms_params);
 #endif  // CONFIG_BVP_IMPROVEMENT
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

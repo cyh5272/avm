@@ -1385,6 +1385,9 @@ void av1_build_one_inter_predictor(
 }
 
 #if CONFIG_BAWP
+// Derive the scaling factor and offset of block adaptive weighted prediction
+// mode. One row from the top boundary and one column from the left boundary
+// are used in the less square error process.
 void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
                             uint16_t *recon_left, int rec_stride,
                             uint16_t *ref_top, uint16_t *ref_left,
@@ -1424,7 +1427,9 @@ void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
   if (count > 0) {
     int32_t der = sum_xx - (int32_t)((int64_t)sum_x * sum_x / count);
     int32_t nor = sum_xy - (int32_t)((int64_t)sum_x * sum_y / count);
-    // temporal design, to be further updated
+    // Add a small portion to both self-correlation and cross-correlation to
+    // keep mode stable and have scaling factor leaning to value 1.0
+    // Temporal design, to be further updated
     nor += der / 16;
     der += der / 16;
 
@@ -1440,6 +1445,7 @@ void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
   }
 }
 
+// generate inter prediction of a block coded in bwap mode enabled
 void av1_build_one_bawp_inter_predictor(
     uint16_t *dst, int dst_stride, const MV *const src_mv,
     InterPredParams *inter_pred_params, const AV1_COMMON *cm, MACROBLOCKD *xd,

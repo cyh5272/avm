@@ -1554,7 +1554,6 @@ void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint16_t *ref_y_buffer,
 
     const uint16_t *const ref_y_ptr =
         &ref_y_buffer[ref_y_stride * fp_row + fp_col];
-
     // Find sad for current vector.
     const int this_sad = cpi->fn_ptr[block_size].sdf(
         src_y_ptr, x->plane[0].src.stride, ref_y_ptr, ref_y_stride);

@@ -2827,7 +2827,6 @@ static int64_t motion_mode_rd(
           mode_costs->interintra_cost[size_group_lookup[bsize]]
                                      [mbmi->ref_frame[1] == INTRA_FRAME];
     }
-
     if ((last_motion_mode_allowed > SIMPLE_TRANSLATION) &&
         (mbmi->ref_frame[1] != INTRA_FRAME)) {
       if (last_motion_mode_allowed == WARPED_CAUSAL) {
@@ -4314,7 +4313,6 @@ static int64_t handle_inter_mode(
 #endif  // CONFIG_C071_SUBBLK_WARPMV
   int best_xskip_txfm = 0;
   int64_t newmv_ret_val = INT64_MAX;
-
 #if CONFIG_FLEX_MVRES
   inter_mode_info mode_info[NUM_MV_PRECISIONS][MAX_REF_MV_SEARCH];
 
