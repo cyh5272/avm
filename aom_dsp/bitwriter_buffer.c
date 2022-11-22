@@ -135,8 +135,8 @@ static void wb_write_primitive_refsubexpfin(struct aom_write_bit_buffer *wb,
 void aom_wb_write_signed_primitive_refsubexpfin(struct aom_write_bit_buffer *wb,
                                                 uint32_t n, uint32_t k,
                                                 int32_t ref, int32_t v) {
-  ref += n - 1;
-  v += n - 1;
+  int32_t offset = (int32_t)(n - 1);
   const uint32_t scaled_n = (n << 1) - 1;
-  wb_write_primitive_refsubexpfin(wb, scaled_n, k, ref, v);
+  wb_write_primitive_refsubexpfin(wb, scaled_n, k, (uint32_t)(ref + offset),
+                                  (uint32_t)(v + offset));
 }

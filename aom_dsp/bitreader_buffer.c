@@ -111,7 +111,9 @@ static uint32_t aom_rb_read_primitive_refsubexpfin(
 
 int32_t aom_rb_read_signed_primitive_refsubexpfin(
     struct aom_read_bit_buffer *rb, uint32_t n, uint32_t k, int32_t ref) {
-  ref += n - 1;
+  int32_t offset = (int32_t)(n - 1);
   const uint32_t scaled_n = (n << 1) - 1;
-  return aom_rb_read_primitive_refsubexpfin(rb, scaled_n, k, ref) - n + 1;
+  uint32_t coded_value = aom_rb_read_primitive_refsubexpfin(
+      rb, scaled_n, k, (uint32_t)(ref + offset));
+  return (int32_t)coded_value - offset;
 }
