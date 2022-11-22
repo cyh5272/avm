@@ -180,7 +180,7 @@ typedef struct {
   Vector *unit_indices;
 #endif  // CONFIG_LR_MERGE_COEFFS
 
-  AV1PixelRect tile_rect;
+  PixelRect tile_rect;
 } RestSearchCtxt;
 
 #if CONFIG_WIENER_NONSEP
@@ -289,7 +289,7 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
 
 static int64_t try_restoration_unit(const RestSearchCtxt *rsc,
                                     const RestorationTileLimits *limits,
-                                    const AV1PixelRect *tile_rect,
+                                    const PixelRect *tile_rect,
                                     const RestorationUnitInfo *rui) {
   const AV1_COMMON *const cm = rsc->cm;
   const int plane = rsc->plane;
@@ -846,7 +846,7 @@ static int64_t count_sgrproj_bits_set(const ModeCosts *mode_costs,
 #endif  // CONFIG_LR_MERGE_COEFFS
 
 static AOM_INLINE void search_sgrproj_visitor(
-    const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
+    const RestorationTileLimits *limits, const PixelRect *tile_rect,
     int rest_unit_idx, int rest_unit_idx_seq, void *priv, int32_t *tmpbuf,
     RestorationLineBuffers *rlbs) {
   (void)tile_rect;
@@ -1219,7 +1219,7 @@ static int count_pc_wiener_bits() {
 }
 
 static AOM_INLINE void search_pc_wiener_visitor(
-    const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
+    const RestorationTileLimits *limits, const PixelRect *tile_rect,
     int rest_unit_idx, int rest_unit_idx_seq, void *priv, int32_t *tmpbuf,
     RestorationLineBuffers *rlbs) {
   (void)tile_rect;
@@ -1682,7 +1682,7 @@ static int64_t count_wiener_bits_set(int wiener_win,
 // Otherwise, calculates error for all units in the stack using stored limits.
 static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
                                             const RestorationTileLimits *limits,
-                                            const AV1PixelRect *tile,
+                                            const PixelRect *tile,
                                             RestorationUnitInfo *rui) {
   int64_t err = 0;
 #if CONFIG_LR_MERGE_COEFFS
@@ -1713,7 +1713,7 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 // This function resets the dst buffers using the correct filters.
 static int64_t reset_unit_stack_dst_buffers(const RestSearchCtxt *rsc,
                                             const RestorationTileLimits *limits,
-                                            const AV1PixelRect *tile,
+                                            const PixelRect *tile,
                                             RestorationUnitInfo *rui) {
   int64_t err = 0;
   if (limits != NULL) {
@@ -1763,7 +1763,7 @@ static int64_t reset_unit_stack_dst_buffers(const RestSearchCtxt *rsc,
 #define RD_WIENER_REFINEMENT_SEARCH 0
 static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
                                         const RestorationTileLimits *limits,
-                                        const AV1PixelRect *tile,
+                                        const PixelRect *tile,
                                         RestorationUnitInfo *rui,
                                         int wiener_win, int reduced_wiener_win,
                                         const WienerInfoBank *ref_wiener_bank) {
@@ -1946,7 +1946,7 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 }
 
 static AOM_INLINE void search_wiener_visitor(
-    const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
+    const RestorationTileLimits *limits, const PixelRect *tile_rect,
     int rest_unit_idx, int rest_unit_idx_seq, void *priv, int32_t *tmpbuf,
     RestorationLineBuffers *rlbs) {
   (void)tile_rect;
@@ -2381,7 +2381,7 @@ static AOM_INLINE void search_wiener_visitor(
 }
 
 static AOM_INLINE void search_norestore_visitor(
-    const RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
+    const RestorationTileLimits *limits, const PixelRect *tile_rect,
     int rest_unit_idx, int rest_unit_idx_seq, void *priv, int32_t *tmpbuf,
     RestorationLineBuffers *rlbs) {
   (void)tile_rect;
@@ -2579,7 +2579,7 @@ static int16_t quantize_wienerns_tap(double x, int16_t minv, int16_t n,
 
 static int64_t finer_tile_search_wienerns(
     RestSearchCtxt *rsc, const RestorationTileLimits *limits,
-    const AV1PixelRect *tile_rect, RestorationUnitInfo *rui,
+    const PixelRect *tile_rect, RestorationUnitInfo *rui,
     const WienernsFilterParameters *nsfilter_params, int ext_search,
     const WienerNonsepInfoBank *ref_wienerns_bank, int wiener_class_id) {
   assert(rsc->plane == rui->plane);
@@ -3213,7 +3213,7 @@ static int64_t compute_stats_for_wienerns_filter(
 
 static int compute_quantized_wienerns_filter(
     RestSearchCtxt *rsc, const RestorationTileLimits *limits,
-    const AV1PixelRect *tile_rect, RestorationUnitInfo *rui, const double *A,
+    const PixelRect *tile_rect, RestorationUnitInfo *rui, const double *A,
     const double *b, int64_t real_sse,
     const WienernsFilterParameters *nsfilter_params) {
   const int num_classes = rsc->num_filter_classes;
@@ -3349,8 +3349,8 @@ void populate_current_unit_indices(
 
 double set_cand_merge_sse_and_bits(
     RestSearchCtxt *rsc, const WienernsFilterParameters *nsfilter_params,
-    const AV1PixelRect *tile_rect, int begin_idx_cand,
-    Vector *current_unit_stack, WienerNonsepInfo *token_wienerns_info_cand,
+    const PixelRect *tile_rect, int begin_idx_cand, Vector *current_unit_stack,
+    WienerNonsepInfo *token_wienerns_info_cand,
     RestorationUnitInfo *rui_merge_cand, int wiener_class_id) {
   const int last_idx =
       ((RstUnitSnapshot *)aom_vector_back(current_unit_stack))->rest_unit_idx;
@@ -3491,8 +3491,7 @@ double accumulate_merge_stats(const RestSearchCtxt *rsc,
 #endif  // CONFIG_LR_MERGE_COEFFS
 
 static void gather_stats_wienerns(const RestorationTileLimits *limits,
-                                  const AV1PixelRect *tile_rect,
-                                  int rest_unit_idx,
+                                  const PixelRect *tile_rect, int rest_unit_idx,
                                   int rest_unit_idx_in_rutile, void *priv,
                                   int32_t *tmpbuf,
                                   RestorationLineBuffers *rlbs) {
@@ -3525,7 +3524,7 @@ static void gather_stats_wienerns(const RestorationTileLimits *limits,
 }
 
 static void search_wienerns_visitor(const RestorationTileLimits *limits,
-                                    const AV1PixelRect *tile_rect,
+                                    const PixelRect *tile_rect,
                                     int rest_unit_idx,
                                     int rest_unit_idx_in_rutile, void *priv,
                                     int32_t *tmpbuf,
@@ -4006,7 +4005,7 @@ static int64_t count_switchable_bits(int rest_type, RestSearchCtxt *rsc,
 }
 
 static void search_switchable_visitor(const RestorationTileLimits *limits,
-                                      const AV1PixelRect *tile_rect,
+                                      const PixelRect *tile_rect,
                                       int rest_unit_idx, int rest_unit_idx_seq,
                                       void *priv, int32_t *tmpbuf,
                                       RestorationLineBuffers *rlbs) {
@@ -4256,7 +4255,7 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
               rsc->cm, rsc->plane, mi_row, mi_col, rsc->cm->seq_params.sb_size,
               &rcol0, &rcol1, &rrow0, &rrow1)) {
         // RU domain rectangle for the coded SB
-        AV1PixelRect ru_sb_rect = av1_get_rutile_rect(
+        PixelRect ru_sb_rect = av1_get_rutile_rect(
             rsc->cm, is_uv, rrow0, rrow1, rcol0, rcol1, ru_size, ru_size);
         const int unit_idx0 = rrow0 * rsi->horz_units_per_tile + rcol0;
         av1_foreach_rest_unit_in_sb(&ru_sb_rect, unit_idx0, rcol1 - rcol0,
@@ -4339,7 +4338,7 @@ static double search_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
 }
 
 static void copy_unit_info_visitor(const RestorationTileLimits *limits,
-                                   const AV1PixelRect *tile_rect,
+                                   const PixelRect *tile_rect,
                                    int rest_unit_idx, int rest_unit_idx_seq,
                                    void *priv, int32_t *tmpbuf,
                                    RestorationLineBuffers *rlbs) {

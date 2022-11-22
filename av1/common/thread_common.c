@@ -719,7 +719,7 @@ static void enqueue_lr_jobs(AV1LrSync *lr_sync, AV1LrStruct *lr_ctxt,
     const int is_uv = plane > 0;
     const int ss_y = is_uv && cm->seq_params.subsampling_y;
 
-    AV1PixelRect tile_rect = ctxt[plane].tile_rect;
+    PixelRect tile_rect = ctxt[plane].tile_rect;
     const int unit_size = ctxt[plane].rsi->restoration_unit_size;
 
     const int tile_h = tile_rect.bottom - tile_rect.top;
@@ -899,7 +899,7 @@ static void foreach_rest_unit_in_planes_mt(AV1LrStruct *lr_ctxt,
         cm->mi_params.wiener_class_id_stride[plane];
 #endif  // CONFIG_PC_WIENER
 
-    const AV1PixelRect tile_rect = ctxt[plane].tile_rect;
+    const PixelRect tile_rect = ctxt[plane].tile_rect;
     const int max_tile_h = tile_rect.bottom - tile_rect.top;
 
     const int unit_size = cm->rst_info[plane].restoration_unit_size;

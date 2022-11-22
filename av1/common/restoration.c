@@ -361,8 +361,8 @@ const sgr_params_type av1_sgr_params[SGRPROJ_PARAMS] = {
   { { 2, 0 }, { 56, -1 } },    { { 2, 0 }, { 22, -1 } },
 };
 
-AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
-  AV1PixelRect rect;
+PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
+  PixelRect rect;
 
   int ss_x = is_uv && cm->seq_params.subsampling_x;
   int ss_y = is_uv && cm->seq_params.subsampling_y;
@@ -394,11 +394,10 @@ int av1_lr_count_units_in_tile(int unit_size, int tile_size) {
 // Note the limits of the last RU in row or col is simply the size
 // of the image, which makes the last RU either bigger or smaller
 // than the other RUs.
-AV1PixelRect av1_get_rutile_rect(const AV1_COMMON *cm, int plane,
-                                 int ru_start_row, int ru_end_row,
-                                 int ru_start_col, int ru_end_col,
-                                 int ru_height, int ru_width) {
-  AV1PixelRect rect;
+PixelRect av1_get_rutile_rect(const AV1_COMMON *cm, int plane, int ru_start_row,
+                              int ru_end_row, int ru_start_col, int ru_end_col,
+                              int ru_height, int ru_width) {
+  PixelRect rect;
   const RestorationInfo *rsi = &cm->rst_info[plane];
 
   int ss_x = plane && cm->seq_params.subsampling_x;
@@ -432,7 +431,7 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   // top-left and we can use av1_get_tile_rect(). With CONFIG_MAX_TILE, we have
   // to do the computation ourselves, iterating over the tiles and keeping
   // track of the largest width and height, then upscaling.
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
   const int max_tile_w = tile_rect.right - tile_rect.left;
   const int max_tile_h = tile_rect.bottom - tile_rect.top;
 
@@ -566,7 +565,7 @@ static void copy_tile(int width, int height, const uint16_t *src,
 // av1_loop_restoration_save_boundary_lines() function, so here we just need
 // to decide if we're overwriting the above/below boundary pixels or not.
 static void get_stripe_boundary_info(const RestorationTileLimits *limits,
-                                     const AV1PixelRect *tile_rect, int ss_y,
+                                     const PixelRect *tile_rect, int ss_y,
                                      int *copy_above, int *copy_below) {
   *copy_above = 1;
   *copy_below = 1;
@@ -2070,7 +2069,7 @@ static const stripe_filter_fun stripe_filters[NUM_STRIPE_FILTERS] = {
 void av1_loop_restoration_filter_unit(
     const RestorationTileLimits *limits, const RestorationUnitInfo *rui,
     const RestorationStripeBoundaries *rsb, RestorationLineBuffers *rlbs,
-    const AV1PixelRect *tile_rect, int tile_stripe0, int ss_x, int ss_y,
+    const PixelRect *tile_rect, int tile_stripe0, int ss_x, int ss_y,
     int bit_depth, uint16_t *data, int stride, uint16_t *dst, int dst_stride,
     int32_t *tmpbuf, int optimized_lr) {
   RestorationType unit_rtype = rui->restoration_type;
@@ -2196,9 +2195,9 @@ void av1_loop_restoration_filter_unit(
 }
 
 static void filter_frame_on_unit(const RestorationTileLimits *limits,
-                                 const AV1PixelRect *tile_rect,
-                                 int rest_unit_idx, int rest_unit_idx_seq,
-                                 void *priv, int32_t *tmpbuf,
+                                 const PixelRect *tile_rect, int rest_unit_idx,
+                                 int rest_unit_idx_seq, void *priv,
+                                 int32_t *tmpbuf,
                                  RestorationLineBuffers *rlbs) {
   (void)rest_unit_idx_seq;
   FilterFrameCtxt *ctxt = (FilterFrameCtxt *)priv;
@@ -2290,7 +2289,7 @@ void av1_loop_restoration_copy_planes(AV1LrStruct *loop_rest_ctxt,
   assert(num_planes <= 3);
   for (int plane = 0; plane < num_planes; ++plane) {
     if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) continue;
-    AV1PixelRect tile_rect = loop_rest_ctxt->ctxt[plane].tile_rect;
+    PixelRect tile_rect = loop_rest_ctxt->ctxt[plane].tile_rect;
     copy_funs[plane](loop_rest_ctxt->dst, loop_rest_ctxt->frame, tile_rect.left,
                      tile_rect.right, tile_rect.top, tile_rect.bottom);
   }
@@ -2366,7 +2365,7 @@ void av1_loop_restoration_filter_frame(YV12_BUFFER_CONFIG *frame,
 }
 
 void av1_foreach_rest_unit_in_row(
-    RestorationTileLimits *limits, const AV1PixelRect *tile_rect,
+    RestorationTileLimits *limits, const PixelRect *tile_rect,
     rest_unit_visitor_t on_rest_unit, int row_number, int unit_size,
     int unit_idx0, int hunits_per_tile, int vunits_per_tile, int unit_stride,
     int plane, void *priv, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
@@ -2439,7 +2438,7 @@ void av1_lr_sync_write_dummy(void *const lr_sync, int r, int c,
 // the frame. However we still preserve the generic functionality here in this
 // function. In the future if we allow filtering to be conducted independently
 // within each tile, this function could be more useful.
-void av1_foreach_rest_unit_in_tile(const AV1PixelRect *tile_rect, int unit_idx0,
+void av1_foreach_rest_unit_in_tile(const PixelRect *tile_rect, int unit_idx0,
                                    int hunits_per_tile, int vunits_per_tile,
                                    int unit_stride, int unit_size, int ss_y,
                                    int plane, rest_unit_visitor_t on_rest_unit,
@@ -2480,7 +2479,7 @@ void av1_foreach_rest_unit_in_tile(const AV1PixelRect *tile_rect, int unit_idx0,
 // expected to be offset only if the tile_rect starts at row 0. Note that
 // this is a simple variation of the function above and could have been
 // combined, but they are kept distinct to avoid confusion in the future.
-void av1_foreach_rest_unit_in_sb(const AV1PixelRect *tile_rect, int unit_idx0,
+void av1_foreach_rest_unit_in_sb(const PixelRect *tile_rect, int unit_idx0,
                                  int hunits_per_tile, int vunits_per_tile,
                                  int unit_stride, int unit_size, int ss_y,
                                  int plane, rest_unit_visitor_t on_rest_unit,
@@ -2520,7 +2519,7 @@ void av1_foreach_rest_unit_in_sb(const AV1PixelRect *tile_rect, int unit_idx0,
 
 void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
                                     rest_unit_visitor_t on_rest_unit,
-                                    void *priv, AV1PixelRect *tile_rect,
+                                    void *priv, PixelRect *tile_rect,
                                     int32_t *tmpbuf,
                                     RestorationLineBuffers *rlbs) {
   const int is_uv = plane > 0;
@@ -2549,7 +2548,7 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
 
   const int is_uv = plane > 0;
 
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
   const int tile_w = tile_rect.right - tile_rect.left;
   const int tile_h = tile_rect.bottom - tile_rect.top;
 
@@ -2716,7 +2715,7 @@ static void save_tile_row_boundary_lines(const YV12_BUFFER_CONFIG *frame,
 
   // Get the tile rectangle, with height rounded up to the next multiple of 8
   // luma pixels (only relevant for the bottom tile of the frame)
-  const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
+  const PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
   const int stripe0 = 0;
 
   RestorationStripeBoundaries *boundaries = &cm->rst_info[plane].boundaries;
