@@ -374,7 +374,8 @@ static void fill_flow_field_borders(double *flow, int width, int height,
 // make sure flow_u and flow_v start at 0
 static void compute_flow_field(ImagePyramid *frm_pyr, ImagePyramid *ref_pyr,
                                FlowField *flow) {
-  int cur_width, cur_height, cur_stride, cur_loc;
+  int cur_width, cur_height, cur_stride;
+  size_t cur_loc;
   int cur_flow_width, cur_flow_height, cur_flow_stride;
 
   double *flow_u = flow->u;

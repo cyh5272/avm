@@ -13,6 +13,7 @@
 #ifndef AOM_AOM_DSP_LINALG_H_
 #define AOM_AOM_DSP_LINALG_H_
 
+#include <stdint.h>
 #include <math.h>
 
 #include "config/aom_config.h"
@@ -69,6 +70,11 @@ static INLINE double pythag(double a, double b) {
 
 int SVD(double *U, double *W, double *V, double *matx, int M, int N);
 
+int klt_filtered_components(int n, const int16_t **components, int width,
+                            int height, int stride, int kernel_size,
+                            int *kernel, double *klt);
+int klt_components(int n, const int16_t **components, int width, int height,
+                   int stride, double *klt);
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -322,8 +322,8 @@ int SVD(double *U, double *W, double *V, double *matx, int M, int N) {
 // The n x n forward KLT is returned in klt array which is assumed to store n^2
 // values in the KLT matrix in row by row order.
 // Returns 0 for success, 1 for failure.
-static INLINE int klt_components(int n, const int16_t **components, int width,
-                                 int height, int stride, double *klt) {
+int klt_components(int n, const int16_t **components, int width, int height,
+                   int stride, double *klt) {
   const int size = width * height;
   double one_by_size = 1.0 / size;
   int64_t *sumsq = (int64_t *)aom_malloc(n * (n + 2) * sizeof(*sumsq));
@@ -386,10 +386,9 @@ static INLINE int klt_components(int n, const int16_t **components, int width,
 
 // Variation of the above where filtered versions of the components
 // are used where the filter kernel is provided as an input.
-static INLINE int klt_filtered_components(int n, const int16_t **components,
-                                          int width, int height, int stride,
-                                          int kernel_size, int *kernel,
-                                          double *klt) {
+int klt_filtered_components(int n, const int16_t **components, int width,
+                            int height, int stride, int kernel_size,
+                            int *kernel, double *klt) {
   assert(kernel_size & 1);  // must be odd
   const int half_kernel_size = kernel_size >> 1;
   assert(width > 2 * half_kernel_size);

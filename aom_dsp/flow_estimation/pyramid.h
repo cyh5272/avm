@@ -17,6 +17,7 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
 #include "config/aom_config.h"
 
 // Maximum number of pyramid levels
@@ -48,7 +49,7 @@ typedef struct {
   int widths[MAX_PYRAMID_LEVELS];
   int heights[MAX_PYRAMID_LEVELS];
   int strides[MAX_PYRAMID_LEVELS];
-  int level_loc[MAX_PYRAMID_LEVELS];
+  size_t level_loc[MAX_PYRAMID_LEVELS];
   unsigned char *level_buffer;
 } ImagePyramid;
 

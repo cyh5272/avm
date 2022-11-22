@@ -78,9 +78,9 @@ typedef struct {
   double *v;
 
   // Sizes of the above arrays
-  size_t width;
-  size_t height;
-  size_t stride;
+  int width;
+  int height;
+  int stride;
 } FlowField;
 
 // We want to present external code with a generic type, which holds whatever
