@@ -499,12 +499,6 @@ static AOM_INLINE void setup_global_motion_info_params(AV1_COMP *cpi) {
   GlobalMotionInfo *const gm_info = &cpi->gm_info;
   YV12_BUFFER_CONFIG *source = cpi->source;
 
-/*
-  // The source buffer is 16-bit, so we need to convert to 8 bits for the
-  // following code. We cache the result until the source frame is released.
-  gm_info->src_buffer =
-      av1_downconvert_frame(source, cpi->common.seq_params.bit_depth);
-*/
   gm_info->segment_map_w =
       (source->y_width + WARP_ERROR_BLOCK) >> WARP_ERROR_BLOCK_LOG;
   gm_info->segment_map_h =
