@@ -4636,7 +4636,6 @@ static int64_t handle_inter_mode(
 
 #if CONFIG_BAWP
         int_mv bawp_off_mv[2];
-        int bawp_off_newmv_ret_val = 0;
         int64_t bawp_off_newmv_ret_val = 0;
         for (i = 0; i < is_comp_pred + 1; ++i) {
           bawp_off_mv[i].as_int = cur_mv[i].as_int;
