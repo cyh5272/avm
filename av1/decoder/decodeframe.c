@@ -2288,6 +2288,23 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       all_none = 0;
       chroma_none &= p == 0;
     }
+#if CONFIG_WIENER_NONSEP
+    if (p == AOM_PLANE_Y) {
+#if CONFIG_LR_FLEX_SYNTAX
+      // TODO: Figure out how to set this and clean up.
+      int read_num_classes = 1;
+#else
+      int read_num_classes =
+          rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
+          rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+#endif  // #if CONFIG_LR_FLEX_SYNTAX
+      read_num_classes = read_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+      if (read_num_classes)
+        rsi->num_filter_classes = decode_num_filter_classes(
+            aom_rb_read_literal(rb, NUM_FILTER_CLASSES_BITS));
+    } else
+      rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
+#endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
@@ -2596,8 +2613,7 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
   const int is_uv = (plane > 0);
   (void)is_uv;
 #if CONFIG_WIENER_NONSEP
-  rui->wienerns_info.num_classes =
-      xd->wienerns_info[plane].filter[0].num_classes;
+  rui->wienerns_info.num_classes = rsi->num_filter_classes;
 #endif  // CONFIG_WIENER_NONSEP
 
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE) {
@@ -3921,7 +3937,17 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
   av1_zero_above_context(cm, xd, tile_info.mi_col_start, tile_info.mi_col_end,
                          tile_row);
   av1_reset_loop_filter_delta(xd, num_planes);
-  av1_reset_loop_restoration(xd, 0, num_planes);
+#if CONFIG_WIENER_NONSEP
+  int num_filter_classes[MAX_MB_PLANE];
+  for (int p = 0; p < num_planes; ++p)
+    num_filter_classes[p] = cm->rst_info[p].num_filter_classes;
+#endif  // CONFIG_WIENER_NONSEP
+  av1_reset_loop_restoration(xd, 0, num_planes
+#if CONFIG_WIENER_NONSEP
+                             ,
+                             num_filter_classes
+#endif  // CONFIG_WIENER_NONSEP
+  );
 
 #if CONFIG_REF_MV_BANK
   av1_zero(xd->ref_mv_bank);
@@ -4416,7 +4442,17 @@ static AOM_INLINE void parse_tile_row_mt(AV1Decoder *pbi, ThreadData *const td,
   av1_zero_above_context(cm, xd, tile_info.mi_col_start, tile_info.mi_col_end,
                          tile_row);
   av1_reset_loop_filter_delta(xd, num_planes);
-  av1_reset_loop_restoration(xd, 0, num_planes);
+#if CONFIG_WIENER_NONSEP
+  int num_filter_classes[MAX_MB_PLANE];
+  for (int p = 0; p < num_planes; ++p)
+    num_filter_classes[p] = cm->rst_info[p].num_filter_classes;
+#endif  // CONFIG_WIENER_NONSEP
+  av1_reset_loop_restoration(xd, 0, num_planes
+#if CONFIG_WIENER_NONSEP
+                             ,
+                             num_filter_classes
+#endif  // CONFIG_WIENER_NONSEP
+  );
 
 #if CONFIG_REF_MV_BANK
   av1_zero(xd->ref_mv_bank);
