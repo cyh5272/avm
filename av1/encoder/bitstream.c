@@ -2575,6 +2575,26 @@ static AOM_INLINE void encode_restoration_mode(
       default: assert(0);
     }
 #endif  // CONFIG_LR_FLEX_SYNTAX
+#if CONFIG_WIENER_NONSEP
+    // Skip chroma.
+    if (p == AOM_PLANE_Y) {
+#if CONFIG_LR_FLEX_SYNTAX
+      // TODO: Figure out how to set this.
+      int write_num_classes = 1;
+#else
+      int write_num_classes =
+          rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
+          rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+#endif  // #if CONFIG_LR_FLEX_SYNTAX
+      write_num_classes = write_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+      if (write_num_classes)
+        aom_wb_write_literal(wb,
+                             encode_num_filter_classes(rsi->num_filter_classes),
+                             NUM_FILTER_CLASSES_BITS);
+    } else {
+      assert(rsi->num_filter_classes == NUM_WIENERNS_CLASS_INIT_CHROMA);
+    }
+#endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
@@ -5238,7 +5258,17 @@ static uint32_t write_tiles_in_tg_obus(AV1_COMP *const cpi, uint8_t *const dst,
       mode_bc.allow_update_cdf =
           mode_bc.allow_update_cdf && !cm->features.disable_cdf_update;
       const int num_planes = av1_num_planes(cm);
-      av1_reset_loop_restoration(&cpi->td.mb.e_mbd, 0, num_planes);
+#if CONFIG_WIENER_NONSEP
+      int num_filter_classes[MAX_MB_PLANE];
+      for (int p = 0; p < num_planes; ++p)
+        num_filter_classes[p] = cm->rst_info[p].num_filter_classes;
+#endif  // CONFIG_WIENER_NONSEP
+      av1_reset_loop_restoration(&cpi->td.mb.e_mbd, 0, num_planes
+#if CONFIG_WIENER_NONSEP
+                                 ,
+                                 num_filter_classes
+#endif  // CONFIG_WIENER_NONSEP
+      );
 
       aom_start_encode(&mode_bc, dst + total_size);
       write_modes(cpi, &tile_info, &mode_bc, tile_row, tile_col);
