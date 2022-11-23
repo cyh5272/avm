@@ -533,6 +533,9 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
                                fc->obmc_cdf[i], NULL);
     }
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_BAWP
+    av1_cost_tokens_from_cdf(mode_costs->bawp_flg_cost, fc->bawp_cdf, NULL);
+#endif
     for (i = 0; i < COMP_GROUP_IDX_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_group_idx_cost[i],
                                fc->comp_group_idx_cdf[i], NULL);
@@ -1551,6 +1554,7 @@ void av1_mv_pred(const AV1_COMP *cpi, MACROBLOCK *x, uint16_t *ref_y_buffer,
 
     const uint16_t *const ref_y_ptr =
         &ref_y_buffer[ref_y_stride * fp_row + fp_col];
+
     // Find sad for current vector.
     const int this_sad = cpi->fn_ptr[block_size].sdf(
         src_y_ptr, x->plane[0].src.stride, ref_y_ptr, ref_y_stride);
