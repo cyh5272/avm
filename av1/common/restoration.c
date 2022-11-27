@@ -1832,32 +1832,6 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
 #endif  // CONFIG_PC_WIENER
 
 #if CONFIG_WIENER_NONSEP
-void apply_wienerns_highbd(const uint8_t *dgd8, int width, int height,
-                           int stride, int base_qindex, const int16_t *filter,
-                           uint8_t *dst8, int dst_stride, int plane,
-                           const uint8_t *luma8, int luma_stride,
-                           int bit_depth) {
-  (void)luma8;
-  (void)luma_stride;
-  int is_uv = (plane != AOM_PLANE_Y);
-  const NonsepFilterConfig *nsfilter_config =
-      get_wienerns_config(base_qindex, is_uv);
-  const int16_t *filter_ = filter;
-#if CONFIG_WIENER_NONSEP_CROSS_FILT
-  if (!is_uv || nsfilter_config->num_pixels2 == 0) {
-    av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter_config,
-                               filter_, dst8, dst_stride, bit_depth);
-  } else {
-    av1_convolve_nonsep_dual_highbd(dgd8, width, height, stride, luma8,
-                                    luma_stride, nsfilter_config, filter_, dst8,
-                                    dst_stride, bit_depth);
-  }
-#else
-  av1_convolve_nonsep_highbd(dgd8, width, height, stride, nsfilter_config,
-                             filter_, dst8, dst_stride, bit_depth);
-#endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
-  return;
-}
 
 #if CONFIG_COMBINE_PC_NS_WIENER
 const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index) {
