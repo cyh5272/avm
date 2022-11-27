@@ -2509,7 +2509,6 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
       cm->seq_params.bit_depth);
   assert(luma_buf != NULL);
 #endif  // CONFIG_WIENER_NONSEP && CONFIG_WIENER_NONSEP_CROSS_FILT
-  RusPerTileHelper rus_per_tile_helper = av1_get_rus_per_tile_helper(cm);
 
   for (int plane = 0; plane < num_planes; ++plane) {
     if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) {
@@ -2553,9 +2552,9 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     ctxt[plane].class_id_stride = cm->mi_params.class_id_stride[plane];
 #endif  // CONFIG_PC_WIENER
 
-    av1_foreach_rest_unit_in_plane(
-        cm, plane, lr_ctxt->on_rest_unit, &ctxt[plane], &ctxt[plane].tile_rect,
-        cm->rst_tmpbuf, cm->rlbs, &rus_per_tile_helper);
+    av1_foreach_rest_unit_in_plane(cm, plane, lr_ctxt->on_rest_unit,
+                                   &ctxt[plane], &ctxt[plane].tile_rect,
+                                   cm->rst_tmpbuf, cm->rlbs);
   }
 
 #if CONFIG_WIENER_NONSEP && CONFIG_WIENER_NONSEP_CROSS_FILT
@@ -2613,6 +2612,20 @@ RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm) {
                                 &ru_row_end, &ru_col_start, &ru_col_end);
       helper.begin_ru_col_in_tile[plane][tile_col] = ru_col_start;
       helper.end_ru_col_in_tile[plane][tile_col] = ru_col_end;
+    }
+  }
+  for (int plane = 0; plane < helper.num_planes; ++plane) {
+    int ru_base_idx = 0;
+    for (int tile_row = 0; tile_row < helper.tile_rows; tile_row++) {
+      for (int tile_col = 0; tile_col < helper.tile_cols; tile_col++) {
+        const int ru_start_row = helper.begin_ru_row_in_tile[plane][tile_row];
+        const int ru_end_row = helper.end_ru_row_in_tile[plane][tile_row];
+        const int ru_start_col = helper.begin_ru_col_in_tile[plane][tile_col];
+        const int ru_end_col = helper.end_ru_col_in_tile[plane][tile_col];
+        helper.ru_base_idx[plane][tile_row][tile_col] = ru_base_idx;
+        ru_base_idx +=
+            (ru_end_col - ru_start_col) * (ru_end_row - ru_start_row);
+      }
     }
   }
   return helper;
@@ -2713,11 +2726,11 @@ static void foreach_rest_unit_in_tile(const AV1PixelRect *tile_rect,
   }
 }
 
-void av1_foreach_rest_unit_in_plane(
-    const struct AV1Common *cm, int plane, rest_unit_visitor_t on_rest_unit,
-    void *priv, AV1PixelRect *tile_rect, int32_t *tmpbuf,
-    RestorationLineBuffers *rlbs, const RusPerTileHelper *rus_per_tile_helper) {
-  (void)rus_per_tile_helper;
+void av1_foreach_rest_unit_in_plane(const struct AV1Common *cm, int plane,
+                                    rest_unit_visitor_t on_rest_unit,
+                                    void *priv, AV1PixelRect *tile_rect,
+                                    int32_t *tmpbuf,
+                                    RestorationLineBuffers *rlbs) {
   const int is_uv = plane > 0;
   const int ss_y = is_uv && cm->seq_params.subsampling_y;
 
@@ -2734,9 +2747,7 @@ void av1_foreach_rest_unit_in_plane(
 void av1_foreach_rest_unit_in_rutile(
     const struct AV1Common *cm, int plane, int unit_idx0, int horz_units,
     int vert_units, rest_unit_visitor_t on_rest_unit, void *priv,
-    AV1PixelRect *tile_rect, int32_t *tmpbuf, RestorationLineBuffers *rlbs,
-    const RusPerTileHelper *rus_per_tile_helper) {
-  (void)rus_per_tile_helper;
+    AV1PixelRect *tile_rect, int32_t *tmpbuf, RestorationLineBuffers *rlbs) {
   const int is_uv = plane > 0;
   const int ss_y = is_uv && cm->seq_params.subsampling_y;
 
