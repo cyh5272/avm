@@ -165,6 +165,10 @@ typedef struct {
 
   // If !=0 search_wienerns computes statistics and quick-returns.
   int compute_stats_and_return;
+  // Number of classes in the initial wienerns stat calculation.
+  int num_stat_classes;
+  // Number of classes in the wienerns filtering calculation.
+  int num_filter_classes;
 
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint8_t *luma;
@@ -190,7 +194,9 @@ typedef struct {
 typedef struct RstUnitStats {
   double A[WIENERNS_MAX_CLASSES * WIENERNS_MAX * WIENERNS_MAX];
   double b[WIENERNS_MAX_CLASSES * WIENERNS_MAX];
+  // TODO(oguleryuz): Add weights.
   int64_t real_sse;
+  int num_stats_classes;
   int ru_idx;  // debug.
 } RstUnitStats;
 #endif  // CONFIG_WIENER_NONSEP
@@ -225,16 +231,9 @@ static AOM_INLINE void reset_all_banks(RestSearchCtxt *rsc) {
   av1_reset_wiener_bank(&rsc->wiener_bank);
   av1_reset_sgrproj_bank(&rsc->sgrproj_bank);
 #if CONFIG_WIENER_NONSEP
-#if CONFIG_COMBINE_PC_NS_WIENER
-  // TODO: Adjust every frame.
-  const int num_classes_per_frame = rsc->plane == AOM_PLANE_Y ? 2 : 1;
-#else
-  const int num_classes_per_frame = 1;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
-  // TODO add num_classes_per_frame
   av1_reset_wienerns_bank(&rsc->wienerns_bank,
                           rsc->cm->quant_params.base_qindex,
-                          num_classes_per_frame, rsc->plane != AOM_PLANE_Y);
+                          rsc->num_filter_classes, rsc->plane != AOM_PLANE_Y);
 #endif  // CONFIG_WIENER_NONSEP
 }
 
@@ -444,6 +443,11 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
   rsc->unit_stack = unit_stack;
   rsc->unit_indices = unit_indices;
 #endif  // CONFIG_RST_MERGECOEFFS
+#if CONFIG_WIENER_NONSEP
+  rsc->num_stat_classes =
+      is_uv ? NUM_WIENERNS_CLASS_INIT_CHROMA : NUM_WIENERNS_CLASS_INIT_LUMA;
+  rsc->num_filter_classes = rsc->num_stat_classes;
+#endif  // CONFIG_WIENER_NONSEP
 }
 
 static int rest_tiles_in_plane(const AV1_COMMON *cm, int plane) {
@@ -3258,8 +3262,9 @@ static void quantize_wrapper(int n, const double *square_mat_A, int stride,
       }
       half_normalizers[col] = AOMMAX(sum, eps) / 2;
     }
-
+#ifndef NDEBUG
     double prev_err = 1e90;
+#endif
     int change = 1;
     int num_iterations = 0;
     while (change && num_iterations < max_num_iterations) {
@@ -3315,17 +3320,17 @@ static void quantize_wrapper(int n, const double *square_mat_A, int stride,
 #endif  // USE_Q_WRAPPER
 
 static int64_t compute_stats_for_wienerns_filter(
-    RestSearchCtxt *rsc, const uint8_t *dgd, const uint8_t *src,
-    const RestorationTileLimits *limits, int dgd_stride, int src_stride,
-    const RestorationUnitInfo *rui, int bit_depth, double *A, double *b,
-    const WienernsFilterParameters *nsfilter_params) {
+    const uint8_t *dgd, const uint8_t *src, const RestorationTileLimits *limits,
+    int dgd_stride, int src_stride, const RestorationUnitInfo *rui,
+    int bit_depth, double *A, double *b,
+    const WienernsFilterParameters *nsfilter_params, int num_classes) {
+  (void)rui;
   const uint16_t *src_hbd = CONVERT_TO_SHORTPTR(src);
   const uint16_t *dgd_hbd = CONVERT_TO_SHORTPTR(dgd);
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
   const uint16_t *luma_hbd = CONVERT_TO_SHORTPTR(rui->luma);
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 
-  const int num_classes = rsc->wienerns_bank.filter[0].num_classes;
   const int total_dim_A = num_classes * WIENERNS_MAX * WIENERNS_MAX;
   const int stride_A = WIENERNS_MAX * WIENERNS_MAX;
   const int total_dim_b = num_classes * WIENERNS_MAX;
@@ -3341,9 +3346,9 @@ static int64_t compute_stats_for_wienerns_filter(
   memset(A, 0, sizeof(*A) * total_dim_A);
   memset(b, 0, sizeof(*b) * total_dim_b);
 
-  int is_uv = (rui->plane != AOM_PLANE_Y);
   const int(*wienerns_config)[3] = nsfilter_params->nsfilter_config.config;
 #if CONFIG_WIENER_NONSEP_CROSS_FILT
+  int is_uv = (rui->plane != AOM_PLANE_Y);
   const int(*wienerns_config2)[3] =
       is_uv ? nsfilter_params->nsfilter_config.config2 : NULL;
   const int end_pixel = is_uv ? nsfilter_params->nsfilter_config.num_pixels +
@@ -3436,7 +3441,8 @@ static int compute_quantized_wienerns_filter(
     const AV1PixelRect *tile_rect, RestorationUnitInfo *rui, const double *A,
     const double *b, int64_t real_sse,
     const WienernsFilterParameters *nsfilter_params) {
-  const int num_classes = rsc->wienerns_bank.filter[0].num_classes;
+  const int num_classes = rsc->num_filter_classes;
+  assert(num_classes == rsc->wienerns_bank.filter[0].num_classes);
   const int stride_A = WIENERNS_MAX * WIENERNS_MAX;
   const int total_dim_b = num_classes * WIENERNS_MAX;
   const int stride_b = WIENERNS_MAX;
@@ -3799,16 +3805,18 @@ static void search_wienerns(const RestorationTileLimits *limits,
   const WienernsFilterParameters *nsfilter_params = get_wienerns_parameters(
       rsc->cm->quant_params.base_qindex, rsc->plane != AOM_PLANE_Y);
 
-  const int num_classes = rsc->wienerns_bank.filter[0].num_classes;
+  const int num_classes = rsc->num_filter_classes;
+  assert(num_classes == rsc->wienerns_bank.filter[0].num_classes);
   rui.wienerns_info.num_classes = num_classes;
   if (rsc->compute_stats_and_return) {
     // Calculate and save this RU's stats.
     RstUnitStats unit_stats;
     unit_stats.real_sse = compute_stats_for_wienerns_filter(
-        rsc, rsc->dgd_buffer, rsc->src_buffer, limits, rsc->dgd_stride,
+        rsc->dgd_buffer, rsc->src_buffer, limits, rsc->dgd_stride,
         rsc->src_stride, &rui, rsc->cm->seq_params.bit_depth, unit_stats.A,
-        unit_stats.b, nsfilter_params);
+        unit_stats.b, nsfilter_params, rsc->num_stat_classes);
     unit_stats.ru_idx = rest_unit_idx;
+    unit_stats.num_stats_classes = rsc->num_stat_classes;
     aom_vector_push_back(rsc->wienerns_stats, &unit_stats);
     return;
   }
@@ -4569,6 +4577,9 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
     }
   }
   rsi->frame_restoration_type = ntools < 2 ? rused : RESTORE_SWITCHABLE;
+#if CONFIG_WIENER_NONSEP
+  rsi->num_filter_classes = rsc->num_filter_classes;
+#endif
 #if CONFIG_LR_FLEX_SYNTAX
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE &&
       rsc->cm->features.lr_tools_count[rsc->plane] > 2) {
@@ -4608,6 +4619,71 @@ static void finalize_unit_info(RestorationType frame_rtype,
     }
   }
 }
+
+#if CONFIG_WIENER_NONSEP
+// Reduces the class granularity of the stats to target_classes.
+static void collapse_stats_to_target_classes(int target_classes,
+                                             const uint8_t *class_converter,
+                                             RstUnitStats *unit_stats) {
+  assert(unit_stats->num_stats_classes >= target_classes);
+  if (unit_stats->num_stats_classes == target_classes) return;
+
+  // TODO: Reduce buffer/copy size.
+  RstUnitStats collapsed_unit_stats;
+  memset(&collapsed_unit_stats, 0, sizeof(collapsed_unit_stats));
+  collapsed_unit_stats.ru_idx = unit_stats->ru_idx;
+  collapsed_unit_stats.real_sse = unit_stats->real_sse;
+  collapsed_unit_stats.num_stats_classes = target_classes;
+
+  const int dim_per_class_A = WIENERNS_MAX * WIENERNS_MAX;
+  const int dim_per_class_b = WIENERNS_MAX;
+  for (int c_id = 0; c_id < unit_stats->num_stats_classes; ++c_id) {
+    const int tc_id = class_converter[c_id];
+    for (int i = 0; i < dim_per_class_A; ++i) {
+      collapsed_unit_stats.A[tc_id * dim_per_class_A + i] +=
+          unit_stats->A[c_id * dim_per_class_A + i];
+    }
+    for (int i = 0; i < dim_per_class_b; ++i) {
+      collapsed_unit_stats.b[tc_id * dim_per_class_b + i] +=
+          unit_stats->b[c_id * dim_per_class_b + i];
+    }
+  }
+  *unit_stats = collapsed_unit_stats;
+}
+
+static void find_optimal_num_classes_and_filters(RestSearchCtxt *rsc) {
+  // TODO(oguleryuz): Fill this routine.
+  rsc->num_filter_classes = rsc->plane == AOM_PLANE_Y
+                                ? NUM_WIENERNS_CLASS_INIT_LUMA
+                                : NUM_WIENERNS_CLASS_INIT_CHROMA;
+}
+
+// Initial set of stats are determined using rsc->num_stat_classes classes.
+// After optimization the final class number is rsc->num_filter_classes. This
+// routine collapses the initial set of stats to rsc->num_filter_classes for
+// downstream use.
+static void collapse_all_stats(RestSearchCtxt *rsc) {
+  const int num_stats_classes = rsc->num_stat_classes;
+  const int target_classes = rsc->num_filter_classes;
+
+  int qindex_offset = 0;
+  if (rsc->plane != AOM_PLANE_Y)
+    qindex_offset = rsc->plane == AOM_PLANE_U
+                        ? rsc->cm->quant_params.u_dc_delta_q
+                        : rsc->cm->quant_params.v_dc_delta_q;
+  else
+    qindex_offset = rsc->cm->quant_params.y_dc_delta_q;
+  const int bank_index =
+      get_filter_bank_index(rsc->cm->quant_params.base_qindex + qindex_offset);
+  const uint8_t *class_converter =
+      get_converter(bank_index, num_stats_classes, target_classes);
+  VECTOR_FOR_EACH(rsc->wienerns_stats, unit_stats) {
+    collapse_stats_to_target_classes(target_classes, class_converter,
+                                     (RstUnitStats *)(unit_stats.pointer));
+  }
+}
+
+#endif  // CONFIG_WIENER_NONSEP
 
 void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
@@ -4734,8 +4810,10 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
           rsc.compute_stats_and_return = 0;
 
           // Find RDO-num_classes and frame-level filters.
-          // TODO(oguleryuz): Decide num_classes and calculate frame-level
-          //  filters here.
+          find_optimal_num_classes_and_filters(&rsc);
+
+          // Collapse stats to resulting num_classes;
+          collapse_all_stats(&rsc);
         }
 #endif  // CONFIG_WIENER_NONSEP
         double cost = search_rest_type(&rsc, &rus_per_tile_helper, r);

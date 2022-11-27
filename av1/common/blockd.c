@@ -126,20 +126,18 @@ void av1_reset_loop_filter_delta(MACROBLOCKD *xd, int num_planes) {
   for (int lf_id = 0; lf_id < frame_lf_count; ++lf_id) xd->delta_lf[lf_id] = 0;
 }
 
-void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start,
-                                int plane_end) {
+void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start, int plane_end
+#if CONFIG_WIENER_NONSEP
+                                ,
+                                const int *num_filter_classes
+#endif  // CONFIG_WIENER_NONSEP
+) {
   for (int p = plane_start; p < plane_end; ++p) {
     av1_reset_wiener_bank(&xd->wiener_info[p]);
     av1_reset_sgrproj_bank(&xd->sgrproj_info[p]);
 #if CONFIG_WIENER_NONSEP
-#if CONFIG_COMBINE_PC_NS_WIENER
-    // TODO(oguleryuz): Adjust every frame.
-    const int num_classes_per_frame = p == AOM_PLANE_Y ? 2 : 1;
-#else
-    const int num_classes_per_frame = 1;
-#endif  // CONFIG_COMBINE_PC_NS_WIENER
     av1_reset_wienerns_bank(&xd->wienerns_info[p], xd->base_qindex,
-                            num_classes_per_frame, p != AOM_PLANE_Y);
+                            num_filter_classes[p], p != AOM_PLANE_Y);
 #endif  // CONFIG_WIENER_NONSEP
   }
 }
@@ -261,7 +259,6 @@ void av1_get_from_sgrproj_bank(SgrprojInfoBank *bank, int ndx,
 void av1_reset_wienerns_bank(WienerNonsepInfoBank *bank, int qindex,
                              int num_classes, int chroma) {
   for (int i = 0; i < LR_BANK_SIZE; ++i) {
-    // TODO: Change the default initialization.
     set_default_wienerns(&bank->filter[i], qindex, num_classes, chroma);
   }
   for (int c_id = 0; c_id < num_classes; ++c_id) {

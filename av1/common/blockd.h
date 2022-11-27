@@ -757,8 +757,12 @@ typedef struct {
 #if CONFIG_WIENER_NONSEP
 #if CONFIG_COMBINE_PC_NS_WIENER
 #define WIENERNS_MAX_CLASSES 4
+#define NUM_WIENERNS_CLASS_INIT_LUMA 4
+#define NUM_WIENERNS_CLASS_INIT_CHROMA 1
 #else
 #define WIENERNS_MAX_CLASSES 1
+#define NUM_WIENERNS_CLASS_INIT_LUMA 1
+#define NUM_WIENERNS_CLASS_INIT_CHROMA 1
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 // Need two of the WIENERNS_YUV_MAX to store potential center taps. Adjust
@@ -1917,8 +1921,12 @@ void av1_upd_to_wienerns_bank(WienerNonsepInfoBank *bank, int ndx,
                               const WienerNonsepInfo *info, int class_id);
 #endif  // CONFIG_WIENER_NONSEP
 
-void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start,
-                                int plane_end);
+void av1_reset_loop_restoration(MACROBLOCKD *xd, int plane_start, int plane_end
+#if CONFIG_WIENER_NONSEP
+                                ,
+                                const int *num_filter_classes
+#endif  // CONFIG_WIENER_NONSEP
+);
 
 typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   int blk_row, int blk_col,

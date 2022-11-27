@@ -452,6 +452,13 @@ typedef struct {
    */
   uint8_t sw_lr_tools_disable_mask;
 #endif  // CONFIG_LR_FLEX_SYNTAX
+
+#if CONFIG_WIENER_NONSEP
+  /*!
+   * Number of classes in the Wienerns filtering calculation.
+   */
+  int num_filter_classes;
+#endif
 } RestorationInfo;
 
 /*!\cond */
