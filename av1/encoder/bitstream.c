@@ -2576,10 +2576,9 @@ static AOM_INLINE void encode_restoration_mode(
     }
 #endif  // CONFIG_LR_FLEX_SYNTAX
 #if CONFIG_WIENER_NONSEP
-    // Skip chroma.
     if (p == AOM_PLANE_Y) {
 #if CONFIG_LR_FLEX_SYNTAX
-      // TODO: Figure out how to set this.
+      // TODO: Figure out how to set this and clean up.
       int write_num_classes = 1;
 #else
       int write_num_classes =

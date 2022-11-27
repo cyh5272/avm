@@ -2302,6 +2302,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       if (read_num_classes)
         rsi->num_filter_classes = decode_num_filter_classes(
             aom_rb_read_literal(rb, NUM_FILTER_CLASSES_BITS));
+      else
+        rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_LUMA;
     } else
       rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
 #endif  // CONFIG_WIENER_NONSEP
