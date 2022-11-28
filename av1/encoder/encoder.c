@@ -683,7 +683,7 @@ static void set_seq_lr_tools_mask(SequenceHeader *const seq_params,
 #if CONFIG_PC_WIENER
   if (!tool_cfg->enable_pc_wiener) {
     seq_params->lr_tools_disable_mask[0] |= (1 << RESTORE_PC_WIENER);
-    seq_params->lr_tools_disable_mask[1] |= 1;
+    seq_params->lr_tools_disable_mask[1] |= (1 << RESTORE_PC_WIENER);
   }
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_WIENER_NONSEP
