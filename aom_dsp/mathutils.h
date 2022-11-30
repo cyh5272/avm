@@ -10,14 +10,17 @@
  * aomedia.org/license/patent-license/.
  */
 
-#ifndef AOM_AV1_ENCODER_MATHUTILS_H_
-#define AOM_AV1_ENCODER_MATHUTILS_H_
+#ifndef AOM_AOM_DSP_MATHUTILS_H_
+#define AOM_AOM_DSP_MATHUTILS_H_
 
 #include <memory.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_mem/aom_mem.h"
 
 static const double TINY_NEAR_ZERO = 1.0E-16;
 
@@ -519,4 +522,4 @@ static INLINE int klt_filtered_components(int n, const int16_t **components,
   aom_free(covar);
   return res;
 }
-#endif  // AOM_AV1_ENCODER_MATHUTILS_H_
+#endif  // AOM_AOM_DSP_MATHUTILS_H_

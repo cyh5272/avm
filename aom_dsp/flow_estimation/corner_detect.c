@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2022, Alliance for Open Media. All rights reserved
  *
  * This source code is subject to the terms of the BSD 3-Clause Clear License
  * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
@@ -18,7 +18,7 @@
 
 #include "third_party/fastfeat/fast.h"
 
-#include "av1/encoder/corner_detect.h"
+#include "aom_dsp/flow_estimation/corner_detect.h"
 
 // Fast_9 wrapper
 #define FAST_BARRIER 18

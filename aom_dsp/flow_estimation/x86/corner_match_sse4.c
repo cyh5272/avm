@@ -1,13 +1,12 @@
 /*
- * Copyright (c) 2021, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2018, Alliance for Open Media. All rights reserved
  *
- * This source code is subject to the terms of the BSD 3-Clause Clear License
- * and the Alliance for Open Media Patent License 1.0. If the BSD 3-Clause Clear
- * License was not distributed with this source code in the LICENSE file, you
- * can obtain it at aomedia.org/license/software-license/bsd-3-c-c/.  If the
- * Alliance for Open Media Patent License 1.0 was not distributed with this
- * source code in the PATENTS file, you can obtain it at
- * aomedia.org/license/patent-license/.
+ * This source code is subject to the terms of the BSD 2 Clause License and
+ * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+ * was not distributed with this source code in the LICENSE file, you can
+ * obtain it at www.aomedia.org/license/software. If the Alliance for Open
+ * Media Patent License 1.0 was not distributed with this source code in the
+ * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
 #include <stdlib.h>
@@ -17,11 +16,10 @@
 
 #include <smmintrin.h>
 
-#include "config/av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "aom_ports/mem.h"
-#include "aom_ports/system_state.h"
-#include "av1/encoder/corner_match.h"
+#include "aom_dsp/flow_estimation/corner_match.h"
 
 DECLARE_ALIGNED(16, static const uint8_t,
                 byte_mask[16]) = { 255, 255, 255, 255, 255, 255, 255, 255,
@@ -101,6 +99,5 @@ double av1_compute_cross_correlation_sse4_1(unsigned char *im1, int stride1,
 
   int var2 = sumsq2 * MATCH_SZ_SQ - sum2 * sum2;
   int cov = cross * MATCH_SZ_SQ - sum1 * sum2;
-  aom_clear_system_state();
   return cov / sqrt((double)var2);
 }
