@@ -74,9 +74,10 @@ static uint8_t calculate_next_resize_scale(const AV1_COMP *cpi) {
 
 #if CONFIG_EXT_SUPERRES
 static bool superres_in_recode_allowed_qp(const AV1_COMP *const cpi) {
+  const int qpoff = (cpi->td.mb.e_mbd.bd - 8) * 24;
   const int qp = cpi->oxcf.rc_cfg.qp;
-  const int q_thresh_kf = 160;
-  const int q_thresh_non_kf = 185;
+  const int q_thresh_kf = 160 + qpoff;
+  const int q_thresh_non_kf = 160 + qpoff;
 
   return (frame_is_intra_only(&cpi->common) && qp > q_thresh_kf) ||
          qp > q_thresh_non_kf;
