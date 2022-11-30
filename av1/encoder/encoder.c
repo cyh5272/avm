@@ -3027,7 +3027,7 @@ static INLINE int compute_tip_direct_output_mode_RD(AV1_COMP *cpi,
 
     // Compute sse and rate.
     YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
-    *sse = aom_highbd_get_y_sse(cpi->source, tip_frame_buf);
+    *sse = aom_highbd_get_y_sse(&cpi->scaled_source, tip_frame_buf);
 
     const int64_t bits = (*size << 3);
     *rate = (bits << 5);  // To match scale.
