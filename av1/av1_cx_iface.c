@@ -1060,11 +1060,11 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
 #endif  // CONFIG_REF_MV_BANK
 }
 
-static double convert_qp_offset(int qp, int qp_offset, int bit_depth) {
+static double convert_qp_offset_to_ratio(int qp, int qp_offset, int bit_depth) {
   const double base_q_val = av1_convert_qindex_to_q(qp, bit_depth);
   const int new_qp = AOMMAX(qp - qp_offset, 0);
   const double new_q_val = av1_convert_qindex_to_q(new_qp, bit_depth);
-  return (base_q_val - new_q_val);
+  return (base_q_val - new_q_val) / base_q_val;
 }
 
 static double get_modeled_qp_offset(int qp, int level, int bit_depth,
@@ -1098,7 +1098,7 @@ static double get_modeled_qp_offset(int qp, int level, int bit_depth,
       }
     }
   }
-  return q_val * factor / 100;
+  return factor / 100;
 }
 
 // update_config parameter is used to indicate whether extra command line
@@ -1337,14 +1337,14 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   for (int i = 0; i < FIXED_QP_OFFSET_COUNT; ++i) {
     if (q_cfg->use_fixed_qp_offsets) {
       if (cfg->fixed_qp_offsets[i] >= 0) {  // user-provided qp offset
-        q_cfg->fixed_qp_offsets[i] = convert_qp_offset(
+        q_cfg->fixed_q_offsets[i] = convert_qp_offset_to_ratio(
             rc_cfg->qp, cfg->fixed_qp_offsets[i], tool_cfg->bit_depth);
       } else {  // auto-selected qp offset
-        q_cfg->fixed_qp_offsets[i] = get_modeled_qp_offset(
+        q_cfg->fixed_q_offsets[i] = get_modeled_qp_offset(
             rc_cfg->qp, i, tool_cfg->bit_depth, q_cfg->q_based_qp_offsets);
       }
     } else {
-      q_cfg->fixed_qp_offsets[i] = -1.0;
+      q_cfg->fixed_q_offsets[i] = -1.0;
     }
   }
 
