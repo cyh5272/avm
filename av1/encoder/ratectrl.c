@@ -1067,7 +1067,7 @@ static int get_active_qp(const RATE_CONTROL *rc,
  *
  * The q index offsets are fixed in the sense that they are independent of the
  * video content. The offsets for each pyramid level are taken from
- * \c oxcf->q_cfg.fixed_qp_offsets array.
+ * \c oxcf->q_cfg.fixed_q_offsets array.
  *
  * \ingroup rate_control
  * \param[in]   oxcf        Top level encoder configuration
@@ -1113,12 +1113,12 @@ static int get_q_using_fixed_offsets(const AV1EncoderConfig *const oxcf,
     return qp;  // Directly Return worst quality allowed.
   }
   assert(offset_idx >= 0 && offset_idx < FIXED_QP_OFFSET_COUNT);
-  assert(oxcf->q_cfg.fixed_qp_offsets[offset_idx] >= 0);
+  assert(oxcf->q_cfg.fixed_q_offsets[offset_idx] >= 0);
 
   // Get qindex offset, by first converting to 'q' and then back.
   const double q_val_orig = av1_convert_qindex_to_q(qp, bit_depth);
   const double q_val_target =
-      AOMMAX(q_val_orig - oxcf->q_cfg.fixed_qp_offsets[offset_idx], 0.0);
+      AOMMAX(q_val_orig * (1.0 - oxcf->q_cfg.fixed_q_offsets[offset_idx]), 0.0);
   const int delta_qindex =
       av1_compute_qdelta(rc, q_val_orig, q_val_target, bit_depth);
   return AOMMAX(qp + delta_qindex, 0);

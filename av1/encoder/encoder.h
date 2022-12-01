@@ -723,13 +723,15 @@ typedef struct {
 } InputCfg;
 
 typedef struct {
-  // List of QP offsets for: keyframe, ALTREF, and 3 levels of internal ARFs.
-  // If any of these values are negative, fixed offsets are disabled.
-  double fixed_qp_offsets[FIXED_QP_OFFSET_COUNT];
+  // List of Q-step ratio offsets for: keyframe, ALTREF, and 3 levels of
+  // internal ARFs.  If any of these values are negative, fixed offsets
+  // are disabled.
+  double fixed_q_offsets[FIXED_QP_OFFSET_COUNT];
   // If the value is 0 (default), encoder may not use fixed QP offsets.
   // If the value is 1, encoder will use fixed QP offsets, that are
   // either:
-  // - Given by the user, and stored in 'fixed_qp_offsets' array, OR
+  // - Given by the user, and stored in 'fixed_q_offsets' array after
+  // conversion to Q-step ratio offset, OR
   // - Picked automatically from qp using a fixed factor.
   // If the value is 2, encoder will use fixed QP offsets that are :
   // - Derived from qp and has variable factors across Temporal levels as a fn.
