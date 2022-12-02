@@ -4616,7 +4616,8 @@ static void gather_stats_rest_type(RestSearchCtxt *rsc,
     NULL
   };
 #if CONFIG_WIENER_NONSEP
-  aom_vector_clear(rsc->wienerns_stats);
+  if(rtype == RESTORE_WIENER_NONSEP)
+    aom_vector_clear(rsc->wienerns_stats);
 #endif  // CONFIG_WIENER_NONSEP
   if (funs[rtype]) process_by_rutile(rsc, rus_per_tile_helper, funs[rtype]);
 }
