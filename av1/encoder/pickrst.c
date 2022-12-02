@@ -196,6 +196,7 @@ typedef struct RstUnitStats {
   int64_t real_sse;
   int num_stats_classes;
   int ru_idx;  // debug.
+  int plane;   // debug.
 } RstUnitStats;
 #endif  // CONFIG_WIENER_NONSEP
 
@@ -3814,6 +3815,7 @@ static void gather_stats_wienerns(const RestorationTileLimits *limits,
       rsc->src_stride, &rui, rsc->cm->seq_params.bit_depth, unit_stats.A,
       unit_stats.b, nsfilter_params, rsc->num_stat_classes);
   unit_stats.ru_idx = rest_unit_idx;
+  unit_stats.plane = rsc->plane;
   unit_stats.num_stats_classes = rsc->num_stat_classes;
   aom_vector_push_back(rsc->wienerns_stats, &unit_stats);
   return;
@@ -3880,6 +3882,7 @@ static void search_wienerns(const RestorationTileLimits *limits,
   const RstUnitStats *unit_stats = (const RstUnitStats *)aom_vector_const_get(
       rsc->wienerns_stats, rsc->ru_idx_base + rest_unit_idx_in_rutile);
   assert(unit_stats->ru_idx == rest_unit_idx);
+  assert(unit_stats->plane == rsc->plane);
 
   if (!compute_quantized_wienerns_filter(
           rsc, limits, tile_rect, &rui, unit_stats->A, unit_stats->b,
@@ -4735,6 +4738,7 @@ static void collapse_stats_to_target_classes(int target_classes,
   RstUnitStats collapsed_unit_stats;
   memset(&collapsed_unit_stats, 0, sizeof(collapsed_unit_stats));
   collapsed_unit_stats.ru_idx = unit_stats->ru_idx;
+  collapsed_unit_stats.plane = unit_stats->plane;
   collapsed_unit_stats.real_sse = unit_stats->real_sse;
   collapsed_unit_stats.num_stats_classes = target_classes;
 
