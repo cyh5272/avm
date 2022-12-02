@@ -4618,6 +4618,7 @@ static void gather_stats_rest_type(RestSearchCtxt *rsc,
 #endif  // CONFIG_WIENER_NONSEP
     NULL
   };
+  // TODO(oguleryuz): Move to reset_rsc_stats().
 #if CONFIG_WIENER_NONSEP
   if (rtype == RESTORE_WIENER_NONSEP) aom_vector_clear(rsc->wienerns_stats);
 #endif  // CONFIG_WIENER_NONSEP
