@@ -2576,22 +2576,26 @@ static AOM_INLINE void encode_restoration_mode(
     }
 #endif  // CONFIG_LR_FLEX_SYNTAX
 #if CONFIG_WIENER_NONSEP
-    if (p == AOM_PLANE_Y) {
+    int is_wiener_nonsep_possible =
+        rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
+        rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+    if (is_wiener_nonsep_possible) {
+      if (p == AOM_PLANE_Y) {
 #if CONFIG_LR_FLEX_SYNTAX
-      // TODO: Figure out how to set this and clean up.
-      int write_num_classes = 1;
+        // TODO: Figure out how to set this and clean up.
+        int write_num_classes = NUM_WIENERNS_CLASS_INIT_LUMA > 1;
 #else
-      int write_num_classes =
-          rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
-          rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+        int write_num_classes = NUM_WIENERNS_CLASS_INIT_LUMA > 1;
 #endif  // #if CONFIG_LR_FLEX_SYNTAX
-      write_num_classes = write_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
-      if (write_num_classes)
-        aom_wb_write_literal(wb,
-                             encode_num_filter_classes(rsi->num_filter_classes),
-                             NUM_FILTER_CLASSES_BITS);
-    } else {
-      assert(rsi->num_filter_classes == NUM_WIENERNS_CLASS_INIT_CHROMA);
+        write_num_classes =
+            write_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+        if (write_num_classes)
+          aom_wb_write_literal(
+              wb, encode_num_filter_classes(rsi->num_filter_classes),
+              NUM_FILTER_CLASSES_BITS);
+      } else {
+        assert(rsi->num_filter_classes == NUM_WIENERNS_CLASS_INIT_CHROMA);
+      }
     }
 #endif  // CONFIG_WIENER_NONSEP
   }
