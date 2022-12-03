@@ -2308,8 +2308,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
           rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_LUMA;
       } else
         rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
-#endif  // CONFIG_WIENER_NONSEP
     }
+#endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
