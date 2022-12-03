@@ -2289,23 +2289,26 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       chroma_none &= p == 0;
     }
 #if CONFIG_WIENER_NONSEP
-    if (p == AOM_PLANE_Y) {
+    int is_wiener_nonsep_possible =
+        rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
+        rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+    if (is_wiener_nonsep_possible) {
+      if (p == AOM_PLANE_Y) {
 #if CONFIG_LR_FLEX_SYNTAX
-      // TODO: Figure out how to set this and clean up.
-      int read_num_classes = 1;
+        // TODO: Figure out how to set this and clean up.
+        int read_num_classes = 1;
 #else
-      int read_num_classes =
-          rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
-          rsi->frame_restoration_type == RESTORE_SWITCHABLE;
+        int read_num_classes = 1;
 #endif  // #if CONFIG_LR_FLEX_SYNTAX
-      read_num_classes = read_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
-      if (read_num_classes)
-        rsi->num_filter_classes = decode_num_filter_classes(
-            aom_rb_read_literal(rb, NUM_FILTER_CLASSES_BITS));
-      else
-        rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_LUMA;
-    } else
-      rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
+        read_num_classes = read_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+        if (read_num_classes)
+          rsi->num_filter_classes = decode_num_filter_classes(
+              aom_rb_read_literal(rb, NUM_FILTER_CLASSES_BITS));
+        else
+          rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_LUMA;
+      } else
+        rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
+    }
 #endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
