@@ -2583,9 +2583,9 @@ static AOM_INLINE void encode_restoration_mode(
       if (p == AOM_PLANE_Y) {
 #if CONFIG_LR_FLEX_SYNTAX
         // TODO: Figure out how to set this and clean up.
-        int write_num_classes = NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+        int write_num_classes = 1;
 #else
-        int write_num_classes = NUM_WIENERNS_CLASS_INIT_LUMA > 1;
+        int write_num_classes = 1;
 #endif  // #if CONFIG_LR_FLEX_SYNTAX
         write_num_classes =
             write_num_classes && NUM_WIENERNS_CLASS_INIT_LUMA > 1;
