@@ -347,7 +347,6 @@ Serial Parallel compare:
   stage: report
   interruptible: true
   script:
-    - git fetch --unshallow
     - cat parallel_gop1.obu parallel_gop2.obu > parallel_2gops.obu
     - diff serial_2gops.obu parallel_2gops.obu
   needs:
