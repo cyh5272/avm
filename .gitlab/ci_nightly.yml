@@ -23,11 +23,13 @@ Linux Nightly Build:
   script:
     - 'echo "CMake Flags: $CMAKE_FLAGS"'
     - cmake -B "aom_nightly_build" -GNinja $CMAKE_FLAGS
+    - cmake --build "aom_nightly_build" --target aomenc
     - cmake --build "aom_nightly_build" --target test_libaom
   needs: []
   artifacts:
     expire_in: 1 day
     paths:
+      - 'aom_nightly_build/aomenc'
       - 'aom_nightly_build/test_libaom'
       - 'aom_nightly_build/**/*.gcno'
       - 'aom_nightly_build/**/*.[hc]'
@@ -286,12 +288,12 @@ Linux Sanitizer (thread) Test Nightly:
     AOMENC_QP: 160
     AOMENC_INPUT: Vertical_Bayshore_270x480_2997.y4m
     AOMENC_OUTPUT: serial_2gops
-    AOMENC: installroot/usr/local/bin/aomenc
   before_script:
     - curl -s -S -f -O https://gitlab.com/AOMediaCodec/aom-testing/-/raw/master/test-files/${AOMENC_INPUT}.xz
     - unxz ${AOMENC_INPUT}.xz
   script:
-    - ${AOMENC}
+    - cd aom_nightly_build
+    - ./aomenc
         --debug
         --cpu-used=0
         --passes=1
