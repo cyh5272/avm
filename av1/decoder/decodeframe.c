@@ -6434,6 +6434,11 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #if CONFIG_TIP
       if (cm->seq_params.enable_tip) {
         features->tip_frame_mode = aom_rb_read_literal(rb, 2);
+        if (features->tip_frame_mode == TIP_FRAME_AS_OUTPUT &&
+            cm->superres_scale_denominator != SCALE_NUMERATOR) {
+          aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
+                             "Invalid TIP mode.");
+        }
         if (features->tip_frame_mode >= TIP_FRAME_MODES) {
           aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                              "Invalid TIP mode.");

@@ -3007,7 +3007,8 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
 #if CONFIG_TIP
 static INLINE bool allow_tip_direct_output(AV1_COMMON *const cm) {
   if (!frame_is_intra_only(cm) && !encode_show_existing_frame(cm) &&
-      cm->seq_params.enable_tip == 1 && cm->features.tip_frame_mode) {
+      cm->seq_params.enable_tip == 1 && cm->features.tip_frame_mode &&
+      cm->superres_scale_denominator == SCALE_NUMERATOR) {
     return true;
   }
 
@@ -3027,7 +3028,12 @@ static INLINE int compute_tip_direct_output_mode_RD(AV1_COMP *cpi,
 
     // Compute sse and rate.
     YV12_BUFFER_CONFIG *tip_frame_buf = &cm->tip_ref.tip_frame->buf;
-    *sse = aom_highbd_get_y_sse(&cpi->scaled_source, tip_frame_buf);
+    if (cm->superres_scale_denominator != SCALE_NUMERATOR) {
+      *sse = aom_highbd_get_y_sse(&cpi->scaled_source, tip_frame_buf);
+    } else {
+      // TODO (debargha, yuec): Fix why scaled_source cannot be used
+      *sse = aom_highbd_get_y_sse(cpi->source, tip_frame_buf);
+    }
 
     const int64_t bits = (*size << 3);
     *rate = (bits << 5);  // To match scale.
