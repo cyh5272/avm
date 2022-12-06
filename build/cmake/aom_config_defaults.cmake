@@ -137,6 +137,8 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
+set_aom_config_var(CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES 0
+                   "AV2 allow TIP direct mode with superres.")
 set_aom_config_var(CONFIG_ACROSS_SCALE_TPL_MVS 0
                    "AV2 enable across-scale temporal MV propagation.")
 set_aom_config_var(CONFIG_FORWARDSKIP 1

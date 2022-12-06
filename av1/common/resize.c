@@ -1297,13 +1297,15 @@ void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint8_t *src,
 }
 
 #if CONFIG_EXT_SUPERRES
-void av1_upscale_2d_lanczos_and_extend_frame(const AV1_COMMON *cm,
-                                             const YV12_BUFFER_CONFIG *src,
-                                             YV12_BUFFER_CONFIG *dst,
-                                             const int bd, const int subx,
-                                             const int suby, const int sr_denom,
-                                             const int sr_num) {
+void av1_upscale_2d_normative_and_extend_frame(const AV1_COMMON *cm,
+                                               const YV12_BUFFER_CONFIG *src,
+                                               YV12_BUFFER_CONFIG *dst) {
   const int num_planes = av1_num_planes(cm);
+  const int bd = cm->seq_params.bit_depth;
+  const int subx = cm->seq_params.subsampling_x;
+  const int suby = cm->seq_params.subsampling_y;
+  const int sr_denom = cm->superres_scale_denominator;
+  const int sr_num = cm->superres_scale_numerator;
   for (int i = 0; i < num_planes; ++i) {
     const int is_uv = (i > 0);
     // The resampler takes sr_num as the scaling denominator and sr_demon as the
@@ -1550,10 +1552,7 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
   // Scale up and back into frame_to_show.
   assert(frame_to_show->y_crop_width != cm->width);
 #if CONFIG_EXT_SUPERRES
-  av1_upscale_2d_lanczos_and_extend_frame(
-      cm, &copy_buffer, frame_to_show, (int)seq_params->bit_depth,
-      seq_params->subsampling_x, seq_params->subsampling_y,
-      cm->superres_scale_denominator, cm->superres_scale_numerator);
+  av1_upscale_2d_normative_and_extend_frame(cm, &copy_buffer, frame_to_show);
 #else   // CONFIG_EXT_SUPERRES
   av1_upscale_normative_and_extend_frame(cm, &copy_buffer, frame_to_show);
 #endif  // CONFIG_EXT_SUPERRES

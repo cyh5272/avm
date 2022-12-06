@@ -36,6 +36,9 @@ void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
                                          const int num_planes, const int subx,
                                          const int suby, const int denom,
                                          const int num);
+void av1_upscale_2d_normative_and_extend_frame(const AV1_COMMON *cm,
+                                               const YV12_BUFFER_CONFIG *src,
+                                               YV12_BUFFER_CONFIG *dst);
 #endif  // CONFIG_EXT_SUPERRES
 
 void av1_resize_plane(const uint8_t *const input, int height, int width,

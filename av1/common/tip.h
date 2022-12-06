@@ -20,6 +20,7 @@ extern "C" {
 #include "av1/common/av1_common_int.h"
 #include "av1/common/mvref_common.h"
 #include "av1/common/reconinter.h"
+#include "av1/common/resize.h"
 
 // Derive temporal motion field from one closest forward and one closet backward
 // reference frames, then fill the hole
