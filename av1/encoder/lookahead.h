@@ -64,7 +64,7 @@ struct lookahead_ctx {
 struct lookahead_ctx *av1_lookahead_init(
     unsigned int width, unsigned int height, unsigned int subsampling_x,
     unsigned int subsampling_y, unsigned int depth, const int border_in_pixels,
-    int byte_alignment, int num_lap_buffers);
+    int byte_alignment, int num_lap_buffers, int num_pyramid_levels);
 
 /**\brief Destroys the lookahead stage
  */
@@ -82,10 +82,12 @@ void av1_lookahead_destroy(struct lookahead_ctx *ctx);
  * \param[in] src         Pointer to the image to enqueue
  * \param[in] ts_start    Timestamp for the start of this frame
  * \param[in] ts_end      Timestamp for the end of this frame
+ * \param[in] num_pyramid_levels Number of pyramid levels to allocate
+                          for each frame buffer
  * \param[in] flags       Flags set on this frame
  */
 int av1_lookahead_push(struct lookahead_ctx *ctx, const YV12_BUFFER_CONFIG *src,
-                       int64_t ts_start, int64_t ts_end,
+                       int64_t ts_start, int64_t ts_end, int num_pyramid_levels,
                        aom_enc_frame_flags_t flags);
 
 /**\brief Get the next source buffer to encode

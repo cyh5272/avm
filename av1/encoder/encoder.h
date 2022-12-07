@@ -1967,11 +1967,6 @@ typedef struct {
   YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME];
 
   /*!
-   * Pointer to the source frame buffer.
-   */
-  unsigned char *src_buffer;
-
-  /*!
    * Holds the number of valid reference frames in past and future directions
    * w.r.t. the current frame. num_ref_frames[i] stores the total number of
    * valid reference frames in 'i' direction.
@@ -2894,6 +2889,12 @@ typedef struct AV1_COMP {
    * Number of frames left to be encoded, is 0 if limit is not set.
    */
   int frames_left;
+
+  /*!
+   *  Number of downsampling pyramid levels to allocate for each frame
+   *  This is currently only used for global motion
+   */
+  int image_pyramid_levels;
 } AV1_COMP;
 
 /*!

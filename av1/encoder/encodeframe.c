@@ -1811,6 +1811,21 @@ void av1_encode_frame(AV1_COMP *cpi) {
   set_rel_frame_dist(cm, &cpi->ref_frame_dist_info, cm->ref_frame_flags);
   av1_setup_frame_sign_bias(cm);
 
+  // If global motion is enabled, then every buffer which is used as either
+  // a source or a ref frame should have an image pyramid allocated.
+  // Check here so that issues can be caught early in debug mode
+#if !defined(NDEBUG)
+  if (cpi->image_pyramid_levels > 0) {
+    assert(cpi->source->y_pyramid);
+    for (int ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
+      const RefCntBuffer *const buf = get_ref_frame_buf(cm, ref_frame);
+      if (buf != NULL) {
+        assert(buf->buf.y_pyramid);
+      }
+    }
+  }
+#endif  // !defined(NDEBUG)
+
 #if CONFIG_MISMATCH_DEBUG
   mismatch_reset_frame(num_planes);
 #else

@@ -193,6 +193,7 @@ if(CONFIG_AV1_ENCODER)
   list(
     APPEND
     AOM_DSP_ENCODER_SOURCES
+    "${AOM_ROOT}/aom_dsp/pyramid.c"
     "${AOM_ROOT}/aom_dsp/flow_estimation/corner_detect.c"
     "${AOM_ROOT}/aom_dsp/flow_estimation/corner_match.c"
     "${AOM_ROOT}/aom_dsp/flow_estimation/disflow.c"

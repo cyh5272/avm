@@ -519,7 +519,8 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
           RefCntBuffer *ref_fb = get_ref_frame_buf(cm, ref_frame);
           if (aom_yv12_realloc_with_new_border(
                   &ref_fb->buf, AOM_BORDER_IN_PIXELS,
-                  cm->features.byte_alignment, num_planes) != 0) {
+                  cm->features.byte_alignment, cpi->image_pyramid_levels,
+                  num_planes) != 0) {
             aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                                "Failed to allocate frame buffer");
           }
@@ -542,7 +543,7 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
                   &new_fb->buf, cm->width, cm->height,
                   cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
                   AOM_BORDER_IN_PIXELS, cm->features.byte_alignment, NULL, NULL,
-                  NULL)) {
+                  NULL, cpi->image_pyramid_levels)) {
             if (force_scaling) {
               // Release the reference acquired in the get_free_fb() call above.
               --new_fb->ref_count;

@@ -649,6 +649,8 @@ static void init_config(struct AV1_COMP *cpi, AV1EncoderConfig *oxcf) {
   init_buffer_indices(&cpi->force_intpel_info, cm->remapped_ref_idx);
 
   av1_noise_estimate_init(&cpi->noise_estimate, cm->width, cm->height);
+
+  cpi->image_pyramid_levels = oxcf->tool_cfg.enable_global_motion ? 1 : 0;
 }
 
 int aom_strcmp(const char *a, const char *b) {
@@ -2056,7 +2058,7 @@ static void setup_tip_frame_size(AV1_COMP *cpi) {
   if (aom_realloc_frame_buffer(
           &tip_frame->buf, cm->width, cm->height, cm->seq_params.subsampling_x,
           cm->seq_params.subsampling_y, cpi->oxcf.border_in_pixels,
-          cm->features.byte_alignment, NULL, NULL, NULL)) {
+          cm->features.byte_alignment, NULL, NULL, NULL, 0)) {
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate frame buffer");
   }
@@ -2106,7 +2108,8 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   if (aom_realloc_frame_buffer(
           &cm->cur_frame->buf, cm->width, cm->height, seq_params->subsampling_x,
           seq_params->subsampling_y, cpi->oxcf.border_in_pixels,
-          cm->features.byte_alignment, NULL, NULL, NULL))
+          cm->features.byte_alignment, NULL, NULL, NULL,
+          cpi->image_pyramid_levels))
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate frame buffer");
 
@@ -2403,7 +2406,7 @@ static int encode_without_recode(AV1_COMP *cpi) {
   int phase_scaler = 0;
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_pyramid(cpi->source->y_pyramid);
   av1_setup_frame_size(cpi);
   av1_set_size_dependent_vars(cpi, &q, &bottom_index, &top_index);
 
@@ -2567,7 +2570,7 @@ static int encode_with_recode_loop(AV1_COMP *cpi, size_t *size, uint8_t *dest) {
   assert(IMPLIES(oxcf->rc_cfg.min_cr > 0, allow_recode));
 
   set_size_independent_vars(cpi);
-  cpi->source->buf_8bit_valid = 0;
+  aom_invalidate_pyramid(cpi->source->y_pyramid);
 
   av1_setup_frame_size(cpi);
 
@@ -3716,7 +3719,8 @@ int av1_receive_raw_frame(AV1_COMP *cpi, aom_enc_frame_flags_t frame_flags,
       res = -1;
 #endif  //  CONFIG_DENOISE
 
-  if (av1_lookahead_push(cpi->lookahead, sd, time_stamp, end_time, frame_flags))
+  if (av1_lookahead_push(cpi->lookahead, sd, time_stamp, end_time,
+                         cpi->image_pyramid_levels, frame_flags))
     res = -1;
 #if CONFIG_INTERNAL_STATS
   aom_usec_timer_mark(&timer);
