@@ -368,12 +368,9 @@ static INLINE int get_intrabc_ctx(const MACROBLOCKD *xd) {
 
 #if CONFIG_CROSS_CHROMA_TX
 // Determine whether to allow cctx or not for a given block
-static INLINE int is_cctx_allowed(const AV1_COMMON *cm, const MACROBLOCKD *xd,
-                                  TX_SIZE tx_size) {
+static INLINE int is_cctx_allowed(const AV1_COMMON *cm, const MACROBLOCKD *xd) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-  if (!cm->seq_params.enable_cctx || xd->lossless[mbmi->segment_id]) return 0;
-  (void)tx_size;
-  return 1;
+  return cm->seq_params.enable_cctx && !xd->lossless[mbmi->segment_id];
 }
 
 static INLINE void get_above_and_left_cctx_type(const AV1_COMMON *cm,
@@ -406,10 +403,9 @@ static INLINE void get_above_and_left_cctx_type(const AV1_COMMON *cm,
 // Context of cctx type is determined by comparing the numbers of positive and
 // negative angles in the above and left neighbors of the current tx block.
 // 0: tie, 1: more positive angles, 2: more negative angles.
-static INLINE int get_cctx_context(const MACROBLOCKD *xd, TX_SIZE tx_size,
-                                   int *above, int *left) {
+static INLINE int get_cctx_context(const MACROBLOCKD *xd, int *above,
+                                   int *left) {
   int cnt = 0;
-  (void)tx_size;
   if (xd->chroma_up_available && *above > CCTX_NONE)
     cnt += (*above > CCTX_60) ? -1 : 1;
   if (xd->chroma_left_available && *left > CCTX_NONE)

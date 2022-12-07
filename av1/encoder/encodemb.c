@@ -382,7 +382,7 @@ void av1_xform_quant(
   const int is_inter = is_inter_block(mbmi, xd->tree_type);
 #endif  // CONFIG_FORWARDSKIP
 #if CONFIG_CROSS_CHROMA_TX
-  if (is_cctx_allowed(cm, xd, txfm_param->tx_size)) {
+  if (is_cctx_allowed(cm, xd)) {
     // In the pipeline of cross-chroma transform, the forward transform for
     // plane V is done earlier in plane U, followed by forward cross chroma
     // transform, in order to obtain the quantized coefficients of the second
@@ -665,7 +665,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   if (!is_blk_skip(x->txfm_search_info.blk_skip, plane,
                    blk_row * bw + blk_col) &&
 #if CONFIG_CROSS_CHROMA_TX
-      (plane < AOM_PLANE_V || !is_cctx_allowed(cm, xd, tx_size) ||
+      (plane < AOM_PLANE_V || !is_cctx_allowed(cm, xd) ||
 #if CCTX_C2_DROPPED
        ((cctx_type == CCTX_NONE || x->plane[AOM_PLANE_U].eobs[block]) &&
         keep_chroma_c2(cctx_type))) &&
@@ -763,15 +763,14 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #if CONFIG_CROSS_CHROMA_TX
     // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
     // when eob of U is 0.
-    if (is_cctx_allowed(cm, xd, tx_size) && plane == AOM_PLANE_U &&
-        p->eobs[block] == 0)
+    if (is_cctx_allowed(cm, xd) && plane == AOM_PLANE_U && p->eobs[block] == 0)
       update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 #endif  // CONFIG_CROSS_CHROMA_TX
   } else {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
     // Reset coeffs and dqcoeffs
     if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type) &&
-        is_cctx_allowed(cm, xd, tx_size))
+        is_cctx_allowed(cm, xd))
       av1_quantize_skip(av1_get_max_eob(tx_size),
                         p->coeff + BLOCK_OFFSET(block), dqcoeff,
                         &p->eobs[block]);
@@ -786,7 +785,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   // In CONFIG_CROSS_CHROMA_TX, reconstruction for U plane relies on dqcoeffs of
   // V plane, so the below operations for U are performed together with V once
   // dqcoeffs of V are obtained.
-  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd)) {
     if (p->eobs[block]) *(args->skip) = 0;
     return;
   }
@@ -797,8 +796,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
       &pd_u->dst.buf[(blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2];
   int eob_u = plane ? p_u->eobs[block] : 0;
   int eob_v = plane ? x->plane[AOM_PLANE_V].eobs[block] : 0;
-  if (plane == AOM_PLANE_V && (eob_u || eob_v) &&
-      is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_V && (eob_u || eob_v) && is_cctx_allowed(cm, xd)) {
     av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff, tx_size, cctx_type);
     av1_inverse_transform_block(xd, dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
                                 dst_u, pd_u->dst.stride, AOMMAX(eob_u, eob_v),
@@ -806,7 +804,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   }
 
   if (p->eobs[block] ||
-      (plane && (eob_u || eob_v) && is_cctx_allowed(cm, xd, tx_size))) {
+      (plane && (eob_u || eob_v) && is_cctx_allowed(cm, xd))) {
 #else
   if (p->eobs[block]) {
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -814,9 +812,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     av1_inverse_transform_block(
         xd, dqcoeff, plane, tx_type, tx_size, dst, pd->dst.stride,
 #if CONFIG_CROSS_CHROMA_TX
-        (plane == 0 || !is_cctx_allowed(cm, xd, tx_size))
-            ? p->eobs[block]
-            : AOMMAX(eob_u, eob_v),
+        (plane == 0 || !is_cctx_allowed(cm, xd)) ? p->eobs[block]
+                                                 : AOMMAX(eob_u, eob_v),
 #else
         p->eobs[block],
 #endif
@@ -853,7 +850,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     mi_to_pixel_loc(&pixel_c, &pixel_r, xd->mi_col, xd->mi_row, blk_col,
                     blk_row, pd->subsampling_x, pd->subsampling_y);
 #if CONFIG_CROSS_CHROMA_TX
-    if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size))
+    if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd))
       mismatch_record_block_tx(dst_u, pd_u->dst.stride,
                                cm->current_frame.order_hint, AOM_PLANE_U,
                                pixel_c, pixel_r, blk_w, blk_h);
@@ -1363,7 +1360,7 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = args->x;
   MACROBLOCKD *const xd = &x->e_mbd;
-  assert(is_cctx_allowed(cm, xd, tx_size));
+  assert(is_cctx_allowed(cm, xd));
 
   struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
   struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];

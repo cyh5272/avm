@@ -561,7 +561,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
                       cm->features.reduced_tx_set_used);
 
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
-  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     if (!keep_chroma_c2(cctx_type)) return 0;
   }
@@ -582,7 +582,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     if (eob > 0) av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
   }
@@ -716,7 +716,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if !CONFIG_FORWARDSKIP
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
-  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     if (!keep_chroma_c2(cctx_type)) return 0;
   }
@@ -736,7 +736,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif  // CONFIG_CONTEXT_DERIVATION
 
 #if CONFIG_CROSS_CHROMA_TX
-  if (plane == AOM_PLANE_U && eob > 0 && is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_U && eob > 0 && is_cctx_allowed(cm, xd)) {
     CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     av1_write_cctx_type(cm, xd, cctx_type, tx_size, w);
   }
@@ -1235,11 +1235,11 @@ int get_cctx_type_cost(const AV1_COMMON *cm, const MACROBLOCK *x,
                        const MACROBLOCKD *xd, int plane, TX_SIZE tx_size,
                        int block, CctxType cctx_type) {
   if (plane == AOM_PLANE_U && x->plane[plane].eobs[block] &&
-      is_cctx_allowed(cm, xd, tx_size)) {
+      is_cctx_allowed(cm, xd)) {
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
     int above_cctx, left_cctx;
     get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
-    const int cctx_ctx = get_cctx_context(xd, tx_size, &above_cctx, &left_cctx);
+    const int cctx_ctx = get_cctx_context(xd, &above_cctx, &left_cctx);
     return x->mode_costs.cctx_type_cost[square_tx_size][cctx_ctx][cctx_type];
   } else {
     return 0;
@@ -1858,7 +1858,7 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
   if (eob == 0) {
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
     if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type) &&
-        is_cctx_allowed(cm, xd, tx_size))
+        is_cctx_allowed(cm, xd))
       return 0;
 #endif  // CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
 #if CONFIG_CONTEXT_DERIVATION
@@ -3406,7 +3406,7 @@ static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
     const CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
     int above_cctx, left_cctx;
     get_above_and_left_cctx_type(cm, xd, tx_size, &above_cctx, &left_cctx);
-    const int cctx_ctx = get_cctx_context(xd, tx_size, &above_cctx, &left_cctx);
+    const int cctx_ctx = get_cctx_context(xd, &above_cctx, &left_cctx);
     if (allow_update_cdf)
       update_cdf(fc->cctx_type_cdf[txsize_sqr_map[tx_size]][cctx_ctx],
                  cctx_type, CCTX_TYPES);
@@ -3800,7 +3800,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
 #endif  // CONFIG_FORWARDSKIP
     );
 #if CONFIG_CROSS_CHROMA_TX && CCTX_C2_DROPPED
-    if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd, tx_size)) {
+    if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd)) {
       CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
       if (!keep_chroma_c2(cctx_type)) {
         assert(eob == 0);
@@ -3867,7 +3867,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
     eob_txb[block] = eob;
 
 #if CONFIG_CROSS_CHROMA_TX
-    if (is_cctx_allowed(cm, xd, tx_size) && plane == AOM_PLANE_U && eob > 0)
+    if (is_cctx_allowed(cm, xd) && plane == AOM_PLANE_U && eob > 0)
       update_cctx_type_count(cm, xd, blk_row, blk_col, tx_size, td->counts,
                              allow_update_cdf);
 #endif  // CONFIG_CROSS_CHROMA_TX

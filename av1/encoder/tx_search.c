@@ -2971,7 +2971,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // Intra mode needs decoded pixels such that the next transform block
   // can use them for prediction. If cctx is enabled, this reconstruction
   // should be done later in search_cctx_type, when cctx type is chosen.
-  if (plane == AOM_PLANE_Y || !is_cctx_allowed(cm, xd, tx_size)) {
+  if (plane == AOM_PLANE_Y || !is_cctx_allowed(cm, xd)) {
     recon_intra(cpi, x, plane, block, blk_row, blk_col, plane_bsize, tx_size,
                 txb_ctx, skip_trellis, best_tx_type, 0, &rate_cost, best_eob);
     p->dqcoeff = orig_dqcoeff;
@@ -4712,7 +4712,7 @@ int av1_txfm_uvrd(const AV1_COMP *const cpi, MACROBLOCK *x, RD_STATS *rd_stats,
   const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
   int is_cost_valid = 1;
 #if CONFIG_CROSS_CHROMA_TX
-  if (is_cctx_allowed(&cpi->common, xd, uv_tx_size)) {
+  if (is_cctx_allowed(&cpi->common, xd)) {
     RD_STATS this_rd_stats;
     int64_t chroma_ref_best_rd = ref_best_rd;
     if (cpi->sf.inter_sf.perform_best_rd_based_gating_for_chroma && is_inter &&

@@ -272,8 +272,7 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
                                          mi_col - mi_col_offset);
     CctxType *const cctx_type_map = mi_params->cctx_type_map + grid_idx;
     const int mi_stride = mi_params->mi_stride;
-    const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
-    const int allow_cctx = is_cctx_allowed(cm, xd, uv_tx_size);
+    const int allow_cctx = is_cctx_allowed(cm, xd);
     // Set cctx_type to CCTX_NONE when not allowed or for skip blocks
     CctxType cur_cctx_type = (txfm_info->skip_txfm || !allow_cctx)
                                  ? CCTX_NONE
