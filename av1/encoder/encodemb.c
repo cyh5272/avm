@@ -493,6 +493,7 @@ void av1_xform(MACROBLOCK *x, int plane, int block, int blk_row, int blk_col,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+// Facade function for forward cross chroma component transform
 void forward_cross_chroma_transform(MACROBLOCK *x, int block, TX_SIZE tx_size,
                                     CctxType cctx_type) {
   struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
@@ -1353,6 +1354,7 @@ void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+// Jointly encode two chroma components for an intra block.
 void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
                                      BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
                                      void *arg) {
@@ -1481,6 +1483,7 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   *(args->skip) = 0;
 }
 
+// Jointly code two chroma components and set contexts
 static void encode_block_intra_and_set_context_joint_uv(
     int plane, int block, int blk_row, int blk_col, BLOCK_SIZE plane_bsize,
     TX_SIZE tx_size, void *arg) {
@@ -1498,6 +1501,10 @@ static void encode_block_intra_and_set_context_joint_uv(
   av1_set_txb_context(x, AOM_PLANE_V, block, tx_size, av, lv);
 }
 
+// This function codes the two chroma components jointly for each transform
+// blocks within a block. This coding path is used instead of
+// av1_encode_intra_block() when cross chroma component transform is
+// applicable.
 void av1_encode_intra_block_joint_uv(const struct AV1_COMP *cpi, MACROBLOCK *x,
                                      BLOCK_SIZE bsize, RUN_TYPE dry_run,
                                      TRELLIS_OPT_TYPE enable_optimize_b) {

@@ -3390,6 +3390,7 @@ uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+// Update counts of cctx types
 static void update_cctx_type_count(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                    int blk_row, int blk_col, TX_SIZE tx_size,
                                    FRAME_COUNTS *counts,

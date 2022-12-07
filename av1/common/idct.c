@@ -318,6 +318,7 @@ void av1_highbd_inv_txfm_add_c(const tran_low_t *input, uint16_t *dest,
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+// Apply inverse cross chroma component transform
 void av1_inv_cross_chroma_tx_block(tran_low_t *dqcoeff_u, tran_low_t *dqcoeff_v,
                                    TX_SIZE tx_size, CctxType cctx_type) {
   if (cctx_type == CCTX_NONE) return;

@@ -4264,6 +4264,8 @@ static int inter_block_yrd(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif  // !CONFIG_NEW_TX_PARTITION
 
 #if CONFIG_CROSS_CHROMA_TX
+// Search for the best cross chroma component transform (cctx) type for the
+// given transform block and obtain the corresponding RD cost.
 static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
                                               int blk_row, int blk_col,
                                               BLOCK_SIZE plane_bsize,
@@ -4355,6 +4357,7 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
   av1_merge_rd_stats(&args->rd_stats, &rd_stats_joint_uv);
 }
 
+// Jointly obtain the RD for U and V planes for the search of cctx type.
 void av1_txfm_rd_joint_uv(MACROBLOCK *x, const AV1_COMP *cpi,
                           RD_STATS *rd_stats, int64_t ref_best_rd,
                           int64_t current_rd, BLOCK_SIZE plane_bsize,

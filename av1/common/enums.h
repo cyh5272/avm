@@ -411,13 +411,13 @@ enum {
 #endif  // CCTX_C2_DROPPED
 
 enum {
-  CCTX_NONE,  // No cross chroma transform
-  CCTX_45,    // 45 degrees rotation (Haar transform)
-  CCTX_30,    // 30 degrees rotation
-  CCTX_60,    // 60 degrees rotation
-  CCTX_M45,   // -45 degrees rotation
-  CCTX_M30,   // -30 degrees rotation
-  CCTX_M60,   // -60 degrees rotation
+  CCTX_NONE,     // No cross chroma transform
+  CCTX_45,       // 45 degrees rotation (Haar transform)
+  CCTX_30,       // 30 degrees rotation
+  CCTX_60,       // 60 degrees rotation
+  CCTX_MINUS45,  // -45 degrees rotation
+  CCTX_MINUS30,  // -30 degrees rotation
+  CCTX_MINUS60,  // -60 degrees rotation
   CCTX_TYPES,
   CCTX_START = CCTX_NONE + 1,
 } UENUM1BYTE(CctxType);

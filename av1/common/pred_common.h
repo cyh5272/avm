@@ -367,6 +367,7 @@ static INLINE int get_intrabc_ctx(const MACROBLOCKD *xd) {
 #endif  // CONFIG_NEW_CONTEXT_MODELING
 
 #if CONFIG_CROSS_CHROMA_TX
+// Determine whether to allow cctx or not for a given block
 static INLINE int is_cctx_allowed(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                                   TX_SIZE tx_size) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];

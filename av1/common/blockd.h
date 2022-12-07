@@ -1899,16 +1899,17 @@ static INLINE void update_txk_array(MACROBLOCKD *const xd, int blk_row,
 
 #if CONFIG_CROSS_CHROMA_TX
 #if CCTX_C2_DROPPED
+// Determine whether or not to keep the second chroma channel (C2).
 static INLINE int keep_chroma_c2(CctxType cctx_type) {
   return
 #if !CCTX_DROP_45
-      cctx_type == CCTX_M45 || cctx_type == CCTX_45 ||
+      cctx_type == CCTX_MINUS45 || cctx_type == CCTX_45 ||
 #endif  // !CCTX_DROP_45
 #if !CCTX_DROP_30
-      cctx_type == CCTX_M30 || cctx_type == CCTX_30 ||
+      cctx_type == CCTX_MINUS30 || cctx_type == CCTX_30 ||
 #endif  // !CCTX_DROP_30
 #if !CCTX_DROP_60
-      cctx_type == CCTX_M60 || cctx_type == CCTX_60 ||
+      cctx_type == CCTX_MINUS60 || cctx_type == CCTX_60 ||
 #endif  // !CCTX_DROP_60
       cctx_type == CCTX_NONE;
 }

@@ -283,6 +283,7 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
 }
 
 #if CONFIG_CROSS_CHROMA_TX
+// Facade function for inverse cross chroma component transform
 static AOM_INLINE void inverse_cross_chroma_transform_block(
     const AV1_COMMON *const cm, DecoderCodingBlock *dcb, aom_reader *const r,
     const int plane, const int blk_row, const int blk_col,
