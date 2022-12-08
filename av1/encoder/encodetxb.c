@@ -1183,6 +1183,9 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
           get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
       for (int plane = plane_start; plane < plane_end; ++plane) {
         if (plane && !xd->is_chroma_ref) break;
+#if CONFIG_CROSS_CHROMA_TX
+        if (plane == AOM_PLANE_U && is_cctx_allowed(cm, xd)) continue;
+#endif  // CONFIG_CROSS_CHROMA_TX
         const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
         const int stepr = tx_size_high_unit[tx_size];
         const int stepc = tx_size_wide_unit[tx_size];
@@ -1196,6 +1199,22 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
              blk_row += stepr) {
           for (int blk_col = col >> pd->subsampling_x; blk_col < unit_width;
                blk_col += stepc) {
+#if CONFIG_CROSS_CHROMA_TX
+            // Loop order for the two chroma planes is changed for CCTX
+            // because the transform information for both planes are needed at
+            // once at the decoder side.
+            if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd)) {
+#if CONFIG_FORWARDSKIP
+              const int code_rest =
+                  av1_write_sig_txtype(cm, x, w, blk_row, blk_col, AOM_PLANE_U,
+                                       block[AOM_PLANE_U], tx_size);
+              if (code_rest)
+#endif  // CONFIG_FORWARDSKIP
+                av1_write_coeffs_txb(cm, x, w, blk_row, blk_col, AOM_PLANE_U,
+                                     block[AOM_PLANE_U], tx_size);
+              block[AOM_PLANE_U] += step;
+            }
+#endif  // CONFIG_CROSS_CHROMA_TX
 #if CONFIG_FORWARDSKIP
             const int code_rest = av1_write_sig_txtype(
                 cm, x, w, blk_row, blk_col, plane, block[plane], tx_size);
