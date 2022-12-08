@@ -2469,6 +2469,9 @@ static INLINE void predict_dc_only_block(
 static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
                            int block, int blk_row, int blk_col,
                            BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
+#if CONFIG_CROSS_CHROMA_TX
+                           int *coeffs_available,
+#endif  // CONFIG_CROSS_CHROMA_TX
                            const TXB_CTX *const txb_ctx,
                            FAST_TX_SEARCH_MODE ftxs_mode, int skip_trellis,
                            int64_t ref_best_rd, RD_STATS *best_rd_stats) {
@@ -2723,6 +2726,9 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 #endif
       else
         av1_xform_dc_only(x, plane, block, &txfm_param, per_px_mean);
+#if CONFIG_CROSS_CHROMA_TX
+      *coeffs_available = 1;
+#endif  // CONFIG_CROSS_CHROMA_TX
 
 #if CONFIG_IST
       skip_trellis_based_on_satd[txfm_param.tx_type] =
@@ -2989,7 +2995,8 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
 // Search for the best CCTX type for a given transform block.
 static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
                              int blk_row, int blk_col, BLOCK_SIZE plane_bsize,
-                             TX_SIZE tx_size, const TXB_CTX *const txb_ctx_uv,
+                             TX_SIZE tx_size, int uv_coeffs_available,
+                             const TXB_CTX *const txb_ctx_uv,
                              const int skip_trellis, RD_STATS *best_rd_stats) {
   const AV1_COMMON *cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
@@ -3005,6 +3012,41 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   TX_TYPE tx_type =
       av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
                       cpi->common.features.reduced_tx_set_used);
+  TxfmParam txfm_param;
+  av1_setup_xform(cm, x,
+#if CONFIG_IST
+                  AOM_PLANE_U,
+#endif
+                  tx_size, tx_type, CCTX_NONE, &txfm_param);
+  QUANT_PARAM quant_param;
+  int xform_quant_idx =
+      skip_trellis
+          ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B : AV1_XFORM_QUANT_FP)
+          : AV1_XFORM_QUANT_FP;
+  av1_setup_quant(tx_size, !skip_trellis, xform_quant_idx,
+                  cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
+
+  if (!uv_coeffs_available) {
+#if CONFIG_IST
+    av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize, &txfm_param,
+              0);
+    av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize, &txfm_param,
+              0);
+#else
+    av1_xform(x, AOM_PLANE_U, block, blk_row, blk_col, plane_bsize,
+              &txfm_param);
+    av1_xform(x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
+              &txfm_param);
+#endif  // CONFIG_IST
+    if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
+      av1_setup_qmatrix(&cm->quant_params, xd, AOM_PLANE_U, tx_size, tx_type,
+                        &quant_param);
+    av1_quant(x, AOM_PLANE_U, block, &txfm_param, &quant_param);
+    if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
+      av1_setup_qmatrix(&cm->quant_params, xd, AOM_PLANE_V, tx_size, tx_type,
+                        &quant_param);
+    av1_quant(x, AOM_PLANE_V, block, &txfm_param, &quant_param);
+  }
 
   int rate_cost[2] = { 0, 0 };
 
@@ -3026,13 +3068,6 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
   uint8_t best_txb_ctx_u = 0;
   uint8_t best_txb_ctx_v = 0;
-
-  TxfmParam txfm_param;
-  av1_setup_xform(cm, x,
-#if CONFIG_IST
-                  AOM_PLANE_U,
-#endif
-                  tx_size, tx_type, CCTX_NONE, &txfm_param);
 
   // CCTX is performed in-place, so these buffers are needed to store original
   // transform coefficients.
@@ -3064,18 +3099,9 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       }
 #endif
 
-      QUANT_PARAM quant_param;
-      int xform_quant_idx = skip_trellis
-                                ? (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B
-                                                          : AV1_XFORM_QUANT_FP)
-                                : AV1_XFORM_QUANT_FP;
-      av1_setup_quant(tx_size, !skip_trellis, xform_quant_idx,
-                      cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
-
       if (av1_use_qmatrix(&cm->quant_params, xd, mbmi->segment_id))
         av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
                           &quant_param);
-
       av1_quant(x, plane, block, &txfm_param, &quant_param);
 
       // Calculate rate cost of quantized coefficients.
@@ -3226,7 +3252,13 @@ static AOM_INLINE void tx_type_rd(const AV1_COMP *cpi, MACROBLOCK *x,
 
   RD_STATS this_rd_stats;
   const int skip_trellis = 0;
+#if CONFIG_CROSS_CHROMA_TX
+  int dummy = 0;
+#endif  // CONFIG_CROSS_CHROMA_TX
   search_tx_type(cpi, x, 0, block, blk_row, blk_col, plane_bsize, tx_size,
+#if CONFIG_CROSS_CHROMA_TX
+                 &dummy,
+#endif  // CONFIG_CROSS_CHROMA_TX
                  txb_ctx, ftxs_mode, skip_trellis, ref_rdcost, &this_rd_stats);
 
   av1_merge_rd_stats(rd_stats, &this_rd_stats);
@@ -3956,7 +3988,13 @@ static AOM_INLINE void block_rd_txfm(int plane, int block, int blk_row,
               xd->mi[0]->fsc_mode[xd->tree_type == CHROMA_PART]
 #endif  // CONFIG_FORWARDSKIP
   );
+#if CONFIG_CROSS_CHROMA_TX
+  int dummy = 0;
+#endif  // CONFIG_CROSS_CHROMA_TX
   search_tx_type(cpi, x, plane, block, blk_row, blk_col, plane_bsize, tx_size,
+#if CONFIG_CROSS_CHROMA_TX
+                 &dummy,
+#endif  // CONFIG_CROSS_CHROMA_TX
                  &txb_ctx, args->ftxs_mode, args->skip_trellis,
                  args->best_rd - args->current_rd, &this_rd_stats);
 #if CONFIG_FORWARDSKIP
@@ -4287,6 +4325,7 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
   av1_init_rd_stats(&rd_stats_uv[0]);
   av1_init_rd_stats(&rd_stats_uv[1]);
   TXB_CTX txb_ctx_uv[2];
+  int uv_coeffs_available[2] = { 0, 0 };
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; ++plane) {
     RD_STATS *this_rd_stats = &rd_stats_uv[plane - AOM_PLANE_U];
     TXB_CTX *txb_ctx = &txb_ctx_uv[plane - AOM_PLANE_U];
@@ -4313,6 +4352,9 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
 
     // Obtain stats for CCTX_NONE
     search_tx_type(cpi, x, plane, block, blk_row, blk_col, plane_bsize, tx_size,
+#if CONFIG_CROSS_CHROMA_TX
+                   &uv_coeffs_available[plane - AOM_PLANE_U],
+#endif  // CONFIG_CROSS_CHROMA_TX
                    txb_ctx, args->ftxs_mode, args->skip_trellis,
                    args->best_rd - args->current_rd, this_rd_stats);
 #if CONFIG_FORWARDSKIP
@@ -4352,6 +4394,9 @@ static AOM_INLINE void block_rd_txfm_joint_uv(int dummy_plane, int block,
 
   if (!rd_stats_uv[0].skip_txfm || !rd_stats_uv[1].skip_txfm) {
     search_cctx_type(cpi, x, block, blk_row, blk_col, plane_bsize, tx_size,
+#if CONFIG_CROSS_CHROMA_TX
+                     uv_coeffs_available[0] && uv_coeffs_available[1],
+#endif  // CONFIG_CROSS_CHROMA_TX
                      txb_ctx_uv, args->skip_trellis, &rd_stats_joint_uv);
   }
   av1_merge_rd_stats(&args->rd_stats, &rd_stats_joint_uv);
