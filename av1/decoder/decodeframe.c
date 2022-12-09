@@ -158,23 +158,18 @@ static AOM_INLINE void inverse_transform_block(DecoderCodingBlock *dcb,
   tran_low_t *const dqcoeff = dcb->dqcoeff_block[plane] + dcb->cb_offset[plane];
 #endif
   eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
-#if CONFIG_CROSS_CHROMA_TX
-  eob_info *eob_data_c1 =
-      dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-  eob_info *eob_data_c2 =
-      dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
-  uint16_t scan_line = (plane == 0)
-                           ? eob_data->max_scan_line
-                           : AOMMIN(av1_get_max_eob(tx_size),
-                                    AOMMAX(eob_data_c1->max_scan_line,
-                                           eob_data_c2->max_scan_line));
-  uint16_t eob = (plane == 0)
-                     ? eob_data->eob
-                     : AOMMIN(av1_get_max_eob(tx_size),
-                              AOMMAX(eob_data_c1->eob, eob_data_c2->eob));
-#else
   uint16_t scan_line = eob_data->max_scan_line;
   uint16_t eob = eob_data->eob;
+#if CONFIG_CROSS_CHROMA_TX
+  // Update eob and scan_line according to those of the other chroma plane
+  if (plane) {
+    eob_info *eob_data_c1 =
+        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+    eob_info *eob_data_c2 =
+        dcb->eob_data[AOM_PLANE_V] + dcb->txb_offset[AOM_PLANE_V];
+    scan_line = AOMMAX(eob_data_c1->max_scan_line, eob_data_c2->max_scan_line);
+    eob = AOMMAX(eob_data_c1->eob, eob_data_c2->eob);
+  }
 #endif  // CONFIG_CROSS_CHROMA_TX
   av1_inverse_transform_block(&dcb->xd, dqcoeff, plane, tx_type, tx_size, dst,
                               stride, eob, reduced_tx_set);
@@ -249,11 +244,16 @@ static AOM_INLINE void predict_and_reconstruct_intra_block(
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     eob_info *eob_data = dcb->eob_data[plane] + dcb->txb_offset[plane];
 #if CONFIG_CROSS_CHROMA_TX
-    eob_info *eob_data_c1 =
-        dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
-    if (eob_data->eob || !is_cctx_allowed(cm, xd) ||
-        (plane == AOM_PLANE_V && eob_data_c1->eob &&
-         av1_get_cctx_type(xd, row, col) > CCTX_NONE)) {
+    // In CCTX, when C2 eob = 0 but C1 eob > 0, plane V reconstruction is
+    // still needed
+    int recon_with_cctx = 0;
+    if (is_cctx_allowed(cm, xd) && plane == AOM_PLANE_V &&
+        av1_get_cctx_type(xd, row, col) > CCTX_NONE) {
+      eob_info *eob_data_c1 =
+          dcb->eob_data[AOM_PLANE_U] + dcb->txb_offset[AOM_PLANE_U];
+      recon_with_cctx = eob_data_c1->eob > 0;
+    }
+    if (eob_data->eob || recon_with_cctx) {
 #else
     if (eob_data->eob) {
 #endif  // CONFIG_CROSS_CHROMA_TX

@@ -789,23 +789,28 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     if (p->eobs[block]) *(args->skip) = 0;
     return;
   }
-  struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
-  struct macroblockd_plane *const pd_c1 = &xd->plane[AOM_PLANE_U];
-  tran_low_t *dqcoeff_c1 = p_c1->dqcoeff + BLOCK_OFFSET(block);
-  uint16_t *dst_c1 =
-      &pd_c1->dst.buf[(blk_row * pd_c1->dst.stride + blk_col) << MI_SIZE_LOG2];
-  int eob_c1 = plane ? p_c1->eobs[block] : 0;
-  int eob_c2 = plane ? x->plane[AOM_PLANE_V].eobs[block] : 0;
-  if (plane == AOM_PLANE_V && (eob_c1 || eob_c2) && is_cctx_allowed(cm, xd)) {
-    av1_inv_cross_chroma_tx_block(dqcoeff_c1, dqcoeff, tx_size, cctx_type);
-    av1_inverse_transform_block(xd, dqcoeff_c1, AOM_PLANE_U, tx_type, tx_size,
-                                dst_c1, pd_c1->dst.stride,
-                                AOMMAX(eob_c1, eob_c2),
-                                cm->features.reduced_tx_set_used);
+  int recon_with_cctx = 0;
+  int max_chroma_eob = 0;
+  if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd)) {
+    struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+    struct macroblockd_plane *const pd_c1 = &xd->plane[AOM_PLANE_U];
+    tran_low_t *dqcoeff_c1 = p_c1->dqcoeff + BLOCK_OFFSET(block);
+    uint16_t *dst_c1 =
+        &pd_c1->dst
+             .buf[(blk_row * pd_c1->dst.stride + blk_col) << MI_SIZE_LOG2];
+    int eob_c1 = p_c1->eobs[block];
+    int eob_c2 = x->plane[AOM_PLANE_V].eobs[block];
+    recon_with_cctx = eob_c1 || eob_c2;
+    max_chroma_eob = AOMMAX(eob_c1, eob_c2);
+    if (recon_with_cctx) {
+      av1_inv_cross_chroma_tx_block(dqcoeff_c1, dqcoeff, tx_size, cctx_type);
+      av1_inverse_transform_block(xd, dqcoeff_c1, AOM_PLANE_U, tx_type, tx_size,
+                                  dst_c1, pd_c1->dst.stride, max_chroma_eob,
+                                  cm->features.reduced_tx_set_used);
+    }
   }
 
-  if (p->eobs[block] ||
-      (plane && (eob_c1 || eob_c2) && is_cctx_allowed(cm, xd))) {
+  if (p->eobs[block] || recon_with_cctx) {
 #else
   if (p->eobs[block]) {
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -814,7 +819,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
         xd, dqcoeff, plane, tx_type, tx_size, dst, pd->dst.stride,
 #if CONFIG_CROSS_CHROMA_TX
         (plane == 0 || !is_cctx_allowed(cm, xd)) ? p->eobs[block]
-                                                 : AOMMAX(eob_c1, eob_c2),
+                                                 : max_chroma_eob,
 #else
         p->eobs[block],
 #endif
