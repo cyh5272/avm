@@ -1168,18 +1168,18 @@ static INLINE void recon_intra(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
     // of V plane, so the below operators for U are performed together with V
     // once dqcoeffs of V are obtained.
     if (plane == AOM_PLANE_V) {
-      tran_low_t *dqcoeff_u =
+      tran_low_t *dqcoeff_c1 =
           x->plane[AOM_PLANE_U].dqcoeff + BLOCK_OFFSET(block);
-      tran_low_t *dqcoeff_v =
+      tran_low_t *dqcoeff_c2 =
           x->plane[AOM_PLANE_V].dqcoeff + BLOCK_OFFSET(block);
-      const int max_uv_eob = AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
-                                    x->plane[AOM_PLANE_V].eobs[block]);
-      av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
+      const int max_chroma_eob = AOMMAX(x->plane[AOM_PLANE_U].eobs[block],
+                                        x->plane[AOM_PLANE_V].eobs[block]);
+      av1_inv_cross_chroma_tx_block(dqcoeff_c1, dqcoeff_c2, tx_size, cctx_type);
       inverse_transform_block_facade(x, AOM_PLANE_U, block, blk_row, blk_col,
-                                     max_uv_eob,
+                                     max_chroma_eob,
                                      cm->features.reduced_tx_set_used);
       inverse_transform_block_facade(x, AOM_PLANE_V, block, blk_row, blk_col,
-                                     max_uv_eob,
+                                     max_chroma_eob,
                                      cm->features.reduced_tx_set_used);
     } else if (plane == AOM_PLANE_Y) {
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -1292,72 +1292,74 @@ static INLINE int64_t joint_uv_dist_block_px_domain(
     const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE plane_bsize, int block,
     int blk_row, int blk_col, TX_SIZE tx_size) {
   MACROBLOCKD *const xd = &x->e_mbd;
-  const struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-  const struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
-  const struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
-  const struct macroblockd_plane *const pd_v = &xd->plane[AOM_PLANE_V];
-  const uint16_t max_uv_eob = AOMMAX(p_u->eobs[block], p_v->eobs[block]);
+  const struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+  const struct macroblock_plane *const p_c2 = &x->plane[AOM_PLANE_V];
+  const struct macroblockd_plane *const pd_c1 = &xd->plane[AOM_PLANE_U];
+  const struct macroblockd_plane *const pd_c2 = &xd->plane[AOM_PLANE_V];
+  const uint16_t max_chroma_eob = AOMMAX(p_c1->eobs[block], p_c2->eobs[block]);
   const int eob_max = av1_get_max_eob(tx_size);
   const BLOCK_SIZE tx_bsize = txsize_to_bsize[tx_size];
   const int bsw = block_size_wide[tx_bsize];
   const int bsh = block_size_high[tx_bsize];
   // Scale the transform block index to pixel unit.
-  const int src_idx_u = (blk_row * p_u->src.stride + blk_col) << MI_SIZE_LOG2;
-  const int src_idx_v = (blk_row * p_v->src.stride + blk_col) << MI_SIZE_LOG2;
-  const int dst_idx_u = (blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2;
-  const int dst_idx_v = (blk_row * pd_v->dst.stride + blk_col) << MI_SIZE_LOG2;
-  const uint16_t *src_u = &p_u->src.buf[src_idx_u];
-  const uint16_t *src_v = &p_v->src.buf[src_idx_v];
-  const uint16_t *dst_u = &pd_u->dst.buf[dst_idx_u];
-  const uint16_t *dst_v = &pd_v->dst.buf[dst_idx_v];
-  // p_u->dqcoeff and p_v->dqcoeff must remain unchanged here because the best
+  const int src_idx_c1 = (blk_row * p_c1->src.stride + blk_col) << MI_SIZE_LOG2;
+  const int src_idx_c2 = (blk_row * p_c2->src.stride + blk_col) << MI_SIZE_LOG2;
+  const int dst_idx_c1 = (blk_row * pd_c1->dst.stride + blk_col)
+                         << MI_SIZE_LOG2;
+  const int dst_idx_c2 = (blk_row * pd_c2->dst.stride + blk_col)
+                         << MI_SIZE_LOG2;
+  const uint16_t *src_c1 = &p_c1->src.buf[src_idx_c1];
+  const uint16_t *src_c2 = &p_c2->src.buf[src_idx_c2];
+  const uint16_t *dst_c1 = &pd_c1->dst.buf[dst_idx_c1];
+  const uint16_t *dst_c2 = &pd_c2->dst.buf[dst_idx_c2];
+  // p_c1->dqcoeff and p_c2->dqcoeff must remain unchanged here because the best
   // dqcoeff in the CCTX domain may be used in the search later.
-  tran_low_t *tmp_dqcoeff_u =
+  tran_low_t *tmp_dqcoeff_c1 =
       aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
-  tran_low_t *tmp_dqcoeff_v =
+  tran_low_t *tmp_dqcoeff_c2 =
       aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
-  memcpy(tmp_dqcoeff_u, p_u->dqcoeff + BLOCK_OFFSET(block),
+  memcpy(tmp_dqcoeff_c1, p_c1->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
-  memcpy(tmp_dqcoeff_v, p_v->dqcoeff + BLOCK_OFFSET(block),
+  memcpy(tmp_dqcoeff_c2, p_c2->dqcoeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * eob_max);
 
-  assert(p_u->eobs[block] > 0);
+  assert(p_c1->eobs[block] > 0);
   assert(cpi != NULL);
   assert(tx_size_wide_log2[0] == tx_size_high_log2[0]);
 
-  uint16_t *recon_u = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
-  uint16_t *recon_v = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
+  uint16_t *recon_c1 = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
+  uint16_t *recon_c2 = aom_memalign(16, MAX_TX_SQUARE * sizeof(uint16_t));
 
-  aom_highbd_convolve_copy(dst_u, pd_u->dst.stride, recon_u, MAX_TX_SIZE, bsw,
-                           bsh);
-  aom_highbd_convolve_copy(dst_v, pd_v->dst.stride, recon_v, MAX_TX_SIZE, bsw,
-                           bsh);
+  aom_highbd_convolve_copy(dst_c1, pd_c1->dst.stride, recon_c1, MAX_TX_SIZE,
+                           bsw, bsh);
+  aom_highbd_convolve_copy(dst_c2, pd_c2->dst.stride, recon_c2, MAX_TX_SIZE,
+                           bsw, bsh);
 
   CctxType cctx_type = av1_get_cctx_type(xd, blk_row, blk_col);
   TX_TYPE tx_type =
       av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
                       cpi->common.features.reduced_tx_set_used);
-  av1_inv_cross_chroma_tx_block(tmp_dqcoeff_u, tmp_dqcoeff_v, tx_size,
+  av1_inv_cross_chroma_tx_block(tmp_dqcoeff_c1, tmp_dqcoeff_c2, tx_size,
                                 cctx_type);
-  av1_inverse_transform_block(xd, tmp_dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
-                              recon_u, MAX_TX_SIZE, max_uv_eob,
+  av1_inverse_transform_block(xd, tmp_dqcoeff_c1, AOM_PLANE_U, tx_type, tx_size,
+                              recon_c1, MAX_TX_SIZE, max_chroma_eob,
                               cpi->common.features.reduced_tx_set_used);
-  av1_inverse_transform_block(xd, tmp_dqcoeff_v, AOM_PLANE_V, tx_type, tx_size,
-                              recon_v, MAX_TX_SIZE, max_uv_eob,
+  av1_inverse_transform_block(xd, tmp_dqcoeff_c2, AOM_PLANE_V, tx_type, tx_size,
+                              recon_c2, MAX_TX_SIZE, max_chroma_eob,
                               cpi->common.features.reduced_tx_set_used);
-  aom_free(tmp_dqcoeff_u);
-  aom_free(tmp_dqcoeff_v);
+  aom_free(tmp_dqcoeff_c1);
+  aom_free(tmp_dqcoeff_c2);
 
-  int64_t dist_u =
-      pixel_dist(cpi, x, AOM_PLANE_U, src_u, p_u->src.stride, recon_u,
+  int64_t dist_c1 =
+      pixel_dist(cpi, x, AOM_PLANE_U, src_c1, p_c1->src.stride, recon_c1,
                  MAX_TX_SIZE, blk_row, blk_col, plane_bsize, tx_bsize);
-  int64_t dist_v =
-      pixel_dist(cpi, x, AOM_PLANE_V, src_v, p_v->src.stride, recon_v,
+  int64_t dist_c2 =
+      pixel_dist(cpi, x, AOM_PLANE_V, src_c2, p_c2->src.stride, recon_c2,
                  MAX_TX_SIZE, blk_row, blk_col, plane_bsize, tx_bsize);
-  aom_free(recon_u);
-  aom_free(recon_v);
+  aom_free(recon_c1);
+  aom_free(recon_c2);
 
-  return 16 * (dist_u + dist_v);
+  return 16 * (dist_c1 + dist_c2);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -3001,13 +3003,13 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   const AV1_COMMON *cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
-  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-  struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
+  struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+  struct macroblock_plane *const p_c2 = &x->plane[AOM_PLANE_V];
 
   const int max_eob = av1_get_max_eob(tx_size);
   int64_t best_rd = RDCOST(x->rdmult, best_rd_stats->rate, best_rd_stats->dist);
-  uint16_t best_eob_u = p_u->eobs[block];
-  uint16_t best_eob_v = p_v->eobs[block];
+  uint16_t best_eob_c1 = p_c1->eobs[block];
+  uint16_t best_eob_c2 = p_c2->eobs[block];
   CctxType best_cctx_type = CCTX_NONE;
   TX_TYPE tx_type =
       av1_get_tx_type(xd, PLANE_TYPE_UV, blk_row, blk_col, tx_size,
@@ -3053,31 +3055,31 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   // The buffer used to swap dqcoeff in macroblockd_plane so we can keep dqcoeff
   // of the best tx_type. best_dqcoeff are initialized as those dqcoeffs
   // obtained earlier with CCTX_NONE
-  tran_low_t *this_dqcoeff_u =
+  tran_low_t *this_dqcoeff_c1 =
       aom_memalign(32, MAX_SB_SQUARE * sizeof(tran_low_t));
-  tran_low_t *this_dqcoeff_v =
+  tran_low_t *this_dqcoeff_c2 =
       aom_memalign(32, MAX_SB_SQUARE * sizeof(tran_low_t));
-  memcpy(this_dqcoeff_u, p_u->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
-  memcpy(this_dqcoeff_v, p_v->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
-  tran_low_t *orig_dqcoeff_u = p_u->dqcoeff;
-  tran_low_t *orig_dqcoeff_v = p_v->dqcoeff;
-  tran_low_t *best_dqcoeff_u = this_dqcoeff_u;
-  tran_low_t *best_dqcoeff_v = this_dqcoeff_v;
+  memcpy(this_dqcoeff_c1, p_c1->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
+  memcpy(this_dqcoeff_c2, p_c2->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
+  tran_low_t *orig_dqcoeff_c1 = p_c1->dqcoeff;
+  tran_low_t *orig_dqcoeff_c2 = p_c2->dqcoeff;
+  tran_low_t *best_dqcoeff_c1 = this_dqcoeff_c1;
+  tran_low_t *best_dqcoeff_c2 = this_dqcoeff_c2;
 
-  uint16_t *eobs_ptr_u = x->plane[AOM_PLANE_U].eobs;
-  uint16_t *eobs_ptr_v = x->plane[AOM_PLANE_V].eobs;
-  uint8_t best_txb_ctx_u = 0;
-  uint8_t best_txb_ctx_v = 0;
+  uint16_t *eobs_ptr_c1 = x->plane[AOM_PLANE_U].eobs;
+  uint16_t *eobs_ptr_c2 = x->plane[AOM_PLANE_V].eobs;
+  uint8_t best_txb_ctx_c1 = 0;
+  uint8_t best_txb_ctx_c2 = 0;
 
   // CCTX is performed in-place, so these buffers are needed to store original
   // transform coefficients.
-  tran_low_t *orig_coeff_u =
+  tran_low_t *orig_coeff_c1 =
       aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
-  tran_low_t *orig_coeff_v =
+  tran_low_t *orig_coeff_c2 =
       aom_memalign(32, MAX_TX_SQUARE * sizeof(tran_low_t));
-  memcpy(orig_coeff_u, p_u->coeff + BLOCK_OFFSET(block),
+  memcpy(orig_coeff_c1, p_c1->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
-  memcpy(orig_coeff_v, p_v->coeff + BLOCK_OFFSET(block),
+  memcpy(orig_coeff_c2, p_c2->coeff + BLOCK_OFFSET(block),
          sizeof(tran_low_t) * max_eob);
 
   // Iterate through all transform type candidates.
@@ -3091,9 +3093,9 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
     for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
 #if CCTX_C2_DROPPED
       if (plane == AOM_PLANE_V && !keep_chroma_c2(cctx_type)) {
-        av1_quantize_skip(max_eob, p_v->qcoeff + BLOCK_OFFSET(block),
-                          p_v->dqcoeff + BLOCK_OFFSET(block),
-                          &eobs_ptr_v[block]);
+        av1_quantize_skip(max_eob, p_c2->qcoeff + BLOCK_OFFSET(block),
+                          p_c2->dqcoeff + BLOCK_OFFSET(block),
+                          &eobs_ptr_c2[block]);
         rate_cost[1] = 0;
         break;
       }
@@ -3121,20 +3123,20 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
 
     // Recover the original transform coefficients
     if (cctx_type < CCTX_TYPES - 1) {
-      memcpy(p_u->coeff + BLOCK_OFFSET(block), orig_coeff_u,
+      memcpy(p_c1->coeff + BLOCK_OFFSET(block), orig_coeff_c1,
              sizeof(tran_low_t) * max_eob);
-      memcpy(p_v->coeff + BLOCK_OFFSET(block), orig_coeff_v,
+      memcpy(p_c2->coeff + BLOCK_OFFSET(block), orig_coeff_c2,
              sizeof(tran_low_t) * max_eob);
     }
 
     // TODO(kslu) for negative angles, skip av1_xform_quant and reuse previous
     // dqcoeffs
     // Disallow the case where C1 eob is zero in cctx
-    uint64_t sse_dqcoeff_u = aom_sum_squares_i16(
-        (int16_t *)(p_u->dqcoeff + BLOCK_OFFSET(block)), (uint32_t)max_eob);
-    uint64_t sse_dqcoeff_v = aom_sum_squares_i16(
-        (int16_t *)(p_v->dqcoeff + BLOCK_OFFSET(block)), (uint32_t)max_eob);
-    if (eobs_ptr_u[block] == 0 || sse_dqcoeff_v > sse_dqcoeff_u) {
+    uint64_t sse_dqcoeff_c1 = aom_sum_squares_i16(
+        (int16_t *)(p_c1->dqcoeff + BLOCK_OFFSET(block)), (uint32_t)max_eob);
+    uint64_t sse_dqcoeff_c2 = aom_sum_squares_i16(
+        (int16_t *)(p_c2->dqcoeff + BLOCK_OFFSET(block)), (uint32_t)max_eob);
+    if (eobs_ptr_c1[block] == 0 || sse_dqcoeff_c2 > sse_dqcoeff_c1) {
       continue;
     }
 
@@ -3143,7 +3145,7 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
     if (RDCOST(x->rdmult, rate_cost[0] + rate_cost[1], 0) > best_rd) continue;
 
     // Calculate distortion.
-    if (eobs_ptr_u[block] == 0 && eobs_ptr_v[block] == 0) {
+    if (eobs_ptr_c1[block] == 0 && eobs_ptr_c2[block] == 0) {
       // When eob is 0, pixel domain distortion is more efficient and accurate.
       this_rd_stats.dist = this_rd_stats.sse = best_rd_stats->sse;
     } else {
@@ -3161,39 +3163,39 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
       best_rd = rd;
       *best_rd_stats = this_rd_stats;
       best_cctx_type = cctx_type;
-      best_txb_ctx_u = p_u->txb_entropy_ctx[block];
-      best_txb_ctx_v = p_v->txb_entropy_ctx[block];
-      best_eob_u = p_u->eobs[block];
-      best_eob_v = p_v->eobs[block];
+      best_txb_ctx_c1 = p_c1->txb_entropy_ctx[block];
+      best_txb_ctx_c2 = p_c2->txb_entropy_ctx[block];
+      best_eob_c1 = p_c1->eobs[block];
+      best_eob_c2 = p_c2->eobs[block];
       // Swap dqcoeff buffers
-      tran_low_t *const tmp_dqcoeff_u = best_dqcoeff_u;
-      tran_low_t *const tmp_dqcoeff_v = best_dqcoeff_v;
-      best_dqcoeff_u = p_u->dqcoeff;
-      best_dqcoeff_v = p_v->dqcoeff;
-      p_u->dqcoeff = tmp_dqcoeff_u;
-      p_v->dqcoeff = tmp_dqcoeff_v;
+      tran_low_t *const tmp_dqcoeff_c1 = best_dqcoeff_c1;
+      tran_low_t *const tmp_dqcoeff_c2 = best_dqcoeff_c2;
+      best_dqcoeff_c1 = p_c1->dqcoeff;
+      best_dqcoeff_c2 = p_c2->dqcoeff;
+      p_c1->dqcoeff = tmp_dqcoeff_c1;
+      p_c2->dqcoeff = tmp_dqcoeff_c2;
     }
   }
 
   assert(best_rd != INT64_MAX);
 
-  best_rd_stats->skip_txfm = (best_eob_u == 0 && best_eob_v == 0);
+  best_rd_stats->skip_txfm = (best_eob_c1 == 0 && best_eob_c2 == 0);
   update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, best_cctx_type);
-  p_u->txb_entropy_ctx[block] = best_txb_ctx_u;
-  p_v->txb_entropy_ctx[block] = best_txb_ctx_v;
-  p_u->eobs[block] = best_eob_u;
-  p_v->eobs[block] = best_eob_v;
+  p_c1->txb_entropy_ctx[block] = best_txb_ctx_c1;
+  p_c2->txb_entropy_ctx[block] = best_txb_ctx_c2;
+  p_c1->eobs[block] = best_eob_c1;
+  p_c2->eobs[block] = best_eob_c2;
 
-  assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_u > 0));
+  assert(IMPLIES(best_cctx_type > CCTX_NONE, best_eob_c1 > 0));
 #if CCTX_C2_DROPPED
-  assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_v == 0));
+  assert(IMPLIES(!keep_chroma_c2(best_cctx_type), best_eob_c2 == 0));
 #endif
 
   // Point dqcoeff to the quantized coefficients corresponding to the best
   // transform type, then we can skip transform and quantization, e.g. in the
   // final pixel domain distortion calculation and recon_intra().
-  p_u->dqcoeff = best_dqcoeff_u;
-  p_v->dqcoeff = best_dqcoeff_v;
+  p_c1->dqcoeff = best_dqcoeff_c1;
+  p_c2->dqcoeff = best_dqcoeff_c2;
 
   // Intra mode needs decoded pixels such that the next transform block can use
   // them for prediction. Here, quantization is not need, so there is no need
@@ -3201,14 +3203,14 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   // planes will be handled in recon_intra with AOM_PLANE_V.
   recon_intra(cpi, x, AOM_PLANE_V, block, blk_row, blk_col, plane_bsize,
               tx_size, &txb_ctx_uv[1], skip_trellis, tx_type, 0, &rate_cost[1],
-              AOMMAX(best_eob_u, best_eob_v));
-  p_u->dqcoeff = orig_dqcoeff_u;
-  p_v->dqcoeff = orig_dqcoeff_v;
+              AOMMAX(best_eob_c1, best_eob_c2));
+  p_c1->dqcoeff = orig_dqcoeff_c1;
+  p_c2->dqcoeff = orig_dqcoeff_c2;
 
-  aom_free(this_dqcoeff_u);
-  aom_free(this_dqcoeff_v);
-  aom_free(orig_coeff_u);
-  aom_free(orig_coeff_v);
+  aom_free(this_dqcoeff_c1);
+  aom_free(this_dqcoeff_c2);
+  aom_free(orig_coeff_c1);
+  aom_free(orig_coeff_c2);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 

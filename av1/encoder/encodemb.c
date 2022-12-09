@@ -496,12 +496,12 @@ void av1_xform(MACROBLOCK *x, int plane, int block, int blk_row, int blk_col,
 // Facade function for forward cross chroma component transform
 void forward_cross_chroma_transform(MACROBLOCK *x, int block, TX_SIZE tx_size,
                                     CctxType cctx_type) {
-  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-  struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
+  struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+  struct macroblock_plane *const p_c2 = &x->plane[AOM_PLANE_V];
   const int block_offset = BLOCK_OFFSET(block);
-  tran_low_t *coeff_u = p_u->coeff + block_offset;
-  tran_low_t *coeff_v = p_v->coeff + block_offset;
-  av1_fwd_cross_chroma_tx_block(coeff_u, coeff_v, tx_size, cctx_type);
+  tran_low_t *coeff_c1 = p_c1->coeff + block_offset;
+  tran_low_t *coeff_c2 = p_c2->coeff + block_offset;
+  av1_fwd_cross_chroma_tx_block(coeff_c1, coeff_c2, tx_size, cctx_type);
 }
 #endif  // CONFIG_CROSS_CHROMA_TX
 
@@ -789,22 +789,23 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     if (p->eobs[block]) *(args->skip) = 0;
     return;
   }
-  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-  struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
-  tran_low_t *dqcoeff_u = p_u->dqcoeff + BLOCK_OFFSET(block);
-  uint16_t *dst_u =
-      &pd_u->dst.buf[(blk_row * pd_u->dst.stride + blk_col) << MI_SIZE_LOG2];
-  int eob_u = plane ? p_u->eobs[block] : 0;
-  int eob_v = plane ? x->plane[AOM_PLANE_V].eobs[block] : 0;
-  if (plane == AOM_PLANE_V && (eob_u || eob_v) && is_cctx_allowed(cm, xd)) {
-    av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff, tx_size, cctx_type);
-    av1_inverse_transform_block(xd, dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
-                                dst_u, pd_u->dst.stride, AOMMAX(eob_u, eob_v),
+  struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+  struct macroblockd_plane *const pd_c1 = &xd->plane[AOM_PLANE_U];
+  tran_low_t *dqcoeff_c1 = p_c1->dqcoeff + BLOCK_OFFSET(block);
+  uint16_t *dst_c1 =
+      &pd_c1->dst.buf[(blk_row * pd_c1->dst.stride + blk_col) << MI_SIZE_LOG2];
+  int eob_c1 = plane ? p_c1->eobs[block] : 0;
+  int eob_c2 = plane ? x->plane[AOM_PLANE_V].eobs[block] : 0;
+  if (plane == AOM_PLANE_V && (eob_c1 || eob_c2) && is_cctx_allowed(cm, xd)) {
+    av1_inv_cross_chroma_tx_block(dqcoeff_c1, dqcoeff, tx_size, cctx_type);
+    av1_inverse_transform_block(xd, dqcoeff_c1, AOM_PLANE_U, tx_type, tx_size,
+                                dst_c1, pd_c1->dst.stride,
+                                AOMMAX(eob_c1, eob_c2),
                                 cm->features.reduced_tx_set_used);
   }
 
   if (p->eobs[block] ||
-      (plane && (eob_u || eob_v) && is_cctx_allowed(cm, xd))) {
+      (plane && (eob_c1 || eob_c2) && is_cctx_allowed(cm, xd))) {
 #else
   if (p->eobs[block]) {
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -813,7 +814,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
         xd, dqcoeff, plane, tx_type, tx_size, dst, pd->dst.stride,
 #if CONFIG_CROSS_CHROMA_TX
         (plane == 0 || !is_cctx_allowed(cm, xd)) ? p->eobs[block]
-                                                 : AOMMAX(eob_u, eob_v),
+                                                 : AOMMAX(eob_c1, eob_c2),
 #else
         p->eobs[block],
 #endif
@@ -851,7 +852,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
                     blk_row, pd->subsampling_x, pd->subsampling_y);
 #if CONFIG_CROSS_CHROMA_TX
     if (plane == AOM_PLANE_V && is_cctx_allowed(cm, xd))
-      mismatch_record_block_tx(dst_u, pd_u->dst.stride,
+      mismatch_record_block_tx(dst_c1, pd_c1->dst.stride,
                                cm->current_frame.order_hint, AOM_PLANE_U,
                                pixel_c, pixel_r, blk_w, blk_h);
 #endif  // CONFIG_CROSS_CHROMA_TX
@@ -1362,19 +1363,19 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   MACROBLOCKD *const xd = &x->e_mbd;
   assert(is_cctx_allowed(cm, xd));
 
-  struct macroblock_plane *const p_u = &x->plane[AOM_PLANE_U];
-  struct macroblock_plane *const p_v = &x->plane[AOM_PLANE_V];
-  struct macroblockd_plane *const pd_u = &xd->plane[AOM_PLANE_U];
-  struct macroblockd_plane *const pd_v = &xd->plane[AOM_PLANE_V];
-  tran_low_t *dqcoeff_u = p_u->dqcoeff + BLOCK_OFFSET(block);
-  tran_low_t *dqcoeff_v = p_v->dqcoeff + BLOCK_OFFSET(block);
-  uint16_t *eob_u = &p_u->eobs[block];
-  uint16_t *eob_v = &p_v->eobs[block];
-  const int dst_stride = pd_u->dst.stride;
-  uint16_t *dst_u =
-      &pd_u->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
-  uint16_t *dst_v =
-      &pd_v->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+  struct macroblock_plane *const p_c1 = &x->plane[AOM_PLANE_U];
+  struct macroblock_plane *const p_c2 = &x->plane[AOM_PLANE_V];
+  struct macroblockd_plane *const pd_c1 = &xd->plane[AOM_PLANE_U];
+  struct macroblockd_plane *const pd_c2 = &xd->plane[AOM_PLANE_V];
+  tran_low_t *dqcoeff_c1 = p_c1->dqcoeff + BLOCK_OFFSET(block);
+  tran_low_t *dqcoeff_c2 = p_c2->dqcoeff + BLOCK_OFFSET(block);
+  uint16_t *eob_c1 = &p_c1->eobs[block];
+  uint16_t *eob_c2 = &p_c2->eobs[block];
+  const int dst_stride = pd_c1->dst.stride;
+  uint16_t *dst_c1 =
+      &pd_c1->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+  uint16_t *dst_c2 =
+      &pd_c2->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
   int dummy_rate_cost = 0;
 
   av1_predict_intra_block_facade(cm, xd, AOM_PLANE_U, blk_col, blk_row,
@@ -1424,16 +1425,16 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
   for (int plane = AOM_PLANE_U; plane <= AOM_PLANE_V; plane++) {
     // Since eob can be updated here, make sure cctx_type is always CCTX_NONE
     // when eob of U is 0.
-    if (plane == AOM_PLANE_V && *eob_u == 0)
+    if (plane == AOM_PLANE_V && *eob_c1 == 0)
       update_cctx_array(xd, blk_row, blk_col, 0, 0, tx_size, CCTX_NONE);
 #if CCTX_C2_DROPPED
     if (plane == AOM_PLANE_V && (!keep_chroma_c2(cctx_type) ||
-                                 (*eob_u == 0 && cctx_type > CCTX_NONE))) {
+                                 (*eob_c1 == 0 && cctx_type > CCTX_NONE))) {
 #else
-    if (plane == AOM_PLANE_V && *eob_u == 0 && cctx_type > CCTX_NONE) {
+    if (plane == AOM_PLANE_V && *eob_c1 == 0 && cctx_type > CCTX_NONE) {
 #endif  // CCTX_C2_DROPPED
       av1_quantize_skip(av1_get_max_eob(tx_size),
-                        p_v->qcoeff + BLOCK_OFFSET(block), dqcoeff_v, eob_v);
+                        p_c2->qcoeff + BLOCK_OFFSET(block), dqcoeff_c2, eob_c2);
       break;
     }
     av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
@@ -1465,13 +1466,13 @@ void av1_encode_block_intra_joint_uv(int block, int blk_row, int blk_col,
     }
   }
 
-  if (*eob_u || *eob_v) {
-    av1_inv_cross_chroma_tx_block(dqcoeff_u, dqcoeff_v, tx_size, cctx_type);
-    av1_inverse_transform_block(xd, dqcoeff_u, AOM_PLANE_U, tx_type, tx_size,
-                                dst_u, dst_stride, AOMMAX(*eob_u, *eob_v),
+  if (*eob_c1 || *eob_c2) {
+    av1_inv_cross_chroma_tx_block(dqcoeff_c1, dqcoeff_c2, tx_size, cctx_type);
+    av1_inverse_transform_block(xd, dqcoeff_c1, AOM_PLANE_U, tx_type, tx_size,
+                                dst_c1, dst_stride, AOMMAX(*eob_c1, *eob_c2),
                                 cm->features.reduced_tx_set_used);
-    av1_inverse_transform_block(xd, dqcoeff_v, AOM_PLANE_V, tx_type, tx_size,
-                                dst_v, dst_stride, AOMMAX(*eob_u, *eob_v),
+    av1_inverse_transform_block(xd, dqcoeff_c2, AOM_PLANE_V, tx_type, tx_size,
+                                dst_c2, dst_stride, AOMMAX(*eob_c1, *eob_c2),
                                 cm->features.reduced_tx_set_used);
   }
 
