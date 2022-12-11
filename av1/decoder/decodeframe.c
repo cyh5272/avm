@@ -87,7 +87,6 @@
 #define MC_TEMP_BUF_PELS                       \
   (((MAX_SB_SIZE)*2 + (AOM_INTERP_EXTEND)*2) * \
    ((MAX_SB_SIZE)*2 + (AOM_INTERP_EXTEND)*2))
-
 #if CONFIG_THROUGHPUT_ANALYSIS
 int64_t tot_ctx_syms = { 0 };
 int64_t tot_bypass_syms = { 0 };
@@ -705,8 +704,13 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
     orig_pos_y += src_mv->row * (1 << (1 - ssy));
     int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
     orig_pos_x += src_mv->col * (1 << (1 - ssx));
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+    int pos_y = sf->scale_value_y_invariant(orig_pos_y, sf, ssy);
+    int pos_x = sf->scale_value_x_invariant(orig_pos_x, sf, ssx);
+#else
     int pos_y = sf->scale_value_y(orig_pos_y, sf);
     int pos_x = sf->scale_value_x(orig_pos_x, sf);
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
 
@@ -1135,7 +1139,6 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
                            ref_scale_factors, num_planes);
     }
   }
-
   dec_build_inter_predictor(cm, dcb, mi_row, mi_col, bsize);
   if (mbmi->motion_mode == OBMC_CAUSAL) {
     dec_build_obmc_inter_predictors_sb(cm, dcb);

@@ -22,9 +22,26 @@ extern "C" {
 
 #define SCALE_NUMERATOR 8
 
+#if CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS && CONFIG_EXT_SUPERRES
 #define REF_SCALE_SHIFT 14
+#define SCALE_SUBPEL_BITS 14
+#else
+#define REF_SCALE_SHIFT 14
+#define SCALE_SUBPEL_BITS 10
+#endif  // CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS && CONFIG_EXT_SUPERRES
+
 #define REF_NO_SCALE (1 << REF_SCALE_SHIFT)
 #define REF_INVALID_SCALE -1
+
+#define SCALE_SUBPEL_SHIFTS (1 << SCALE_SUBPEL_BITS)
+#define SCALE_SUBPEL_MASK (SCALE_SUBPEL_SHIFTS - 1)
+#define SCALE_EXTRA_BITS (SCALE_SUBPEL_BITS - SUBPEL_BITS)
+#define SCALE_EXTRA_OFF ((1 << SCALE_EXTRA_BITS) / 2)
+
+#define RS_SCALE_SUBPEL_BITS 14
+#define RS_SCALE_SUBPEL_MASK ((1 << RS_SCALE_SUBPEL_BITS) - 1)
+#define RS_SCALE_EXTRA_BITS (RS_SCALE_SUBPEL_BITS - RS_SUBPEL_BITS)
+#define RS_SCALE_EXTRA_OFF (1 << (RS_SCALE_EXTRA_BITS - 1))
 
 struct scale_factors {
   int x_scale_fp;  // horizontal fixed point scale factor
@@ -38,6 +55,20 @@ struct scale_factors {
 #if CONFIG_ACROSS_SCALE_TPL_MVS
   int (*scale_value_x_gen)(int val, const struct scale_factors *sf);
   int (*scale_value_y_gen)(int val, const struct scale_factors *sf);
+#if CONFIG_TIP
+  // Boundary invariant versions for use in TIP.
+  // Note this is only needed because the TIP implementation is such that
+  // the blocks used during generation of the tip ref buffer on the encoder
+  // side may not be the same as the blocks used on the decoder side for
+  // on-the-fly generation. If the implementation changes in the future
+  // to make the encoder and decoder consistent, then these versions would
+  // not be needed and we can go back to using scale_value_x() and
+  // scale_value_y().
+  int (*scale_value_x_invariant)(int val, const struct scale_factors *sf,
+                                 int sx);
+  int (*scale_value_y_invariant)(int val, const struct scale_factors *sf,
+                                 int sy);
+#endif  // CONFIG_TIP
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 };
 

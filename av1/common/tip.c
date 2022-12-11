@@ -788,7 +788,9 @@ static void tip_setup_tip_frame_plane(
       int blk_width = unit_blk_size;
       int blk_height = unit_blk_size;
       int offset = step;
+      // Make sure blocks do not cross 128 aligned boundaries
       while (blk_col + offset < blk_col_end && blk_width < max_allow_blk_size &&
+             blk_width + tpl_col < MAX_SB_SIZE &&
              tip_ref->mf_need_clamp[tpl_offset] ==
                  tip_ref->mf_need_clamp[tpl_offset + offset] &&
              tpl_mvs->mfmv0.as_int ==
@@ -808,7 +810,6 @@ static void tip_setup_tip_frame_plane(
         mv[0] = zero_mv[0];
         mv[1] = zero_mv[1];
       }
-
       tip_component_setup_pred_planes(cm, plane, tpl_row, tpl_col);
       tip_component_setup_dst_planes(cm, plane, tpl_row, tpl_col);
       tip_component_build_inter_predictors(
@@ -1002,7 +1003,9 @@ static void tip_setup_tip_plane_blocks(
       int blk_width = unit_blk_size;
       int blk_height = unit_blk_size;
       int offset = step;
+      // Make sure blocks do not cross 128 aligned boundaries
       while (blk_col + offset < blk_col_end && blk_width < max_allow_blk_size &&
+             blk_width + tpl_col < MAX_SB_SIZE &&
              !tip_ref->available_flag[tpl_offset + offset] &&
              tip_ref->mf_need_clamp[tpl_offset] ==
                  tip_ref->mf_need_clamp[tpl_offset + offset] &&
