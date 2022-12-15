@@ -78,8 +78,8 @@ static int realloc_frame_buffer_aligned(
 #if CONFIG_AV1_ENCODER
     // The size of ybf->y_pyramid
     if (num_pyramid_levels > 0) {
-      alloc_size += aom_get_pyramid_alloc_size(aligned_width, aligned_height,
-                                               num_pyramid_levels);
+      alloc_size +=
+          aom_get_pyramid_alloc_size(width, height, num_pyramid_levels);
       alloc_size += av1_get_corner_list_size();
     }
 #endif  // CONFIG_AV1_ENCODER
@@ -177,8 +177,7 @@ static int realloc_frame_buffer_aligned(
       ybf->corners = NULL;
     }
     if (num_pyramid_levels > 0) {
-      ybf->y_pyramid =
-          aom_alloc_pyramid(aligned_width, aligned_height, num_pyramid_levels);
+      ybf->y_pyramid = aom_alloc_pyramid(width, height, num_pyramid_levels);
       ybf->corners = av1_alloc_corner_list();
     }
 #endif                  // CONFIG_AV1_ENCODER
