@@ -297,7 +297,8 @@ static AOM_INLINE void inverse_transform_inter_block(
   mi_to_pixel_loc(&pixel_c, &pixel_r, mi_col, mi_row, blk_col, blk_row,
                   pd->subsampling_x, pd->subsampling_y);
   mismatch_check_block_tx(dst, pd->dst.stride, cm->current_frame.order_hint,
-                          plane, pixel_c, pixel_r, blk_w, blk_h);
+                          cm->superres_scale_denominator, plane, pixel_c,
+                          pixel_r, blk_w, blk_h);
 #endif
 }
 
@@ -1152,7 +1153,8 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
                              pd->subsampling_y))
       continue;
     mismatch_check_block_pre(pd->dst.buf, pd->dst.stride,
-                             cm->current_frame.order_hint, plane, pixel_c,
+                             cm->current_frame.order_hint,
+                             cm->superres_scale_denominator, plane, pixel_c,
                              pixel_r, pd->width, pd->height);
   }
 #endif
