@@ -17,6 +17,9 @@
 #include "config/av1_rtcd.h"
 
 #include "aom/internal/aom_codec_internal.h"
+#if CONFIG_AV1_ENCODER
+#include "aom_dsp/flow_estimation/corner_detect.h"
+#endif  // CONFIG_AV1_ENCODER
 #include "aom_util/aom_thread.h"
 #include "av1/common/alloccommon.h"
 #include "av1/common/av1_loopfilter.h"
@@ -1821,6 +1824,7 @@ static INLINE RefCntBuffer *assign_cur_frame_new_fb(AV1_COMMON *const cm) {
   cm->cur_frame = &cm->buffer_pool->frame_bufs[new_fb_idx];
 #if CONFIG_AV1_ENCODER
   aom_invalidate_pyramid(cm->cur_frame->buf.y_pyramid);
+  av1_invalidate_corner_list(cm->cur_frame->buf.corners);
 #endif  // CONFIG_AV1_ENCODER
   av1_zero(cm->cur_frame->interp_filter_selected);
   av1_zero(cm->cur_frame->raw_frame_hash);
