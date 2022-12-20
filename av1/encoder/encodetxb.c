@@ -3827,8 +3827,8 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
         const int txb_offset =
             x->mbmi_ext_frame
                 ->cb_offset[(plane > 0 && xd->tree_type == CHROMA_PART) ? 1
-                                                                        : 0] /
-            (TX_SIZE_W_MIN * TX_SIZE_H_MIN);
+                                                                        : 0] >>
+            (MIN_TX_SIZE_LOG2 * 2);
         uint16_t *eob_txb = cb_coef_buff->eobs[plane] + txb_offset;
         uint8_t *const entropy_ctx =
             cb_coef_buff->entropy_ctx[plane] + txb_offset;
