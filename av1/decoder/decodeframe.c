@@ -1425,7 +1425,10 @@ static AOM_INLINE void decode_token_recon_block(AV1Decoder *const pbi,
       int mu_blocks_high = mi_size_high[max_unit_bsize];
       for (int row = 0; row < max_blocks_high; row += mu_blocks_high) {
         for (int col = 0; col < max_blocks_wide; col += mu_blocks_wide) {
-          update_cctx_array(xd, 0, 0, 0, 0, max_tx_size, CCTX_NONE);
+          int row_offset, col_offset;
+          get_offsets_to_8x8(xd, max_tx_size, &row_offset, &col_offset);
+          update_cctx_array(xd, 0, 0, row_offset, col_offset, max_tx_size,
+                            CCTX_NONE);
         }
       }
 #endif  // CONFIG_CROSS_CHROMA_TX
