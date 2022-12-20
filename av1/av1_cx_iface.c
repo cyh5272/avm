@@ -24,6 +24,8 @@
 #include "aom/internal/aom_codec_internal.h"
 #include "aom/internal/aom_image_internal.h"
 
+#include "aom_dsp/flow_estimation/flow_estimation.h"
+
 #include "av1/av1_iface_common.h"
 #include "av1/encoder/bitstream.h"
 #include "av1/encoder/encoder.h"
@@ -236,6 +238,7 @@ struct av1_extracfg {
 #if CONFIG_PAR_HIDING
   int enable_parity_hiding;
 #endif  // CONFIG_PAR_HIDING
+  GlobalMotionMethod global_motion_method;
 };
 
 // Example subgop configs. Currently not used by default.
@@ -566,8 +569,9 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable_refmvbank
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  1,    // enable_parity_hiding
-#endif  // CONFIG_PAR_HIDING
+  1,                                   // enable_parity_hiding
+#endif                                 // CONFIG_PAR_HIDING
+  GLOBAL_MOTION_METHOD_FEATURE_MATCH,  // global_motion_method
 };
 
 struct aom_codec_alg_priv {
@@ -843,6 +847,9 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   else
     RANGE_CHECK(extra_cfg, max_partition_size, 4, 128);
   RANGE_CHECK_HI(extra_cfg, min_partition_size, extra_cfg->max_partition_size);
+
+  RANGE_CHECK(extra_cfg, global_motion_method,
+              GLOBAL_MOTION_METHOD_FEATURE_MATCH, GLOBAL_MOTION_METHOD_LAST);
 
   for (int i = 0; i < MAX_NUM_OPERATING_POINTS; ++i) {
     const int level_idx = extra_cfg->target_seq_level_idx[i];
@@ -1619,6 +1626,8 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   oxcf->motion_mode_cfg.allow_warped_motion =
       (extra_cfg->allow_warped_motion & extra_cfg->enable_warped_motion);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+
+  oxcf->global_motion_method = extra_cfg->global_motion_method;
 
   // Set partition related configuration.
   part_cfg->disable_ml_partition_speed_features =
@@ -4031,6 +4040,9 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                               argv, err_string)) {
     extra_cfg.enable_parity_hiding = arg_parse_uint_helper(&arg, err_string);
 #endif  // CONFIG_PAR_HIDING
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.global_motion_method,
+                              argv, err_string)) {
+    extra_cfg.global_motion_method = arg_parse_enum_helper(&arg, err_string);
   } else {
     match = 0;
     snprintf(err_string, ARG_ERR_MSG_MAX_LEN, "Cannot find aom option %s",

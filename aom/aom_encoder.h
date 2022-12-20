@@ -34,6 +34,8 @@ extern "C" {
 #include "config/aom_config.h"
 #include "aom/aom_codec.h"
 
+#include "aom_dsp/flow_estimation/flow_estimation.h"
+
 /*!\brief Current ABI version number
  *
  * \internal

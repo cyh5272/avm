@@ -489,6 +489,7 @@ const arg_def_t *av1_key_val_args[] = {
   &g_av1_codec_arg_defs.enable_warp_delta,
   &g_av1_codec_arg_defs.enable_warp_extend,
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+  &g_av1_codec_arg_defs.global_motion_method,
   NULL,
 };
 

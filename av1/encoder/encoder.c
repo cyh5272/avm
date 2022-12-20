@@ -649,8 +649,6 @@ static void init_config(struct AV1_COMP *cpi, AV1EncoderConfig *oxcf) {
   init_buffer_indices(&cpi->force_intpel_info, cm->remapped_ref_idx);
 
   av1_noise_estimate_init(&cpi->noise_estimate, cm->width, cm->height);
-
-  cpi->image_pyramid_levels = oxcf->tool_cfg.enable_global_motion ? 1 : 0;
 }
 
 int aom_strcmp(const char *a, const char *b) {
@@ -976,6 +974,13 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
       // is in fact in the config file format that can be parsed back.
       av1_print_subgop_config_set(&cpi->subgop_config_set);
     }
+  }
+
+  if (oxcf->tool_cfg.enable_global_motion) {
+    cpi->image_pyramid_levels =
+        global_motion_pyr_levels[oxcf->global_motion_method];
+  } else {
+    cpi->image_pyramid_levels = 0;
   }
 }
 

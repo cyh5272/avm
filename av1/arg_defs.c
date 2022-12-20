@@ -140,6 +140,12 @@ static const struct arg_enum_list frame_hash_metadata_enum[] = {
   { "both", AOM_DFH_BOTH },
   { NULL, 0 }
 };
+
+static const struct arg_enum_list global_motion_method_enum[] = {
+  { "feature-match", GLOBAL_MOTION_METHOD_FEATURE_MATCH },
+  { "disflow", GLOBAL_MOTION_METHOD_DISFLOW },
+  { NULL, 0 }
+};
 #endif  // CONFIG_AV1_ENCODER
 
 const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
@@ -781,5 +787,9 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
       ARG_DEF(NULL, "use-per-plane-frame-hash", 1,
               "Write hash values for each plane instead of the entire frame. "
               "(0: false (default), 1: true)"),
+  .global_motion_method = ARG_DEF_ENUM(NULL, "global-motion-method", 1,
+                                       "Global motion search method "
+                                       "(default: feature-match)",
+                                       global_motion_method_enum),
 #endif  // CONFIG_AV1_ENCODER
 };

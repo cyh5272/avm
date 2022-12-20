@@ -1166,6 +1166,8 @@ typedef struct AV1EncoderConfig {
   // format.
   bool save_as_annexb;
 
+  // Selected global motion search method
+  GlobalMotionMethod global_motion_method;
   /*!\endcond */
 } AV1EncoderConfig;
 

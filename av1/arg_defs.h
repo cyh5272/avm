@@ -22,6 +22,7 @@ extern "C" {
 #include "common/webmenc.h"
 #endif
 #include "aom/aomcx.h"
+#include "aom_dsp/flow_estimation/flow_estimation.h"
 
 enum TestDecodeFatality {
   TEST_DECODE_OFF,
@@ -286,6 +287,7 @@ typedef struct av1_codec_arg_definitions {
 #endif  // CONFIG_AV1_ENCODER
   arg_def_t frame_hash_metadata;
   arg_def_t frame_hash_per_plane;
+  arg_def_t global_motion_method;
 } av1_codec_arg_definitions_t;
 
 extern const av1_codec_arg_definitions_t g_av1_codec_arg_defs;
