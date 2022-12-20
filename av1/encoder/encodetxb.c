@@ -130,7 +130,6 @@ static void write_golomb(aom_writer *w, int level) {
 
   for (i = length - 1; i >= 0; --i) aom_write_bit(w, (x >> i) & 0x01);
 #endif
-
 }
 
 static INLINE int64_t get_coeff_dist(tran_low_t tcoeff, tran_low_t dqcoeff,
@@ -580,7 +579,7 @@ int av1_write_sig_txtype(const AV1_COMMON *const cm, MACROBLOCK *const x,
   }
 #else
   aom_write_symbol(w, eob == 0, ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx], 2);
-#endif  // CONFIG_CONTEXT_DERIVATION
+#endif               // CONFIG_CONTEXT_DERIVATION
   if (eob == 0) return 0;
   if (plane == 0) {  // Only y plane's tx_type is transmitted
     av1_write_tx_type(cm, xd, tx_type, tx_size, w);
@@ -2879,7 +2878,7 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
   if (nzsbb < PHTHRESH - 1 ||
       (!needtune && nzsbb == PHTHRESH - 1))  // disable coef_info for this sbb
   {
-    return false;  // not hide
+    return false;                            // not hide
   }
 
   const int ratesaving =
