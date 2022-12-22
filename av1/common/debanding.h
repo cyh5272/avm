@@ -31,6 +31,7 @@ extern "C" {
 #define CAMDA_MASK_FILTER_SIZE (7)
 #define CAMDA_BLOCK_SIZE (4)
 #define CAMDA_LOG2_BLOCK_SIZE (2)
+#define CAMDA_BLOCK_MAX_COUNT (4)
 
 /* Visibility threshold for luminance ΔL < tvi_threshold*L_mean for BT.1886 */
 #define CAMBI_TVI (0.019)

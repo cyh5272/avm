@@ -226,9 +226,11 @@ int avm_deband_init(DebandInfo *const dbi, const int frame_width,
     dbi->buffers.c_values_histograms =
         aom_malloc(frame_width * dbi->num_bins * sizeof(uint16_t));
   } else {
-    int mask_width = frame_width >> CAMDA_LOG2_BLOCK_SIZE;
-    int mask_height = frame_height >> CAMDA_LOG2_BLOCK_SIZE;
-    dbi->mask = aom_malloc(mask_width * mask_height * sizeof(*dbi->mask));
+    int mask_size = (frame_width>>CAMDA_LOG2_BLOCK_SIZE) *
+                    (frame_height>>CAMDA_LOG2_BLOCK_SIZE) * sizeof(uint16_t);
+    dbi->mask = aom_malloc(mask_size);
+    dbi->block_values = aom_malloc(mask_size * (CAMDA_BLOCK_MAX_COUNT+1));
+    dbi->block_hist = aom_malloc(mask_size * CAMDA_BLOCK_MAX_COUNT);
   }
 
   return use_deband;
@@ -271,6 +273,35 @@ uint16_t cambi_get_mask_index(int input_width, int input_height,
   return (filter_size * filter_size + 3 * (ceil_log2(shifted_wh) - 11) - 1)>>1;
 }
 
+
+uint16_t pixel_count_if_below_thr(DebandInfo *dbi, uint16_t *image, ptrdiff_t stride,
+                                  int mask_pos, int b_row, int b_col) {
+  const int row = b_row << CAMDA_LOG2_BLOCK_SIZE;
+  const int col = b_col << CAMDA_LOG2_BLOCK_SIZE;
+  long int index = row * stride + col;
+  uint16_t num_vals = 0;
+  uint16_t *values = (uint16_t*) dbi->block_values + mask_pos * (CAMDA_BLOCK_MAX_COUNT+1);
+  uint16_t *hist = (uint16_t*)  dbi->block_hist + mask_pos * CAMDA_BLOCK_MAX_COUNT;
+
+  for (int i=0; i<CAMDA_BLOCK_SIZE; i++, index+=stride) {
+    for (int j=0; j<CAMDA_BLOCK_SIZE; j++) {
+      uint16_t count = 0;
+      while (values[count]!=image[index+j] && values[count]!=UINT16_MAX)
+        count++;
+
+      if (count>num_vals) {
+        num_vals = count;
+        if (count==CAMDA_BLOCK_MAX_COUNT)
+          return 0;
+      }
+
+      values[count] = image[index+j];
+      hist[count]++;
+    }
+  }
+  return num_vals+1;
+}
+
 void camda_get_spatial_mask(DebandInfo *dbi, int width, int height) {
   uint16_t pad_size = CAMDA_MASK_FILTER_SIZE >> 1;
   uint16_t *image_data = dbi->frame;
@@ -284,7 +315,11 @@ void camda_get_spatial_mask(DebandInfo *dbi, int width, int height) {
   int dp_width = width + 2 * pad_size + 1;
   int dp_height = 2 * pad_size + 2;
   memset(dp, 0, dp_width * dp_height * sizeof(uint32_t));
-  memset(mask_data, 0, mask_stride * mask_height * sizeof(uint16_t));
+
+  int mask_size = mask_height * mask_stride * sizeof(uint16_t);
+  memset(mask_data, 0, mask_size);
+  memset(dbi->block_values, UINT16_MAX, mask_size * (CAMDA_BLOCK_MAX_COUNT+1));
+  memset(dbi->block_hist, 0, mask_size * CAMDA_BLOCK_MAX_COUNT);
 
   // Initial computation: fill dp except for the last row
   for (int i = 0; i < pad_size; i++) {
@@ -343,40 +378,36 @@ void camda_get_spatial_mask(DebandInfo *dbi, int width, int height) {
               + dp[top * dp_width + left];
 
           int mask_j = left >> CAMDA_LOG2_BLOCK_SIZE;
-          mask_data[mask_i * mask_stride + mask_j] = (result > mask_index);
+          if (result > mask_index) {
+            int mask_pos = mask_i * mask_stride + mask_j;
+            mask_data[mask_pos] = pixel_count_if_below_thr(dbi, image_data, stride,
+                                                           mask_pos, mask_i, mask_j);
+          }
         }
       }
     }
   }
 }
 
-static inline void add_block_to_histogram(uint16_t *histogram, int b_row, int b_col,
-                                          uint16_t *image, ptrdiff_t stride,
-                                          const uint16_t num_diffs) {
+static inline void add_hist_to_histogram(DebandInfo *dbi, uint16_t *histogram,
+                                         ptrdiff_t mask_pos, const uint16_t num_diffs,
+                                         uint16_t num_values) {
   uint16_t *hist_diff = histogram + num_diffs;
-  const int row = b_row << CAMDA_LOG2_BLOCK_SIZE;
-  const int col = b_col << CAMDA_LOG2_BLOCK_SIZE;
-  long int index = row * stride + col;
-  for (int i=0; i<CAMDA_BLOCK_SIZE; i++, index+=stride) {
-    hist_diff[image[index]]++;
-    hist_diff[image[index+1]]++;
-    hist_diff[image[index+2]]++;
-    hist_diff[image[index+3]]++;
+  ptrdiff_t hist_pos = mask_pos * CAMDA_BLOCK_MAX_COUNT;
+  ptrdiff_t values_pos = hist_pos + mask_pos;
+  for (int i=0; i<num_values; i++) {
+    hist_diff[dbi->block_values[values_pos++]] += dbi->block_hist[hist_pos++];
   }
 }
 
-static inline void sub_block_to_histogram(uint16_t *histogram, int b_row, int b_col,
-                                          uint16_t *image, ptrdiff_t stride,
-                                          const uint16_t num_diffs) {
+static inline void sub_hist_to_histogram(DebandInfo *dbi, uint16_t *histogram,
+                                         ptrdiff_t mask_pos, const uint16_t num_diffs,
+                                         uint16_t num_values) {
   uint16_t *hist_diff = histogram + num_diffs;
-  const int row = b_row << CAMDA_LOG2_BLOCK_SIZE;
-  const int col = b_col << CAMDA_LOG2_BLOCK_SIZE;
-  long int index = row * stride + col;
-  for (int i=0; i<CAMDA_BLOCK_SIZE; i++, index+=stride) {
-    hist_diff[image[index]]--;
-    hist_diff[image[index+1]]--;
-    hist_diff[image[index+2]]--;
-    hist_diff[image[index+3]]--;
+  ptrdiff_t hist_pos = mask_pos * CAMDA_BLOCK_MAX_COUNT;
+  ptrdiff_t values_pos = hist_pos + mask_pos;
+  for (int i=0; i<num_values; i++) {
+    hist_diff[dbi->block_values[values_pos++]] -= dbi->block_hist[hist_pos++];
   }
 }
 
@@ -469,9 +500,11 @@ static void camda_dither_frame(DebandInfo *dbi, int width, int height) {
 
     for (int b_i=-b_pad_size; b_i<=b_pad_size; b_i++)
       for (int b_j=0; b_j<=b_pad_size; b_j++)
-        if (b_row+b_i>=0 && b_row+b_i<b_height)
-          if (mask[(b_row+b_i) * mask_stride + b_j])
-            add_block_to_histogram(hist, b_row + b_i, b_j, image, stride, num_diffs);
+        if (b_row+b_i>=0 && b_row+b_i<b_height) {
+          ptrdiff_t mask_pos = (b_row+b_i) * mask_stride + b_j;
+          if (mask[mask_pos])
+            add_hist_to_histogram(dbi, hist, mask_pos, num_diffs, mask[mask_pos]);
+        }
 
     if (mask[b_row * mask_stride])
       dither_block(hist, image, b_row, 0, stride, num_diffs, tvi_for_diff, dbi);
@@ -483,15 +516,17 @@ static void camda_dither_frame(DebandInfo *dbi, int width, int height) {
           int b_col_in = b_col + b_pad_size;
           int b_col_out = b_col - b_pad_size - 1;
 
-          if (b_col_out >= 0)
-            if (mask[b_row_curr * mask_stride + b_col_out])
-              sub_block_to_histogram(hist, b_row_curr, b_col_out,
-                                     image, stride, num_diffs);
+          if (b_col_out >= 0) {
+            ptrdiff_t mask_pos = b_row_curr * mask_stride + b_col_out;
+            if (mask[mask_pos])
+              sub_hist_to_histogram(dbi, hist, mask_pos, num_diffs, mask[mask_pos]);
+          }
 
-          if (b_col_in<b_width)
-            if (mask[b_row_curr * mask_stride + b_col_in])
-              add_block_to_histogram(hist, b_row_curr, b_col_in,
-                                     image, stride, num_diffs);
+          if (b_col_in<b_width) {
+            ptrdiff_t mask_pos = b_row_curr * mask_stride + b_col_in;
+            if (mask[mask_pos])
+              add_hist_to_histogram(dbi, hist, mask_pos, num_diffs, mask[mask_pos]);
+          }
         }
       }
 
@@ -540,5 +575,8 @@ void avm_deband_close(DebandInfo *const dbi, bool encoder) {
     aom_free(dbi->diffs_weights);
     aom_free(dbi->buffers.c_values);
     aom_free(dbi->buffers.c_values_histograms);
+  } else {
+    aom_free(dbi->block_values);
+    aom_free(dbi->block_hist);
   }
 }

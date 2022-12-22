@@ -390,6 +390,10 @@ typedef struct {
   uint16_t *frame;
   /** mask frame buffer */
   uint16_t *mask;
+  /** buffer with block pixel values */
+  uint16_t *block_values;
+  /** buffer with # of occurrens of pixel values in a block */
+  uint16_t *block_hist;
   /** stride from frame, mask and c_values buffers */
   int stride;
   /** frame height for 'frame', mask and c_values buffers */
