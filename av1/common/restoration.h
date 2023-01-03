@@ -210,23 +210,13 @@ extern const WienernsFilterPairParameters wienerns_filters_lowqp;
 extern const WienernsFilterPairParameters wienerns_filters_midqp;
 extern const WienernsFilterPairParameters wienerns_filters_highqp;
 
-#define USE_QBASED_WIENER_NONSEP 0
 #define USE_CENTER_WIENER_NONSEP 0
 
 static INLINE const WienernsFilterParameters *get_wienerns_parameters(
     int qindex, int is_uv) {
   const WienernsFilterPairParameters *pair_nsfilter_params = NULL;
-#if USE_QBASED_WIENER_NONSEP
-  if (qindex <= 96)
-    pair_nsfilter_params = &wienerns_filters_midqp;
-  else if (qindex <= 200)
-    pair_nsfilter_params = &wienerns_filters_midqp;
-  else
-    pair_nsfilter_params = &wienerns_filters_highqp;
-#else
   (void)qindex;
   pair_nsfilter_params = &wienerns_filters_midqp;
-#endif  // USE_QBASED_WIENER_NONSEP
   return is_uv ? pair_nsfilter_params->uv : pair_nsfilter_params->y;
 }
 
@@ -237,10 +227,6 @@ static INLINE const NonsepFilterConfig *get_wienerns_config(int qindex,
   return &base_nsfilter_params->nsfilter_config;
 }
 #endif  // CONFIG_WIENER_NONSEP
-
-#if CONFIG_MULTIQ_LR_SIGNALING
-static INLINE int get_multiq_lr_level(int qindex) { return qindex > 200; }
-#endif  // CONFIG_MULTIQ_LR_SIGNALING
 
 #if CONFIG_COMBINE_PC_NS_WIENER
 const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index);
