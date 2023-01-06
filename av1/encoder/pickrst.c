@@ -150,6 +150,8 @@ typedef struct {
   int64_t sse;
   int64_t bits;
   int tile_y0, tile_stripe0;
+  // Helps convert tile-localized RU indices to frame RU indices.
+  int ru_idx_base;
 
   // sgrproj and wiener are initialised by rsc_on_tile when starting the first
   // tile in the frame.
@@ -193,8 +195,9 @@ typedef struct RstUnitStats {
   // TODO(oguleryuz): Add weights.
   int64_t real_sse;
   int num_stats_classes;
-  int ru_idx;  // debug.
-  int plane;   // debug.
+  int ru_idx;          // debug.
+  int ru_idx_in_tile;  // debug.
+  int plane;           // debug.
 } RstUnitStats;
 #endif  // CONFIG_WIENER_NONSEP
 
@@ -234,10 +237,11 @@ static AOM_INLINE void reset_all_banks(RestSearchCtxt *rsc) {
 #endif  // CONFIG_WIENER_NONSEP
 }
 
-static AOM_INLINE void rsc_on_tile(void *priv) {
+static AOM_INLINE void rsc_on_tile(void *priv, int idx) {
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
   reset_all_banks(rsc);
   rsc->tile_stripe0 = 0;
+  rsc->ru_idx_base = idx;
 }
 
 #if CONFIG_SAVE_IN_LOOP_DATA
@@ -3805,6 +3809,7 @@ static void gather_stats_wienerns_visitor(const RestorationTileLimits *limits,
       rsc->src_stride, &rui, rsc->cm->seq_params.bit_depth, unit_stats.A,
       unit_stats.b, nsfilter_params, rsc->num_stat_classes);
   unit_stats.ru_idx = rest_unit_idx;
+  unit_stats.ru_idx_in_tile = rest_unit_idx_seq - rsc->ru_idx_base;
   unit_stats.plane = rsc->plane;
   unit_stats.num_stats_classes = rsc->num_stat_classes;
   aom_vector_push_back(rsc->wienerns_stats, &unit_stats);
@@ -3874,6 +3879,7 @@ static void search_wienerns_visitor(const RestorationTileLimits *limits,
   const RstUnitStats *unit_stats = (const RstUnitStats *)aom_vector_const_get(
       rsc->wienerns_stats, rest_unit_idx_seq);
   assert(unit_stats->ru_idx == rest_unit_idx);
+  assert(unit_stats->ru_idx_in_tile + rsc->ru_idx_base == rest_unit_idx_seq);
   assert(unit_stats->plane == rsc->plane);
 
   if (!compute_quantized_wienerns_filter(
@@ -4553,7 +4559,7 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
   assert(tile_info.mi_col_start < tile_info.mi_col_end);
 
   reset_rsc(rsc);
-  rsc_on_tile(rsc);
+  rsc_on_tile(rsc, *processed);
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += rsc->cm->seq_params.mib_size) {
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
@@ -4733,6 +4739,7 @@ static void collapse_stats_to_target_classes(int target_classes,
   RstUnitStats collapsed_unit_stats;
   memset(&collapsed_unit_stats, 0, sizeof(collapsed_unit_stats));
   collapsed_unit_stats.ru_idx = unit_stats->ru_idx;
+  collapsed_unit_stats.ru_idx_in_tile = unit_stats->ru_idx_in_tile;
   collapsed_unit_stats.plane = unit_stats->plane;
   collapsed_unit_stats.real_sse = unit_stats->real_sse;
   collapsed_unit_stats.num_stats_classes = target_classes;
