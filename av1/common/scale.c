@@ -18,47 +18,26 @@
 #include "aom_dsp/aom_filter.h"
 
 // Note: Expect val to be in q4 precision
-static INLINE int scaled_x(int val, const struct scale_factors *sf, int ssx) {
-  (void)ssx;
+static INLINE int scaled_x(int val, const struct scale_factors *sf) {
   const int off =
       (sf->x_scale_fp - (1 << REF_SCALE_SHIFT)) * (1 << (SUBPEL_BITS - 1));
-#if CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
-  const int val128 = val & ~((1 << (SUBPEL_BITS + MAX_SB_SIZE_LOG2 - ssx)) - 1);
-  const int val128off = val - val128;
-  const int64_t tval128 = (int64_t)val128 * sf->x_scale_fp + off;
-  const int start128 = (int)ROUND_POWER_OF_TWO_SIGNED_64(
-      tval128, REF_SCALE_SHIFT - SCALE_EXTRA_BITS);
-  return start128 + (sf->x_step_q4 >> SUBPEL_BITS) * val128off;
-#else
   const int64_t tval = (int64_t)val * sf->x_scale_fp + off;
   return (int)ROUND_POWER_OF_TWO_SIGNED_64(tval,
                                            REF_SCALE_SHIFT - SCALE_EXTRA_BITS);
-#endif  // CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
 }
 
 // Note: Expect val to be in q4 precision
-static INLINE int scaled_y(int val, const struct scale_factors *sf, int ssy) {
-  (void)ssy;
+static INLINE int scaled_y(int val, const struct scale_factors *sf) {
   const int off =
       (sf->y_scale_fp - (1 << REF_SCALE_SHIFT)) * (1 << (SUBPEL_BITS - 1));
-#if CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
-  const int val128 = val & ~((1 << (SUBPEL_BITS + MAX_SB_SIZE_LOG2 - ssy)) - 1);
-  const int val128off = val - val128;
-  const int64_t tval128 = (int64_t)val128 * sf->y_scale_fp + off;
-  const int start128 = (int)ROUND_POWER_OF_TWO_SIGNED_64(
-      tval128, REF_SCALE_SHIFT - SCALE_EXTRA_BITS);
-  return start128 + (sf->y_step_q4 >> SUBPEL_BITS) * val128off;
-#else
   const int64_t tval = (int64_t)val * sf->y_scale_fp + off;
   return (int)ROUND_POWER_OF_TWO_SIGNED_64(tval,
                                            REF_SCALE_SHIFT - SCALE_EXTRA_BITS);
-#endif  // CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
 }
 
 // Note: Expect val to be in q4 precision
-static int unscaled_value(int val, const struct scale_factors *sf, int sub) {
+static int unscaled_value(int val, const struct scale_factors *sf) {
   (void)sf;
-  (void)sub;
   return val * (1 << SCALE_EXTRA_BITS);
 }
 
@@ -98,13 +77,13 @@ static int fixed_point_scale_to_coarse_point_scale(int scale_fp,
 }
 
 // Note: x and y are integer precision, mvq4 is q4 precision.
-MV32 av1_scale_mv(const MV *mvq4, int x, int y, const struct scale_factors *sf,
-                  int ssx, int ssy) {
-  const int y_off_q4 = sf->scale_value_y(y << SUBPEL_BITS, sf, ssy);
-  const int x_off_q4 = sf->scale_value_x(x << SUBPEL_BITS, sf, ssx);
+MV32 av1_scale_mv(const MV *mvq4, int x, int y,
+                  const struct scale_factors *sf) {
+  const int y_off_q4 = sf->scale_value_y(y << SUBPEL_BITS, sf);
+  const int x_off_q4 = sf->scale_value_x(x << SUBPEL_BITS, sf);
   const MV32 res = {
-    sf->scale_value_y((y << SUBPEL_BITS) + mvq4->row, sf, ssy) - y_off_q4,
-    sf->scale_value_x((x << SUBPEL_BITS) + mvq4->col, sf, ssx) - x_off_q4
+    sf->scale_value_y((y << SUBPEL_BITS) + mvq4->row, sf) - y_off_q4,
+    sf->scale_value_x((x << SUBPEL_BITS) + mvq4->col, sf) - x_off_q4
   };
   return res;
 }
@@ -122,21 +101,10 @@ void av1_setup_scale_factors_for_frame(struct scale_factors *sf, int other_w,
   sf->y_scale_fp =
       get_fixed_point_scale_factor(other_h, this_h, REF_SCALE_SHIFT);
 
-#if CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
-  sf->x_step_q4 =
-      fixed_point_scale_to_coarse_point_scale(
-          sf->x_scale_fp, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS + SUBPEL_BITS)
-      << SUBPEL_BITS;
-  sf->y_step_q4 =
-      fixed_point_scale_to_coarse_point_scale(
-          sf->y_scale_fp, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS + SUBPEL_BITS)
-      << SUBPEL_BITS;
-#else
   sf->x_step_q4 = fixed_point_scale_to_coarse_point_scale(
       sf->x_scale_fp, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
   sf->y_step_q4 = fixed_point_scale_to_coarse_point_scale(
       sf->y_scale_fp, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
-#endif  // CONFIG_TIP && CONFIG_ACROSS_SCALE_TPL_MVS
 
   if (av1_is_scaled(sf)) {
     sf->scale_value_x = scaled_x;

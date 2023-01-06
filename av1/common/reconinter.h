@@ -532,12 +532,11 @@ static INLINE MV clamp_mv_to_umv_border_sb(const MACROBLOCKD *xd,
 
 static INLINE int64_t scaled_buffer_offset(int x_offset, int y_offset,
                                            int stride,
-                                           const struct scale_factors *sf,
-                                           int ssx, int ssy) {
+                                           const struct scale_factors *sf) {
   const int x =
-      sf ? sf->scale_value_x(x_offset, sf, ssx) >> SCALE_EXTRA_BITS : x_offset;
+      sf ? sf->scale_value_x(x_offset, sf) >> SCALE_EXTRA_BITS : x_offset;
   const int y =
-      sf ? sf->scale_value_y(y_offset, sf, ssy) >> SCALE_EXTRA_BITS : y_offset;
+      sf ? sf->scale_value_y(y_offset, sf) >> SCALE_EXTRA_BITS : y_offset;
   return (int64_t)y * stride + x;
 }
 
@@ -554,8 +553,7 @@ static INLINE void setup_pred_plane(struct buf_2d *dst, BLOCK_SIZE bsize,
 
   const int x = (MI_SIZE * mi_col) >> subsampling_x;
   const int y = (MI_SIZE * mi_row) >> subsampling_y;
-  dst->buf = src + scaled_buffer_offset(x, y, stride, scale, subsampling_x,
-                                        subsampling_y);
+  dst->buf = src + scaled_buffer_offset(x, y, stride, scale);
   dst->buf0 = src;
   dst->width = width;
   dst->height = height;

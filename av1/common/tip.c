@@ -17,7 +17,12 @@
 // CHROMA_MI_SIZE is the block size in luma unit for Chroma TIP interpolation
 #define CHROMA_MI_SIZE (TMVP_MI_SIZE << 1)
 // Maximum block size is allowed to combine the blocks with same MV
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+// Encoder and decoder must use 8x8 units to prevent scaled pred mismatches
+#define MAX_BLOCK_SIZE_WITH_SAME_MV 8
+#else
 #define MAX_BLOCK_SIZE_WITH_SAME_MV 128
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 // Percentage threshold of number of blocks with available motion
 // projection in a frame to allow TIP mode
 #define TIP_ENABLE_COUNT_THRESHOLD 60
@@ -717,8 +722,7 @@ static INLINE void tip_setup_pred_plane(struct buf_2d *dst, uint8_t *src,
                                         int subsampling_x, int subsampling_y) {
   const int x = tpl_col >> subsampling_x;
   const int y = tpl_row >> subsampling_y;
-  dst->buf = src + scaled_buffer_offset(x, y, stride, scale, subsampling_x,
-                                        subsampling_y);
+  dst->buf = src + scaled_buffer_offset(x, y, stride, scale);
   dst->buf0 = src;
   dst->width = width;
   dst->height = height;
@@ -791,7 +795,6 @@ static void tip_setup_tip_frame_plane(
       int offset = step;
       // Make sure blocks do not cross 128 aligned boundaries
       while (blk_col + offset < blk_col_end && blk_width < max_allow_blk_size &&
-             blk_width + tpl_col < MAX_SB_SIZE &&
              tip_ref->mf_need_clamp[tpl_offset] ==
                  tip_ref->mf_need_clamp[tpl_offset + offset] &&
              tpl_mvs->mfmv0.as_int ==
@@ -1018,7 +1021,6 @@ static void tip_setup_tip_plane_blocks(
       int offset = step;
       // Make sure blocks do not cross 128 aligned boundaries
       while (blk_col + offset < blk_col_end && blk_width < max_allow_blk_size &&
-             blk_width + tpl_col < MAX_SB_SIZE &&
              !tip_ref->available_flag[tpl_offset + offset] &&
              tip_ref->mf_need_clamp[tpl_offset] ==
                  tip_ref->mf_need_clamp[tpl_offset + offset] &&

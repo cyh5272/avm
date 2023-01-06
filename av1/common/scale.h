@@ -49,8 +49,8 @@ struct scale_factors {
   int x_step_q4;
   int y_step_q4;
 
-  int (*scale_value_x)(int val, const struct scale_factors *sf, int ssx);
-  int (*scale_value_y)(int val, const struct scale_factors *sf, int ssy);
+  int (*scale_value_x)(int val, const struct scale_factors *sf);
+  int (*scale_value_y)(int val, const struct scale_factors *sf);
 
 #if CONFIG_ACROSS_SCALE_TPL_MVS
   int (*scale_value_x_gen)(int val, const struct scale_factors *sf);
@@ -58,8 +58,7 @@ struct scale_factors {
 #endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 };
 
-MV32 av1_scale_mv(const MV *mv, int x, int y, const struct scale_factors *sf,
-                  int ssx, int ssy);
+MV32 av1_scale_mv(const MV *mv, int x, int y, const struct scale_factors *sf);
 
 void av1_setup_scale_factors_for_frame(struct scale_factors *sf, int other_w,
                                        int other_h, int this_w, int this_h);
