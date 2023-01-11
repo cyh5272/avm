@@ -100,7 +100,7 @@ static AOM_INLINE int64_t calc_erroradv_threshold(int64_t ref_frame_error) {
 static AOM_INLINE void compute_global_motion_for_ref_frame(
     AV1_COMP *cpi,
     YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
-    int frame, MotionModel *params_by_motion, uint8_t *segment_map,
+    int frame, MotionModel *motion_models, uint8_t *segment_map,
     const int segment_map_w, const int segment_map_h,
     const WarpedMotionParams *ref_params) {
   ThreadData *const td = &cpi->td;
@@ -118,7 +118,6 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   // clang-format on
   WarpedMotionParams tmp_wm_params;
   const double *params_this_motion;
-  int inliers_by_motion[RANSAC_NUM_MOTIONS];
   assert(ref_buf[frame] != NULL);
   TransformationType model;
 
@@ -141,25 +140,25 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
     int64_t best_warp_error = INT64_MAX;
     // Initially set all params to identity.
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
-      memcpy(params_by_motion[i].params, kIdentityParams,
-             (MAX_PARAMDIM - 1) * sizeof(*(params_by_motion[i].params)));
-      params_by_motion[i].num_inliers = 0;
+      memcpy(motion_models[i].params, kIdentityParams,
+             (MAX_PARAMDIM - 1) * sizeof(*(motion_models[i].params)));
+      motion_models[i].num_inliers = 0;
     }
 
     aom_compute_global_motion(model, cpi->source, ref_buf[frame], bit_depth,
-                              gm_estimation_type, inliers_by_motion,
-                              params_by_motion, RANSAC_NUM_MOTIONS);
+                              gm_estimation_type, motion_models,
+                              RANSAC_NUM_MOTIONS);
     int64_t ref_frame_error = 0;
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
-      if (inliers_by_motion[i] == 0) continue;
+      if (motion_models[i].num_inliers == 0) continue;
 
-      params_this_motion = params_by_motion[i].params;
+      params_this_motion = motion_models[i].params;
       av1_convert_model_to_params(params_this_motion, &tmp_wm_params);
 
       if (tmp_wm_params.wmtype != IDENTITY) {
         av1_compute_feature_segmentation_map(
-            segment_map, segment_map_w, segment_map_h,
-            params_by_motion[i].inliers, params_by_motion[i].num_inliers);
+            segment_map, segment_map_w, segment_map_h, motion_models[i].inliers,
+            motion_models[i].num_inliers);
 
         ref_frame_error = av1_segmented_frame_error(
             xd->bd, ref_buf[frame]->y_buffer, ref_buf[frame]->y_stride,
@@ -237,7 +236,7 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
 void av1_compute_gm_for_valid_ref_frames(
     AV1_COMP *cpi,
     YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
-    int frame, MotionModel *params_by_motion, uint8_t *segment_map,
+    int frame, MotionModel *motion_models, uint8_t *segment_map,
     int segment_map_w, int segment_map_h) {
   AV1_COMMON *const cm = &cpi->common;
   GlobalMotionInfo *const gm_info = &cpi->gm_info;
@@ -245,7 +244,7 @@ void av1_compute_gm_for_valid_ref_frames(
       cm->prev_frame ? &cm->prev_frame->global_motion[frame]
                      : &default_warp_params;
 
-  compute_global_motion_for_ref_frame(cpi, ref_buf, frame, params_by_motion,
+  compute_global_motion_for_ref_frame(cpi, ref_buf, frame, motion_models,
                                       segment_map, segment_map_w, segment_map_h,
                                       ref_params);
 
@@ -265,16 +264,16 @@ static AOM_INLINE void compute_global_motion_for_references(
     AV1_COMP *cpi,
     YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
     FrameDistPair reference_frame[INTER_REFS_PER_FRAME],
-    int num_ref_frames, MotionModel *params_by_motion, uint8_t *segment_map,
+    int num_ref_frames, MotionModel *motion_models, uint8_t *segment_map,
     const int segment_map_w, const int segment_map_h) {
   AV1_COMMON *const cm = &cpi->common;
   // Compute global motion w.r.t. reference frames starting from the nearest ref
   // frame in a given direction.
   for (int frame = 0; frame < num_ref_frames; frame++) {
     int ref_frame = reference_frame[frame].frame;
-    av1_compute_gm_for_valid_ref_frames(cpi, ref_buf, ref_frame,
-                                        params_by_motion, segment_map,
-                                        segment_map_w, segment_map_h);
+    av1_compute_gm_for_valid_ref_frames(cpi, ref_buf, ref_frame, motion_models,
+                                        segment_map, segment_map_w,
+                                        segment_map_h);
     // If global motion w.r.t. current ref frame is
     // INVALID/TRANSLATION/IDENTITY, skip the evaluation of global motion w.r.t
     // the remaining ref frames in that direction. The below exit is disabled
@@ -394,30 +393,38 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
   }
 }
 
-// Allocates and initializes memory for segment_map and MotionModel.
-static AOM_INLINE void alloc_global_motion_data(MotionModel *params_by_motion,
-                                                uint8_t **segment_map,
-                                                const int segment_map_w,
-                                                const int segment_map_h) {
-  for (int m = 0; m < RANSAC_NUM_MOTIONS; m++) {
-    av1_zero(params_by_motion[m]);
-    params_by_motion[m].inliers =
-        aom_malloc(sizeof(*(params_by_motion[m].inliers)) * 2 * MAX_CORNERS);
-  }
-
-  *segment_map = (uint8_t *)aom_malloc(sizeof(*segment_map) * segment_map_w *
-                                       segment_map_h);
-  av1_zero_array(*segment_map, segment_map_w * segment_map_h);
-}
-
 // Deallocates segment_map and inliers.
-static AOM_INLINE void dealloc_global_motion_data(MotionModel *params_by_motion,
+static AOM_INLINE void dealloc_global_motion_data(MotionModel *motion_models,
                                                   uint8_t *segment_map) {
   aom_free(segment_map);
 
   for (int m = 0; m < RANSAC_NUM_MOTIONS; m++) {
-    aom_free(params_by_motion[m].inliers);
+    aom_free(motion_models[m].inliers);
   }
+}
+
+// Allocates and initializes memory for segment_map and MotionModel.
+static AOM_INLINE bool alloc_global_motion_data(MotionModel *motion_models,
+                                                uint8_t **segment_map,
+                                                const int segment_map_w,
+                                                const int segment_map_h) {
+  av1_zero_array(motion_models, RANSAC_NUM_MOTIONS);
+  for (int m = 0; m < RANSAC_NUM_MOTIONS; m++) {
+    motion_models[m].inliers =
+        aom_malloc(sizeof(*(motion_models[m].inliers)) * 2 * MAX_CORNERS);
+    if (!motion_models[m].inliers) {
+      dealloc_global_motion_data(motion_models, NULL);
+      return false;
+    }
+  }
+
+  *segment_map = (uint8_t *)aom_calloc(segment_map_w * segment_map_h,
+                                       sizeof(*segment_map));
+  if (!*segment_map) {
+    dealloc_global_motion_data(motion_models, NULL);
+    return false;
+  }
+  return true;
 }
 
 // Initializes parameters used for computing global motion.
@@ -452,11 +459,11 @@ static AOM_INLINE void setup_global_motion_info_params(AV1_COMP *cpi) {
 // Computes global motion w.r.t. valid reference frames.
 static AOM_INLINE void global_motion_estimation(AV1_COMP *cpi) {
   GlobalMotionInfo *const gm_info = &cpi->gm_info;
-  MotionModel params_by_motion[RANSAC_NUM_MOTIONS];
+  MotionModel motion_models[RANSAC_NUM_MOTIONS];
   uint8_t *segment_map = NULL;
 
-  alloc_global_motion_data(params_by_motion, &segment_map,
-                           gm_info->segment_map_w, gm_info->segment_map_h);
+  alloc_global_motion_data(motion_models, &segment_map, gm_info->segment_map_w,
+                           gm_info->segment_map_h);
 
   // Compute global motion w.r.t. past reference frames and future reference
   // frames
@@ -464,11 +471,11 @@ static AOM_INLINE void global_motion_estimation(AV1_COMP *cpi) {
     if (gm_info->num_ref_frames[dir] > 0)
       compute_global_motion_for_references(
           cpi, gm_info->ref_buf, gm_info->reference_frames[dir],
-          gm_info->num_ref_frames[dir], params_by_motion, segment_map,
+          gm_info->num_ref_frames[dir], motion_models, segment_map,
           gm_info->segment_map_w, gm_info->segment_map_h);
   }
 
-  dealloc_global_motion_data(params_by_motion, segment_map);
+  dealloc_global_motion_data(motion_models, segment_map);
 }
 
 // Global motion estimation for the current frame is computed.This computation
