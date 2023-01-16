@@ -569,9 +569,9 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable_refmvbank
 #endif  // CONFIG_REF_MV_BANK
 #if CONFIG_PAR_HIDING
-  1,                                   // enable_parity_hiding
-#endif                                 // CONFIG_PAR_HIDING
-  GLOBAL_MOTION_METHOD_FEATURE_MATCH,  // global_motion_method
+  1,                             // enable_parity_hiding
+#endif                           // CONFIG_PAR_HIDING
+  GLOBAL_MOTION_METHOD_DISFLOW,  // global_motion_method
 };
 
 struct aom_codec_alg_priv {

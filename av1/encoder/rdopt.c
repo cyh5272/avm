@@ -2601,51 +2601,57 @@ static int64_t skip_mode_rd(RD_STATS *rd_stats, const AV1_COMP *const cpi,
 }
 #endif  // !CONFIG_SKIP_MODE_ENHANCEMENT
 
-// Check NEARMV and GLOBALMV ref mvs for duplicate and skip the relevant mode
+// Check NEARMV, GLOBALMV ref mvs for duplicate and skip the relevant
+// mode
 static INLINE int check_repeat_ref_mv(const MB_MODE_INFO_EXT *mbmi_ext,
                                       int ref_idx,
                                       const MV_REFERENCE_FRAME *ref_frame,
-                                      PREDICTION_MODE single_mode) {
+                                      PREDICTION_MODE single_mode,
+                                      bool is_global_warp_block) {
   const uint8_t ref_frame_type = av1_ref_frame_type(ref_frame);
 #if CONFIG_TIP
   if (is_tip_ref_frame(ref_frame_type)) return 0;
 #endif  // CONFIG_TIP
   const int ref_mv_count = mbmi_ext->ref_mv_count[ref_frame_type];
   assert(single_mode != NEWMV);
-  // when ref_mv_count = 0 or 1, NEARMV is same as GLOBALMV
-  if (single_mode == NEARMV && ref_mv_count < 2) {
-    return 1;
-  }
-  if (single_mode != GLOBALMV) {
-    return 0;
-  }
-  // when ref_mv_count == 0, GLOBALMV is same as NEARMV
-  if (ref_mv_count == 0) {
-    return 1;
-  } else if (ref_mv_count == 1) {
-    // when ref_mv_count == 1, NEARMV is same as GLOBALMV
-    return 0;
+  if (single_mode == NEARMV) {
+    // when ref_mv_count = 0, NEARMV is same as GLOBALMV
+    // If global warp is not used, then these two modes lead to the same
+    // prediction, but NEARMV is generally more expensive than GLOBALMV.
+    // If global warp is used, then GLOBALMV uses a warped prediction, which
+    // will generally be better
+    // In either case, skip NEARMV
+    if (ref_mv_count == 0) return 1;
+  } else if (single_mode == GLOBALMV) {
+    // If the selected ref frames have a global motion model, then GLOBALMV
+    // will give a different (and generally better) prediction to
+    // NEARMV, even if they have the same MV. So always try GLOBALMV
+    if (is_global_warp_block) return 0;
+
+    // Otherwise, check if the same MV can be accessed through another entry
+    // in the refmv stack. If so, prune away GLOBALMV.
+    int stack_size = AOMMIN(USABLE_REF_MV_STACK_SIZE, ref_mv_count);
+    for (int ref_mv_idx = 0; ref_mv_idx < stack_size; ref_mv_idx++) {
+      int_mv this_mv;
+
+      if (ref_idx == 0)
+        this_mv = mbmi_ext->ref_mv_stack[ref_frame_type][ref_mv_idx].this_mv;
+      else
+        this_mv = mbmi_ext->ref_mv_stack[ref_frame_type][ref_mv_idx].comp_mv;
+
+      if (this_mv.as_int == mbmi_ext->global_mvs[ref_frame[ref_idx]].as_int)
+        return 1;
+    }
   }
 
-  int stack_size = AOMMIN(USABLE_REF_MV_STACK_SIZE, ref_mv_count);
-  // Check GLOBALMV is matching with any mv in ref_mv_stack
-  for (int ref_mv_idx = 0; ref_mv_idx < stack_size; ref_mv_idx++) {
-    int_mv this_mv;
-
-    if (ref_idx == 0)
-      this_mv = mbmi_ext->ref_mv_stack[ref_frame_type][ref_mv_idx].this_mv;
-    else
-      this_mv = mbmi_ext->ref_mv_stack[ref_frame_type][ref_mv_idx].comp_mv;
-
-    if (this_mv.as_int == mbmi_ext->global_mvs[ref_frame[ref_idx]].as_int)
-      return 1;
-  }
+  // If we get here, this mode should not be pruned
   return 0;
 }
 
 static INLINE int get_this_mv(int_mv *this_mv, PREDICTION_MODE this_mode,
                               int ref_idx, int ref_mv_idx,
                               int skip_repeated_ref_mv,
+                              bool is_global_warp_block,
                               const MV_REFERENCE_FRAME *ref_frame,
                               const MB_MODE_INFO_EXT *mbmi_ext) {
   const PREDICTION_MODE single_mode = get_single_mode(this_mode, ref_idx);
@@ -2654,7 +2660,8 @@ static INLINE int get_this_mv(int_mv *this_mv, PREDICTION_MODE this_mode,
     this_mv->as_int = INVALID_MV;
   } else if (single_mode == GLOBALMV) {
     if (skip_repeated_ref_mv &&
-        check_repeat_ref_mv(mbmi_ext, ref_idx, ref_frame, single_mode))
+        check_repeat_ref_mv(mbmi_ext, ref_idx, ref_frame, single_mode,
+                            is_global_warp_block))
       return 0;
     *this_mv = mbmi_ext->global_mvs[ref_frame[ref_idx]];
   }
@@ -2681,7 +2688,8 @@ static INLINE int get_this_mv(int_mv *this_mv, PREDICTION_MODE this_mode,
       }
     } else {
       if (skip_repeated_ref_mv &&
-          check_repeat_ref_mv(mbmi_ext, ref_idx, ref_frame, single_mode))
+          check_repeat_ref_mv(mbmi_ext, ref_idx, ref_frame, single_mode,
+                              is_global_warp_block))
         return 0;
 #if CONFIG_TIP
       if (is_tip_ref_frame(ref_frame_type)) {
@@ -2704,6 +2712,19 @@ static INLINE int build_cur_mv(int_mv *cur_mv, PREDICTION_MODE this_mode,
   const MACROBLOCKD *xd = &x->e_mbd;
   const MB_MODE_INFO *mbmi = xd->mi[0];
   const int is_comp_pred = has_second_ref(mbmi);
+
+  bool is_global_warp_block = false;
+  if (AOMMIN(mi_size_wide[mbmi->sb_type[PLANE_TYPE_Y]],
+             mi_size_high[mbmi->sb_type[PLANE_TYPE_Y]]) >= 2) {
+    if (this_mode == GLOBALMV) {
+      is_global_warp_block =
+          (xd->global_motion[mbmi->ref_frame[0]].wmtype > TRANSLATION);
+    } else if (this_mode == GLOBAL_GLOBALMV) {
+      is_global_warp_block =
+          (xd->global_motion[mbmi->ref_frame[0]].wmtype > TRANSLATION) ||
+          (xd->global_motion[mbmi->ref_frame[1]].wmtype > TRANSLATION);
+    }
+  }
 
 #if CONFIG_SKIP_MODE_DRL_WITH_REF_IDX
   if (mbmi->skip_mode) {
@@ -2747,7 +2768,8 @@ static INLINE int build_cur_mv(int_mv *cur_mv, PREDICTION_MODE this_mode,
     int_mv this_mv;
     this_mv.as_int = INVALID_MV;
     ret = get_this_mv(&this_mv, this_mode, i, mbmi->ref_mv_idx,
-                      skip_repeated_ref_mv, mbmi->ref_frame, x->mbmi_ext);
+                      skip_repeated_ref_mv, is_global_warp_block,
+                      mbmi->ref_frame, x->mbmi_ext);
     if (!ret) return 0;
     const PREDICTION_MODE single_mode = get_single_mode(this_mode, i);
     if (single_mode == NEWMV) {
@@ -7247,9 +7269,9 @@ static int compound_skip_by_single_states(
     for (int ref_mv_idx = 0; ref_mv_idx < ref_set; ref_mv_idx++) {
       int_mv single_mv;
       int_mv comp_mv;
-      get_this_mv(&single_mv, mode[i], 0, ref_mv_idx, 0, single_refs,
+      get_this_mv(&single_mv, mode[i], 0, ref_mv_idx, 0, 0, single_refs,
                   x->mbmi_ext);
-      get_this_mv(&comp_mv, this_mode, i, ref_mv_idx, 0, refs, x->mbmi_ext);
+      get_this_mv(&comp_mv, this_mode, i, ref_mv_idx, 0, 0, refs, x->mbmi_ext);
       if (single_mv.as_int != comp_mv.as_int) {
         ref_mv_match[i] = 0;
         break;

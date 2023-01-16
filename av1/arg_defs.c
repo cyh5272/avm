@@ -789,7 +789,7 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
               "(0: false (default), 1: true)"),
   .global_motion_method = ARG_DEF_ENUM(NULL, "global-motion-method", 1,
                                        "Global motion search method "
-                                       "(default: feature-match)",
+                                       "(default: disflow):",
                                        global_motion_method_enum),
 #endif  // CONFIG_AV1_ENCODER
 };
