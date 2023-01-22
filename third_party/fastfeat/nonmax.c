@@ -5,13 +5,15 @@
 
 #define Compare(X, Y) ((X)>=(Y))
 
-xy* aom_nonmax_suppression(const xy* corners, const int* scores, int num_corners, int* ret_num_nonmax)
+xy* aom_nonmax_suppression(const xy* corners, const int* scores, int num_corners,
+                           int** ret_scores, int* ret_num_nonmax)
 {
   int num_nonmax=0;
   int last_row;
   int* row_start;
   int i, j;
   xy* ret_nonmax;
+  int* nonmax_scores;
   const int sz = (int)num_corners;
 
   /*Point above points (roughly) to the pixel above the one of interest, if there
@@ -27,12 +29,29 @@ xy* aom_nonmax_suppression(const xy* corners, const int* scores, int num_corners
   }
 
   ret_nonmax = (xy*)malloc(num_corners * sizeof(xy));
+  if (! ret_nonmax)
+  {
+    return 0;
+  }
+
+  nonmax_scores = (int*)malloc(num_corners * sizeof(*nonmax_scores));
+  if (! nonmax_scores)
+  {
+    free(ret_nonmax);
+    return 0;
+  }
 
   /* Find where each row begins
      (the corners are output in raster scan order). A beginning of -1 signifies
      that there are no corners on that row. */
   last_row = corners[num_corners-1].y;
   row_start = (int*)malloc((last_row+1)*sizeof(int));
+  if(! row_start)
+  {
+    free(ret_nonmax);
+    free(nonmax_scores);
+    return 0;
+  }
 
   for(i=0; i < last_row+1; i++)
     row_start[i] = -1;
@@ -108,12 +127,15 @@ xy* aom_nonmax_suppression(const xy* corners, const int* scores, int num_corners
         }
       }
 
-    ret_nonmax[num_nonmax++] = corners[i];
+    ret_nonmax[num_nonmax] = corners[i];
+    nonmax_scores[num_nonmax] = scores[i];
+    num_nonmax++;
 cont:
     ;
   }
 
   free(row_start);
+  *ret_scores = nonmax_scores;
   *ret_num_nonmax = num_nonmax;
   return ret_nonmax;
 }
