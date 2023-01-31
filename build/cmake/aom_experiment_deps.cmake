@@ -111,4 +111,10 @@ macro(fix_experiment_configs)
     change_config_and_warn(CONFIG_EXTENDED_WARP_PREDICTION 1
                            CONFIG_INTERINTRA_WARP)
   endif()
+
+  # CONFIG_IMPROVED_GLOBAL_MOTION depends on CONFIG_FLEX_MVRES
+  if(NOT CONFIG_FLEX_MVRES AND CONFIG_IMPROVED_GLOBAL_MOTION)
+    change_config_and_warn(CONFIG_IMPROVED_GLOBAL_MOTION 0 !CONFIG_FLEX_MVRES)
+  endif()
+
 endmacro()
