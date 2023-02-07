@@ -196,10 +196,9 @@ int64_t av1_refine_integerized_param(
     int r_width, int r_height, int r_stride, uint16_t *dst, int d_width,
     int d_height, int d_stride, int n_refinements, int64_t best_frame_error,
     uint8_t *segment_map, int segment_map_stride, int64_t erroradv_threshold) {
-  static const int max_trans_model_params[TRANS_TYPES] = { 0, 2, 4, 6 };
   const int border = ERRORADV_BORDER;
   int i = 0, p;
-  int n_params = max_trans_model_params[wmtype];
+  int n_params = trans_model_params[wmtype];
   int32_t *param_mat = wm->wmmat;
   int64_t step_error, best_error;
   int32_t step;

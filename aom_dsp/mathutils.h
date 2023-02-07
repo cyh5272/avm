@@ -22,6 +22,13 @@
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_mem/aom_mem.h"
 
+// Calculate the Euclidean norm of a vector
+static INLINE double norm(double *x, int len) {
+  double normsq = 0.0;
+  for (int i = 0; i < len; ++i) normsq += x[i] * x[i];
+  return sqrt(normsq);
+}
+
 static const double TINY_NEAR_ZERO = 1.0E-16;
 
 // Solves Ax = b, where x and b are column vectors of size nx1 and A is nxn
@@ -123,6 +130,29 @@ static INLINE void least_squares_accumulate(double *mat, double *y,
 static INLINE int least_squares_solve(double *mat, double *y, double *x,
                                       int n) {
   return linsolve(n, mat, n, y, x);
+}
+
+// All-in-one least squares function
+// This integrates the other least_squares_* functions into a single call.
+// However, it requires the caller to allocate a potentially large intermediate
+// matrix, so the separate functions should be preferred where possible.
+static INLINE int least_squares(int n, double *A, int rows, int stride,
+                                double *b, double *scratch, double *x) {
+  double *scratch_ = NULL;
+  if (!scratch) {
+    scratch_ = (double *)aom_malloc(sizeof(*scratch) * n * (n + 1));
+    scratch = scratch_;
+  }
+  double *AtA = scratch;
+  double *Atb = scratch + n * n;
+
+  least_squares_init(AtA, Atb, n);
+  for (int row = 0; row < rows; row++) {
+    least_squares_accumulate(AtA, Atb, &A[row * stride], b[row], n);
+  }
+  int ret = least_squares_solve(AtA, Atb, x, n);
+  if (scratch_) aom_free(scratch_);
+  return ret;
 }
 
 // Matrix multiply

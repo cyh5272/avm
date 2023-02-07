@@ -23,8 +23,8 @@
 #include "av1/encoder/ethread.h"
 #include "av1/encoder/rdopt.h"
 
-// Highest motion model to search.
-#define GLOBAL_TRANS_TYPES_ENC 3
+// List of global motion types to search
+#define GLOBAL_TRANS_TYPES_ENC 1
 
 // Computes the cost for the warp parameters.
 static int gm_get_params_cost(const WarpedMotionParams *gm,
@@ -112,19 +112,18 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   WarpedMotionParams tmp_wm_params;
   const double *params_this_motion;
   assert(ref_buf[frame] != NULL);
-  TransformationType model;
 
-  int bit_depth = cpi->common.seq_params.bit_depth;
-  GlobalMotionMethod global_motion_method = cpi->oxcf.global_motion_method;
   int num_refinements = cpi->sf.gm_sf.num_refinement_steps;
 
   aom_clear_system_state();
 
-  for (model = ROTZOOM; model < GLOBAL_TRANS_TYPES_ENC; ++model) {
-    if (!aom_compute_global_motion(model, cpi->source, ref_buf[frame],
-                                   bit_depth, global_motion_method,
-                                   motion_models, RANSAC_NUM_MOTIONS)) {
-      continue;
+  for (int model_index = 0; model_index < GLOBAL_TRANS_TYPES_ENC;
+       ++model_index) {
+    // Initially set all params to identity.
+    for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
+      memcpy(motion_models[i].params, kIdentityParams,
+             (MAX_PARAMDIM - 1) * sizeof(*(motion_models[i].params)));
+      motion_models[i].num_inliers = 0;
     }
 
     int64_t best_ref_frame_error = 0;
