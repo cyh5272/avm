@@ -28,6 +28,9 @@ bool ransac(const Correspondence *matched_points, int npoints,
             TransformationType type, MotionModel *motion_models,
             int num_desired_motions);
 
+bool aom_fit_motion_model(TransformationType type, int np, double *pts1,
+                          double *pts2, double *mat);
+
 #ifdef __cplusplus
 }
 #endif

@@ -13,6 +13,7 @@
 #define AOM_AOM_DSP_FLOW_ESTIMATION_H_
 
 #include "aom_dsp/pyramid.h"
+#include "aom_dsp/rect.h"
 #include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_ports/mem.h"
 #include "aom_scale/yv12config.h"
@@ -71,26 +72,62 @@ typedef struct {
   double rx, ry;
 } Correspondence;
 
+typedef struct {
+  int num_correspondences;
+  Correspondence *correspondences;
+} CorrespondenceList;
+
+typedef struct {
+  // x and y directions of flow, per patch
+  double *u;
+  double *v;
+
+  // Sizes of the above arrays
+  int width;
+  int height;
+  int stride;
+} FlowField;
+
+// We want to present external code with a generic type, which holds whatever
+// data is needed for the desired motion estimation method.
+// As different methods use different data, we store this in a tagged union,
+// with the selected motion estimation method as the tag.
+typedef struct {
+  GlobalMotionMethod method;
+  union {
+    CorrespondenceList *corrs;
+    FlowField *flow;
+  };
+} FlowData;
+
 // For each global motion method, how many pyramid levels should we allocate?
 // Note that this is a maximum, and fewer levels will be allocated if the frame
 // is not large enough to need all of the specified levels
 extern const int global_motion_pyr_levels[GLOBAL_MOTION_METHODS];
 
-extern const double kIdentityParams[MAX_PARAMDIM - 1];
+FlowData *aom_compute_flow_data(YV12_BUFFER_CONFIG *src,
+                                YV12_BUFFER_CONFIG *ref, int bit_depth,
+                                GlobalMotionMethod gm_method);
 
-// Compute a global motion model between the given source and ref frames.
+// Fit one or several models of a given type to the specified flow data.
+// This function fits models to the entire frame, using the RANSAC method
+// to fit models in a noise-resilient way.
 //
 // As is standard for video codecs, the resulting model maps from (x, y)
 // coordinates in `src` to the corresponding points in `ref`, regardless
 // of the temporal order of the two frames.
-//
-// Returns true if global motion estimation succeeded, false if not.
-// The output models should only be used if this function succeeds.
-bool aom_compute_global_motion(TransformationType type, YV12_BUFFER_CONFIG *src,
-                               YV12_BUFFER_CONFIG *ref, int bit_depth,
-                               GlobalMotionMethod gm_method,
-                               MotionModel *motion_models,
-                               int num_motion_models);
+bool aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
+                                 YV12_BUFFER_CONFIG *src,
+                                 MotionModel *motion_models,
+                                 int num_motion_models);
+
+// Fit a model of a given type to part of a frame.
+// This method does not use the RANSAC method, and only returns a single model,
+// which is more suitable for fitting per-block or per-superblock models.
+bool aom_fit_local_motion_model(FlowData *flow_data, PixelRect *rect,
+                                TransformationType type, double *mat);
+
+void aom_free_flow_data(FlowData *flow_data);
 
 #ifdef __cplusplus
 }

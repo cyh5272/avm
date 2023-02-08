@@ -66,6 +66,7 @@ list(
   "${AOM_ROOT}/test/encode_test_driver.cc"
   "${AOM_ROOT}/test/encode_test_driver.h"
   "${AOM_ROOT}/test/end_to_end_test.cc"
+  "${AOM_ROOT}/test/flow_estimation_test.cc"
   "${AOM_ROOT}/test/gf_pyr_height_test.cc"
   "${AOM_ROOT}/test/horz_superres_test.cc"
   "${AOM_ROOT}/test/i420_video_source.h"

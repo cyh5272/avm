@@ -1408,6 +1408,11 @@ static bool ransac_internal(const Correspondence *matched_points, int npoints,
   double *points1, *points2;
   double *corners1, *corners2;
   double *projected_corners;
+  // clang-format off
+  static const double kIdentityParams[MAX_PARAMDIM - 1] = {
+    0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0
+  };
+  // clang-format on
 
   // Store information for the num_desired_motions best transformations found
   // and the worst motion among them, as well as the motion currently under
@@ -1640,4 +1645,17 @@ bool ransac(const Correspondence *matched_points, int npoints,
 
   return ransac_internal(matched_points, npoints, motion_models,
                          num_desired_motions, &ransac_model_info[type]);
+}
+
+// Fit a specified type of motion model to a set of correspondences.
+// The input consists of `np` points, where pts1 stores the source position
+// and pts2 stores the destination position for each correspondence.
+// The resulting model is stored in `mat`.
+// Returns true on success, false on error
+//
+// Note: The input points lists may be modified during processing
+bool aom_fit_motion_model(TransformationType type, int np, double *pts1,
+                          double *pts2, double *mat) {
+  assert(type > IDENTITY && type < TRANS_TYPES);
+  return ransac_model_info[type].find_transformation(np, pts1, pts2, mat);
 }

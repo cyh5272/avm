@@ -25,6 +25,9 @@
 
 // List of global motion types to search
 #define GLOBAL_TRANS_TYPES_ENC 1
+static const TransformationType gm_types_to_try[GLOBAL_TRANS_TYPES_ENC] = {
+  ROTZOOM
+};
 
 // Computes the cost for the warp parameters.
 static int gm_get_params_cost(const WarpedMotionParams *gm,
@@ -109,6 +112,12 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   int src_width = cpi->source->y_crop_width;
   int src_height = cpi->source->y_crop_height;
   int src_stride = cpi->source->y_stride;
+  // clang-format off
+  static const double kIdentityParams[MAX_PARAMDIM - 1] = {
+     0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0
+  };
+  // clang-format on
+
   WarpedMotionParams tmp_wm_params;
   const double *params_this_motion;
   assert(ref_buf[frame] != NULL);
@@ -117,8 +126,15 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
 
   aom_clear_system_state();
 
+  int bit_depth = cpi->common.seq_params.bit_depth;
+  GlobalMotionMethod global_motion_method = cpi->oxcf.global_motion_method;
+  FlowData *flow_data = aom_compute_flow_data(cpi->source, ref_buf[frame],
+                                              bit_depth, global_motion_method);
+
   for (int model_index = 0; model_index < GLOBAL_TRANS_TYPES_ENC;
        ++model_index) {
+    TransformationType model = gm_types_to_try[model_index];
+    int64_t best_warp_error = INT64_MAX;
     // Initially set all params to identity.
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
       memcpy(motion_models[i].params, kIdentityParams,
@@ -126,8 +142,10 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       motion_models[i].num_inliers = 0;
     }
 
-    int64_t best_ref_frame_error = 0;
-    int64_t best_warp_error = INT64_MAX;
+    aom_fit_global_motion_model(flow_data, model, cpi->source, motion_models,
+                                RANSAC_NUM_MOTIONS);
+
+    int64_t best_ref_frame_error = INT64_MAX;
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
       if (motion_models[i].num_inliers == 0) continue;
 

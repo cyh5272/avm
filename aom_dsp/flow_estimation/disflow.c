@@ -595,29 +595,12 @@ static FlowField *alloc_flow_field(int frame_width, int frame_height) {
   return flow;
 }
 
-static void free_flow_field(FlowField *flow) {
-  aom_free(flow->u);
-  aom_free(flow->v);
-  aom_free(flow);
-}
-
-// Compute flow field between `src` and `ref`, and then use that flow to
-// compute a global motion model relating the two frames.
-//
-// Following the convention in flow_estimation.h, the flow vectors are computed
-// at fixed points in `src` and point to the corresponding locations in `ref`,
-// regardless of the temporal ordering of the frames.
-bool av1_compute_global_motion_disflow(TransformationType type,
-                                       YV12_BUFFER_CONFIG *src,
-                                       YV12_BUFFER_CONFIG *ref, int bit_depth,
-                                       MotionModel *motion_models,
-                                       int num_motion_models) {
+FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *src,
+                                  YV12_BUFFER_CONFIG *ref, int bit_depth) {
   // Precompute information we will need about each frame
   ImagePyramid *src_pyramid = src->y_pyramid;
-  CornerList *src_corners = src->corners;
   ImagePyramid *ref_pyramid = ref->y_pyramid;
   aom_compute_pyramid(src, bit_depth, src_pyramid);
-  av1_compute_corner_list(src_pyramid, src_corners);
   aom_compute_pyramid(ref, bit_depth, ref_pyramid);
 
   const int src_width = src_pyramid->layers[0].width;
@@ -630,11 +613,24 @@ bool av1_compute_global_motion_disflow(TransformationType type,
 
   compute_flow_field(src_pyramid, ref_pyramid, flow);
 
+  return flow;
+}
+
+bool aom_fit_global_model_to_flow_field(FlowField *flow,
+                                        TransformationType type,
+                                        YV12_BUFFER_CONFIG *src,
+                                        MotionModel *motion_models,
+                                        int num_motion_models) {
+  ImagePyramid *src_pyramid = src->y_pyramid;
+  CornerList *src_corners = src->corners;
+  assert(aom_is_pyramid_valid(src_pyramid));
+  av1_compute_corner_list(src_pyramid, src_corners);
+
   // find correspondences between the two images using the flow field
   Correspondence *correspondences =
       aom_malloc(src_corners->num_corners * sizeof(*correspondences));
   if (!correspondences) {
-    free_flow_field(flow);
+    aom_free_flow_field(flow);
     return false;
   }
 
@@ -643,8 +639,65 @@ bool av1_compute_global_motion_disflow(TransformationType type,
 
   bool result = ransac(correspondences, num_correspondences, type,
                        motion_models, num_motion_models);
+  (void)result;
 
   aom_free(correspondences);
-  free_flow_field(flow);
+
+  // Set num_inliers = 0 for motions with too few inliers so they are ignored.
+  for (int i = 0; i < num_motion_models; ++i) {
+    if (motion_models[i].num_inliers < MIN_INLIER_PROB * num_correspondences) {
+      motion_models[i].num_inliers = 0;
+    }
+  }
+
+  // Return true if any one of the motions has inliers.
+  for (int i = 0; i < num_motion_models; ++i) {
+    if (motion_models[i].num_inliers > 0) return true;
+  }
+  return false;
+}
+
+bool aom_fit_local_model_to_flow_field(const FlowField *flow,
+                                       const PixelRect *rect,
+                                       TransformationType type, double *mat) {
+  // Map rectangle onto flow field
+  int patch_left = clamp(rect->left >> DOWNSAMPLE_SHIFT, 0, flow->width);
+  int patch_right = clamp(rect->right >> DOWNSAMPLE_SHIFT, 0, flow->width);
+  int patch_top = clamp(rect->top >> DOWNSAMPLE_SHIFT, 0, flow->height);
+  int patch_bottom = clamp(rect->bottom >> DOWNSAMPLE_SHIFT, 0, flow->height);
+
+  int patches_x = patch_right - patch_left;
+  int patches_y = patch_bottom - patch_top;
+  int num_points = patches_x * patches_y;
+
+  double *pts1 = aom_malloc(num_points * 2 * sizeof(double));
+  double *pts2 = aom_malloc(num_points * 2 * sizeof(double));
+  int index = 0;
+
+  for (int y = patch_top; y < patch_bottom; y++) {
+    for (int x = patch_left; x < patch_right; x++) {
+      int src_x = (x << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
+      int src_y = (y << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
+      pts1[2 * index + 0] = (double)src_x;
+      pts1[2 * index + 1] = (double)src_y;
+      pts2[2 * index + 0] = (double)src_x + flow->u[y * flow->stride + x];
+      pts2[2 * index + 1] = (double)src_y + flow->v[y * flow->stride + x];
+      index++;
+    }
+  }
+
+  // Check that we filled the expected number of points
+  assert(index == num_points);
+
+  bool result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
+
+  aom_free(pts1);
+  aom_free(pts2);
   return result;
+}
+
+void aom_free_flow_field(FlowField *flow) {
+  aom_free(flow->u);
+  aom_free(flow->v);
+  aom_free(flow);
 }

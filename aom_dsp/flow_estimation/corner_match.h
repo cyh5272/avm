@@ -37,9 +37,21 @@ int aom_determine_correspondence(const unsigned char *src,
                                  int ref_stride,
                                  Correspondence *correspondences);
 
-bool av1_compute_global_motion_feature_match(
-    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *motion_models, int num_motion_models);
+CorrespondenceList *aom_compute_feature_match(YV12_BUFFER_CONFIG *src,
+                                              YV12_BUFFER_CONFIG *ref,
+                                              int bit_depth);
+
+bool aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                             TransformationType type,
+                                             MotionModel *motion_models,
+                                             int num_motion_models);
+
+bool aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                            PixelRect *rect,
+                                            TransformationType type,
+                                            double *mat);
+
+void aom_free_correspondence_list(CorrespondenceList *list);
 
 #ifdef __cplusplus
 }

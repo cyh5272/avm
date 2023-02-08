@@ -200,11 +200,9 @@ int aom_determine_correspondence(const unsigned char *src,
   return num_correspondences;
 }
 
-bool av1_compute_global_motion_feature_match(
-    TransformationType type, YV12_BUFFER_CONFIG *src, YV12_BUFFER_CONFIG *ref,
-    int bit_depth, MotionModel *motion_models, int num_motion_models) {
-  int num_correspondences;
-  Correspondence *correspondences;
+CorrespondenceList *aom_compute_feature_match(YV12_BUFFER_CONFIG *src,
+                                              YV12_BUFFER_CONFIG *ref,
+                                              int bit_depth) {
   ImagePyramid *src_pyramid = src->y_pyramid;
   CornerList *src_corners = src->corners;
   ImagePyramid *ref_pyramid = ref->y_pyramid;
@@ -226,18 +224,79 @@ bool av1_compute_global_motion_feature_match(
   assert(ref_pyramid->layers[0].height == src_height);
   const int ref_stride = ref_pyramid->layers[0].stride;
 
-  // find correspondences between the two images
-  correspondences = (Correspondence *)aom_malloc(src_corners->num_corners *
-                                                 sizeof(*correspondences));
-  if (!correspondences) return false;
-  num_correspondences = aom_determine_correspondence(
+  // Compute correspondences
+  CorrespondenceList *list = aom_malloc(sizeof(CorrespondenceList));
+  list->correspondences = (Correspondence *)aom_malloc(
+      src_corners->num_corners * sizeof(*list->correspondences));
+  list->num_correspondences = aom_determine_correspondence(
       src_buffer, src_corners->corners, src_corners->num_corners, ref_buffer,
       ref_corners->corners, ref_corners->num_corners, src_width, src_height,
-      src_stride, ref_stride, correspondences);
+      src_stride, ref_stride, list->correspondences);
+  return list;
+}
 
-  bool result = ransac(correspondences, num_correspondences, type,
-                       motion_models, num_motion_models);
+bool aom_fit_global_model_to_correspondences(CorrespondenceList *corrs,
+                                             TransformationType type,
+                                             MotionModel *motion_models,
+                                             int num_motion_models) {
+  int num_correspondences = corrs->num_correspondences;
 
-  aom_free(correspondences);
+  ransac(corrs->correspondences, num_correspondences, type, motion_models,
+         num_motion_models);
+
+  // Set num_inliers = 0 for motions with too few inliers so they are ignored.
+  for (int i = 0; i < num_motion_models; ++i) {
+    if (motion_models[i].num_inliers < MIN_INLIER_PROB * num_correspondences ||
+        num_correspondences == 0) {
+      motion_models[i].num_inliers = 0;
+    }
+  }
+
+  // Return true if any one of the motions has inliers.
+  for (int i = 0; i < num_motion_models; ++i) {
+    if (motion_models[i].num_inliers > 0) return 1;
+  }
+  return 0;
+}
+
+bool aom_fit_local_model_to_correspondences(CorrespondenceList *corrs,
+                                            PixelRect *rect,
+                                            TransformationType type,
+                                            double *mat) {
+  int num_correspondences = corrs->num_correspondences;
+  double *pts1 = aom_malloc(num_correspondences * 2 * sizeof(double));
+  double *pts2 = aom_malloc(num_correspondences * 2 * sizeof(double));
+  int num_points = 0;
+
+  for (int i = 0; i < corrs->num_correspondences; i++) {
+    Correspondence *corr = &corrs->correspondences[i];
+    int x = (int)corr->x;
+    int y = (int)corr->y;
+    if (is_inside_rect(x, y, rect)) {
+      pts1[2 * num_points + 0] = corr->x;
+      pts1[2 * num_points + 1] = corr->y;
+      pts2[2 * num_points + 0] = corr->rx;
+      pts2[2 * num_points + 1] = corr->ry;
+      num_points++;
+    }
+  }
+
+  bool result;
+  if (num_points < 4) {
+    // Too few points to fit a model
+    result = false;
+  } else {
+    result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
+  }
+
+  aom_free(pts1);
+  aom_free(pts2);
   return result;
+}
+
+void aom_free_correspondence_list(CorrespondenceList *list) {
+  if (list) {
+    aom_free(list->correspondences);
+    aom_free(list);
+  }
 }

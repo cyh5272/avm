@@ -78,22 +78,20 @@ extern "C" {
 // as 2^15 = 32768 is too large to fit in an int16_t.
 #define DISFLOW_INTERP_BITS 14
 
-typedef struct {
-  // x and y directions of flow, per patch
-  double *u;
-  double *v;
+FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
+                                  YV12_BUFFER_CONFIG *ref, int bit_depth);
 
-  // Sizes of the above arrays
-  int width;
-  int height;
-  int stride;
-} FlowField;
+bool aom_fit_global_model_to_flow_field(FlowField *flow,
+                                        TransformationType type,
+                                        YV12_BUFFER_CONFIG *frm,
+                                        MotionModel *motion_models,
+                                        int num_motion_models);
 
-bool av1_compute_global_motion_disflow(TransformationType type,
-                                       YV12_BUFFER_CONFIG *src,
-                                       YV12_BUFFER_CONFIG *ref, int bit_depth,
-                                       MotionModel *motion_models,
-                                       int num_motion_models);
+bool aom_fit_local_model_to_flow_field(const FlowField *flow,
+                                       const PixelRect *rect,
+                                       TransformationType type, double *mat);
+
+void aom_free_flow_field(FlowField *flow);
 
 #ifdef __cplusplus
 }
