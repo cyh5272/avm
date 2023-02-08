@@ -1978,6 +1978,25 @@ typedef struct {
   int segment_map_w; /*!< segment map width */
   int segment_map_h; /*!< segment map height */
   /**@}*/
+
+#if CONFIG_IMPROVED_GLOBAL_MOTION
+  /*!
+   * \brief Error ratio for each selected global motion model
+   *
+   * This is used to help decide which models will actually be used,
+   * because that decision has to be deferred until we actually select a
+   * base model to use
+   */
+  double erroradvantage[INTER_REFS_PER_FRAME];
+
+  /**
+   * \name Reference path for selected base model
+   */
+  /**@{*/
+  int base_model_our_ref;   /*!< which of our ref frames to copy from */
+  int base_model_their_ref; /*!< which model to copy from that frame */
+  /**@}*/
+#endif  // CONFIG_IMPROVED_GLOBAL_MOTION
 } GlobalMotionInfo;
 
 /*!
