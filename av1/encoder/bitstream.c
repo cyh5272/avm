@@ -2577,8 +2577,8 @@ static AOM_INLINE void encode_restoration_mode(
       default: assert(0);
     }
 #endif  // CONFIG_LR_FLEX_SYNTAX
-#if CONFIG_WIENER_NONSEP
-    int is_wiener_nonsep_possible =
+#if CONFIG_COMBINE_PC_NS_WIENER
+    const int is_wiener_nonsep_possible =
         rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
         rsi->frame_restoration_type == RESTORE_SWITCHABLE;
     if (is_wiener_nonsep_possible) {
@@ -2599,7 +2599,7 @@ static AOM_INLINE void encode_restoration_mode(
         assert(rsi->num_filter_classes == NUM_WIENERNS_CLASS_INIT_CHROMA);
       }
     }
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
@@ -2796,13 +2796,42 @@ static int check_and_write_merge_info(
 
 static AOM_INLINE void write_wienerns_filter(
     MACROBLOCKD *xd, int plane, const WienerNonsepInfo *wienerns_info,
-    WienerNonsepInfoBank *bank, aom_writer *wb) {
+    WienerNonsepInfoBank *bank, aom_writer *wb
+#if CONFIG_COMBINE_PC_NS_WIENER
+    ,
+    int base_qindex, int qindex_offset
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+) {
   const WienernsFilterParameters *nsfilter_params =
       get_wienerns_parameters(xd->base_qindex, plane != AOM_PLANE_Y);
   int skip_filter_write_for_class[WIENERNS_MAX_CLASSES] = { 0 };
   int ref_for_class[WIENERNS_MAX_CLASSES] = { 0 };
 #if CONFIG_RST_MERGECOEFFS
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+  int skip_filter_write =
+      plane == AOM_PLANE_Y && bank->frame_filter_predictors_are_set;
+  if (plane == AOM_PLANE_Y && !bank->frame_filter_predictors_are_set) {
+    for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+      assert(wienerns_info->match_indices[c_id] >= 0 &&
+             wienerns_info->match_indices[c_id] <=
+                 (1 << NUM_FRAME_PREDICTOR_BITS) - 1);
+      aom_write_literal(wb, wienerns_info->match_indices[c_id],
+                        NUM_FRAME_PREDICTOR_BITS);
+    }
+    fill_first_slot_of_bank_with_pc_wiener_match(
+        bank, wienerns_info->match_indices, base_qindex, qindex_offset);
+    bank->frame_filter_predictors_are_set = 1;
+  }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+#if CONFIG_COMBINE_PC_NS_WIENER
+    if (skip_filter_write) {
+      skip_filter_write_for_class[c_id] = 1;
+      continue;
+    }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
     skip_filter_write_for_class[c_id] = check_and_write_merge_info(
         wienerns_info, bank, nsfilter_params, c_id, ref_for_class, xd, wb);
   }
@@ -2963,7 +2992,12 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
         write_wienerns_filter(xd, plane, &rui->wienerns_info,
-                              &xd->wienerns_info[plane], w);
+                              &xd->wienerns_info[plane], w
+#if CONFIG_COMBINE_PC_NS_WIENER
+                              ,
+                              rui->base_qindex, rui->qindex_offset
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+        );
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -3000,8 +3034,13 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
     ++counts->wienerns_restore[unit_rtype != RESTORE_NONE];
 #endif  // CONFIG_ENTROPY_STATS
     if (unit_rtype != RESTORE_NONE) {
-      write_wienerns_filter(xd, plane, &rui->wienerns_info,
-                            &xd->wienerns_info[plane], w);
+      write_wienerns_filter(
+          xd, plane, &rui->wienerns_info, &xd->wienerns_info[plane], w
+#if CONFIG_COMBINE_PC_NS_WIENER
+          ,
+          cm->quant_params.base_qindex, cm->quant_params.y_dc_delta_q
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+      );
     }
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER

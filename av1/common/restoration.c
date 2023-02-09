@@ -1807,11 +1807,11 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
   }
   (void)tmpbuf;
   (void)bit_depth;
-  const int bank_index =
-      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
+  const int set_index =
+      get_filter_set_index(rui->base_qindex + rui->qindex_offset);
   const int16_t(*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA] =
-      get_filter_bank(bank_index);
-  const uint8_t *filter_selector = get_filter_selector(bank_index);
+      get_filter_set(set_index);
+  const uint8_t *filter_selector = get_filter_selector(set_index);
 
   setup_qval_tskip_lut(rui->base_qindex + rui->qindex_offset, bit_depth);
   for (int j = 0; j < stripe_width; j += procunit_width) {
@@ -1834,8 +1834,8 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
 #if CONFIG_WIENER_NONSEP
 
 #if CONFIG_COMBINE_PC_NS_WIENER
-const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int bank_index) {
-  const PcWienerSubClassifiers *sub_class = get_sub_classifiers(bank_index);
+const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int set_index) {
+  const PcWienerSubClassifiers *sub_class = get_sub_classifiers(set_index);
   switch (num_classes) {
     case 2: return sub_class->pc_wiener_sub_classify_to_2;
     case 4: return sub_class->pc_wiener_sub_classify_to_4;
@@ -1944,7 +1944,7 @@ void apply_wienerns_class_id_highbd(
 #if CONFIG_COMBINE_PC_NS_WIENER
     ,
     const uint8_t *class_id, int class_id_stride, int class_id_restrict,
-    int num_classes, int bank_index
+    int num_classes, int set_index
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 ) {
   (void)luma8;
@@ -1977,7 +1977,7 @@ void apply_wienerns_class_id_highbd(
   const int block_size = 4;
 #if CONFIG_COMBINE_PC_NS_WIENER
   const uint8_t *pc_wiener_sub_classify =
-      get_pc_wiener_sub_classifier(num_classes, bank_index);
+      get_pc_wiener_sub_classifier(num_classes, set_index);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   for (int r = 0; r < height; r += block_size) {
     const int h = AOMMIN(block_size, height - r);
@@ -2020,8 +2020,8 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
   (void)bit_depth;
 
 #if CONFIG_COMBINE_PC_NS_WIENER
-  const int bank_index =
-      get_filter_bank_index(rui->base_qindex + rui->qindex_offset);
+  const int set_index =
+      get_filter_set_index(rui->base_qindex + rui->qindex_offset);
   if (rui->compute_classification && rui->wienerns_info.num_classes > 1) {
     // Replicate pc_wiener_stripe but only perform classification, i.e., no
     // filtering. Only needed in the decoding loop. Encoder side will buffer the
@@ -2084,7 +2084,7 @@ static void wiener_nsfilter_stripe_highbd(const RestorationUnitInfo *rui,
 #if CONFIG_COMBINE_PC_NS_WIENER
         ,
         rui->class_id + (j >> MI_SIZE_LOG2), rui->class_id_stride,
-        rui->class_id_restrict, rui->wienerns_info.num_classes, bank_index
+        rui->class_id_restrict, rui->wienerns_info.num_classes, set_index
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
     );
   }
@@ -3081,3 +3081,97 @@ void av1_loop_restoration_save_boundary_lines(const YV12_BUFFER_CONFIG *frame,
     save_tile_row_boundary_lines(frame, p, cm, after_cdef);
   }
 }
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+int wienerns_to_pcwiener_translator(const NonsepFilterConfig *nsfilter_config,
+                                    int *tap_translator, int max_num_taps) {
+  const int num_sym_taps = nsfilter_config->num_pixels / 2;
+  assert(num_sym_taps <= max_num_taps);
+  for (int i = 0; i < num_sym_taps; ++i) {
+    const int filter_pos_row = nsfilter_config->config[2 * i][0];
+    const int filter_pos_col = nsfilter_config->config[2 * i][1];
+    int found_index = -1;
+    for (int j = 0; j < 2 * num_sym_taps; ++j) {
+      if (pcwiener_tap_config_luma[j][0] == filter_pos_row &&
+          pcwiener_tap_config_luma[j][1] == filter_pos_col) {
+        found_index = j;
+        break;
+      }
+    }
+    assert(found_index != -1);
+    tap_translator[i] = pcwiener_tap_config_luma[found_index][2];
+  }
+  return num_sym_taps;
+}
+
+static int16_t clip_to_wienerns_range(int16_t scale_x, int16_t minv,
+                                      int16_t n) {
+  scale_x = AOMMAX(scale_x, minv);
+  scale_x = AOMMIN(scale_x, minv + n - 1);
+  return (int16_t)scale_x;
+}
+
+void fill_filter_with_pcwiener_match(
+    WienerNonsepInfo *filter, int set_index, const int *tap_translator,
+    const int *match_indices, const WienernsFilterParameters *nsfilter_params,
+    int class_id) {
+  const int num_feat = nsfilter_params->ncoeffs;
+  const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
+  const int16_t(*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA] =
+      get_filter_set(set_index);
+  const int precision_diff =
+      PC_WIENER_PREC_FILTER - nsfilter_params->nsfilter_config.prec_bits;
+  assert(precision_diff >= 0);
+  const int16_t all_zeros_filter[WIENERNS_YUV_MAX] = { 0 };
+
+  int c_id_begin = 0;
+  int c_id_end = filter->num_classes;
+  if (class_id != ALL_WIENERNS_CLASSES) {
+    c_id_begin = class_id;
+    c_id_end = class_id + 1;
+  }
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    int16_t *wienerns_filter = nsfilter_taps(filter, c_id);
+    const int filter_index = match_indices[c_id];
+    assert(filter_index >= 0 && filter_index < NUM_PC_WIENER_FILTERS);
+    const int16_t *pcwiener_filter = pcwiener_filters_luma[filter_index];
+    if (filter_index == 0) pcwiener_filter = all_zeros_filter;
+
+    for (int i = 0; i < num_feat; ++i) {
+      const int16_t scaled_tap = ROUND_POWER_OF_TWO_SIGNED(
+          pcwiener_filter[tap_translator[i]], precision_diff);
+      wienerns_filter[i] = clip_to_wienerns_range(
+          scaled_tap, wienerns_coeffs[i][WIENERNS_MIN_ID],
+          (1 << wienerns_coeffs[i][WIENERNS_BIT_ID]));
+    }
+  }
+}
+
+void fill_first_slot_of_bank_with_pc_wiener_match(WienerNonsepInfoBank *bank,
+                                                  const int *match_indices,
+                                                  int base_qindex,
+                                                  int qindex_offset) {
+  assert(!bank->frame_filter_predictors_are_set);
+  base_qindex = 0;
+  qindex_offset = 0;
+
+  const int is_uv = 0;
+  const WienernsFilterParameters *nsfilter_params =
+      get_wienerns_parameters(base_qindex, is_uv);
+  const int num_feat = nsfilter_params->ncoeffs;
+
+  int tap_translator[WIENERNS_YUV_MAX];
+  const int num_taps = wienerns_to_pcwiener_translator(
+      &nsfilter_params->nsfilter_config, tap_translator, WIENERNS_YUV_MAX);
+  assert(num_taps == num_feat);
+
+  const int set_index = get_filter_set_index(base_qindex + qindex_offset);
+
+  const int bank_ref = 0;
+  const int c_id = 0;
+  fill_filter_with_pcwiener_match(
+      av1_ref_from_wienerns_bank(bank, bank_ref, c_id), set_index,
+      tap_translator, match_indices, nsfilter_params, ALL_WIENERNS_CLASSES);
+}
+
+#endif  // CONFIG_COMBINE_PC_NS_WIENER

@@ -2312,8 +2312,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       all_none = 0;
       chroma_none &= p == 0;
     }
-#if CONFIG_WIENER_NONSEP
-    int is_wiener_nonsep_possible =
+#if CONFIG_COMBINE_PC_NS_WIENER
+    const int is_wiener_nonsep_possible =
         rsi->frame_restoration_type == RESTORE_WIENER_NONSEP ||
         rsi->frame_restoration_type == RESTORE_SWITCHABLE;
     if (is_wiener_nonsep_possible) {
@@ -2333,7 +2333,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       } else
         rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
     }
-#endif  // CONFIG_WIENER_NONSEP
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
   if (!all_none) {
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
@@ -2515,11 +2515,40 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
 #if CONFIG_WIENER_NONSEP
 static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
                                  WienerNonsepInfo *wienerns_info,
-                                 WienerNonsepInfoBank *bank, aom_reader *rb) {
+                                 WienerNonsepInfoBank *bank, aom_reader *rb
+#if CONFIG_COMBINE_PC_NS_WIENER
+                                 ,
+                                 int base_qindex, int qindex_offset
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+) {
   int skip_filter_read_for_class[WIENERNS_MAX_CLASSES] = { 0 };
   int ref_for_class[WIENERNS_MAX_CLASSES] = { 0 };
 #if CONFIG_RST_MERGECOEFFS
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+  int skip_filter_read = !is_uv && bank->frame_filter_predictors_are_set;
+  if (!is_uv && !bank->frame_filter_predictors_are_set) {
+    for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+      wienerns_info->match_indices[c_id] =
+          aom_read_literal(rb, NUM_FRAME_PREDICTOR_BITS, ACCT_STR);
+    }
+    fill_first_slot_of_bank_with_pc_wiener_match(
+        bank, wienerns_info->match_indices, base_qindex, qindex_offset);
+    bank->frame_filter_predictors_are_set = 1;
+  }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
+#if CONFIG_COMBINE_PC_NS_WIENER
+    if (skip_filter_read) {
+      skip_filter_read_for_class[c_id] = 1;
+      const int ref_to_use = 0;  // last filter in bank.
+      copy_nsfilter_taps_for_class(
+          wienerns_info,
+          av1_constref_from_wienerns_bank(bank, ref_to_use, c_id), c_id);
+      continue;
+    }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
     const int exact_match =
         aom_read_symbol(rb, xd->tile_ctx->merged_param_cdf, 2, ACCT_STR);
     int ref;
@@ -2667,8 +2696,13 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
         break;
 #if CONFIG_WIENER_NONSEP
       case RESTORE_WIENER_NONSEP:
-        read_wienerns_filter(xd, is_uv, &rui->wienerns_info,
-                             &xd->wienerns_info[plane], r);
+        read_wienerns_filter(
+            xd, is_uv, &rui->wienerns_info, &xd->wienerns_info[plane], r
+#if CONFIG_COMBINE_PC_NS_WIENER
+            ,
+            cm->quant_params.base_qindex, cm->quant_params.y_dc_delta_q
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+        );
         break;
 #endif  // CONFIG_WIENER_NONSEP
 #if CONFIG_PC_WIENER
@@ -2698,7 +2732,12 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     if (aom_read_symbol(r, xd->tile_ctx->wienerns_restore_cdf, 2, ACCT_STR)) {
       rui->restoration_type = RESTORE_WIENER_NONSEP;
       read_wienerns_filter(xd, is_uv, &rui->wienerns_info,
-                           &xd->wienerns_info[plane], r);
+                           &xd->wienerns_info[plane], r
+#if CONFIG_COMBINE_PC_NS_WIENER
+                           ,
+                           rui->base_qindex, rui->qindex_offset
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+      );
     } else {
       rui->restoration_type = RESTORE_NONE;
     }
