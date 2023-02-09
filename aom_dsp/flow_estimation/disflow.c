@@ -23,7 +23,7 @@
 
 // TODO(rachelbarker):
 // Implement specialized functions for upscaling flow fields,
-// replacing av1_upscale_plane_double_prec().
+// replacing av1_resize_plane_double().
 // Then we can avoid needing to include code from av1/
 #include "av1/common/resize.h"
 
@@ -521,12 +521,12 @@ static void compute_flow_field(const ImagePyramid *src_pyr,
       const int upscale_flow_height = cur_flow_height << 1;
       const int upscale_stride = flow->stride;
 
-      av1_upscale_plane_double_prec(
-          flow_u, cur_flow_height, cur_flow_width, cur_flow_stride, u_upscale,
-          upscale_flow_height, upscale_flow_width, upscale_stride);
-      av1_upscale_plane_double_prec(
-          flow_v, cur_flow_height, cur_flow_width, cur_flow_stride, v_upscale,
-          upscale_flow_height, upscale_flow_width, upscale_stride);
+      av1_resize_plane_double(flow_u, cur_flow_height, cur_flow_width,
+                              cur_flow_stride, u_upscale, upscale_flow_height,
+                              upscale_flow_width, upscale_stride);
+      av1_resize_plane_double(flow_v, cur_flow_height, cur_flow_width,
+                              cur_flow_stride, v_upscale, upscale_flow_height,
+                              upscale_flow_width, upscale_stride);
 
       // Multiply all flow vectors by 2.
       // When we move down a pyramid level, the image resolution doubles.

@@ -315,11 +315,10 @@ static void interpolate_core(const uint8_t *const input, int in_length,
   }
 }
 
-static void interpolate_core_double_prec(const double *const input,
-                                         int in_length, double *output,
-                                         int out_length,
-                                         const int16_t *interp_filters,
-                                         int interp_taps) {
+static void interpolate_core_double(const double *const input, int in_length,
+                                    double *output, int out_length,
+                                    const int16_t *interp_filters,
+                                    int interp_taps) {
   const int32_t delta =
       (((uint32_t)in_length << RS_SCALE_SUBPEL_BITS) + out_length / 2) /
       out_length;
@@ -400,6 +399,90 @@ static void interpolate_core_double_prec(const double *const input,
   }
 }
 
+static void interpolate_core_float(const float *const input, int in_length,
+                                   float *output, int out_length,
+                                   const int16_t *interp_filters,
+                                   int interp_taps) {
+  const int32_t delta =
+      (((uint32_t)in_length << RS_SCALE_SUBPEL_BITS) + out_length / 2) /
+      out_length;
+  const int32_t offset =
+      in_length > out_length
+          ? (((int32_t)(in_length - out_length) << (RS_SCALE_SUBPEL_BITS - 1)) +
+             out_length / 2) /
+                out_length
+          : -(((int32_t)(out_length - in_length)
+               << (RS_SCALE_SUBPEL_BITS - 1)) +
+              out_length / 2) /
+                out_length;
+  float *optr = output;
+  int x, x1, x2, k, int_pel, sub_pel;
+  float sum;
+  int32_t y;
+
+  x = 0;
+  y = offset + RS_SCALE_EXTRA_OFF;
+  while ((y >> RS_SCALE_SUBPEL_BITS) < (interp_taps / 2 - 1)) {
+    x++;
+    y += delta;
+  }
+  x1 = x;
+  x = out_length - 1;
+  y = delta * x + offset + RS_SCALE_EXTRA_OFF;
+  while ((y >> RS_SCALE_SUBPEL_BITS) + (int32_t)(interp_taps / 2) >=
+         in_length) {
+    x--;
+    y -= delta;
+  }
+  x2 = x;
+  if (x1 > x2) {
+    for (x = 0, y = offset + RS_SCALE_EXTRA_OFF; x < out_length;
+         ++x, y += delta) {
+      int_pel = y >> RS_SCALE_SUBPEL_BITS;
+      sub_pel = (y >> RS_SCALE_EXTRA_BITS) & RS_SUBPEL_MASK;
+      const int16_t *filter = &interp_filters[sub_pel * interp_taps];
+      sum = 0;
+      for (k = 0; k < interp_taps; ++k) {
+        const int pk = int_pel - interp_taps / 2 + 1 + k;
+        sum += filter[k] * input[AOMMAX(AOMMIN(pk, in_length - 1), 0)];
+      }
+      *optr++ = sum / (1 << FILTER_BITS);
+    }
+  } else {
+    // Initial part.
+    for (x = 0, y = offset + RS_SCALE_EXTRA_OFF; x < x1; ++x, y += delta) {
+      int_pel = y >> RS_SCALE_SUBPEL_BITS;
+      sub_pel = (y >> RS_SCALE_EXTRA_BITS) & RS_SUBPEL_MASK;
+      const int16_t *filter = &interp_filters[sub_pel * interp_taps];
+      sum = 0;
+      for (k = 0; k < interp_taps; ++k)
+        sum += filter[k] * input[AOMMAX(int_pel - interp_taps / 2 + 1 + k, 0)];
+      *optr++ = sum / (1 << FILTER_BITS);
+    }
+    // Middle part.
+    for (; x <= x2; ++x, y += delta) {
+      int_pel = y >> RS_SCALE_SUBPEL_BITS;
+      sub_pel = (y >> RS_SCALE_EXTRA_BITS) & RS_SUBPEL_MASK;
+      const int16_t *filter = &interp_filters[sub_pel * interp_taps];
+      sum = 0;
+      for (k = 0; k < interp_taps; ++k)
+        sum += filter[k] * input[int_pel - interp_taps / 2 + 1 + k];
+      *optr++ = sum / (1 << FILTER_BITS);
+    }
+    // End part.
+    for (; x < out_length; ++x, y += delta) {
+      int_pel = y >> RS_SCALE_SUBPEL_BITS;
+      sub_pel = (y >> RS_SCALE_EXTRA_BITS) & RS_SUBPEL_MASK;
+      const int16_t *filter = &interp_filters[sub_pel * interp_taps];
+      sum = 0;
+      for (k = 0; k < interp_taps; ++k)
+        sum += filter[k] *
+               input[AOMMIN(int_pel - interp_taps / 2 + 1 + k, in_length - 1)];
+      *optr++ = sum / (1 << FILTER_BITS);
+    }
+  }
+}
+
 static void interpolate(const uint8_t *const input, int in_length,
                         uint8_t *output, int out_length) {
   const InterpKernel *interp_filters =
@@ -409,13 +492,22 @@ static void interpolate(const uint8_t *const input, int in_length,
                    SUBPEL_TAPS);
 }
 
-static void interpolate_double_prec(const double *const input, int in_length,
-                                    double *output, int out_length) {
+static void interpolate_double(const double *const input, int in_length,
+                               double *output, int out_length) {
   const InterpKernel *interp_filters =
       choose_interp_filter(in_length, out_length);
 
-  interpolate_core_double_prec(input, in_length, output, out_length,
-                               &interp_filters[0][0], SUBPEL_TAPS);
+  interpolate_core_double(input, in_length, output, out_length,
+                          &interp_filters[0][0], SUBPEL_TAPS);
+}
+
+static void interpolate_float(const float *const input, int in_length,
+                              float *output, int out_length) {
+  const InterpKernel *interp_filters =
+      choose_interp_filter(in_length, out_length);
+
+  interpolate_core_float(input, in_length, output, out_length,
+                         &interp_filters[0][0], SUBPEL_TAPS);
 }
 
 int32_t av1_get_upscale_convolve_step(int in_length, int out_length) {
@@ -543,6 +635,226 @@ static void down2_symodd(const uint8_t *const input, int length,
   }
 }
 
+static void down2_symeven_double(const double *const input, int length,
+                                 double *output) {
+  // Actual filter len = 2 * filter_len_half.
+  const int16_t *filter = av1_down2_symeven_half_filter;
+  const int filter_len_half = sizeof(av1_down2_symeven_half_filter) / 2;
+  int i, j;
+  double *optr = output;
+  int l1 = filter_len_half;
+  int l2 = (length - filter_len_half);
+  l1 += (l1 & 1);
+  l2 += (l2 & 1);
+  if (l1 > l2) {
+    // Short input length.
+    for (i = 0; i < length; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum +=
+            (input[AOMMAX(i - j, 0)] + input[AOMMIN(i + 1 + j, length - 1)]) *
+            filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  } else {
+    // Initial part.
+    for (i = 0; i < l1; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum += (input[AOMMAX(i - j, 0)] + input[i + 1 + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // Middle part.
+    for (; i < l2; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[i + 1 + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // End part.
+    for (; i < length; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum +=
+            (input[i - j] + input[AOMMIN(i + 1 + j, length - 1)]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  }
+}
+
+static void down2_symodd_double(const double *const input, int length,
+                                double *output) {
+  // Actual filter len = 2 * filter_len_half - 1.
+  const int16_t *filter = av1_down2_symodd_half_filter;
+  const int filter_len_half = sizeof(av1_down2_symodd_half_filter) / 2;
+  int i, j;
+  double *optr = output;
+  int l1 = filter_len_half - 1;
+  int l2 = (length - filter_len_half + 1);
+  l1 += (l1 & 1);
+  l2 += (l2 & 1);
+  if (l1 > l2) {
+    // Short input length.
+    for (i = 0; i < length; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[(i - j < 0 ? 0 : i - j)] +
+                input[(i + j >= length ? length - 1 : i + j)]) *
+               filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  } else {
+    // Initial part.
+    for (i = 0; i < l1; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[(i - j < 0 ? 0 : i - j)] + input[i + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // Middle part.
+    for (; i < l2; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[i + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // End part.
+    for (; i < length; i += 2) {
+      double sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[(i + j >= length ? length - 1 : i + j)]) *
+               filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  }
+}
+
+static void down2_symeven_float(const float *const input, int length,
+                                float *output) {
+  // Actual filter len = 2 * filter_len_half.
+  const int16_t *filter = av1_down2_symeven_half_filter;
+  const int filter_len_half = sizeof(av1_down2_symeven_half_filter) / 2;
+  int i, j;
+  float *optr = output;
+  int l1 = filter_len_half;
+  int l2 = (length - filter_len_half);
+  l1 += (l1 & 1);
+  l2 += (l2 & 1);
+  if (l1 > l2) {
+    // Short input length.
+    for (i = 0; i < length; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum +=
+            (input[AOMMAX(i - j, 0)] + input[AOMMIN(i + 1 + j, length - 1)]) *
+            filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  } else {
+    // Initial part.
+    for (i = 0; i < l1; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum += (input[AOMMAX(i - j, 0)] + input[i + 1 + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // Middle part.
+    for (; i < l2; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[i + 1 + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // End part.
+    for (; i < length; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1));
+      for (j = 0; j < filter_len_half; ++j) {
+        sum +=
+            (input[i - j] + input[AOMMIN(i + 1 + j, length - 1)]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  }
+}
+
+static void down2_symodd_float(const float *const input, int length,
+                               float *output) {
+  // Actual filter len = 2 * filter_len_half - 1.
+  const int16_t *filter = av1_down2_symodd_half_filter;
+  const int filter_len_half = sizeof(av1_down2_symodd_half_filter) / 2;
+  int i, j;
+  float *optr = output;
+  int l1 = filter_len_half - 1;
+  int l2 = (length - filter_len_half + 1);
+  l1 += (l1 & 1);
+  l2 += (l2 & 1);
+  if (l1 > l2) {
+    // Short input length.
+    for (i = 0; i < length; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[(i - j < 0 ? 0 : i - j)] +
+                input[(i + j >= length ? length - 1 : i + j)]) *
+               filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  } else {
+    // Initial part.
+    for (i = 0; i < l1; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[(i - j < 0 ? 0 : i - j)] + input[i + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // Middle part.
+    for (; i < l2; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[i + j]) * filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+    // End part.
+    for (; i < length; i += 2) {
+      float sum = (1 << (FILTER_BITS - 1)) + input[i] * filter[0];
+      for (j = 1; j < filter_len_half; ++j) {
+        sum += (input[i - j] + input[(i + j >= length ? length - 1 : i + j)]) *
+               filter[j];
+      }
+      sum /= (1 << FILTER_BITS);
+      *optr++ = sum;
+    }
+  }
+}
+
 static int get_down2_length(int length, int steps) {
   for (int s = 0; s < steps; ++s) length = (length + 1) >> 1;
   return length;
@@ -599,10 +911,74 @@ static void resize_multistep(const uint8_t *const input, int length,
   }
 }
 
-static void upscale_multistep_double_prec(const double *const input, int length,
-                                          double *output, int olength) {
-  assert(length < olength);
-  interpolate_double_prec(input, length, output, olength);
+static void resize_multistep_double(const double *const input, int length,
+                                    double *output, int olength, double *otmp) {
+  if (length == olength) {
+    memcpy(output, input, sizeof(output[0]) * length);
+    return;
+  }
+  const int steps = get_down2_steps(length, olength);
+
+  if (steps > 0) {
+    double *out = NULL;
+    int filteredlength = length;
+
+    assert(otmp != NULL);
+    double *otmp2 = otmp + get_down2_length(length, 1);
+    for (int s = 0; s < steps; ++s) {
+      const int proj_filteredlength = get_down2_length(filteredlength, 1);
+      const double *const in = (s == 0 ? input : out);
+      if (s == steps - 1 && proj_filteredlength == olength)
+        out = output;
+      else
+        out = (s & 1 ? otmp2 : otmp);
+      if (filteredlength & 1)
+        down2_symodd_double(in, filteredlength, out);
+      else
+        down2_symeven_double(in, filteredlength, out);
+      filteredlength = proj_filteredlength;
+    }
+    if (filteredlength != olength) {
+      interpolate_double(out, filteredlength, output, olength);
+    }
+  } else {
+    interpolate_double(input, length, output, olength);
+  }
+}
+
+static void resize_multistep_float(const float *const input, int length,
+                                   float *output, int olength, float *otmp) {
+  if (length == olength) {
+    memcpy(output, input, sizeof(output[0]) * length);
+    return;
+  }
+  const int steps = get_down2_steps(length, olength);
+
+  if (steps > 0) {
+    float *out = NULL;
+    int filteredlength = length;
+
+    assert(otmp != NULL);
+    float *otmp2 = otmp + get_down2_length(length, 1);
+    for (int s = 0; s < steps; ++s) {
+      const int proj_filteredlength = get_down2_length(filteredlength, 1);
+      const float *const in = (s == 0 ? input : out);
+      if (s == steps - 1 && proj_filteredlength == olength)
+        out = output;
+      else
+        out = (s & 1 ? otmp2 : otmp);
+      if (filteredlength & 1)
+        down2_symodd_float(in, filteredlength, out);
+      else
+        down2_symeven_float(in, filteredlength, out);
+      filteredlength = proj_filteredlength;
+    }
+    if (filteredlength != olength) {
+      interpolate_float(out, filteredlength, output, olength);
+    }
+  } else {
+    interpolate_float(input, length, output, olength);
+  }
 }
 
 static void fill_col_to_arr(uint8_t *img, int stride, int len, uint8_t *arr) {
@@ -623,8 +999,8 @@ static void fill_arr_to_col(uint8_t *img, int stride, int len, uint8_t *arr) {
   }
 }
 
-static void fill_col_to_arr_double_prec(double *img, int stride, int len,
-                                        double *arr) {
+static void fill_col_to_arr_double(double *img, int stride, int len,
+                                   double *arr) {
   int i;
   double *iptr = img;
   double *aptr = arr;
@@ -633,11 +1009,29 @@ static void fill_col_to_arr_double_prec(double *img, int stride, int len,
   }
 }
 
-static void fill_arr_to_col_double_prec(double *img, int stride, int len,
-                                        double *arr) {
+static void fill_arr_to_col_double(double *img, int stride, int len,
+                                   double *arr) {
   int i;
   double *iptr = img;
   double *aptr = arr;
+  for (i = 0; i < len; ++i, iptr += stride) {
+    *iptr = *aptr++;
+  }
+}
+
+static void fill_col_to_arr_float(float *img, int stride, int len, float *arr) {
+  int i;
+  float *iptr = img;
+  float *aptr = arr;
+  for (i = 0; i < len; ++i, iptr += stride) {
+    *aptr++ = *iptr;
+  }
+}
+
+static void fill_arr_to_col_float(float *img, int stride, int len, float *arr) {
+  int i;
+  float *iptr = img;
+  float *aptr = arr;
   for (i = 0; i < len; ++i, iptr += stride) {
     *iptr = *aptr++;
   }
@@ -674,29 +1068,62 @@ Error:
   aom_free(arrbuf2);
 }
 
-void av1_upscale_plane_double_prec(const double *const input, int height,
-                                   int width, int in_stride, double *output,
-                                   int height2, int width2, int out_stride) {
+void av1_resize_plane_double(const double *const input, int height, int width,
+                             int in_stride, double *output, int height2,
+                             int width2, int out_stride) {
   int i;
   double *intbuf = (double *)aom_malloc(sizeof(double) * width2 * height);
+  double *tmpbuf = (double *)aom_malloc(sizeof(double) * AOMMAX(width, height));
   double *arrbuf = (double *)aom_malloc(sizeof(double) * height);
   double *arrbuf2 = (double *)aom_malloc(sizeof(double) * height2);
-  if (intbuf == NULL || arrbuf == NULL || arrbuf2 == NULL) goto Error;
+  if (intbuf == NULL || tmpbuf == NULL || arrbuf == NULL || arrbuf2 == NULL)
+    goto Error;
   assert(width > 0);
   assert(height > 0);
   assert(width2 > 0);
   assert(height2 > 0);
   for (i = 0; i < height; ++i)
-    upscale_multistep_double_prec(input + in_stride * i, width,
-                                  intbuf + width2 * i, width2);
+    resize_multistep_double(input + in_stride * i, width, intbuf + width2 * i,
+                            width2, tmpbuf);
   for (i = 0; i < width2; ++i) {
-    fill_col_to_arr_double_prec(intbuf + i, width2, height, arrbuf);
-    upscale_multistep_double_prec(arrbuf, height, arrbuf2, height2);
-    fill_arr_to_col_double_prec(output + i, out_stride, height2, arrbuf2);
+    fill_col_to_arr_double(intbuf + i, width2, height, arrbuf);
+    resize_multistep_double(arrbuf, height, arrbuf2, height2, tmpbuf);
+    fill_arr_to_col_double(output + i, out_stride, height2, arrbuf2);
   }
 
 Error:
   aom_free(intbuf);
+  aom_free(tmpbuf);
+  aom_free(arrbuf);
+  aom_free(arrbuf2);
+}
+
+void av1_resize_plane_float(const float *const input, int height, int width,
+                            int in_stride, float *output, int height2,
+                            int width2, int out_stride) {
+  int i;
+  float *intbuf = (float *)aom_malloc(sizeof(float) * width2 * height);
+  float *tmpbuf = (float *)aom_malloc(sizeof(float) * AOMMAX(width, height));
+  float *arrbuf = (float *)aom_malloc(sizeof(float) * height);
+  float *arrbuf2 = (float *)aom_malloc(sizeof(float) * height2);
+  if (intbuf == NULL || tmpbuf == NULL || arrbuf == NULL || arrbuf2 == NULL)
+    goto Error;
+  assert(width > 0);
+  assert(height > 0);
+  assert(width2 > 0);
+  assert(height2 > 0);
+  for (i = 0; i < height; ++i)
+    resize_multistep_float(input + in_stride * i, width, intbuf + width2 * i,
+                           width2, tmpbuf);
+  for (i = 0; i < width2; ++i) {
+    fill_col_to_arr_float(intbuf + i, width2, height, arrbuf);
+    resize_multistep_float(arrbuf, height, arrbuf2, height2, tmpbuf);
+    fill_arr_to_col_float(output + i, out_stride, height2, arrbuf2);
+  }
+
+Error:
+  aom_free(intbuf);
+  aom_free(tmpbuf);
   aom_free(arrbuf);
   aom_free(arrbuf2);
 }

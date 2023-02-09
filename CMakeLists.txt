@@ -739,12 +739,25 @@ if(CONFIG_TENSORFLOW_LITE)
       list(APPEND AOM_APP_TARGETS tf_lite_model)
       target_link_tf_lite_libraries(tf_lite_model)
       add_dependencies(tf_lite_model tensorflow_lite fake_dl)
+
+      add_executable(cnn_restore_y4m
+                     "${AOM_ROOT}/examples/cnn_restore/cnn_restore_y4m.cc")
+      list(APPEND AOM_EXAMPLE_TARGETS cnn_restore_y4m)
+      list(APPEND AOM_APP_TARGETS cnn_restore_y4m)
+      target_link_tf_lite_libraries(cnn_restore_y4m)
+      add_dependencies(cnn_restore_y4m tensorflow_lite fake_dl)
+
+      add_executable(
+        deep_flow_y4m
+        "${AOM_ROOT}/examples/deep_flow/deep_flow_y4m.cc"
+        "${AOM_GEN_SRC_DIR}/usage_exit.cc"
+        $<TARGET_OBJECTS:aom_common_app_util>)
+      list(APPEND AOM_EXAMPLE_TARGETS deep_flow_y4m)
+      list(APPEND AOM_APP_TARGETS deep_flow_y4m)
+      target_link_libraries(deep_flow_y4m ${AOM_LIB_LINK_TYPE} aom)
+      target_link_tf_lite_libraries(deep_flow_y4m)
+      add_dependencies(deep_flow_y4m tensorflow_lite fake_dl)
     endif()
-    add_executable(cnn_restore_y4m
-                   "${AOM_ROOT}/examples/cnn_restore/cnn_restore_y4m.cc")
-    list(APPEND AOM_APP_TARGETS cnn_restore_y4m)
-    target_link_tf_lite_libraries(cnn_restore_y4m)
-    add_dependencies(cnn_restore_y4m tensorflow_lite fake_dl)
   endif()
 endif()
 
