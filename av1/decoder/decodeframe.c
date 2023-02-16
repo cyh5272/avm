@@ -7413,6 +7413,11 @@ uint32_t av1_decode_frame_headers_and_setup(AV1Decoder *pbi,
     init_pef_parameter(cm, 0, num_planes);
   }
 #endif  // CONFIG_PEF
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  if (cm->features.allow_ref_frame_mvs) {
+    av1_fill_hole_smooth_single_ref_mv_field(cm);
+  }
+#endif
 
 #if CONFIG_TIP
   process_tip_mode(pbi);

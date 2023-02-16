@@ -301,4 +301,9 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
                           WarpedMotionParams *wm_params);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
+                                      WarpedMotionParams *wm_params, int mi_row,
+                                      int mi_col);
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
 #endif  // AOM_AV1_COMMON_WARPED_MOTION_H_

@@ -1110,6 +1110,20 @@ void av1_find_warp_delta_base_candidates(
     WARP_CANDIDATE spatial_candidates[MAX_WARP_REF_CANDIDATES],
     uint8_t num_wrl_cand, uint8_t *p_valid_num_candidates);
 #endif  // CONFIG_WARP_REF_LIST
+#if CONFIG_TEMPORAL_GLOBAL_MV
+int av1_find_single_ref_projected_samples(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref_frame,
+    const int mi_row, const int mi_col, const int width, const int height,
+    int_mv *projected_mvs, int *pts, int *pts_inref);
+int av1_find_single_ref_projected_samples_sb(const AV1_COMMON *cm,
+                                             const MACROBLOCKD *xd,
+                                             MV_REFERENCE_FRAME ref_frame,
+                                             const int mi_row, const int mi_col,
+                                             int_mv *projected_mvs, int *pts,
+                                             int *pts_inref);
+void av1_set_temporal_global_mvs_sb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                                    const int mi_row, const int mi_col);
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
 
 #if CONFIG_WARPMV
 bool is_warp_candidate_inside_of_frame(const AV1_COMMON *cm,

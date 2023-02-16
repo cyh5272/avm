@@ -264,6 +264,13 @@ static AOM_INLINE void dealloc_compressor_data(AV1_COMP *cpi) {
   aom_free(cm->tpl_mvs);
   cm->tpl_mvs = NULL;
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  for (int i = 0; i < INTER_REFS_PER_FRAME; i++) {
+    aom_free(cm->ref_projected_mvs[i]);
+    cm->ref_projected_mvs[i] = NULL;
+  }
+#endif
+
 #if CONFIG_TIP
   aom_free(cm->tip_ref.available_flag);
   cm->tip_ref.available_flag = NULL;

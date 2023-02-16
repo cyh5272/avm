@@ -983,3 +983,197 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
   return 0;
 }
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+static int32_t get_mult_shift_ndiag_u(int64_t v, int shift) {
+  return (int32_t)clamp64(ROUND_POWER_OF_TWO_SIGNED_64(v, shift),
+                          -WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
+                          WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1);
+}
+
+static int32_t get_mult_shift_diag_u(int64_t v, int shift) {
+  return (int32_t)clamp64(
+      ROUND_POWER_OF_TWO_SIGNED_64(v, shift),
+      (1 << WARPEDMODEL_PREC_BITS) - WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
+      (1 << WARPEDMODEL_PREC_BITS) + WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1);
+}
+
+/*
+static int32_t get_mult_shift_dx_uhp(int64_t *v, int shift, const int32_t *u) {
+  int64_t off = ((int64_t)u[0] << (WARPEDMODEL_PREC_BITS + shift)) -
+                 (int64_t)u[0] * v[0] - (int64_t)u[1] * v[1];
+  return (int32_t)clamp64(ROUND_POWER_OF_TWO_SIGNED_64(v[2] + off, 3 + shift),
+                          -WARPEDMODEL_TRANS_CLAMP + 1,
+                          WARPEDMODEL_TRANS_CLAMP - 1);
+}
+
+static int32_t get_mult_shift_dy_uhp(int64_t *v, int shift, const int32_t *u) {
+  int64_t off = ((int64_t)u[1] << (WARPEDMODEL_PREC_BITS + shift)) -
+                 (int64_t)u[0] * v[0] - (int64_t)u[1] * v[1];
+  return (int32_t)clamp64(ROUND_POWER_OF_TWO_SIGNED_64(v[2] + off, 3 + shift),
+                          -WARPEDMODEL_TRANS_CLAMP + 1,
+                          WARPEDMODEL_TRANS_CLAMP - 1);
+}
+*/
+
+static int32_t get_mult_shift_dx_u(int64_t v, int shift, const int32_t *u,
+                                   int32_t *w) {
+  int32_t vs = (int32_t)(ROUND_POWER_OF_TWO_SIGNED_64(v, shift));
+  int32_t off = (u[0] << WARPEDMODEL_PREC_BITS) - u[0] * w[0] - u[1] * w[1];
+
+  return (int32_t)clamp64(ROUND_POWER_OF_TWO_SIGNED(vs + off, 3),
+                          -WARPEDMODEL_TRANS_CLAMP + 1,
+                          WARPEDMODEL_TRANS_CLAMP - 1);
+}
+
+static int32_t get_mult_shift_dy_u(int64_t v, int shift, const int32_t *u,
+                                   int32_t *w) {
+  int32_t vs = (int32_t)(ROUND_POWER_OF_TWO_SIGNED_64(v, shift));
+  int32_t off = (u[1] << WARPEDMODEL_PREC_BITS) - u[0] * w[0] - u[1] * w[1];
+
+  return (int32_t)clamp64(ROUND_POWER_OF_TWO_SIGNED(vs + off, 3),
+                          -WARPEDMODEL_TRANS_CLAMP + 1,
+                          WARPEDMODEL_TRANS_CLAMP - 1);
+}
+
+#define LS_MAT_DOWN_BITS_U 0
+#define LS_SQUARE_U(a)                                        \
+  (((a) * (a)*4 + (a)*4 * LS_STEP + LS_STEP * LS_STEP * 2) >> \
+   (2 + LS_MAT_DOWN_BITS_U))
+#define LS_PRODUCT1_U(a, b)                                         \
+  (((a) * (b)*4 + ((a) + (b)) * 2 * LS_STEP + LS_STEP * LS_STEP) >> \
+   (2 + LS_MAT_DOWN_BITS_U))
+#define LS_PRODUCT2_U(a, b)                                             \
+  (((a) * (b)*4 + ((a) + (b)) * 2 * LS_STEP + LS_STEP * LS_STEP * 2) >> \
+   (2 + LS_MAT_DOWN_BITS_U))
+#define LS_SUM_U(a) (((a)*4 + LS_STEP * 2) >> (2 + LS_MAT_DOWN_BITS_U))
+
+static int find_affine_unconstrained_int(int np, const int *pts1,
+                                         const int *pts2,
+                                         WarpedMotionParams *wm, int mi_row,
+                                         int mi_col) {
+  int32_t A[3][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+  int32_t Bx[3] = { 0, 0, 0 };
+  int32_t By[3] = { 0, 0, 0 };
+  int i, n = 0;
+
+  int64_t C00, C01, C02, C11, C12, C22;
+  int64_t Px[3], Py[3];
+  int64_t Det;
+
+  // Offsets to make the values in the arrays smaller
+  const int32_t u[2] = { mi_col * MI_SIZE * 8, mi_row * MI_SIZE * 8 };
+
+  // Let source points (xi, yi) map to destimation points (xi', yi'),
+  //     for i = 0, 1, 2, .... n-1
+  // Then if  P = [x0, y0, 1,
+  //               x1, y1, 1
+  //               x2, y2, 1,
+  //                ....
+  //              ]
+  //          q = [x0', x1', x2', ... ]'
+  //          r = [y0', y1', y2', ... ]'
+  // the least squares problems that need to be solved are:
+  //          [h1, h2, dx]' = inv(P'P)P'q and
+  //          [h3, h4, dy]' = inv(P'P)P'r
+  // where the affine transformation is given by:
+  //          x' = h1.x + h2.y + dx
+  //          y' = h3.x + h4.y + dy
+  //
+  // The loop below computes: A = P'P, Bx = P'q, By = P'r
+  // We need to just compute inv(A).Bx and inv(A).By for the solutions.
+  //
+  int sx, sy, dx, dy;
+
+  // Contribution from samples
+  for (i = 0; i < np; i++) {
+    dx = pts2[i * 2] - u[0];
+    dy = pts2[i * 2 + 1] - u[1];
+    sx = pts1[i * 2] - u[0];
+    sy = pts1[i * 2 + 1] - u[1];
+    if (abs(sx - dx) < LS_MV_MAX && abs(sy - dy) < LS_MV_MAX) {
+      A[0][0] += LS_SQUARE_U(sx);
+      A[0][1] += LS_PRODUCT1_U(sx, sy);
+      A[0][2] += LS_SUM_U(sx);
+      A[1][1] += LS_SQUARE_U(sy);
+      A[1][2] += LS_SUM_U(sy);
+      A[2][2] += 1;
+      Bx[0] += LS_PRODUCT2_U(sx, dx);
+      Bx[1] += LS_PRODUCT1_U(sy, dx);
+      Bx[2] += LS_SUM_U(dx);
+      By[0] += LS_PRODUCT1_U(sx, dy);
+      By[1] += LS_PRODUCT2_U(sy, dy);
+      By[2] += LS_SUM_U(dy);
+      n++;
+    }
+  }
+  // Compute Cofactors of A
+  C00 = (int64_t)A[1][1] * A[2][2] - (int64_t)A[1][2] * A[1][2];
+  C01 = (int64_t)A[1][2] * A[0][2] - (int64_t)A[0][1] * A[2][2];
+  C02 = (int64_t)A[0][1] * A[1][2] - (int64_t)A[0][2] * A[1][1];
+  C11 = (int64_t)A[0][0] * A[2][2] - (int64_t)A[0][2] * A[0][2];
+  C12 = (int64_t)A[0][1] * A[0][2] - (int64_t)A[0][0] * A[1][2];
+  C22 = (int64_t)A[0][0] * A[1][1] - (int64_t)A[0][1] * A[0][1];
+
+  // Scale by 1/2^6
+  C00 = ROUND_POWER_OF_TWO_SIGNED_64(C00, 6);
+  C01 = ROUND_POWER_OF_TWO_SIGNED_64(C01, 6);
+  C02 = ROUND_POWER_OF_TWO_SIGNED_64(C02, 6);
+  C11 = ROUND_POWER_OF_TWO_SIGNED_64(C11, 6);
+  C12 = ROUND_POWER_OF_TWO_SIGNED_64(C12, 6);
+  C22 = ROUND_POWER_OF_TWO_SIGNED_64(C22, 6);
+
+  // Compute Determinant of A
+  Det = C00 * A[0][0] + C01 * A[0][1] + C02 * A[0][2];
+  if (Det == 0) return 1;
+
+  // These divided by the Det, are the least squares solutions
+  Px[0] = C00 * Bx[0] + C01 * Bx[1] + C02 * Bx[2];
+  Px[1] = C01 * Bx[0] + C11 * Bx[1] + C12 * Bx[2];
+  Px[2] = C02 * Bx[0] + C12 * Bx[1] + C22 * Bx[2];
+  Py[0] = C00 * By[0] + C01 * By[1] + C02 * By[2];
+  Py[1] = C01 * By[0] + C11 * By[1] + C12 * By[2];
+  Py[2] = C02 * By[0] + C12 * By[1] + C22 * By[2];
+
+  int16_t shift;
+  int16_t iDet = resolve_divisor_64(labs(Det), &shift) * (Det < 0 ? -1 : 1);
+  shift -= WARPEDMODEL_PREC_BITS;
+  if (shift < 0) {
+    iDet <<= (-shift);
+    shift = 0;
+  }
+
+  Px[0] *= iDet;
+  Px[1] *= iDet;
+  Px[2] *= iDet;
+  Py[0] *= iDet;
+  Py[1] *= iDet;
+  Py[2] *= iDet;
+
+  wm->wmmat[2] = get_mult_shift_diag_u(Px[0], shift);
+  wm->wmmat[3] = get_mult_shift_ndiag_u(Px[1], shift);
+  wm->wmmat[4] = get_mult_shift_ndiag_u(Py[0], shift);
+  wm->wmmat[5] = get_mult_shift_diag_u(Py[1], shift);
+
+  // Adjust x displacement for the offset
+  wm->wmmat[0] = get_mult_shift_dx_u(Px[2], shift, u, &wm->wmmat[2]);
+  // Adjust y displacement for the offset
+  wm->wmmat[1] = get_mult_shift_dy_u(Py[2], shift, u, &wm->wmmat[4]);
+
+  wm->wmmat[6] = wm->wmmat[7] = 0;
+  wm->wmtype = AFFINE;
+  return 0;
+}
+
+int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
+                                      WarpedMotionParams *wm_params, int mi_row,
+                                      int mi_col) {
+  if (find_affine_unconstrained_int(np, pts1, pts2, wm_params, mi_row, mi_col))
+    return 1;
+
+  // check compatibility with the fast warp filter
+  if (!av1_get_shear_params(wm_params)) return 1;
+
+  return 0;
+}
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV

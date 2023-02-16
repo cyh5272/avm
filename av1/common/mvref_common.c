@@ -2743,6 +2743,180 @@ static AOM_INLINE void setup_ref_mv_list(
 #endif  // CONFIG_BVP_IMPROVEMENT
 }
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+// This function compute the projected samples of a 8x8 block
+static void get_block_mv_from_single_reference_motion_projection(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, int mi_row, int mi_col,
+    MV_REFERENCE_FRAME ref_frame, int blk_row, int blk_col,
+    int *const points_count, int_mv *projected_mvs, int *pts, int *pts_inref) {
+  POSITION mi_pos;
+  mi_pos.row = (mi_row & 0x01) ? blk_row : blk_row + 1;
+  mi_pos.col = (mi_col & 0x01) ? blk_col : blk_col + 1;
+
+  MV_REFERENCE_FRAME rf[2];
+  av1_set_ref_frame(rf, ref_frame);
+
+  if (!is_inside(&xd->tile, mi_col, mi_row, &mi_pos)) {
+    return;
+  }
+
+  const int tpl_row = ((mi_row + mi_pos.row) >> TMVP_SHIFT_BITS);
+  const int tpl_col = ((mi_col + mi_pos.col) >> TMVP_SHIFT_BITS);
+  const int tpl_stride =
+      ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
+
+  const TPL_MV_REF *projected_frame_mvs =
+      cm->ref_projected_mvs[rf[0]] + tpl_row * tpl_stride + tpl_col;
+
+  if (projected_frame_mvs->mfmv0.as_int == INVALID_MV) {
+    return;
+  }
+
+#if CONFIG_TIP
+  assert(!is_tip_ref_frame(rf[0]));
+#endif
+
+  assert(rf[1] == NONE_FRAME);  // SBMC mode is only for single reference mode
+
+  const int cur_frame_index = cm->cur_frame->order_hint;
+  const RefCntBuffer *const buf_0 = get_ref_frame_buf(cm, rf[0]);
+  const int frame0_index = buf_0->order_hint;
+  const int cur_offset_0 = get_relative_dist(&cm->seq_params.order_hint_info,
+                                             cur_frame_index, frame0_index);
+#if CONFIG_FLEX_MVRES
+  const int fr_mv_precision = cm->features.fr_mv_precision;
+#else
+  const int allow_high_precision_mv = cm->features.allow_high_precision_mv;
+  const int force_integer_mv = cm->features.cur_frame_force_integer_mv;
+#endif
+
+  int_mv this_refmv;
+  get_mv_projection(&this_refmv.as_mv, projected_frame_mvs->mfmv0.as_mv,
+                    cur_offset_0, projected_frame_mvs->ref_frame_offset);
+#if CONFIG_FLEX_MVRES
+  lower_mv_precision(&this_refmv.as_mv, fr_mv_precision);
+#else
+  lower_mv_precision(&this_refmv.as_mv, allow_high_precision_mv,
+                     force_integer_mv);
+#endif
+
+  // TODO (Mohammed): double check this clamping
+  clamp_mv_ref(&this_refmv.as_mv, xd->width << MI_SIZE_LOG2,
+               xd->height << MI_SIZE_LOG2, xd);
+
+  // Find the middle position of the 8x8 block
+  int x = (mi_col + blk_col + 1) * MI_SIZE;
+  int y = (mi_row + blk_row + 1) * MI_SIZE;
+
+  pts[2 * (*points_count)] = GET_MV_SUBPEL(x);
+  pts[2 * (*points_count) + 1] = GET_MV_SUBPEL(y);
+  pts_inref[2 * (*points_count)] = GET_MV_SUBPEL(x) + this_refmv.as_mv.col;
+  pts_inref[2 * (*points_count) + 1] = GET_MV_SUBPEL(y) + this_refmv.as_mv.row;
+
+  if (projected_mvs) {
+    projected_mvs[*points_count].as_mv.row = this_refmv.as_mv.row;
+    projected_mvs[*points_count].as_mv.col = this_refmv.as_mv.col;
+  }
+
+  ++(*points_count);
+}
+
+// pts[k] and pts[k+1] top-left (x,y) position of kth 8x8 block
+// pts_inref[k] and pts_inref[k+1] is the projected (x,y) position of top-left
+// position of kth 8x8 block projected_mvs[k] mv of the k-th 8x8 block
+//  This function returns the number of valid point found
+int av1_find_single_ref_projected_samples(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, MV_REFERENCE_FRAME ref_frame,
+    const int mi_row, const int mi_col, const int width, const int height,
+    int_mv *projected_mvs, int *pts, int *pts_inref) {
+  if (!cm->features.allow_ref_frame_mvs) {
+    return 0;
+  }
+
+  int points_count = 0;
+  const int step_h = mi_size_high[BLOCK_8X8];
+  const int step_w = mi_size_wide[BLOCK_8X8];
+
+  assert(width >= step_w && height >= step_h);
+
+  for (int blk_row = 0; blk_row < height; blk_row += step_h) {
+    for (int blk_col = 0; blk_col < width; blk_col += step_w) {
+      get_block_mv_from_single_reference_motion_projection(
+          cm, xd, mi_row, mi_col, ref_frame, blk_row, blk_col, &points_count,
+          projected_mvs, pts, pts_inref);
+    }
+  }
+
+  return points_count;
+}
+
+/* am example code to call above function
+  int_mv projected_mvs[MAX_NUM_OF_8x8_SB];
+  int pts[MAX_NUM_OF_8x8_SB * 2];
+  int pts_inref[MAX_NUM_OF_8x8_SB * 2];
+  int number_of_valid_points = av1_find_single_ref_projected_samples(
+      cm, xd, ref_frame, mi_row, mi_col, xd->width, xd->height, projected_mvs,
+      pts, pts_inref);
+*/
+
+int av1_find_single_ref_projected_samples_sb(const AV1_COMMON *cm,
+                                             const MACROBLOCKD *xd,
+                                             MV_REFERENCE_FRAME ref_frame,
+                                             const int mi_row, const int mi_col,
+                                             int_mv *projected_mvs, int *pts,
+                                             int *pts_inref) {
+  if (!cm->features.allow_ref_frame_mvs) {
+    return 0;
+  }
+  // mi_row, mi_col should be at the start of a SB
+  assert((mi_row & ((1 << cm->seq_params.mib_size_log2) - 1)) == 0);
+  assert((mi_col & ((1 << cm->seq_params.mib_size_log2) - 1)) == 0);
+
+  const int mvs_rows =
+      ROUND_POWER_OF_TWO(cm->mi_params.mi_rows, TMVP_SHIFT_BITS);
+  const int mvs_cols =
+      ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
+
+  const int mvs_rows_left = mvs_rows - (mi_row >> TMVP_SHIFT_BITS);
+  const int mvs_cols_left = mvs_cols - (mi_col >> TMVP_SHIFT_BITS);
+  const int mvs_rows_sb =
+      AOMMIN(mvs_rows_left, cm->seq_params.mib_size >> TMVP_SHIFT_BITS);
+  const int mvs_cols_sb =
+      AOMMIN(mvs_cols_left, cm->seq_params.mib_size >> TMVP_SHIFT_BITS);
+
+  int points_count = 0;
+  const int step_h = mi_size_high[BLOCK_8X8];
+  const int step_w = mi_size_wide[BLOCK_8X8];
+
+  for (int blk_row = 0; blk_row < mvs_rows_sb; blk_row++) {
+    for (int blk_col = 0; blk_col < mvs_cols_sb; blk_col++) {
+      get_block_mv_from_single_reference_motion_projection(
+          cm, xd, mi_row, mi_col, ref_frame, blk_row * step_h, blk_col * step_w,
+          &points_count, projected_mvs, pts, pts_inref);
+    }
+  }
+  return points_count;
+}
+
+void av1_set_temporal_global_mvs_sb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+                                    const int mi_row, const int mi_col) {
+  SB_INFO *sbi = xd->sbi;
+  int srcpts[2 * MAX_NUM_OF_8x8_SB];
+  int refpts[2 * MAX_NUM_OF_8x8_SB];
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
+       ref_frame++) {
+    sbi->tpl_global_motion[ref_frame] = default_warp_params;
+    int npts = av1_find_single_ref_projected_samples_sb(
+        cm, xd, ref_frame, mi_row, mi_col, NULL, srcpts, refpts);
+    if (npts > 0) {
+      av1_find_projection_unconstrained(npts, srcpts, refpts,
+                                        &sbi->tpl_global_motion[ref_frame],
+                                        mi_row, mi_col);
+    }
+  }
+}
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
+
 #if CONFIG_WARP_REF_LIST
 // Initialize the warp parameter list
 void av1_initialize_warp_wrl_list(
@@ -3027,8 +3201,15 @@ static int get_block_position(AV1_COMMON *cm, int *mi_r, int *mi_c, int blk_row,
 // frames.
 static int motion_field_projection_bwd(AV1_COMMON *cm,
                                        MV_REFERENCE_FRAME start_frame, int dir,
-                                       int overwrite_mv) {
+                                       int overwrite_mv
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                       ,
+                                       TPL_MV_REF *tpl_mvs_base
+#endif
+) {
+#if !CONFIG_TEMPORAL_GLOBAL_MV
   TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
+#endif
   int ref_offset[INTER_REFS_PER_FRAME] = { 0 };
 
   const RefCntBuffer *const start_frame_buf =
@@ -3118,8 +3299,16 @@ static int motion_field_projection_bwd(AV1_COMMON *cm,
 
 static int motion_field_projection(AV1_COMMON *cm,
                                    MV_REFERENCE_FRAME start_frame, int dir,
-                                   int overwrite_mv) {
+                                   int overwrite_mv
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                   ,
+                                   TPL_MV_REF *tpl_mvs_base
+#endif
+) {
+#if !CONFIG_TEMPORAL_GLOBAL_MV
   TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
+#endif
+
   int ref_offset[INTER_REFS_PER_FRAME] = { 0 };
 
   const RefCntBuffer *const start_frame_buf =
@@ -3399,7 +3588,15 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
     ref_buf[i] = NULL;
     cm->ref_frame_side[i] = 0;
     cm->ref_frame_relative_dist[i] = 0;
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+    for (int idx = 0; idx < size; ++idx) {
+      cm->ref_projected_mvs[i][idx].mfmv0.as_int = INVALID_MV;
+      cm->ref_projected_mvs[i][idx].ref_frame_offset = 0;
+    }
+#endif
   }
+
   for (int index = 0; index < cm->ref_frames_info.num_past_refs; index++) {
     const int ref_frame = cm->ref_frames_info.past_refs[index];
     cm->ref_frame_side[ref_frame] = 0;
@@ -3468,33 +3665,92 @@ void av1_setup_motion_field(AV1_COMMON *cm) {
       closest_ref[dir][1] = ref_frame;
     }
   }
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
+       ref_frame++) {
+    const int is_future_ref = cm->ref_frame_side[ref_frame];
+    if (is_future_ref == -1 || is_ref_overlay(cm, ref_frame) ||
+        !is_ref_motion_field_eligible(cm, ref_buf[ref_frame]))
+      continue;
+    if (!is_future_ref) {
+      const int ret_bwd = motion_field_projection_bwd(
+          cm, ref_frame, 2, 0, cm->ref_projected_mvs[ref_frame]);
+      const int ret = motion_field_projection(cm, ref_frame, 2, 0,
+                                              cm->ref_projected_mvs[ref_frame]);
+      (void)ret_bwd;
+      (void)ret;
+    } else {
+      const int ret = motion_field_projection(cm, ref_frame, 0, 0,
+                                              cm->ref_projected_mvs[ref_frame]);
+      const int ret_bwd = motion_field_projection_bwd(
+          cm, ref_frame, 0, 0, cm->ref_projected_mvs[ref_frame]);
+      (void)ret_bwd;
+      (void)ret;
+    }
+
+    if (cm->features.allow_tip_hole_fill)
+      tip_fill_motion_field_holes(cm, cm->ref_projected_mvs[ref_frame]);
+  }
+#endif
+
 #if CONFIG_TMVP_IMPROVEMENT || CONFIG_TIP
   // Do projection on closest past (backward MV), closest future, second
   // closest future, second closest past (backward MV), closest path (forward
   // MV), and then second closest past (forward MVs), without overwriting
   // the MVs.
   if (closest_ref[0][0] != -1) {
-    const int ret = motion_field_projection_bwd(cm, closest_ref[0][0], 2, 0);
+    const int ret = motion_field_projection_bwd(cm, closest_ref[0][0], 2, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                                ,
+                                                cm->tpl_mvs
+#endif
+    );
     n_refs_used += ret;
   }
   if (closest_ref[1][0] != -1) {
-    const int ret = motion_field_projection(cm, closest_ref[1][0], 0, 0);
+    const int ret = motion_field_projection(cm, closest_ref[1][0], 0, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                            ,
+                                            cm->tpl_mvs
+#endif
+    );
     n_refs_used += ret;
   }
   if (closest_ref[1][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
-    const int ret = motion_field_projection(cm, closest_ref[1][1], 0, 0);
+    const int ret = motion_field_projection(cm, closest_ref[1][1], 0, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                            ,
+                                            cm->tpl_mvs
+#endif
+    );
     n_refs_used += ret;
   }
   if (closest_ref[0][0] != -1 && n_refs_used < MFMV_STACK_SIZE) {
-    const int ret = motion_field_projection(cm, closest_ref[0][0], 2, 0);
+    const int ret = motion_field_projection(cm, closest_ref[0][0], 2, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                            ,
+                                            cm->tpl_mvs
+#endif
+    );
     n_refs_used += ret;
   }
   if (closest_ref[0][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
-    const int ret = motion_field_projection_bwd(cm, closest_ref[0][1], 2, 0);
+    const int ret = motion_field_projection_bwd(cm, closest_ref[0][1], 2, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                                ,
+                                                cm->tpl_mvs
+#endif
+    );
     n_refs_used += ret;
   }
   if (closest_ref[0][1] != -1 && n_refs_used < MFMV_STACK_SIZE) {
-    motion_field_projection(cm, closest_ref[0][1], 2, 0);
+    motion_field_projection(cm, closest_ref[0][1], 2, 0
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                            ,
+                            cm->tpl_mvs
+#endif
+    );
   }
 #else
   // Do projection on closest past and future refs if they exist

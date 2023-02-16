@@ -212,9 +212,19 @@ static void tip_temporal_scale_motion_field(AV1_COMMON *cm,
     }
   }
 }
-
-static void tip_fill_motion_field_holes(AV1_COMMON *cm) {
+#if !CONFIG_TEMPORAL_GLOBAL_MV
+static
+#endif
+    void
+    tip_fill_motion_field_holes(AV1_COMMON *cm
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                ,
+                                TPL_MV_REF *tpl_mvs_base
+#endif
+    ) {
+#if !CONFIG_TEMPORAL_GLOBAL_MV
   TPL_MV_REF *tpl_mvs_base = cm->tpl_mvs;
+#endif
   const int mvs_rows =
       ROUND_POWER_OF_TWO(cm->mi_params.mi_rows, TMVP_SHIFT_BITS);
   const int mvs_cols =
@@ -517,13 +527,28 @@ void av1_setup_tip_motion_field(AV1_COMMON *cm, int check_tip_threshold) {
   if (cm->features.tip_frame_mode) {
     tip_temporal_scale_motion_field(cm, cm->tip_ref.ref_frames_offset);
     if (cm->features.allow_tip_hole_fill) {
-      tip_fill_motion_field_holes(cm);
+      tip_fill_motion_field_holes(cm
+#if CONFIG_TEMPORAL_GLOBAL_MV
+                                  ,
+                                  cm->tpl_mvs
+#endif
+      );
       tip_blk_average_filter_mv(cm);
     }
     tip_motion_field_within_frame(cm);
   }
 }
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+void av1_fill_hole_smooth_single_ref_mv_field(AV1_COMMON *cm) {
+  for (int ref_frame = 0; ref_frame < cm->ref_frames_info.num_total_refs;
+       ref_frame++) {
+    tip_fill_motion_field_holes(cm, cm->ref_projected_mvs[ref_frame]);
+    // tip_blk_average_filter_mv(cm);
+    // tip_motion_field_within_frame(cm);
+  }
+}
+#endif
 static AOM_INLINE void tip_highbd_convolve_2d_facade_compound(
     const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride,
     const int w, const int h, const InterpFilterParams *interp_filters[2],

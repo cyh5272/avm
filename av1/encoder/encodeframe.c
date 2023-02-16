@@ -1665,6 +1665,11 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
   }
   if (cm->features.allow_pef) init_pef_parameter(cm, 0, av1_num_planes(cm));
 #endif  // CONFIG_PEF
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  if (cm->features.allow_ref_frame_mvs) {
+    av1_fill_hole_smooth_single_ref_mv_field(cm);
+  }
+#endif
 
 #if CONFIG_TIP
   av1_enc_setup_tip_frame(cpi);

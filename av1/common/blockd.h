@@ -398,6 +398,12 @@ typedef struct CHROMA_REF_INFO {
   BLOCK_SIZE bsize_base;
 } CHROMA_REF_INFO;
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+// Number of 8x8 sub-blocks within a super-block
+#define MAX_NUM_OF_8x8_SB \
+  ((1 << (MAX_SB_SIZE_LOG2 - 3)) * (1 << (MAX_SB_SIZE_LOG2 - 3)))
+#endif
+
 #define INTER_TX_SIZE_BUF_LEN 16
 #define TXK_TYPE_BUF_LEN 64
 /*!\endcond */
@@ -675,6 +681,9 @@ typedef struct SB_INFO {
 #if CONFIG_FLEX_MVRES
   MvSubpelPrecision sb_mv_precision;
 #endif  // CONFIG_FLEX_MVRES
+#if CONFIG_TEMPORAL_GLOBAL_MV
+  WarpedMotionParams tpl_global_motion[INTER_REFS_PER_FRAME];
+#endif  // CONFIG_TEMPORAL_GLOBAL_MV
 } SB_INFO;
 
 void av1_reset_ptree_in_sbi(SB_INFO *sbi, TREE_TYPE tree_type);

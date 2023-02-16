@@ -29,6 +29,9 @@ extern "C" {
 // reference frames, then fill the hole
 void av1_setup_tip_motion_field(AV1_COMMON *cm, int check_tip_threshold);
 
+#if CONFIG_TEMPORAL_GLOBAL_MV
+void av1_fill_hole_smooth_single_ref_mv_field(AV1_COMMON *cm);
+#endif
 // Generate the whole TIP frame with the temporal motion field
 void av1_setup_tip_frame(AV1_COMMON *cm, MACROBLOCKD *xd, uint16_t **mc_buf,
                          CONV_BUF_TYPE *tmp_conv_dst,
@@ -172,6 +175,10 @@ static AOM_INLINE MV tip_clamp_mv_to_umv_border_sb(
 
   return clamped_mv;
 }
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+void tip_fill_motion_field_holes(AV1_COMMON *cm, TPL_MV_REF *tpl_mvs_base);
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

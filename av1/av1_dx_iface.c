@@ -128,6 +128,14 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
     aom_get_worker_interface()->end(worker);
     aom_free(frame_worker_data->pbi->common.tpl_mvs);
     frame_worker_data->pbi->common.tpl_mvs = NULL;
+
+#if CONFIG_TEMPORAL_GLOBAL_MV
+    for (int i = 0; i < INTER_REFS_PER_FRAME; i++) {
+      aom_free(frame_worker_data->pbi->common.ref_projected_mvs[i]);
+      frame_worker_data->pbi->common.ref_projected_mvs[i] = NULL;
+    }
+#endif
+
     av1_remove_common(&frame_worker_data->pbi->common);
     av1_free_restoration_buffers(&frame_worker_data->pbi->common);
     av1_decoder_remove(frame_worker_data->pbi);
