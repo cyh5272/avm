@@ -757,17 +757,40 @@ static void copy_frame_hash_metadata_to_img(
     AV1Decoder *pbi, aom_image_t *img, RefCntBuffer *const output_frame_buf) {
   AV1_COMMON *const cm = &pbi->common;
   const int num_planes = av1_num_planes(cm);
+
   if (!output_frame_buf || !img) return;
 
   if (output_frame_buf->raw_frame_hash.is_present) {
     FrameHash *raw = &output_frame_buf->raw_frame_hash;
+#if CONFIG_CRC_HASH
+    int sz = 0;
+    HASH_TYPE hash_type = raw->hash_type;
+    if (hash_type == MD5_HASH)
+      sz = 1 + (raw->per_plane ? num_planes * 16 : 16);
+#else
     const int sz = 1 + (raw->per_plane ? num_planes * 16 : 16);
+#endif
+#if CONFIG_CRC_HASH
+    else if (hash_type == CRC32C_HASH)
+     sz = 1 + (raw->per_plane ? num_planes * 4 : 4);
+#endif
     aom_img_add_metadata(img, OBU_METADATA_TYPE_DECODED_FRAME_HASH,
                          (uint8_t *)raw, sz, AOM_MIF_ANY_FRAME);
   }
   if (output_frame_buf->grain_frame_hash.is_present) {
     FrameHash *grain = &output_frame_buf->grain_frame_hash;
+#if CONFIG_CRC_HASH
+    int sz = 0;
+    HASH_TYPE hash_type = grain->hash_type;
+    if (hash_type == MD5_HASH)
+      sz = 1 + (grain->per_plane ? num_planes * 16 : 16);
+#else
     const int sz = 1 + (grain->per_plane ? num_planes * 16 : 16);
+#endif
+#if CONFIG_CRC_HASH
+    else if (hash_type == CRC32C_HASH)
+     sz = 1 + (grain->per_plane ? num_planes * 4 : 4);
+#endif
     aom_img_add_metadata(img, OBU_METADATA_TYPE_DECODED_FRAME_HASH,
                          (uint8_t *)grain, sz, AOM_MIF_ANY_FRAME);
   }

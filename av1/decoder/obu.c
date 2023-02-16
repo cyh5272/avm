@@ -646,7 +646,11 @@ static int read_metadata_frame_hash(AV1Decoder *const pbi,
   aom_rb_read_literal(rb, 2);  // reserved
 
   // If hash_type is reserved for future use, ignore the entire OBU
+#if CONFIG_CRC_HASH
+  if (hash_type >= HASH_TYPES) return -1;
+#else
   if (hash_type) return -1;
+#endif
 
   FrameHash *const frame_hash = has_grain ? &cm->cur_frame->grain_frame_hash
                                           : &cm->cur_frame->raw_frame_hash;
@@ -655,16 +659,33 @@ static int read_metadata_frame_hash(AV1Decoder *const pbi,
   frame_hash->hash_type = hash_type;
   frame_hash->per_plane = per_plane;
   frame_hash->has_grain = has_grain;
+#if CONFIG_CRC_HASH
+  uint32_t bytes_in_hash = 0;
+  if(hash_type == MD5_HASH) bytes_in_hash = 16;
+  else if (hash_type == CRC32C_HASH) bytes_in_hash = 4;
+#endif
   if (per_plane) {
     const int num_planes = av1_num_planes(cm);
     for (int i = 0; i < num_planes; ++i) {
+#if CONFIG_CRC_HASH
+      uint8_t* planes = &frame_hash->planes[i * bytes_in_hash];
+      for (size_t j = 0; j < bytes_in_hash; ++j)
+        planes[j] = aom_rb_read_literal(rb, 8);
+#else
       PlaneHash *plane = &frame_hash->plane[i];
       for (size_t j = 0; j < 16; ++j)
         plane->md5[j] = aom_rb_read_literal(rb, 8);
+#endif
     }
   } else {
+#if CONFIG_CRC_HASH
+    uint8_t* planes = &frame_hash->planes[0];
+    for (size_t j = 0; j < bytes_in_hash; ++j)
+      planes[j] = aom_rb_read_literal(rb, 8);
+#else
     PlaneHash *plane = &frame_hash->plane[0];
     for (size_t i = 0; i < 16; ++i) plane->md5[i] = aom_rb_read_literal(rb, 8);
+#endif
   }
   frame_hash->is_present = 1;
 

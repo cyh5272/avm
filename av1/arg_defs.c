@@ -140,6 +140,14 @@ static const struct arg_enum_list frame_hash_metadata_enum[] = {
   { "both", AOM_DFH_BOTH },
   { NULL, 0 }
 };
+#if CONFIG_CRC_HASH
+static const struct arg_enum_list frame_hash_type_enum[] = {
+  { "md5", AOM_DFHT_MD5 },
+  { "crc32c", AOM_DFHT_CRC32C },
+  { NULL, 0 }
+};
+#endif
+
 #endif  // CONFIG_AV1_ENCODER
 
 const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
@@ -780,5 +788,10 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
       ARG_DEF(NULL, "use-per-plane-frame-hash", 1,
               "Write hash values for each plane instead of the entire frame. "
               "(0: false (default), 1: true)"),
+#if CONFIG_CRC_HASH
+  .frame_hash_type = ARG_DEF_ENUM(
+      NULL, "frame-hash-type", 1,
+      "Frame hash metadata type:", frame_hash_type_enum),
+#endif
 #endif  // CONFIG_AV1_ENCODER
 };

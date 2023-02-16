@@ -922,6 +922,10 @@ typedef struct {
   // Indicates if the hash values are written for each plane instead of the
   // entire frame.
   bool frame_hash_per_plane;
+#if CONFIG_CRC_HASH
+  // Indicates what frame hash type to use
+  unsigned int frame_hash_type;
+#endif
 } ToolCfg;
 
 #define MAX_SUBGOP_CONFIGS 64

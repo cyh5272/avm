@@ -48,6 +48,11 @@
 #include "third_party/libyuv/include/libyuv/scale.h"
 #endif
 
+#if CONFIG_CRC_HASH
+#include "common/crc.h"
+#include "av1/common/av1_common_int.h"
+#endif
+
 static const char *exec_name;
 
 struct AvxDecInputContext {
@@ -436,7 +441,11 @@ static int check_decoded_frame_hash(aom_codec_ctx_t *decoder, aom_image_t *img,
     int type = (metadata->payload[0] & 0xF0) >> 4;
     int per_plane = !!(metadata->payload[0] & 8);
     int has_grain = !!(metadata->payload[0] & 4);
+#if CONFIG_CRC_HASH
+    if (type > CRC32C_HASH) continue;
+#else
     if (type) continue;
+#endif
 
     if (has_grain) {
       if (skip_film_gain || !(flags & AOM_FRAME_HAS_FILM_GRAIN_PARAMS))
@@ -451,8 +460,15 @@ static int check_decoded_frame_hash(aom_codec_ctx_t *decoder, aom_image_t *img,
     int num_planes = img->monochrome ? 1 : 3;
     MD5Context md5_ctx;
     unsigned char md5_digest[16];
+#if CONFIG_CRC_HASH
+    uint32_t running_crc;
+    unsigned char* p_crc = (unsigned char*)(&running_crc);
+#endif
     if (per_plane) {
       for (int j = 0; j < num_planes; j++) {
+#if CONFIG_CRC_HASH
+      if (type == MD5_HASH) {
+#endif
         MD5Init(&md5_ctx);
         raw_update_image_md5(img, &planes[j], 1, &md5_ctx);
         MD5Final(md5_digest, &md5_ctx);
@@ -471,8 +487,34 @@ static int check_decoded_frame_hash(aom_codec_ctx_t *decoder, aom_image_t *img,
                plane_names[j], expected, invalid);
           ret = -1;
         }
+#if CONFIG_CRC_HASH
+      } else if (type == CRC32C_HASH) {
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_BEGIN);
+        raw_update_image_crc32c(img, &planes[j], 1, &running_crc);
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_END);
+
+        if (memcmp(&metadata->payload[j * sizeof(running_crc) + 1], &running_crc,
+                   sizeof(running_crc))) {
+          char expected[9], invalid[9];
+          for (size_t k = 0; k < sizeof(running_crc); ++k) {
+            snprintf(expected + k * 2, sizeof(expected) - k * 2, "%02x",
+                     metadata->payload[j * sizeof(running_crc) + k + 1]);
+            snprintf(invalid + k * 2, sizeof(invalid) - k * 2, "%02x",
+                     p_crc[k]);
+          }
+          expected[8] = '\0';
+          invalid[8] = '\0';
+          warn("Frame %d plane %s mismatch (expected %s, got %s)\n", frame_out,
+               plane_names[j], expected, invalid);
+          ret = -1;
+        }
+      }
+#endif
       }
     } else {
+#if CONFIG_CRC_HASH
+      if (type == MD5_HASH) {
+#endif
       MD5Init(&md5_ctx);
       raw_update_image_md5(img, planes, num_planes, &md5_ctx);
       MD5Final(md5_digest, &md5_ctx);
@@ -490,6 +532,31 @@ static int check_decoded_frame_hash(aom_codec_ctx_t *decoder, aom_image_t *img,
              invalid);
         ret = -1;
       }
+#if CONFIG_CRC_HASH
+      } else if (type == CRC32C_HASH) {
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_BEGIN);
+        raw_update_image_crc32c(img, planes, num_planes, &running_crc);
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_END);
+//        printf("\nRunning CRC = %u\n", running_crc);
+
+        if (memcmp(&metadata->payload[1], &running_crc,
+                   sizeof(running_crc))) {
+          char expected[9], invalid[9];
+          for (size_t j = 0; j < sizeof(running_crc); ++j) {
+            snprintf(expected + j * 2, sizeof(expected) - j * 2, "%02x",
+                     metadata->payload[j + 1]);
+            snprintf(invalid + j * 2, sizeof(invalid) - j * 2, "%02x",
+                     p_crc[j]);
+
+          }
+          expected[8] = '\0';
+          invalid[8] = '\0';
+          warn("Frame %d mismatch (expected %s, got %s)\n", frame_out, expected,
+               invalid);
+          ret = -1;
+        }
+      }
+#endif
     }
     checked = 1;
   }

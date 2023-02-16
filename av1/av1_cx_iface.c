@@ -769,7 +769,9 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
 
   RANGE_CHECK_HI(cfg, frame_hash_metadata, 3);
   RANGE_CHECK_HI(cfg, frame_hash_per_plane, 1);
-
+#if CONFIG_CRC_HASH
+  RANGE_CHECK_HI(cfg, frame_hash_type, 1);
+#endif
   RANGE_CHECK(extra_cfg, color_primaries, AOM_CICP_CP_BT_709,
               AOM_CICP_CP_EBU_3213);  // Need to check range more precisely to
                                       // check for reserved values?
@@ -1398,6 +1400,9 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
       cfg->g_error_resilient | extra_cfg->error_resilient_mode;
   tool_cfg->frame_hash_metadata = cfg->frame_hash_metadata;
   tool_cfg->frame_hash_per_plane = cfg->frame_hash_per_plane;
+#if CONFIG_CRC_HASH
+  tool_cfg->frame_hash_type = cfg->frame_hash_type;
+#endif
   tool_cfg->frame_parallel_decoding_mode =
       extra_cfg->frame_parallel_decoding_mode;
   tool_cfg->max_drl_refmvs = extra_cfg->max_drl_refmvs;
@@ -4268,6 +4273,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
     { -1, -1, -1, -1, -1, -1 },  // fixed_qp_offsets
     0,                           // frame_hash_metadata;
     0,                           // frame_hash_per_plane;
+#if CONFIG_CRC_HASH
+    0,                           // frame_hash_type;
+#endif
     {
         0, 128, 128, 4, 1, 1, 1,
 #if CONFIG_EXT_RECUR_PARTITIONS

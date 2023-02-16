@@ -232,16 +232,30 @@ typedef struct {
 } MV_REF;
 #endif  // CONFIG_TIP
 
+#if CONFIG_CRC_HASH
+enum {
+  MD5_HASH = 0,
+  CRC32C_HASH,
+  HASH_TYPES,
+} UENUM1BYTE(HASH_TYPE);
+#endif  // CONFIG_CRC_HASH
+
+#if !CONFIG_CRC_HASH
 typedef struct PlaneHash {
   uint8_t md5[16];
 } PlaneHash;
+#endif
 
 typedef struct FrameHash {
   uint8_t unused : 2;
   uint8_t has_grain : 1;
   uint8_t per_plane : 1;
   uint8_t hash_type : 4;
+#if CONFIG_CRC_HASH
+  uint8_t planes[48];
+#else
   PlaneHash plane[3];
+#endif
   int is_present;
 } FrameHash;
 

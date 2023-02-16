@@ -13,6 +13,9 @@
 #include <stdbool.h>
 #include "common/rawenc.h"
 #include <stdlib.h>
+#if CONFIG_CRC_HASH
+#include "common/crc.h"
+#endif
 
 #define BATCH_SIZE 8
 // When writing greyscale color, batch 8 writes for low bit-depth, 4 writes
@@ -38,6 +41,21 @@ static void write_md5(void *md5, const uint8_t *buffer, unsigned int size,
                       unsigned int nmemb) {
   MD5Update((MD5Context *)md5, buffer, size * nmemb);
 }
+
+#if CONFIG_CRC_HASH
+static void write_crc32c(void *p_crc_buf, const uint8_t *buffer, unsigned int size,
+                      unsigned int nmemb) {
+  // align to 4 bytes
+  //  int init_bytes = (4 - buffer % 4) % 4;
+  uint32_t * p_crc_buf_32bit = (uint32_t *)p_crc_buf;
+  int init_bytes = (4 - (((uintptr_t)(const void *)buffer) % 4 )) % 4;
+  *p_crc_buf_32bit = crc32c_sb8_64_bit( (uint32_t *)p_crc_buf, buffer, size * nmemb, init_bytes, MODE_CONT);
+//  *p_crc_buf_32bit = crc32c( (uint32_t *)p_crc_buf, buffer, size * nmemb, MODE_CONT);
+
+//  MD5Update((uint32_t *)p_crc_buf, buffer, size * nmemb);
+
+}
+#endif
 
 // Writes out n greyscale values.
 static void write_greyscale(const bool high_bitdepth, int n, WRITER writer_func,
@@ -110,3 +128,10 @@ void raw_update_image_md5(const aom_image_t *img, const int *planes,
                           const int num_planes, MD5Context *md5) {
   raw_write_image_file_or_md5(img, planes, num_planes, md5, write_md5);
 }
+#if CONFIG_CRC_HASH
+
+void raw_update_image_crc32c(const aom_image_t *img, const int *planes,
+                          const int num_planes, uint32_t* running_crc) {
+  raw_write_image_file_or_md5(img, planes, num_planes, running_crc, write_crc32c);
+}
+#endif

@@ -25,6 +25,10 @@ void raw_write_image_file(const aom_image_t *img, const int *planes,
                           const int num_planes, FILE *file);
 void raw_update_image_md5(const aom_image_t *img, const int *planes,
                           const int num_planes, MD5Context *md5);
+#if CONFIG_CRC_HASH
+void raw_update_image_crc32c(const aom_image_t *img, const int *planes,
+                             const int num_planes, uint32_t* running_crc);
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

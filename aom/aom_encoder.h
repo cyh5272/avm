@@ -233,6 +233,20 @@ enum aom_frame_hash_mode {
   AOM_DFH_BOTH,
 };
 
+#if CONFIG_CRC_HASH
+/*!\brief Type of frame hash metadata.
+ *
+ * This enumeration determines what hash type should
+ * be used in the frame hash metadata.
+ */
+enum aom_frame_hash_type {
+  /**< Encoder uses MD5 frame hash. */
+  AOM_DFHT_MD5,
+  /**< Encoder uses CRC32C frame hash. */
+  AOM_DFHT_CRC32C,
+};
+#endif
+
 /*!\brief Encoder Config Options
  *
  * This type allows to enumerate and control flags defined for encoder control
@@ -1083,6 +1097,15 @@ typedef struct aom_codec_enc_cfg {
    * - 1 = per plane
    */
   unsigned int frame_hash_per_plane;
+
+#if CONFIG_CRC_HASH
+  /*!\brief Codec control function to set the type of hash values written for
+   * decoded frame of a frame  plane.
+   *
+   * \attention Only applicable if decoded frame hash metadata is not disabled.
+   */
+  enum aom_frame_hash_type frame_hash_type;
+#endif
 
   /*!\brief Options defined per config file
    *

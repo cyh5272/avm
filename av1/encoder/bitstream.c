@@ -23,11 +23,15 @@
 #include "aom_ports/mem_ops.h"
 #include "aom_ports/system_state.h"
 #include "av1/common/blockd.h"
+
 #if CONFIG_BITSTREAM_DEBUG
 #include "aom_util/debug_util.h"
 #endif  // CONFIG_BITSTREAM_DEBUG
 
 #include "common/md5_utils.h"
+#if CONFIG_CRC_HASH
+#include "common/crc.h"
+#endif
 #include "common/rawenc.h"
 
 #include "av1/common/blockd.h"
@@ -55,6 +59,10 @@
 #include "av1/encoder/pickrst.h"
 #include "av1/encoder/segmentation.h"
 #include "av1/encoder/tokenize.h"
+
+#if CONFIG_CRC_HASH
+#include "av1/common/av1_common_int.h"
+#endif
 
 // Silence compiler warning for unused static functions
 static void image2yuvconfig_upshift(aom_image_t *hbd_img,
@@ -5888,30 +5896,71 @@ static size_t av1_write_metadata_array(AV1_COMP *const cpi, uint8_t *dst) {
 
 static void write_frame_hash(AV1_COMP *const cpi,
                              struct aom_write_bit_buffer *wb,
+#if CONFIG_CRC_HASH
+                             aom_image_t *img, HASH_TYPE hash_type) {
+#else
                              aom_image_t *img) {
+#endif
   MD5Context md5_ctx;
   unsigned char md5_digest[16];
+#if CONFIG_CRC_HASH
+  uint32_t running_crc;
+#endif
   const int yuv[3] = { AOM_PLANE_Y, AOM_PLANE_U, AOM_PLANE_V };
   const int planes = img->monochrome ? 1 : 3;
   if (cpi->oxcf.tool_cfg.frame_hash_per_plane) {
     for (int i = 0; i < planes; i++) {
+#if CONFIG_CRC_HASH
+      if (hash_type == MD5_HASH) {
+#endif
       MD5Init(&md5_ctx);
       raw_update_image_md5(img, &yuv[i], 1, &md5_ctx);
       MD5Final(md5_digest, &md5_ctx);
       for (size_t j = 0; j < sizeof(md5_digest); j++)
         aom_wb_write_literal(wb, md5_digest[j], 8);
+#if CONFIG_CRC_HASH
+      } else if (hash_type == CRC32C_HASH) {
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_BEGIN);
+        raw_update_image_crc32c(img, &yuv[i], 1, &running_crc);
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_END);
+
+        for (size_t k = 0; k < sizeof(running_crc); ++k){
+          aom_wb_write_literal(wb, running_crc & 0xff, 8);
+          running_crc >>= 8;
+        }
+      }
+#endif
     }
   } else {
+#if CONFIG_CRC_HASH
+      if (hash_type == MD5_HASH) {
+#endif
     MD5Init(&md5_ctx);
     raw_update_image_md5(img, yuv, planes, &md5_ctx);
     MD5Final(md5_digest, &md5_ctx);
     for (size_t i = 0; i < sizeof(md5_digest); i++)
       aom_wb_write_literal(wb, md5_digest[i], 8);
+#if CONFIG_CRC_HASH
+      } else if (hash_type == CRC32C_HASH) {
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_BEGIN);
+        raw_update_image_crc32c(img, yuv, planes, &running_crc);
+        running_crc = crc32c_sb8_64_bit( &running_crc, NULL, 0, 0, MODE_END);
+        printf("\nRunning CRC = %u\n", running_crc);
+
+        for (size_t i = 0; i < sizeof(running_crc); i++){
+          aom_wb_write_literal(wb, running_crc & 0xff, 8);
+          running_crc >>= 8;
+        }
+      }
+#endif
   }
 }
 
 static size_t av1_write_frame_hash_metadata(
     AV1_COMP *const cpi, uint8_t *dst,
+#if CONFIG_CRC_HASH
+    HASH_TYPE hash_type,
+#endif
     const aom_film_grain_t *const grain_params) {
   if (!cpi->source) return 0;
   AV1_COMMON *const cm = &cpi->common;
@@ -5922,7 +5971,12 @@ static size_t av1_write_frame_hash_metadata(
 
   yuvconfig2image(&img, &cm->cur_frame->buf, NULL);
 
+#if CONFIG_CRC_HASH
+  aom_wb_write_literal(&wb, hash_type, 4);  // hash_type, 0 = md5, 1 = crc32c
+#else
   aom_wb_write_literal(&wb, 0, 4);  // hash_type, 0 = md5
+#endif
+
   aom_wb_write_literal(&wb, cpi->oxcf.tool_cfg.frame_hash_per_plane, 1);
   aom_wb_write_literal(&wb, !!grain_params, 1);
   aom_wb_write_literal(&wb, 0, 2);
@@ -5938,10 +5992,18 @@ static size_t av1_write_frame_hash_metadata(
       aom_internal_error(&cpi->common.error, AOM_CODEC_MEM_ERROR,
                          "Grain systhesis failed");
     }
+#if CONFIG_CRC_HASH
+    write_frame_hash(cpi, &wb, grain_img, hash_type);
+#else
     write_frame_hash(cpi, &wb, grain_img);
+#endif
     aom_img_free(grain_img);
   } else {
+#if CONFIG_CRC_HASH
+    write_frame_hash(cpi, &wb, &img, hash_type);
+#else
     write_frame_hash(cpi, &wb, &img);
+#endif
   }
 
   aom_metadata_t *metadata =
@@ -6028,15 +6090,26 @@ int av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dst, size_t *size,
          ((cpi->oxcf.tool_cfg.frame_hash_metadata & 2) && !apply_grain)) &&
         (cm->show_frame || cm->showable_frame) &&
         !encode_show_existing_frame(cm);
+#if CONFIG_CRC_HASH
+    const HASH_TYPE hash_type = cpi->oxcf.tool_cfg.frame_hash_type;
+#endif
     if (write_raw_frame_hash)
+#if CONFIG_CRC_HASH
+      data += av1_write_frame_hash_metadata(cpi, data, hash_type, NULL);
+#else
       data += av1_write_frame_hash_metadata(cpi, data, NULL);
+#endif
     // write frame hash metadata obu for frames with film grain params applied
     // before the frame obu that outputs the frame
     const int write_grain_frame_hash =
         (cpi->oxcf.tool_cfg.frame_hash_metadata & 2) && cm->show_frame &&
         apply_grain;
     if (write_grain_frame_hash)
+#if CONFIG_CRC_HASH
+      data += av1_write_frame_hash_metadata(cpi, data, hash_type, grain_params);
+#else
       data += av1_write_frame_hash_metadata(cpi, data, grain_params);
+#endif
   }
 
   const int write_frame_header =
