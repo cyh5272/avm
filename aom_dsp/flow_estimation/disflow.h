@@ -70,28 +70,8 @@ extern "C" {
 // Max number of iterations if warp convergence is not found
 #define DISFLOW_MAX_ITR 4
 
-// Internal precision of cubic interpolation filters
-// The limiting factor here is that:
-// * Before integerizing, the maximum value of any kernel tap is 1.0
-// * After integerizing, each tap must fit into an int16_t.
-// Thus the largest multiplier we can get away with is 2^14 = 16384,
-// as 2^15 = 32768 is too large to fit in an int16_t.
-#define DISFLOW_INTERP_BITS 14
-
 FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *frm,
                                   YV12_BUFFER_CONFIG *ref, int bit_depth);
-
-bool aom_fit_global_model_to_flow_field(FlowField *flow,
-                                        TransformationType type,
-                                        YV12_BUFFER_CONFIG *frm,
-                                        MotionModel *motion_models,
-                                        int num_motion_models);
-
-bool aom_fit_local_model_to_flow_field(const FlowField *flow,
-                                       const PixelRect *rect,
-                                       TransformationType type, double *mat);
-
-void aom_free_flow_field(FlowField *flow);
 
 #ifdef __cplusplus
 }

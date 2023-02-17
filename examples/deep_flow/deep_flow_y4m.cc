@@ -327,8 +327,8 @@ static void bilinear_interp_highbd(uint16_t *dst, int dst_stride, uint16_t *src,
   }
 }
 
-static double compute_mse_highbd(uint16_t *src, int src_stride, uint16_t *rec,
-                                 int rec_stride, int width, int height) {
+static double compute_mse_lowbd(uint8_t *src, int src_stride, uint8_t *rec,
+                                int rec_stride, int width, int height) {
   uint64_t sse = 0;
   for (int i = 0; i < height; ++i) {
     for (int j = 0; j < width; ++j) {
@@ -339,8 +339,8 @@ static double compute_mse_highbd(uint16_t *src, int src_stride, uint16_t *rec,
   return (double)sse / (width * height);
 }
 
-static double compute_mse_lowbd(uint8_t *src, int src_stride, uint8_t *rec,
-                                int rec_stride, int width, int height) {
+static double compute_mse_highbd(uint16_t *src, int src_stride, uint16_t *rec,
+                                 int rec_stride, int width, int height) {
   uint64_t sse = 0;
   for (int i = 0; i < height; ++i) {
     for (int j = 0; j < width; ++j) {

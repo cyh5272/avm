@@ -181,6 +181,7 @@ static bool find_translation(int np, const double *pts1, const double *pts2,
   params[3] = 0;
   params[4] = 0;
   params[5] = 1;
+  params[6] = params[7] = 0.0;
   return true;
 }
 
@@ -470,7 +471,7 @@ static bool find_rotzoom(int np, const double *pts1, const double *pts2,
   // Fill in remaining parameters
   params[4] = -params[3];
   params[5] = params[2];
-  params[6] = params[7] = 0;
+  params[6] = params[7] = 0.0;
 
   return true;
 }
@@ -690,7 +691,7 @@ static bool find_affine(int np, const double *pts1, const double *pts2,
   params[3] = x[0][2];
   params[4] = x[1][1];
   params[5] = x[1][2];
-  params[6] = params[7] = 0;
+  params[6] = params[7] = 0.0;
 
   return true;
 }

@@ -15,7 +15,6 @@
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/flow_estimation/corner_detect.h"
 #include "aom_dsp/flow_estimation/disflow.h"
-#include "aom_dsp/flow_estimation/ransac.h"
 #include "aom_dsp/pyramid.h"
 #include "aom_mem/aom_mem.h"
 
@@ -29,125 +28,12 @@
 
 #include <assert.h>
 
-// Amount to downsample the flow field by.
-// eg. DOWNSAMPLE_SHIFT = 2 (DOWNSAMPLE_FACTOR == 4) means we calculate
-// one flow point for each 4x4 pixel region of the frame
-// Must be a power of 2
-#define DOWNSAMPLE_SHIFT 3
-#define DOWNSAMPLE_FACTOR (1 << DOWNSAMPLE_SHIFT)
 // Number of outermost flow field entries (on each edge) which can't be
 // computed, because the patch they correspond to extends outside of the
 // frame
 // The border is (DISFLOW_PATCH_SIZE >> 1) pixels, which is
 // (DISFLOW_PATCH_SIZE >> 1) >> DOWNSAMPLE_SHIFT many flow field entries
 #define FLOW_BORDER ((DISFLOW_PATCH_SIZE >> 1) >> DOWNSAMPLE_SHIFT)
-// When downsampling the flow field, each flow field entry covers a square
-// region of pixels in the image pyramid. This value is equal to the position
-// of the center of that region, as an offset from the top/left edge.
-//
-// Note: Using ((DOWNSAMPLE_FACTOR - 1) / 2) is equivalent to the more
-// natural expression ((DOWNSAMPLE_FACTOR / 2) - 1),
-// unless DOWNSAMPLE_FACTOR == 1 (ie, no downsampling), in which case
-// this gives the correct offset of 0 instead of -1.
-#define UPSAMPLE_CENTER_OFFSET ((DOWNSAMPLE_FACTOR - 1) / 2)
-
-static INLINE void get_cubic_kernel_dbl(double x, double *kernel) {
-  assert(0 <= x && x < 1);
-  double x2 = x * x;
-  double x3 = x2 * x;
-  kernel[0] = -0.5 * x + x2 - 0.5 * x3;
-  kernel[1] = 1.0 - 2.5 * x2 + 1.5 * x3;
-  kernel[2] = 0.5 * x + 2.0 * x2 - 1.5 * x3;
-  kernel[3] = -0.5 * x2 + 0.5 * x3;
-}
-
-static INLINE void get_cubic_kernel_int(double x, int *kernel) {
-  double kernel_dbl[4];
-  get_cubic_kernel_dbl(x, kernel_dbl);
-
-  kernel[0] = (int)rint(kernel_dbl[0] * (1 << DISFLOW_INTERP_BITS));
-  kernel[1] = (int)rint(kernel_dbl[1] * (1 << DISFLOW_INTERP_BITS));
-  kernel[2] = (int)rint(kernel_dbl[2] * (1 << DISFLOW_INTERP_BITS));
-  kernel[3] = (int)rint(kernel_dbl[3] * (1 << DISFLOW_INTERP_BITS));
-}
-
-static INLINE double get_cubic_value_dbl(const double *p,
-                                         const double *kernel) {
-  return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
-         kernel[3] * p[3];
-}
-
-static INLINE int get_cubic_value_int(const int *p, const int *kernel) {
-  return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
-         kernel[3] * p[3];
-}
-
-static INLINE double bicubic_interp_one(const double *arr, int stride,
-                                        double *h_kernel, double *v_kernel) {
-  double tmp[1 * 4];
-
-  // Horizontal convolution
-  for (int i = -1; i < 3; ++i) {
-    tmp[i + 1] = get_cubic_value_dbl(&arr[i * stride - 1], h_kernel);
-  }
-
-  // Vertical convolution
-  return get_cubic_value_dbl(tmp, v_kernel);
-}
-
-static int determine_disflow_correspondence(CornerList *corners,
-                                            const FlowField *flow,
-                                            Correspondence *correspondences) {
-  const int width = flow->width;
-  const int height = flow->height;
-  const int stride = flow->stride;
-
-  int num_correspondences = 0;
-  for (int i = 0; i < corners->num_corners; ++i) {
-    const int x0 = corners->corners[2 * i];
-    const int y0 = corners->corners[2 * i + 1];
-
-    // Offset points, to compensate for the fact that (say) a flow field entry
-    // at horizontal index i, is nominally associated with the pixel at
-    // horizontal coordinate (i << DOWNSAMPLE_FACTOR) + UPSAMPLE_CENTER_OFFSET
-    // This offset must be applied before we split the coordinate into integer
-    // and fractional parts, in order for the interpolation to be correct.
-    const int x = x0 - UPSAMPLE_CENTER_OFFSET;
-    const int y = y0 - UPSAMPLE_CENTER_OFFSET;
-
-    // Split the pixel coordinates into integer flow field coordinates and
-    // an offset for interpolation
-    const int flow_x = x >> DOWNSAMPLE_SHIFT;
-    const double flow_sub_x =
-        (x & (DOWNSAMPLE_FACTOR - 1)) / (double)DOWNSAMPLE_FACTOR;
-    const int flow_y = y >> DOWNSAMPLE_SHIFT;
-    const double flow_sub_y =
-        (y & (DOWNSAMPLE_FACTOR - 1)) / (double)DOWNSAMPLE_FACTOR;
-
-    // Make sure that bicubic interpolation won't read outside of the flow field
-    if (flow_x < 1 || (flow_x + 2) >= width) continue;
-    if (flow_y < 1 || (flow_y + 2) >= height) continue;
-
-    double h_kernel[4];
-    double v_kernel[4];
-    get_cubic_kernel_dbl(flow_sub_x, h_kernel);
-    get_cubic_kernel_dbl(flow_sub_y, v_kernel);
-
-    const double flow_u = bicubic_interp_one(&flow->u[flow_y * stride + flow_x],
-                                             stride, h_kernel, v_kernel);
-    const double flow_v = bicubic_interp_one(&flow->v[flow_y * stride + flow_x],
-                                             stride, h_kernel, v_kernel);
-
-    // Use original points (without offsets) when filling in correspondence
-    // array
-    correspondences[num_correspondences].x = x0;
-    correspondences[num_correspondences].y = y0;
-    correspondences[num_correspondences].rx = x0 + flow_u;
-    correspondences[num_correspondences].ry = y0 + flow_v;
-    num_correspondences++;
-  }
-  return num_correspondences;
-}
 
 // Compare two regions of width x height pixels, one rooted at position
 // (x, y) in src and the other at (x + u, y + v) in ref.
@@ -210,7 +96,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
       // in an int16_t. But with 7 fractional bits it would be 36720,
       // which is too large.
       tmp[i * DISFLOW_PATCH_SIZE + j] = ROUND_POWER_OF_TWO(
-          get_cubic_value_int(arr, h_kernel), DISFLOW_INTERP_BITS - 6);
+          get_cubic_value_int(arr, h_kernel), FLOW_INTERP_BITS - 6);
     }
   }
 
@@ -226,7 +112,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
       // This time, we have to round off the 6 extra bits which were kept
       // earlier, but we also want to keep DISFLOW_DERIV_SCALE_LOG2 extra bits
       // of precision to match the scale of the dx and dy arrays.
-      const int round_bits = DISFLOW_INTERP_BITS + 6 - DISFLOW_DERIV_SCALE_LOG2;
+      const int round_bits = FLOW_INTERP_BITS + 6 - DISFLOW_DERIV_SCALE_LOG2;
       const int warped = ROUND_POWER_OF_TWO(result, round_bits);
       const int src_px = src[(x + j) + (y + i) * stride] << 3;
       const int err = warped - src_px;
@@ -365,20 +251,21 @@ static INLINE void compute_flow_vector(const int16_t *dx, int dx_stride,
 }
 
 // Try to invert the matrix M
-// Note: Due to the nature of how a least-squares matrix is constructed, all of
-// the eigenvalues will be >= 0, and therefore det M >= 0 as well.
-// The regularization term `+ k * I` further ensures that det M >= k^2.
-// As mentioned in compute_flow_matrix(), here we use k = 1, so det M >= 1.
-// So we don't have to worry about non-invertible matrices here.
-static INLINE void invert_2x2(const double *M, double *M_inv) {
+// Returns a success indication:
+// true => M was successfully inverted into M_inv
+// false => M is degenerate (or too close to it), and could not be inverted
+static INLINE bool invert_2x2(const double *M, double *M_inv) {
   double det = (M[0] * M[3]) - (M[1] * M[2]);
-  assert(det >= 1);
+  if (fabs(det) < 1e-5) {
+    return false;
+  }
   const double det_inv = 1 / det;
 
   M_inv[0] = M[3] * det_inv;
   M_inv[1] = -M[1] * det_inv;
   M_inv[2] = -M[2] * det_inv;
   M_inv[3] = M[0] * det_inv;
+  return true;
 }
 
 void aom_compute_flow_at_point_c(const uint8_t *src, const uint8_t *ref, int x,
@@ -397,7 +284,11 @@ void aom_compute_flow_at_point_c(const uint8_t *src, const uint8_t *ref, int x,
   sobel_filter(src_patch, stride, dy, DISFLOW_PATCH_SIZE, 0);
 
   compute_flow_matrix(dx, DISFLOW_PATCH_SIZE, dy, DISFLOW_PATCH_SIZE, M);
-  invert_2x2(M, M_inv);
+  bool valid = invert_2x2(M, M_inv);
+  if (!valid) {
+    // Unable to refine this point at this level
+    return;
+  }
 
   for (int itr = 0; itr < DISFLOW_MAX_ITR; itr++) {
     compute_flow_error(src, ref, width, height, stride, x, y, *u, *v, dt);
@@ -470,8 +361,8 @@ static void compute_flow_field(const ImagePyramid *src_pyr,
   double *flow_v = flow->v;
 
   const size_t flow_size = flow->stride * (size_t)flow->height;
-  double *u_upscale = aom_malloc(flow_size * sizeof(*u_upscale));
-  double *v_upscale = aom_malloc(flow_size * sizeof(*v_upscale));
+  double *u_upscale = aom_calloc(flow_size, sizeof(*u_upscale));
+  double *v_upscale = aom_calloc(flow_size, sizeof(*v_upscale));
 
   // Compute flow field from coarsest to finest level of the pyramid
   for (int level = src_pyr->n_levels - 1; level >= 0; --level) {
@@ -572,29 +463,6 @@ static void compute_flow_field(const ImagePyramid *src_pyr,
   aom_free(v_upscale);
 }
 
-static FlowField *alloc_flow_field(int frame_width, int frame_height) {
-  FlowField *flow = (FlowField *)aom_malloc(sizeof(FlowField));
-  if (flow == NULL) return NULL;
-
-  // Calculate the size of the bottom (largest) layer of the flow pyramid
-  flow->width = frame_width >> DOWNSAMPLE_SHIFT;
-  flow->height = frame_height >> DOWNSAMPLE_SHIFT;
-  flow->stride = flow->width;
-
-  const size_t flow_size = flow->stride * (size_t)flow->height;
-  flow->u = aom_calloc(flow_size, sizeof(*flow->u));
-  flow->v = aom_calloc(flow_size, sizeof(*flow->v));
-
-  if (flow->u == NULL || flow->v == NULL) {
-    aom_free(flow->u);
-    aom_free(flow->v);
-    aom_free(flow);
-    return NULL;
-  }
-
-  return flow;
-}
-
 FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *src,
                                   YV12_BUFFER_CONFIG *ref, int bit_depth) {
   // Precompute information we will need about each frame
@@ -608,96 +476,9 @@ FlowField *aom_compute_flow_field(YV12_BUFFER_CONFIG *src,
   assert(ref_pyramid->layers[0].width == src_width);
   assert(ref_pyramid->layers[0].height == src_height);
 
-  FlowField *flow = alloc_flow_field(src_width, src_height);
-  if (!flow) return false;
+  FlowField *flow = aom_alloc_flow_field(src_width, src_height);
 
   compute_flow_field(src_pyramid, ref_pyramid, flow);
 
   return flow;
-}
-
-bool aom_fit_global_model_to_flow_field(FlowField *flow,
-                                        TransformationType type,
-                                        YV12_BUFFER_CONFIG *src,
-                                        MotionModel *motion_models,
-                                        int num_motion_models) {
-  ImagePyramid *src_pyramid = src->y_pyramid;
-  CornerList *src_corners = src->corners;
-  assert(aom_is_pyramid_valid(src_pyramid));
-  av1_compute_corner_list(src_pyramid, src_corners);
-
-  // find correspondences between the two images using the flow field
-  Correspondence *correspondences =
-      aom_malloc(src_corners->num_corners * sizeof(*correspondences));
-  if (!correspondences) {
-    aom_free_flow_field(flow);
-    return false;
-  }
-
-  const int num_correspondences =
-      determine_disflow_correspondence(src_corners, flow, correspondences);
-
-  bool result = ransac(correspondences, num_correspondences, type,
-                       motion_models, num_motion_models);
-  (void)result;
-
-  aom_free(correspondences);
-
-  // Set num_inliers = 0 for motions with too few inliers so they are ignored.
-  for (int i = 0; i < num_motion_models; ++i) {
-    if (motion_models[i].num_inliers < MIN_INLIER_PROB * num_correspondences) {
-      motion_models[i].num_inliers = 0;
-    }
-  }
-
-  // Return true if any one of the motions has inliers.
-  for (int i = 0; i < num_motion_models; ++i) {
-    if (motion_models[i].num_inliers > 0) return true;
-  }
-  return false;
-}
-
-bool aom_fit_local_model_to_flow_field(const FlowField *flow,
-                                       const PixelRect *rect,
-                                       TransformationType type, double *mat) {
-  // Map rectangle onto flow field
-  int patch_left = clamp(rect->left >> DOWNSAMPLE_SHIFT, 0, flow->width);
-  int patch_right = clamp(rect->right >> DOWNSAMPLE_SHIFT, 0, flow->width);
-  int patch_top = clamp(rect->top >> DOWNSAMPLE_SHIFT, 0, flow->height);
-  int patch_bottom = clamp(rect->bottom >> DOWNSAMPLE_SHIFT, 0, flow->height);
-
-  int patches_x = patch_right - patch_left;
-  int patches_y = patch_bottom - patch_top;
-  int num_points = patches_x * patches_y;
-
-  double *pts1 = aom_malloc(num_points * 2 * sizeof(double));
-  double *pts2 = aom_malloc(num_points * 2 * sizeof(double));
-  int index = 0;
-
-  for (int y = patch_top; y < patch_bottom; y++) {
-    for (int x = patch_left; x < patch_right; x++) {
-      int src_x = (x << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
-      int src_y = (y << DOWNSAMPLE_SHIFT) + UPSAMPLE_CENTER_OFFSET;
-      pts1[2 * index + 0] = (double)src_x;
-      pts1[2 * index + 1] = (double)src_y;
-      pts2[2 * index + 0] = (double)src_x + flow->u[y * flow->stride + x];
-      pts2[2 * index + 1] = (double)src_y + flow->v[y * flow->stride + x];
-      index++;
-    }
-  }
-
-  // Check that we filled the expected number of points
-  assert(index == num_points);
-
-  bool result = aom_fit_motion_model(type, num_points, pts1, pts2, mat);
-
-  aom_free(pts1);
-  aom_free(pts2);
-  return result;
-}
-
-void aom_free_flow_field(FlowField *flow) {
-  aom_free(flow->u);
-  aom_free(flow->v);
-  aom_free(flow);
 }

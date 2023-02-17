@@ -239,6 +239,7 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
     if (cm->global_motion[frame].wmtype != IDENTITY) break;
   }
 
+  aom_free_flow_data(flow_data);
   aom_clear_system_state();
 }
 

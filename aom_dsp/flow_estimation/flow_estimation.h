@@ -12,6 +12,10 @@
 #ifndef AOM_AOM_DSP_FLOW_ESTIMATION_H_
 #define AOM_AOM_DSP_FLOW_ESTIMATION_H_
 
+#include <math.h>
+#include <assert.h>
+
+#include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/pyramid.h"
 #include "aom_dsp/rect.h"
 #include "aom_dsp/flow_estimation/corner_detect.h"
@@ -52,8 +56,11 @@ static const int trans_model_params[TRANS_TYPES] = { 0, 2, 3, 3, 3, 3, 4,
 typedef enum {
   GLOBAL_MOTION_METHOD_FEATURE_MATCH,
   GLOBAL_MOTION_METHOD_DISFLOW,
-  GLOBAL_MOTION_METHOD_LAST = GLOBAL_MOTION_METHOD_DISFLOW,
-  GLOBAL_MOTION_METHODS
+#if CONFIG_TENSORFLOW_LITE
+  GLOBAL_MOTION_METHOD_DEEPFLOW,
+#endif  // CONFIG_TENSORFLOW_LITE
+  GLOBAL_MOTION_METHODS,
+  GLOBAL_MOTION_METHOD_LAST = GLOBAL_MOTION_METHODS - 1,
 } GlobalMotionMethod;
 
 typedef struct {
@@ -105,6 +112,30 @@ typedef struct {
 // is not large enough to need all of the specified levels
 extern const int global_motion_pyr_levels[GLOBAL_MOTION_METHODS];
 
+// Amount to downsample the flow field by.
+// eg. DOWNSAMPLE_SHIFT = 2 (DOWNSAMPLE_FACTOR == 4) means we calculate
+// one flow point for each 4x4 pixel region of the frame
+// Must be a power of 2
+#define DOWNSAMPLE_SHIFT 3
+#define DOWNSAMPLE_FACTOR (1 << DOWNSAMPLE_SHIFT)
+// When downsampling the flow field, each flow field entry covers a square
+// region of pixels in the image pyramid. This value is equal to the position
+// of the center of that region, as an offset from the top/left edge.
+//
+// Note: Using ((DOWNSAMPLE_FACTOR - 1) / 2) is equivalent to the more
+// natural expression ((DOWNSAMPLE_FACTOR / 2) - 1),
+// unless DOWNSAMPLE_FACTOR == 1 (ie, no downsampling), in which case
+// this gives the correct offset of 0 instead of -1.
+#define UPSAMPLE_CENTER_OFFSET ((DOWNSAMPLE_FACTOR - 1) / 2)
+
+// Internal precision of cubic interpolation filters
+// The limiting factor here is that:
+// * Before integerizing, the maximum value of any kernel tap is 1.0
+// * After integerizing, each tap must fit into an int16_t.
+// Thus the largest multiplier we can get away with is 2^14 = 16384,
+// as 2^15 = 32768 is too large to fit in an int16_t.
+#define FLOW_INTERP_BITS 14
+
 FlowData *aom_compute_flow_data(YV12_BUFFER_CONFIG *src,
                                 YV12_BUFFER_CONFIG *ref, int bit_depth,
                                 GlobalMotionMethod gm_method);
@@ -127,7 +158,64 @@ bool aom_fit_global_motion_model(FlowData *flow_data, TransformationType type,
 bool aom_fit_local_motion_model(FlowData *flow_data, PixelRect *rect,
                                 TransformationType type, double *mat);
 
+bool aom_fit_global_model_to_flow_field(FlowField *flow,
+                                        TransformationType type,
+                                        YV12_BUFFER_CONFIG *frm,
+                                        MotionModel *motion_models,
+                                        int num_motion_models);
+
+bool aom_fit_local_model_to_flow_field(const FlowField *flow,
+                                       const PixelRect *rect,
+                                       TransformationType type, double *mat);
+
+FlowField *aom_alloc_flow_field(int frame_width, int frame_height);
+void aom_free_flow_field(FlowField *flow);
+
 void aom_free_flow_data(FlowData *flow_data);
+
+static INLINE void get_cubic_kernel_dbl(double x, double *kernel) {
+  assert(0 <= x && x < 1);
+  double x2 = x * x;
+  double x3 = x2 * x;
+  kernel[0] = -0.5 * x + x2 - 0.5 * x3;
+  kernel[1] = 1.0 - 2.5 * x2 + 1.5 * x3;
+  kernel[2] = 0.5 * x + 2.0 * x2 - 1.5 * x3;
+  kernel[3] = -0.5 * x2 + 0.5 * x3;
+}
+
+static INLINE void get_cubic_kernel_int(double x, int *kernel) {
+  double kernel_dbl[4];
+  get_cubic_kernel_dbl(x, kernel_dbl);
+
+  kernel[0] = (int)rint(kernel_dbl[0] * (1 << FLOW_INTERP_BITS));
+  kernel[1] = (int)rint(kernel_dbl[1] * (1 << FLOW_INTERP_BITS));
+  kernel[2] = (int)rint(kernel_dbl[2] * (1 << FLOW_INTERP_BITS));
+  kernel[3] = (int)rint(kernel_dbl[3] * (1 << FLOW_INTERP_BITS));
+}
+
+static INLINE double get_cubic_value_dbl(const double *p,
+                                         const double *kernel) {
+  return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
+         kernel[3] * p[3];
+}
+
+static INLINE int get_cubic_value_int(const int *p, const int *kernel) {
+  return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
+         kernel[3] * p[3];
+}
+
+static INLINE double bicubic_interp_one(const double *arr, int stride,
+                                        double *h_kernel, double *v_kernel) {
+  double tmp[1 * 4];
+
+  // Horizontal convolution
+  for (int i = -1; i < 3; ++i) {
+    tmp[i + 1] = get_cubic_value_dbl(&arr[i * stride - 1], h_kernel);
+  }
+
+  // Vertical convolution
+  return get_cubic_value_dbl(tmp, v_kernel);
+}
 
 #ifdef __cplusplus
 }

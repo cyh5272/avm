@@ -200,6 +200,12 @@ if(CONFIG_AV1_ENCODER)
     "${AOM_ROOT}/aom_dsp/flow_estimation/flow_estimation.c"
     "${AOM_ROOT}/aom_dsp/flow_estimation/ransac.c")
 
+  if(CONFIG_TENSORFLOW_LITE)
+    list(APPEND AOM_DSP_ENCODER_SOURCES
+         "${AOM_ROOT}/aom_dsp/flow_estimation/deepflow.cc"
+         "${AOM_ROOT}/aom_dsp/flow_estimation/deepflow.h")
+  endif()
+
   list(APPEND AOM_DSP_ENCODER_INTRIN_SSE4_1
        "${AOM_ROOT}/aom_dsp/flow_estimation/x86/corner_match_sse4.c"
        "${AOM_ROOT}/aom_dsp/flow_estimation/x86/disflow_sse4.c")

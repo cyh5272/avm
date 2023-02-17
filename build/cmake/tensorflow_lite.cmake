@@ -220,6 +220,7 @@ function(setup_tensorflow_lite)
     "${CMAKE_CURRENT_BINARY_DIR}/tensorflow_lite/flatbuffers/include/")
 
   add_dependencies(aom_av1_common tensorflow_lite fake_dl)
+  add_dependencies(aom_dsp_encoder tensorflow_lite fake_dl)
   foreach(aom_app ${AOM_APP_TARGETS})
     add_dependencies(${aom_app} tensorflow_lite fake_dl)
     target_link_tf_lite_libraries(${aom_app})

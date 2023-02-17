@@ -26,28 +26,18 @@
 #define CHECK_RESULTS 1
 
 // Note: Max sum(+ve coefficients) = 1.125 * scale
-static INLINE void get_cubic_kernel_dbl(double x, double *kernel) {
-  assert(0 <= x && x < 1);
-  double x2 = x * x;
-  double x3 = x2 * x;
-  kernel[0] = -0.5 * x + x2 - 0.5 * x3;
-  kernel[1] = 1.0 - 2.5 * x2 + 1.5 * x3;
-  kernel[2] = 0.5 * x + 2.0 * x2 - 1.5 * x3;
-  kernel[3] = -0.5 * x2 + 0.5 * x3;
-}
-
-static INLINE void get_cubic_kernel_int(double x, int16_t *kernel) {
+static INLINE void get_cubic_kernel_int16(double x, int16_t *kernel) {
   double kernel_dbl[4];
   get_cubic_kernel_dbl(x, kernel_dbl);
 
-  kernel[0] = (int16_t)rint(kernel_dbl[0] * (1 << DISFLOW_INTERP_BITS));
-  kernel[1] = (int16_t)rint(kernel_dbl[1] * (1 << DISFLOW_INTERP_BITS));
-  kernel[2] = (int16_t)rint(kernel_dbl[2] * (1 << DISFLOW_INTERP_BITS));
-  kernel[3] = (int16_t)rint(kernel_dbl[3] * (1 << DISFLOW_INTERP_BITS));
+  kernel[0] = (int16_t)rint(kernel_dbl[0] * (1 << FLOW_INTERP_BITS));
+  kernel[1] = (int16_t)rint(kernel_dbl[1] * (1 << FLOW_INTERP_BITS));
+  kernel[2] = (int16_t)rint(kernel_dbl[2] * (1 << FLOW_INTERP_BITS));
+  kernel[3] = (int16_t)rint(kernel_dbl[3] * (1 << FLOW_INTERP_BITS));
 }
 
 #if CHECK_RESULTS
-static INLINE int get_cubic_value_int(const int *p, const int16_t *kernel) {
+static INLINE int get_cubic_value_int16(const int *p, const int16_t *kernel) {
   return kernel[0] * p[0] + kernel[1] * p[1] + kernel[2] * p[2] +
          kernel[3] * p[3];
 }
@@ -75,8 +65,8 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
 
   int16_t h_kernel[4];
   int16_t v_kernel[4];
-  get_cubic_kernel_int(u_frac, h_kernel);
-  get_cubic_kernel_int(v_frac, v_kernel);
+  get_cubic_kernel_int16(u_frac, h_kernel);
+  get_cubic_kernel_int16(v_frac, v_kernel);
 
   // Storage for intermediate values between the two convolution directions
   int16_t tmp_[DISFLOW_PATCH_SIZE * (DISFLOW_PATCH_SIZE + 3)];
@@ -105,7 +95,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
   __m128i h_kernel_01 = xx_set2_epi16(h_kernel[0], h_kernel[1]);
   __m128i h_kernel_23 = xx_set2_epi16(h_kernel[2], h_kernel[3]);
 
-  __m128i round_const_h = _mm_set1_epi32(1 << (DISFLOW_INTERP_BITS - 6 - 1));
+  __m128i round_const_h = _mm_set1_epi32(1 << (FLOW_INTERP_BITS - 6 - 1));
 
   for (int i = -1; i < DISFLOW_PATCH_SIZE + 2; ++i) {
     const int y_w = y0 + i;
@@ -140,7 +130,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
                                  _mm_madd_epi16(px1, h_kernel_23));
 
     __m128i out0 = _mm_srai_epi32(_mm_add_epi32(sum0, round_const_h),
-                                  DISFLOW_INTERP_BITS - 6);
+                                  FLOW_INTERP_BITS - 6);
 
     // Compute second four outputs
     __m128i px2 =
@@ -158,7 +148,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
     // of +18360, which can occur if u_frac == 0.5 and the input pixels are
     // {0, 255, 255, 0}.
     __m128i out1 = _mm_srai_epi32(_mm_add_epi32(sum1, round_const_h),
-                                  DISFLOW_INTERP_BITS - 6);
+                                  FLOW_INTERP_BITS - 6);
 
     _mm_storeu_si128((__m128i *)tmp_row, _mm_packs_epi32(out0, out1));
 
@@ -184,8 +174,8 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
       // As an integer with 6 fractional bits, that is 18360, which fits
       // in an int16_t. But with 7 fractional bits it would be 36720,
       // which is too large.
-      const int c_value = ROUND_POWER_OF_TWO(get_cubic_value_int(arr, h_kernel),
-                                             DISFLOW_INTERP_BITS - 6);
+      const int c_value = ROUND_POWER_OF_TWO(
+          get_cubic_value_int16(arr, h_kernel), FLOW_INTERP_BITS - 6);
       (void)c_value;  // Suppress warnings
       assert(tmp_row[j] == c_value);
     }
@@ -193,7 +183,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
   }
 
   // Vertical convolution
-  const int round_bits = DISFLOW_INTERP_BITS + 6 - DISFLOW_DERIV_SCALE_LOG2;
+  const int round_bits = FLOW_INTERP_BITS + 6 - DISFLOW_DERIV_SCALE_LOG2;
   __m128i round_const_v = _mm_set1_epi32(1 << (round_bits - 1));
 
   __m128i v_kernel_01 = xx_set2_epi16(v_kernel[0], v_kernel[1]);
@@ -238,7 +228,7 @@ static INLINE void compute_flow_error(const uint8_t *src, const uint8_t *ref,
       int16_t *p = &tmp[i * DISFLOW_PATCH_SIZE + j];
       int arr[4] = { p[-DISFLOW_PATCH_SIZE], p[0], p[DISFLOW_PATCH_SIZE],
                      p[2 * DISFLOW_PATCH_SIZE] };
-      const int result = get_cubic_value_int(arr, v_kernel);
+      const int result = get_cubic_value_int16(arr, v_kernel);
 
       // Apply kernel and round.
       // This time, we have to round off the 6 extra bits which were kept
@@ -501,20 +491,21 @@ static INLINE void compute_flow_matrix(const int16_t *dx, int dx_stride,
 }
 
 // Try to invert the matrix M
-// Note: Due to the nature of how a least-squares matrix is constructed, all of
-// the eigenvalues will be >= 0, and therefore det M >= 0 as well.
-// The regularization term `+ k * I` further ensures that det M >= k^2.
-// As mentioned in compute_flow_matrix(), here we use k = 1, so det M >= 1.
-// So we don't have to worry about non-invertible matrices here.
-static INLINE void invert_2x2(const double *M, double *M_inv) {
+// Returns a success indication:
+// true => M was successfully inverted into M_inv
+// false => M is degenerate (or too close to it), and could not be inverted
+static INLINE bool invert_2x2(const double *M, double *M_inv) {
   double det = (M[0] * M[3]) - (M[1] * M[2]);
-  assert(det >= 1);
+  if (fabs(det) < 1e-5) {
+    return false;
+  }
   const double det_inv = 1 / det;
 
   M_inv[0] = M[3] * det_inv;
   M_inv[1] = -M[1] * det_inv;
   M_inv[2] = -M[2] * det_inv;
   M_inv[3] = M[0] * det_inv;
+  return true;
 }
 
 void aom_compute_flow_at_point_sse4_1(const uint8_t *src, const uint8_t *ref,
@@ -533,7 +524,11 @@ void aom_compute_flow_at_point_sse4_1(const uint8_t *src, const uint8_t *ref,
   sobel_filter_y(src_patch, stride, dy, DISFLOW_PATCH_SIZE);
 
   compute_flow_matrix(dx, DISFLOW_PATCH_SIZE, dy, DISFLOW_PATCH_SIZE, M);
-  invert_2x2(M, M_inv);
+  bool valid = invert_2x2(M, M_inv);
+  if (!valid) {
+    // Unable to refine this point at this level
+    return;
+  }
 
   for (int itr = 0; itr < DISFLOW_MAX_ITR; itr++) {
     compute_flow_error(src, ref, width, height, stride, x, y, *u, *v, dt);
