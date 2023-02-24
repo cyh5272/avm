@@ -231,15 +231,14 @@ static INLINE const NonsepFilterConfig *get_wienerns_config(int qindex,
 #if CONFIG_COMBINE_PC_NS_WIENER
 const uint8_t *get_pc_wiener_sub_classifier(int num_classes, int set_index);
 void fill_filter_with_pcwiener_match(
-    WienerNonsepInfo *filter, int set_index, const int *tap_translator,
-    const int *match_indices, const WienernsFilterParameters *nsfilter_params,
-    int class_id);
+    WienerNonsepInfo *filter, const WienerNonsepInfo *reference, int set_index,
+    const int *tap_translator, const int *match_indices,
+    const WienernsFilterParameters *nsfilter_params, int class_id);
 int wienerns_to_pcwiener_translator(const NonsepFilterConfig *nsfilter_config,
                                     int *tap_translator, int max_num_taps);
-void fill_first_slot_of_bank_with_pc_wiener_match(WienerNonsepInfoBank *bank,
-                                                  const int *match_indices,
-                                                  int base_qindex,
-                                                  int qindex_offset);
+void fill_first_slot_of_bank_with_pc_wiener_match(
+    WienerNonsepInfoBank *bank, const WienerNonsepInfo *reference,
+    const int *match_indices, int base_qindex, int qindex_offset, int class_id);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
 // Max of SGRPROJ_TMPBUF_SIZE, DOMAINTXFMRF_TMPBUF_SIZE, WIENER_TMPBUF_SIZE
@@ -490,6 +489,15 @@ static INLINE void set_default_wiener(WienerInfo *wiener_info) {
 }
 
 #if CONFIG_WIENER_NONSEP
+
+// Clips scale_x to allowed range of Wienerns filter taps.
+static INLINE int16_t clip_to_wienerns_range(int16_t scale_x, int16_t minv,
+                                             int16_t n) {
+  scale_x = AOMMAX(scale_x, minv);
+  scale_x = AOMMIN(scale_x, minv + n - 1);
+  return (int16_t)scale_x;
+}
+
 static INLINE void set_default_wienerns(WienerNonsepInfo *wienerns_info,
                                         int qindex, int num_classes,
                                         int chroma) {

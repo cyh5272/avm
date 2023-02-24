@@ -3104,17 +3104,10 @@ int wienerns_to_pcwiener_translator(const NonsepFilterConfig *nsfilter_config,
   return num_sym_taps;
 }
 
-static int16_t clip_to_wienerns_range(int16_t scale_x, int16_t minv,
-                                      int16_t n) {
-  scale_x = AOMMAX(scale_x, minv);
-  scale_x = AOMMIN(scale_x, minv + n - 1);
-  return (int16_t)scale_x;
-}
-
 void fill_filter_with_pcwiener_match(
-    WienerNonsepInfo *filter, int set_index, const int *tap_translator,
-    const int *match_indices, const WienernsFilterParameters *nsfilter_params,
-    int class_id) {
+    WienerNonsepInfo *filter, const WienerNonsepInfo *reference, int set_index,
+    const int *tap_translator, const int *match_indices,
+    const WienernsFilterParameters *nsfilter_params, int class_id) {
   const int num_feat = nsfilter_params->ncoeffs;
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
   const int16_t(*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA] =
@@ -3133,24 +3126,37 @@ void fill_filter_with_pcwiener_match(
   for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
     int16_t *wienerns_filter = nsfilter_taps(filter, c_id);
     const int filter_index = match_indices[c_id];
-    assert(filter_index >= 0 && filter_index < NUM_PC_WIENER_FILTERS);
-    const int16_t *pcwiener_filter = pcwiener_filters_luma[filter_index];
-    if (filter_index == 0) pcwiener_filter = all_zeros_filter;
+    assert(filter_index >= 0 &&
+           filter_index < NUM_PC_WIENER_FILTERS + NUM_WIENERNS_CLASS_INIT_LUMA);
 
-    for (int i = 0; i < num_feat; ++i) {
-      const int16_t scaled_tap = ROUND_POWER_OF_TWO_SIGNED(
-          pcwiener_filter[tap_translator[i]], precision_diff);
-      wienerns_filter[i] = clip_to_wienerns_range(
-          scaled_tap, wienerns_coeffs[i][WIENERNS_MIN_ID],
-          (1 << wienerns_coeffs[i][WIENERNS_BIT_ID]));
+    if (filter_index < NUM_PC_WIENER_FILTERS) {
+      const int16_t *pcwiener_filter = pcwiener_filters_luma[filter_index];
+      for (int i = 0; i < num_feat; ++i) {
+        const int16_t scaled_tap = ROUND_POWER_OF_TWO_SIGNED(
+            pcwiener_filter[tap_translator[i]], precision_diff);
+        wienerns_filter[i] = clip_to_wienerns_range(
+            scaled_tap, wienerns_coeffs[i][WIENERNS_MIN_ID],
+            (1 << wienerns_coeffs[i][WIENERNS_BIT_ID]));
+      }
+    } else {
+      const int16_t *matching_filter = all_zeros_filter;
+      int diff_index = filter_index - NUM_PC_WIENER_FILTERS;
+      if (diff_index) {
+        assert(diff_index <= c_id);
+        matching_filter = const_nsfilter_taps(reference, c_id - diff_index);
+      }
+      for (int i = 0; i < num_feat; ++i) {
+        wienerns_filter[i] = matching_filter[i];
+      }
     }
   }
 }
 
-void fill_first_slot_of_bank_with_pc_wiener_match(WienerNonsepInfoBank *bank,
-                                                  const int *match_indices,
-                                                  int base_qindex,
-                                                  int qindex_offset) {
+// TODO: Reorg for more efficient compute.
+void fill_first_slot_of_bank_with_pc_wiener_match(
+    WienerNonsepInfoBank *bank, const WienerNonsepInfo *reference,
+    const int *match_indices, int base_qindex, int qindex_offset,
+    int class_id) {
   assert(!bank->frame_filter_predictors_are_set);
   base_qindex = 0;
   qindex_offset = 0;
@@ -3167,11 +3173,18 @@ void fill_first_slot_of_bank_with_pc_wiener_match(WienerNonsepInfoBank *bank,
 
   const int set_index = get_filter_set_index(base_qindex + qindex_offset);
 
+  int c_id_begin = 0;
+  int c_id_end = bank->filter[0].num_classes;
+  if (class_id != ALL_WIENERNS_CLASSES) {
+    c_id_begin = class_id;
+    c_id_end = class_id + 1;
+  }
   const int bank_ref = 0;
-  const int c_id = 0;
-  fill_filter_with_pcwiener_match(
-      av1_ref_from_wienerns_bank(bank, bank_ref, c_id), set_index,
-      tap_translator, match_indices, nsfilter_params, ALL_WIENERNS_CLASSES);
+  for (int c_id = c_id_begin; c_id < c_id_end; ++c_id) {
+    fill_filter_with_pcwiener_match(
+        av1_ref_from_wienerns_bank(bank, bank_ref, c_id), reference, set_index,
+        tap_translator, match_indices, nsfilter_params, c_id);
+  }
 }
 
 #endif  // CONFIG_COMBINE_PC_NS_WIENER

@@ -2333,6 +2333,10 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       } else
         rsi->num_filter_classes = NUM_WIENERNS_CLASS_INIT_CHROMA;
     }
+#else
+    rsi->num_filter_classes = (p == AOM_PLANE_Y)
+                                  ? NUM_WIENERNS_CLASS_INIT_LUMA
+                                  : NUM_WIENERNS_CLASS_INIT_CHROMA;
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
   if (!all_none) {
@@ -2532,9 +2536,9 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
       wienerns_info->match_indices[c_id] =
           aom_read_literal(rb, NUM_FRAME_PREDICTOR_BITS, ACCT_STR);
     }
-    fill_first_slot_of_bank_with_pc_wiener_match(
-        bank, wienerns_info->match_indices, base_qindex, qindex_offset);
-    bank->frame_filter_predictors_are_set = 1;
+    //    fill_first_slot_of_bank_with_pc_wiener_match(
+    //        bank, wienerns_info->match_indices, base_qindex, qindex_offset);
+    //    bank->frame_filter_predictors_are_set = 1;
   }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
 
@@ -2543,9 +2547,11 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
     if (skip_filter_read) {
       skip_filter_read_for_class[c_id] = 1;
       const int ref_to_use = 0;  // last filter in bank.
-      copy_nsfilter_taps_for_class(
-          wienerns_info,
-          av1_constref_from_wienerns_bank(bank, ref_to_use, c_id), c_id);
+      ref_for_class[c_id] = ref_to_use;
+      //      copy_nsfilter_taps_for_class(
+      //          wienerns_info,
+      //          av1_constref_from_wienerns_bank(bank, ref_to_use, c_id),
+      //          c_id);
       continue;
     }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
@@ -2555,12 +2561,12 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
     for (ref = 0; ref < bank->bank_size_for_class[c_id] - 1; ++ref) {
       if (aom_read_literal(rb, 1, ACCT_STR)) break;
     }
-    if (exact_match) {
-      copy_nsfilter_taps_for_class(
-          wienerns_info, av1_constref_from_wienerns_bank(bank, ref, c_id),
-          c_id);
-    }
-    wienerns_info->bank_ref_for_class[c_id] = ref;
+    //    if (exact_match) {
+    //      copy_nsfilter_taps_for_class(
+    //          wienerns_info, av1_constref_from_wienerns_bank(bank, ref, c_id),
+    //          c_id);
+    //    }
+    //    wienerns_info->bank_ref_for_class[c_id] = ref;
     skip_filter_read_for_class[c_id] = exact_match;
     ref_for_class[c_id] = ref;
   }
@@ -2574,7 +2580,20 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
   const int(*wienerns_coeffs)[WIENERNS_COEFCFG_LEN] = nsfilter_params->coeffs;
   int reduce_step[WIENERNS_REDUCE_STEPS];
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
-    if (skip_filter_read_for_class[c_id]) continue;
+#if CONFIG_COMBINE_PC_NS_WIENER
+    if (!is_uv && !bank->frame_filter_predictors_are_set) {
+      fill_first_slot_of_bank_with_pc_wiener_match(
+          bank, wienerns_info, wienerns_info->match_indices, base_qindex,
+          qindex_offset, c_id);
+    }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+    if (skip_filter_read_for_class[c_id]) {
+      copy_nsfilter_taps_for_class(
+          wienerns_info,
+          av1_constref_from_wienerns_bank(bank, ref_for_class[c_id], c_id),
+          c_id);
+      continue;
+    }
     const int ref = ref_for_class[c_id];
 
     const WienerNonsepInfo *ref_wienerns_info =
@@ -2643,12 +2662,14 @@ static void read_wienerns_filter(MACROBLOCKD *xd, int is_uv,
               ACCT_STR) +
           wienerns_coeffs[i - beg_feat][WIENERNS_MIN_ID];
 #endif  // CONFIG_LR_4PART_CODE
-      // printf("(%d/%d), ", wienerns_info->nsfilter[i],
-      // ref_wienerns_info->nsfilter[i]);
     }
-    // printf("\n");
     av1_add_to_wienerns_bank(bank, wienerns_info, c_id);
   }
+
+#if CONFIG_COMBINE_PC_NS_WIENER
+  if (!is_uv && !bank->frame_filter_predictors_are_set)
+    bank->frame_filter_predictors_are_set = 1;
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
 }
 #endif  // CONFIG_WIENER_NONSEP
 

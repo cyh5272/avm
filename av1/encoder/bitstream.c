@@ -2599,6 +2599,10 @@ static AOM_INLINE void encode_restoration_mode(
         assert(rsi->num_filter_classes == NUM_WIENERNS_CLASS_INIT_CHROMA);
       }
     }
+#else
+    assert(rsi->num_filter_classes == (p == AOM_PLANE_Y)
+               ? NUM_WIENERNS_CLASS_INIT_LUMA
+               : NUM_WIENERNS_CLASS_INIT_CHROMA);
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
   }
   if (!all_none) {
@@ -2794,6 +2798,33 @@ static int check_and_write_merge_info(
 }
 #endif  // CONFIG_RST_MERGECOEFFS
 
+static void print_filters(const WienernsFilterParameters *nsfilter_params,
+                          const WienerNonsepInfo *filter1,
+                          const WienerNonsepInfo *filter2, int class_id,
+                          int skipped) {
+  const int num_feat = nsfilter_params->ncoeffs;
+  char symbol = ' ';
+  if (skipped) symbol = 'S';
+  for (int c_id = class_id; c_id < class_id + 1; ++c_id) {
+    const int16_t *filter1_taps = const_nsfilter_taps(filter1, c_id);
+    printf("%3d:", c_id);
+    for (int tap = 0; tap < num_feat; ++tap) {
+      printf("%3d, ", filter1_taps[tap]);
+    }
+    printf("\n");
+    if (filter2 == NULL) continue;
+    const int16_t *filter2_taps = const_nsfilter_taps(filter2, c_id);
+    char final_symbol = symbol;
+    if (filter1->match_indices[c_id] > NUM_PC_WIENER_FILTERS)
+      final_symbol = skipped ? 'P' : 'M';
+    printf(" %c  ", final_symbol);
+    for (int tap = 0; tap < num_feat; ++tap) {
+      printf("%3d, ", filter2_taps[tap]);
+    }
+    printf("\n");
+  }
+}
+
 static AOM_INLINE void write_wienerns_filter(
     MACROBLOCKD *xd, int plane, const WienerNonsepInfo *wienerns_info,
     WienerNonsepInfoBank *bank, aom_writer *wb
@@ -2809,9 +2840,10 @@ static AOM_INLINE void write_wienerns_filter(
 #if CONFIG_RST_MERGECOEFFS
 
 #if CONFIG_COMBINE_PC_NS_WIENER
-  int skip_filter_write =
+  const int skip_filter_write =
       plane == AOM_PLANE_Y && bank->frame_filter_predictors_are_set;
   if (plane == AOM_PLANE_Y && !bank->frame_filter_predictors_are_set) {
+    printf("writing match indices.\n");
     for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
       assert(wienerns_info->match_indices[c_id] >= 0 &&
              wienerns_info->match_indices[c_id] <=
@@ -2820,7 +2852,8 @@ static AOM_INLINE void write_wienerns_filter(
                         NUM_FRAME_PREDICTOR_BITS);
     }
     fill_first_slot_of_bank_with_pc_wiener_match(
-        bank, wienerns_info->match_indices, base_qindex, qindex_offset);
+        bank, wienerns_info, wienerns_info->match_indices, base_qindex,
+        qindex_offset, ALL_WIENERNS_CLASSES);
     bank->frame_filter_predictors_are_set = 1;
   }
 #endif  // CONFIG_COMBINE_PC_NS_WIENER
@@ -2847,7 +2880,18 @@ static AOM_INLINE void write_wienerns_filter(
   // TODO(debargha): simplify the logic
   int reduce_step[WIENERNS_REDUCE_STEPS];
   for (int c_id = 0; c_id < wienerns_info->num_classes; ++c_id) {
-    if (skip_filter_write_for_class[c_id]) continue;
+    if (skip_filter_write_for_class[c_id]) {
+#if CONFIG_COMBINE_PC_NS_WIENER
+      if (plane == AOM_PLANE_Y && !skip_filter_write) {
+        // printf("%d Wrote filter class %d\n", plane, c_id);
+        print_filters(
+            nsfilter_params, wienerns_info,
+            av1_constref_from_wienerns_bank(bank, ref_for_class[c_id], c_id),
+            c_id, 1);
+      }
+#endif  // CONFIG_COMBINE_PC_NS_WIENER
+      continue;
+    }
     const int ref = ref_for_class[c_id];
 
     const WienerNonsepInfo *ref_wienerns_info =
@@ -2934,7 +2978,16 @@ static AOM_INLINE void write_wienerns_filter(
 #endif  // CONFIG_LR_4PART_CODE
     }
     av1_add_to_wienerns_bank(bank, wienerns_info, c_id);
+    if (plane == AOM_PLANE_Y) {
+      // printf("%d Wrote filter class %d\n", plane, c_id);
+      print_filters(nsfilter_params, wienerns_info, ref_wienerns_info, c_id, 0);
+    }
   }
+#if CONFIG_COMBINE_PC_NS_WIENER
+  if (skip_filter_write) {
+    printf("Skipped filter.\n");
+  }
+#endif
   // printf("\n");
   return;
 }
