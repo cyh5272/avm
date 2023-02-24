@@ -590,7 +590,7 @@ static int main_loop(int argc, const char **argv_) {
   FILE *infile;
   int frame_in = 0, frame_out = 0, flipuv = 0, noblit = 0;
   int do_md5 = 0, progress = 0;
-  int do_verify = 0, error_on_verify = 0;
+  int do_verify = 1, error_on_verify = 0;
   int stop_after = 0, summary = 0, quiet = 1;
   int arg_skip = 0;
   int keep_going = 0;
