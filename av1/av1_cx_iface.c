@@ -1415,7 +1415,17 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
 #endif  // !CONFIG_EXTENDED_WARP_PREDICTION
   tool_cfg->ref_frame_mvs_present =
       extra_cfg->enable_ref_frame_mvs & extra_cfg->enable_order_hint;
-  tool_cfg->enable_global_motion = extra_cfg->enable_global_motion;
+
+  // Explicitly disable global motion in large scale tile mode.
+  //
+  // For large scale tile mode, some of the intended use cases expect
+  // all frame headers to be identical. This breaks if global motion is
+  // used, since global motion data is stored in the frame header.
+  // eg, see test/lightfield_test.sh, which checks that all frame headers
+  // are the same.
+  tool_cfg->enable_global_motion =
+      extra_cfg->enable_global_motion && !cfg->large_scale_tile;
+
   tool_cfg->error_resilient_mode =
       cfg->g_error_resilient | extra_cfg->error_resilient_mode;
   tool_cfg->frame_hash_metadata = cfg->frame_hash_metadata;
