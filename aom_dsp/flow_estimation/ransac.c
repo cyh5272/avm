@@ -24,7 +24,7 @@
 // TODO(rachelbarker): Remove dependence on code in av1/encoder/
 #include "av1/encoder/random.h"
 
-#define MAX_MINPTS 4
+#define MAX_MINPTS 8
 #define MINPTS_MULTIPLIER 5
 
 #define INLIER_THRESHOLD 1.25
@@ -37,6 +37,7 @@
 // by some kind of refinement method. eg, take the SVD result and do gradient
 // descent from there
 #define HOMOGRAPHY_ALGORITHM 0
+#define NORMALIZE_POINTS 1
 
 ////////////////////////////////////////////////////////////////////////////////
 // ransac
@@ -99,7 +100,7 @@ static void project_points_homography(const double *mat, const double *points,
   }
 }
 
-#if 0
+#if NORMALIZE_POINTS
 static void normalize_homography(double *pts, int n, double *T) {
   double *p = pts;
   double mean[2] = { 0, 0 };
@@ -158,7 +159,7 @@ static void denormalize_homography(double *params, double *T1, double *T2) {
   multiply_mat(params, T1, params2, 3, 3, 3);
   multiply_mat(iT2, params2, params, 3, 3, 3);
 }
-#endif  // 0
+#endif  // NORMALIZE_POINTS
 
 static bool find_translation(int np, const double *pts1, const double *pts2,
                              double *params) {
@@ -697,9 +698,9 @@ static bool find_affine(int np, const double *pts1, const double *pts2,
 }
 
 #if HOMOGRAPHY_ALGORITHM == 0
-static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
+static bool find_vertrapezoid(int np, const double *cpts1, const double *cpts2,
                               double *mat) {
-  // Implemented from Peter Kovesi's normalized implementation
+  // Implemented by classical SVD
   const int nvar = 7;
   const int np3 = np * 3;
   double *a = (double *)aom_malloc(sizeof(*a) * np3 * nvar * 2);
@@ -708,9 +709,18 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -742,6 +752,10 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
     a[(i * 3 + 2) * nvar + 5] = 0;
     a[(i * 3 + 2) * nvar + 6] = 0;
   }
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
 
   if (SVD(U, S, V, a, np3, nvar)) {
     aom_free(a);
@@ -766,14 +780,15 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   H[6] = V[5 * nvar + mini];
   H[7] = 0;
   H[8] = V[6 * nvar + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
-    // for (i = 0; i < 8; i++) mat[i] = f * H[i];
     mat[0] = f * H[2];
     mat[1] = f * H[5];
     mat[2] = f * H[0];
@@ -786,9 +801,9 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   return true;
 }
 
-static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
+static bool find_hortrapezoid(int np, const double *cpts1, const double *cpts2,
                               double *mat) {
-  // Implemented from Peter Kovesi's normalized implementation
+  // Implemented by classical SVD
   const int nvar = 7;
   const int np3 = np * 3;
   double *a = (double *)aom_malloc(sizeof(*a) * np3 * nvar * 2);
@@ -797,9 +812,18 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -831,6 +855,10 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
     a[(i * 3 + 2) * nvar + 5] = 0;
     a[(i * 3 + 2) * nvar + 6] = 0;
   }
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
 
   if (SVD(U, S, V, a, np3, nvar)) {
     aom_free(a);
@@ -855,14 +883,15 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   H[6] = 0;
   H[7] = V[5 * nvar + mini];
   H[8] = V[6 * nvar + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
-    // for (i = 0; i < 8; i++) mat[i] = f * H[i];
     mat[0] = f * H[2];
     mat[1] = f * H[5];
     mat[2] = f * H[0];
@@ -875,9 +904,9 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   return true;
 }
 
-static bool find_homography(int np, const double *pts1, const double *pts2,
+static bool find_homography(int np, const double *cpts1, const double *cpts2,
                             double *mat) {
-  // Implemented from Peter Kovesi's normalized implementation
+  // Implemented by classical SVD
   const int np3 = np * 3;
   double *a = (double *)aom_malloc(sizeof(*a) * np3 * 18);
   double *U = a + np3 * 9;
@@ -885,9 +914,18 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -921,6 +959,10 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
     a[(i * 3 + 2) * 9 + 6] = a[(i * 3 + 2) * 9 + 7] = a[(i * 3 + 2) * 9 + 8] =
         0;
   }
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
 
   if (SVD(U, S, V, a, np3, 9)) {
     aom_free(a);
@@ -937,14 +979,15 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
   }
 
   for (i = 0; i < 9; i++) H[i] = V[i * 9 + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
   } else {
     // normalize
     double f = 1.0 / H[8];
-    // for (i = 0; i < 8; i++) mat[i] = f * H[i];
     mat[0] = f * H[2];
     mat[1] = f * H[5];
     mat[2] = f * H[0];
@@ -957,7 +1000,7 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
   return true;
 }
 #elif HOMOGRAPHY_ALGORITHM == 1
-static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
+static bool find_vertrapezoid(int np, const double *cpts1, const double *cpts2,
                               double *mat) {
   // Implemented from Peter Kovesi's normalized implementation
   const int nvar = 7;
@@ -968,9 +1011,18 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -994,6 +1046,10 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
     a[(i * 2 + 1) * nvar + 5] = -dx * sx;
     a[(i * 2 + 1) * nvar + 6] = -dx;
   }
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
 
   if (SVD(U, S, V, a, np2, nvar)) {
     aom_free(a);
@@ -1018,7 +1074,9 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   H[6] = V[5 * nvar + mini];
   H[7] = 0;
   H[8] = V[6 * nvar + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
@@ -1038,7 +1096,7 @@ static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
   return true;
 }
 
-static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
+static bool find_hortrapezoid(int np, const double *cpts1, const double *cpts2,
                               double *mat) {
   // Based on SVD decomposition of homogeneous equation and using the right
   // unitary vector corresponding to the smallest singular value
@@ -1050,9 +1108,18 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -1076,6 +1143,10 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
     a[(i * 2 + 1) * nvar + 5] = dx * sy;
     a[(i * 2 + 1) * nvar + 6] = dx;
   }
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
 
   if (SVD(U, S, V, a, np2, nvar)) {
     aom_free(a);
@@ -1101,7 +1172,9 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   H[6] = 0;
   H[7] = V[5 * nvar + mini];
   H[8] = V[6 * nvar + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
@@ -1121,7 +1194,7 @@ static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
   return true;
 }
 
-static bool find_homography(int np, const double *pts1, const double *pts2,
+static bool find_homography(int np, const double *cpts1, const double *cpts2,
                             double *mat) {
   // Based on SVD decomposition of homogeneous equation and using the right
   // unitary vector corresponding to the smallest singular value
@@ -1132,9 +1205,18 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
   int i, mini;
   double sx, sy, dx, dy;
 
-  // double T1[9], T2[9];
-  // normalize_homography(pts1, np, T1);
-  // normalize_homography(pts2, np, T2);
+#if NORMALIZE_POINTS
+  double *pts1 = (double *)aom_malloc(sizeof(*pts1) * 2 * np);
+  double *pts2 = (double *)aom_malloc(sizeof(*pts2) * 2 * np);
+  memcpy(pts1, cpts1, sizeof(*pts1) * 2 * np);
+  memcpy(pts2, cpts2, sizeof(*pts2) * 2 * np);
+  double T1[9], T2[9];
+  normalize_homography(pts1, np, T1);
+  normalize_homography(pts2, np, T2);
+#else
+  const double *pts1 = cpts1;
+  const double *pts2 = cpts2;
+#endif  // NORMALIZE_POINTS
 
   for (i = 0; i < np; ++i) {
     dx = *(pts2++);
@@ -1160,6 +1242,10 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
     a[(i * 2 + 1) * 9 + 8] = dx;
   }
 
+#if NORMALIZE_POINTS
+  aom_free(pts1 - 2 * np);
+  aom_free(pts2 - 2 * np);
+#endif  // NORMALIZE_POINTS
   if (SVD(U, S, V, a, np2, 9)) {
     aom_free(a);
     return false;
@@ -1175,7 +1261,9 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
   }
 
   for (i = 0; i < 9; i++) H[i] = V[i * 9 + mini];
-  // denormalize_homography_reorder(H, T1, T2);
+#if NORMALIZE_POINTS
+  denormalize_homography(H, T1, T2);
+#endif  // NORMALIZE_POINTS
   aom_free(a);
   if (H[8] == 0.0) {
     return false;
@@ -1192,169 +1280,6 @@ static bool find_homography(int np, const double *pts1, const double *pts2,
     mat[6] = f * H[6];
     mat[7] = f * H[7];
   }
-  return true;
-}
-#elif HOMOGRAPHY_ALGORITHM == 2
-static bool find_vertrapezoid(int np, const double *pts1, const double *pts2,
-                              double *mat) {
-  // Based on straight Least-squares
-  const int np2 = np * 2;
-  const int nvar = 6;
-  double *a =
-      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return false;
-  double *b = a + np2 * nvar;
-  double *temp = b + np2;
-  int i;
-  double sx, sy, dx, dy;
-
-  for (i = 0; i < np; ++i) {
-    dx = *(pts2++);
-    dy = *(pts2++);
-    sx = *(pts1++);
-    sy = *(pts1++);
-
-    a[i * 2 * nvar + 0] = sx;
-    a[i * 2 * nvar + 1] = 1;
-    a[i * 2 * nvar + 2] = 0;
-    a[i * 2 * nvar + 3] = 0;
-    a[i * 2 * nvar + 4] = 0;
-    a[i * 2 * nvar + 5] = -dx * sx;
-
-    a[(i * 2 + 1) * nvar + 0] = 0;
-    a[(i * 2 + 1) * nvar + 1] = 0;
-    a[(i * 2 + 1) * nvar + 2] = sx;
-    a[(i * 2 + 1) * nvar + 3] = sy;
-    a[(i * 2 + 1) * nvar + 4] = 1;
-    a[(i * 2 + 1) * nvar + 5] = -dy * sx;
-
-    b[2 * i] = dx;
-    b[2 * i + 1] = dy;
-  }
-  double sol[8];
-  if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    aom_free(a);
-    return false;
-  }
-  mat[0] = sol[1];
-  mat[1] = sol[4];
-  mat[2] = sol[0];
-  mat[3] = 0;
-  mat[4] = sol[2];
-  mat[5] = sol[3];
-  mat[6] = sol[5];
-  mat[7] = 0;
-  aom_free(a);
-  return true;
-}
-
-static bool find_hortrapezoid(int np, const double *pts1, const double *pts2,
-                              double *mat) {
-  // Based on straight Least-squares
-  const int np2 = np * 2;
-  const int nvar = 8;
-  double *a =
-      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return false;
-  double *b = a + np2 * nvar;
-  double *temp = b + np2;
-  int i;
-  double sx, sy, dx, dy;
-
-  for (i = 0; i < np; ++i) {
-    dx = *(pts2++);
-    dy = *(pts2++);
-    sx = *(pts1++);
-    sy = *(pts1++);
-
-    a[i * 2 * nvar + 0] = sx;
-    a[i * 2 * nvar + 1] = sy;
-    a[i * 2 * nvar + 2] = 1;
-    a[i * 2 * nvar + 3] = 0;
-    a[i * 2 * nvar + 4] = 0;
-    a[i * 2 * nvar + 5] = -dx * sy;
-
-    a[(i * 2 + 1) * nvar + 0] = 0;
-    a[(i * 2 + 1) * nvar + 1] = 0;
-    a[(i * 2 + 1) * nvar + 2] = 0;
-    a[(i * 2 + 1) * nvar + 3] = sy;
-    a[(i * 2 + 1) * nvar + 4] = 1;
-    a[(i * 2 + 1) * nvar + 5] = -dy * sy;
-
-    b[2 * i] = dx;
-    b[2 * i + 1] = dy;
-  }
-  double sol[8];
-  if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    aom_free(a);
-    return false;
-  }
-  mat[0] = sol[2];
-  mat[1] = sol[4];
-  mat[2] = sol[0];
-  mat[3] = sol[1];
-  mat[4] = 0.0;
-  mat[5] = sol[3];
-  mat[6] = 0.0;
-  mat[7] = sol[5];
-  aom_free(a);
-  return true;
-}
-
-static bool find_homography(int np, const double *pts1, const double *pts2,
-                            double *mat) {
-  // Based on straight Least-squares
-  const int np2 = np * 2;
-  const int nvar = 8;
-  double *a =
-      (double *)aom_malloc(sizeof(*a) * (np2 * (nvar + 1) + (nvar + 1) * nvar));
-  if (a == NULL) return false;
-  double *b = a + np2 * nvar;
-  double *temp = b + np2;
-  int i;
-  double sx, sy, dx, dy;
-
-  for (i = 0; i < np; ++i) {
-    dx = *(pts2++);
-    dy = *(pts2++);
-    sx = *(pts1++);
-    sy = *(pts1++);
-
-    a[i * 2 * nvar + 0] = sx;
-    a[i * 2 * nvar + 1] = sy;
-    a[i * 2 * nvar + 2] = 1;
-    a[i * 2 * nvar + 3] = 0;
-    a[i * 2 * nvar + 4] = 0;
-    a[i * 2 * nvar + 5] = 0;
-    a[i * 2 * nvar + 6] = -dx * sx;
-    a[i * 2 * nvar + 7] = -dx * sy;
-
-    a[(i * 2 + 1) * nvar + 0] = 0;
-    a[(i * 2 + 1) * nvar + 1] = 0;
-    a[(i * 2 + 1) * nvar + 2] = 0;
-    a[(i * 2 + 1) * nvar + 3] = sx;
-    a[(i * 2 + 1) * nvar + 4] = sy;
-    a[(i * 2 + 1) * nvar + 5] = 1;
-    a[(i * 2 + 1) * nvar + 6] = -dy * sx;
-    a[(i * 2 + 1) * nvar + 7] = -dy * sy;
-
-    b[2 * i] = dx;
-    b[2 * i + 1] = dy;
-  }
-  double sol[8];
-  if (!least_squares(nvar, a, np2, nvar, b, temp, sol)) {
-    aom_free(a);
-    return false;
-  }
-  mat[0] = sol[2];
-  mat[1] = sol[5];
-  mat[2] = sol[0];
-  mat[3] = sol[1];
-  mat[4] = sol[3];
-  mat[5] = sol[4];
-  mat[6] = sol[6];
-  mat[7] = sol[7];
-  aom_free(a);
   return true;
 }
 #else
@@ -1635,7 +1560,7 @@ static const RansacModelInfo ransac_model_info[TRANS_TYPES] = {
   // HORTRAPEZOID
   { is_degenerate_homography, find_hortrapezoid, project_points_homography, 4 },
   // HOMOGRAPHY
-  { is_degenerate_homography, find_homography, project_points_homography, 4 },
+  { is_degenerate_homography, find_homography, project_points_homography, 6 },
 };
 
 // Returns true on success, false on error

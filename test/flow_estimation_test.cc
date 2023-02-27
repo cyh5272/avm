@@ -39,6 +39,10 @@ typedef tuple<TransformationType> TestParams;
 const int npoints = 100;
 const double noise_level = 0.5;
 const int test_iters = 100;
+const int max_width = 8192;
+const int max_height = 4096;
+
+const double kRelativeThresh = 1.25;
 
 static const char *model_type_names[] = {
   "IDENTITY",     "TRANSLATION",  "ROTATION",  "ZOOM",     "VERTSHEAR",
@@ -156,7 +160,11 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[3] = 0.0;
       model[4] = random_double(rnd, -0.25, 0.25);
       model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
-      model[6] = random_double(rnd, -0.25, 0.25);
+      // Generally h31.x + h32.y + 1 should not get too close to 0, or too
+      // high for positive x, y. Otherwise the estimation will get unstable.
+      // These limits for perspectivity are already quite high for
+      // homographies expected to be encountered in a normal scene.
+      model[6] = random_double(rnd, -1.0 / max_width, 32.0 / max_width);
       model[7] = 0.0;
       break;
 
@@ -168,7 +176,11 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[4] = 0.0;
       model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
       model[6] = 0.0;
-      model[7] = random_double(rnd, -0.25, 0.25);
+      // Generally h31.x + h32.y + 1 should not get too close to 0, or too
+      // high for positive x, y. Otherwise the estimation will get unstable.
+      // These limits for perspectivity are already quite high for
+      // homographies expected to be encountered in a normal scene.
+      model[7] = random_double(rnd, -1.0 / max_height, 32.0 / max_height);
       break;
 
     case HOMOGRAPHY:
@@ -178,8 +190,12 @@ static void generate_model(const TransformationType type, ACMRandom &rnd,
       model[3] = random_double(rnd, -0.25, 0.25);
       model[4] = random_double(rnd, -0.25, 0.25);
       model[5] = 1.0 + random_double(rnd, -0.25, 0.25);
-      model[6] = random_double(rnd, -0.25, 0.25);
-      model[7] = random_double(rnd, -0.25, 0.25);
+      // Generally h31.x + h32.y + 1 should not get too close to 0, or too
+      // high for positive x, y. Otherwise the estimation will get unstable.
+      // These limits for perspectivity are already quite high for
+      // homographies expected to be encountered in a normal scene.
+      model[6] = random_double(rnd, -0.5 / max_width, 32.0 / max_width);
+      model[7] = random_double(rnd, -0.5 / max_height, 32.0 / max_height);
       break;
 
     default: assert(0); break;
@@ -198,8 +214,10 @@ static void apply_model_plus_noise(const int npoints, const double *src_points,
     double dst_sy = model[1] + src_x * model[4] + src_y * model[5];
     double dst_s = 1.0 + src_x * model[6] + src_y * model[7];
 
-    double noise_x = random_double(rnd, -noise_level, noise_level);
-    double noise_y = random_double(rnd, -noise_level, noise_level);
+    double noise_x =
+        noise_level > 0.0 ? random_double(rnd, -noise_level, noise_level) : 0.0;
+    double noise_y =
+        noise_level > 0.0 ? random_double(rnd, -noise_level, noise_level) : 0.0;
 
     double dst_x = dst_sx / dst_s + noise_x;
     double dst_y = dst_sy / dst_s + noise_y;
@@ -213,20 +231,22 @@ static double get_rms_err(const int npoints, const double *src_points,
                           const double *dst_points, const double *model) {
   double sse = 0.0;
   for (int i = 0; i < npoints; i++) {
-    double src_x = src_points[2 * i + 0];
-    double src_y = src_points[2 * i + 1];
-    double dst_x = dst_points[2 * i + 0];
-    double dst_y = dst_points[2 * i + 1];
+    const double src_x = src_points[2 * i + 0];
+    const double src_y = src_points[2 * i + 1];
+    const double dst_x = dst_points[2 * i + 0];
+    const double dst_y = dst_points[2 * i + 1];
 
-    double proj_sx = model[0] + src_x * model[2] + src_y * model[3];
-    double proj_sy = model[1] + src_x * model[4] + src_y * model[5];
-    double proj_s = 1.0 + src_x * model[6] + src_y * model[7];
+    const double proj_sx = model[0] + src_x * model[2] + src_y * model[3];
+    const double proj_sy = model[1] + src_x * model[4] + src_y * model[5];
+    const double proj_s = 1.0 + src_x * model[6] + src_y * model[7];
 
-    double proj_x = proj_sx / proj_s;
-    double proj_y = proj_sy / proj_s;
+    const double proj_x = proj_sx / proj_s;
+    const double proj_y = proj_sy / proj_s;
 
-    sse += (proj_x - dst_x) * (proj_x - dst_x);
-    sse += (proj_y - dst_y) * (proj_y - dst_y);
+    const double dx = (proj_x - dst_x);
+    const double dy = (proj_y - dst_y);
+
+    sse += (dx * dx + dy * dy);
   }
   return sqrt(sse / npoints);
 }
@@ -265,8 +285,8 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
     for (int iter = 0; iter < test_iters; iter++) {
       // Simulate a dataset which could come from an 8K x 4K video frame
       for (int i = 0; i < npoints; i++) {
-        double src_x = random_double(rnd, 0, 8192);
-        double src_y = random_double(rnd, 0, 4096);
+        double src_x = random_double(rnd, 0, max_width);
+        double src_y = random_double(rnd, 0, max_height);
 
         src_points[2 * i + 0] = src_x;
         src_points[2 * i + 1] = src_y;
@@ -294,9 +314,8 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
 
       // Code to aid with debugging
 #if 0
-      if (type == ... && iter == ...) {
+      if (type == ... && iter == ... ) {
         printf("Model type: %s\n", model_type_names[type]);
-
         printf("Ground truth model: ");
         print_model(ground_truth_model);
         printf("\n");
@@ -305,6 +324,16 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
         printf("\n");
         printf("RMS error: Ground truth = %f, fitted = %f\n", ground_truth_rms,
               fitted_rms);
+        apply_model_plus_noise(npoints, src_points, fitted_model, rnd, 0.0, dst_points2);
+        for (int i = 0; i < npoints; i++) {
+          double src_x = src_points[2 * i + 0];
+          double src_y = src_points[2 * i + 1];
+          double dst_x = dst_points[2 * i + 0];
+          double dst_y = dst_points[2 * i + 1];
+          double prj_x = dst_points2[2 * i + 0];
+          double prj_y = dst_points2[2 * i + 1];
+          printf(" [%d] %f %f | %f %f: %f %f\n", i, src_x, src_y, dst_x, dst_y, prj_x, prj_y);
+        }
       }
 #else
       // Suppress unused variable warnings
@@ -318,19 +347,7 @@ class AomFlowEstimationTest : public ::testing::TestWithParam<TestParams> {
       //
       // However, in practice, we want to allow a bit of leeway for numerical
       // imprecision.
-      //
-      // Note: The trapezoid and homography models seem to have an overall
-      // error which is very high, and grows greater-than-linearly with the
-      // noise level, whereas the other models' errors grow remain close to
-      // optimal. This has not been fully investigated yet, but suggests that
-      // the condition number of these problems is very high.
-      double relative_threshold;
-      if (type <= AFFINE) {
-        relative_threshold = 1.25;
-      } else {
-        relative_threshold = 15.0;
-      }
-      ASSERT_LE(fitted_rms, relative_threshold * ground_truth_rms)
+      ASSERT_LE(fitted_rms, kRelativeThresh * ground_truth_rms)
           << "Fitted model for type = " << model_type_names[type]
           << ", iter = " << iter << " is worse than ground truth model";
     }
@@ -347,10 +364,7 @@ TEST_P(AomFlowEstimationTest, Test) { RunTest(); }
 INSTANTIATE_TEST_SUITE_P(C, AomFlowEstimationTest,
                          ::testing::Values(TRANSLATION, ROTATION, ZOOM,
                                            VERTSHEAR, HORZSHEAR, UZOOM, ROTZOOM,
-                                           ROTUZOOM, AFFINE
-                                           // VERTRAPEZOID,
-                                           // HORTRAPEZOID,
-                                           // HOMOGRAPHY
-                                           ));
+                                           ROTUZOOM, AFFINE, VERTRAPEZOID,
+                                           HORTRAPEZOID, HOMOGRAPHY));
 
 }  // namespace
