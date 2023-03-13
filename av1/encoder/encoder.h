@@ -1950,13 +1950,6 @@ typedef struct {
   int type_cost[TRANS_TYPES];
 
   /*!
-   * Array to store the cost for signalling a particular global motion model for
-   * each reference frame. gmparams_cost[i] stores the cost of signalling global
-   * motion for the ith reference frame.
-   */
-  int params_cost[INTER_REFS_PER_FRAME];
-
-  /*!
    * Flag to indicate if global motion search needs to be rerun.
    */
   bool search_done;
