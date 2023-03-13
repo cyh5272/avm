@@ -98,11 +98,9 @@ static AOM_INLINE int64_t calc_erroradv_threshold(int64_t ref_frame_error) {
 // For the given reference frame, computes the global motion parameters for
 // different motion models and finds the best.
 static AOM_INLINE void compute_global_motion_for_ref_frame(
-    AV1_COMP *cpi,
-    YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
-    int frame, MotionModel *motion_models, uint8_t *segment_map,
-    const int segment_map_w, const int segment_map_h,
-    const WarpedMotionParams *ref_params) {
+    AV1_COMP *cpi, YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME], int frame,
+    MotionModel *motion_models, uint8_t *segment_map, const int segment_map_w,
+    const int segment_map_h, const WarpedMotionParams *ref_params) {
   ThreadData *const td = &cpi->td;
   MACROBLOCK *const x = &td->mb;
   AV1_COMMON *const cm = &cpi->common;
@@ -123,50 +121,59 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
   aom_clear_system_state();
 
   for (model = ROTZOOM; model < GLOBAL_TRANS_TYPES_ENC; ++model) {
-    int64_t best_warp_error = INT64_MAX;
-
     if (!aom_compute_global_motion(model, cpi->source, ref_buf[frame],
                                    bit_depth, global_motion_method,
                                    motion_models, RANSAC_NUM_MOTIONS)) {
       continue;
     }
 
-    int64_t ref_frame_error = 0;
+    int64_t best_ref_frame_error = 0;
+    int64_t best_warp_error = INT64_MAX;
     for (i = 0; i < RANSAC_NUM_MOTIONS; ++i) {
       if (motion_models[i].num_inliers == 0) continue;
 
       params_this_motion = motion_models[i].params;
       av1_convert_model_to_params(params_this_motion, &tmp_wm_params);
 
-      if (tmp_wm_params.wmtype != IDENTITY) {
-        av1_compute_feature_segmentation_map(
-            segment_map, segment_map_w, segment_map_h, motion_models[i].inliers,
-            motion_models[i].num_inliers);
+      // For IDENTITY type models, we don't need to evaluate anything because
+      // all the following logic is effectively comparing the estimated model
+      // to an identity model.
+      if (tmp_wm_params.wmtype == IDENTITY) continue;
 
-        ref_frame_error = av1_segmented_frame_error(
-            xd->bd, ref_buf[frame]->y_buffer, ref_buf[frame]->y_stride,
-            cpi->source->y_buffer, src_width, src_height, src_stride,
-            segment_map, segment_map_w);
+      av1_compute_feature_segmentation_map(
+          segment_map, segment_map_w, segment_map_h, motion_models[i].inliers,
+          motion_models[i].num_inliers);
 
-        const int64_t erroradv_threshold =
-            calc_erroradv_threshold(ref_frame_error);
+      int64_t ref_frame_error = av1_segmented_frame_error(
+          xd->bd, ref_buf[frame]->y_buffer, ref_buf[frame]->y_stride,
+          cpi->source->y_buffer, src_width, src_height, src_stride, segment_map,
+          segment_map_w);
 
-        const int64_t warp_error = av1_refine_integerized_param(
-            &tmp_wm_params, tmp_wm_params.wmtype, xd->bd,
-            ref_buf[frame]->y_buffer, ref_buf[frame]->y_crop_width,
-            ref_buf[frame]->y_crop_height, ref_buf[frame]->y_stride,
-            cpi->source->y_buffer, src_width, src_height, src_stride,
-            num_refinements, best_warp_error, segment_map, segment_map_w,
-            erroradv_threshold);
+      if (ref_frame_error == 0) continue;
 
-        if (warp_error < best_warp_error) {
-          best_warp_error = warp_error;
-          // Save the wm_params modified by
-          // av1_refine_integerized_param() rather than motion index to
-          // avoid rerunning refine() below.
-          memcpy(&(cm->global_motion[frame]), &tmp_wm_params,
-                 sizeof(WarpedMotionParams));
-        }
+      const int64_t erroradv_threshold =
+          calc_erroradv_threshold(ref_frame_error);
+
+      const int64_t warp_error = av1_refine_integerized_param(
+          &tmp_wm_params, tmp_wm_params.wmtype, xd->bd,
+          ref_buf[frame]->y_buffer, ref_buf[frame]->y_crop_width,
+          ref_buf[frame]->y_crop_height, ref_buf[frame]->y_stride,
+          cpi->source->y_buffer, src_width, src_height, src_stride,
+          num_refinements, best_warp_error, segment_map, segment_map_w,
+          erroradv_threshold);
+
+      // av1_refine_integerized_param() can return a simpler model type than
+      // its input, so re-check model type here
+      if (tmp_wm_params.wmtype == IDENTITY) continue;
+
+      if (warp_error < best_warp_error) {
+        best_ref_frame_error = ref_frame_error;
+        best_warp_error = warp_error;
+        // Save the wm_params modified by
+        // av1_refine_integerized_param() rather than motion index to
+        // avoid rerunning refine() below.
+        memcpy(&(cm->global_motion[frame]), &tmp_wm_params,
+               sizeof(WarpedMotionParams));
       }
     }
     if (cm->global_motion[frame].wmtype <= AFFINE)
@@ -194,12 +201,15 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
 
     if (cm->global_motion[frame].wmtype == IDENTITY) continue;
 
-    if (ref_frame_error == 0) continue;
+    // Once we get here, best_ref_frame_error must be > 0. This is because
+    // of the logic above, which skips  over any models which have
+    // ref_frame_error == 0
+    assert(best_ref_frame_error > 0);
 
     // If the best error advantage found doesn't meet the threshold for
     // this motion type, revert to IDENTITY.
     if (!av1_is_enough_erroradvantage(
-            (double)best_warp_error / ref_frame_error,
+            (double)best_warp_error / best_ref_frame_error,
             gm_get_params_cost(&cm->global_motion[frame], ref_params,
 #if CONFIG_FLEX_MVRES
                                cm->features.fr_mv_precision))) {
@@ -217,10 +227,9 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
 
 // Computes global motion for the given reference frame.
 void av1_compute_gm_for_valid_ref_frames(
-    AV1_COMP *cpi,
-    YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
-    int frame, MotionModel *motion_models, uint8_t *segment_map,
-    int segment_map_w, int segment_map_h) {
+    AV1_COMP *cpi, YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME], int frame,
+    MotionModel *motion_models, uint8_t *segment_map, int segment_map_w,
+    int segment_map_h) {
   AV1_COMMON *const cm = &cpi->common;
   GlobalMotionInfo *const gm_info = &cpi->gm_info;
   const WarpedMotionParams *ref_params =
@@ -244,11 +253,10 @@ void av1_compute_gm_for_valid_ref_frames(
 
 // Loops over valid reference frames and computes global motion estimation.
 static AOM_INLINE void compute_global_motion_for_references(
-    AV1_COMP *cpi,
-    YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
-    FrameDistPair reference_frame[INTER_REFS_PER_FRAME],
-    int num_ref_frames, MotionModel *motion_models, uint8_t *segment_map,
-    const int segment_map_w, const int segment_map_h) {
+    AV1_COMP *cpi, YV12_BUFFER_CONFIG *ref_buf[INTER_REFS_PER_FRAME],
+    FrameDistPair reference_frame[INTER_REFS_PER_FRAME], int num_ref_frames,
+    MotionModel *motion_models, uint8_t *segment_map, const int segment_map_w,
+    const int segment_map_h) {
   AV1_COMMON *const cm = &cpi->common;
   // Compute global motion w.r.t. reference frames starting from the nearest ref
   // frame in a given direction.
@@ -261,7 +269,7 @@ static AOM_INLINE void compute_global_motion_for_references(
     // INVALID/TRANSLATION/IDENTITY, skip the evaluation of global motion w.r.t
     // the remaining ref frames in that direction.
     if (cpi->sf.gm_sf.prune_ref_frame_for_gm_search &&
-        cm->global_motion[ref_frame].wmtype != ROTZOOM)
+        cm->global_motion[ref_frame].wmtype <= TRANSLATION)
       break;
   }
 }
