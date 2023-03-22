@@ -103,9 +103,10 @@ enum {
 #endif  // CONFIG_IMPROVED_JMVD
 
 // Max superblock size
-#define MAX_SB_SIZE_LOG2 7
+#define MAX_SB_SIZE_LOG2 8
 #define MAX_SB_SIZE (1 << MAX_SB_SIZE_LOG2)
 #define MAX_SB_SQUARE (MAX_SB_SIZE * MAX_SB_SIZE)
+#define BLOCK_32_SIZE_LOG2 5
 
 // Min superblock size
 #define MIN_SB_SIZE_LOG2 6
