@@ -911,6 +911,9 @@ static INLINE BLOCK_SIZE get_h_partition_subsize(BLOCK_SIZE bsize, int index,
       BLOCK_INVALID,  // BLOCK_64X128
       BLOCK_INVALID,  // BLOCK_128X64
       BLOCK_INVALID,  // BLOCK_128X128
+      BLOCK_INVALID,  // BLOCK_128X256
+      BLOCK_INVALID,  // BLOCK_256X128
+      BLOCK_INVALID,  // BLOCK_256X256
     };
 
     return mid_sub_block_hpart[bsize];
@@ -2594,13 +2597,13 @@ static INLINE BLOCK_SIZE get_mb_plane_block_size_from_tree_type(
 static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
                                          int blk_col) {
   static const uint8_t tw_w_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 0, 1, 1, 2, 2, 3,
+    0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 1, 1, 2, 2, 3,
   };
   static const uint8_t tw_h_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 1, 0, 2, 1, 3, 2,
+    0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 0, 2, 1, 3, 2,
   };
   static const uint8_t stride_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 0, 1, 0, 1, 0, 1,
+    0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 2, 3, 3, 0, 1, 0, 1, 0, 1,
   };
   const int index =
       ((blk_row >> tw_h_log2_table[bsize]) << stride_log2_table[bsize]) +
@@ -2638,13 +2641,13 @@ static INLINE int av1_get_txk_type_index(BLOCK_SIZE bsize, int blk_row,
   return index;
 #endif  // CONFIG_NEW_TX_PARTITION
   static const uint8_t tw_w_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2, 2,
+    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2, 2,
   };
   static const uint8_t tw_h_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2, 2,
+    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2, 2,
   };
   static const uint8_t stride_log2_table[BLOCK_SIZES_ALL] = {
-    0, 0, 1, 1, 1, 2, 2, 1, 2, 2, 1, 2, 2, 2, 3, 3, 0, 2, 0, 2, 0, 2,
+    0, 0, 1, 1, 1, 2, 2, 1, 2, 2, 1, 2, 2, 2, 3, 3, 3, 4, 4, 0, 2, 0, 2, 0, 2,
   };
   index = ((blk_row >> tw_h_log2_table[bsize]) << stride_log2_table[bsize]) +
           (blk_col >> tw_w_log2_table[bsize]);
@@ -2897,7 +2900,7 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
  */
 static INLINE int bsize_to_max_depth(BLOCK_SIZE bsize) {
   static const uint8_t bsize_to_max_depth_table[BLOCK_SIZES_ALL] = {
-    0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+    0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
   };
   return bsize_to_max_depth_table[bsize];
 }
@@ -2917,7 +2920,7 @@ static INLINE int bsize_to_max_depth(BLOCK_SIZE bsize) {
 static INLINE int bsize_to_tx_size_cat(BLOCK_SIZE bsize) {
   assert(bsize < BLOCK_SIZES_ALL);
   static const uint8_t bsize_to_tx_size_depth_table[BLOCK_SIZES_ALL] = {
-    0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 4, 4,
+    0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 4, 4,
   };
   const int depth = bsize_to_tx_size_depth_table[bsize];
   assert(depth <= MAX_TX_CATS);
