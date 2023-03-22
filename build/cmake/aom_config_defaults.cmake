@@ -154,6 +154,7 @@ set_aom_config_var(CONFIG_EXT_RECUR_PARTITIONS 1 NUMBER
                    "AV2 Fully recursive partitions experiment flag")
 set_aom_config_var(CONFIG_H_PARTITION 1 NUMBER
                    "AV2 H partition mode experiment flag")
+set_aom_config_var(CONFIG_BLOCK_256 1 NUMBER "AV2 BLOCK_256 experiment flag")
 set_aom_config_var(CONFIG_ERP_TFLITE 0 NUMBER "Build ERP with TFLite")
 set_aom_config_var(CONFIG_COMPOUND_WARP_SAMPLES 1 NUMBER
                    "AV2 compound warped motion samples experiment flag")

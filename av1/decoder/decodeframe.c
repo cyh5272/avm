@@ -3579,6 +3579,13 @@ static AOM_INLINE void setup_frame_size(AV1_COMMON *cm,
 
 static AOM_INLINE void setup_sb_size(SequenceHeader *seq_params,
                                      struct aom_read_bit_buffer *rb) {
+#if CONFIG_BLOCK_256
+  bool is_256 = aom_rb_read_bit(rb);
+  if (is_256) {
+    set_sb_size(seq_params, BLOCK_256X256);
+    return;
+  }
+#endif  // CONFIG_BLOCK_256
   set_sb_size(seq_params, aom_rb_read_bit(rb) ? BLOCK_128X128 : BLOCK_64X64);
 }
 

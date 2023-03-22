@@ -4233,9 +4233,21 @@ static AOM_INLINE void write_sb_size(const SequenceHeader *const seq_params,
   (void)wb;
   assert(seq_params->mib_size == mi_size_wide[seq_params->sb_size]);
   assert(seq_params->mib_size == 1 << seq_params->mib_size_log2);
+
+#if CONFIG_BLOCK_256
+  assert(seq_params->sb_size == BLOCK_256X256 ||
+         seq_params->sb_size == BLOCK_128X128 ||
+         seq_params->sb_size == BLOCK_64X64);
+  const bool is_256 = seq_params->sb_size == BLOCK_256X256;
+  aom_wb_write_bit(wb, is_256);
+  if (is_256) {
+    return;
+  }
+#else
   assert(seq_params->sb_size == BLOCK_128X128 ||
          seq_params->sb_size == BLOCK_64X64);
-  aom_wb_write_bit(wb, seq_params->sb_size == BLOCK_128X128 ? 1 : 0);
+#endif  // CONFIG_BLOCK_256
+  aom_wb_write_bit(wb, seq_params->sb_size == BLOCK_128X128);
 }
 
 static AOM_INLINE void write_sequence_header(
