@@ -494,12 +494,22 @@ typedef struct SimpleMotionData {
 } SimpleMotionData;
 
 /*!\cond */
+#if CONFIG_BLOCK_256
+#define BLOCK_256_COUNT 1
+#define BLOCK_128_COUNT 3
+#define BLOCK_64_COUNT 7
+#define BLOCK_32_COUNT 15
+#define BLOCK_16_COUNT 31
+#define BLOCK_8_COUNT 127
+#define BLOCK_4_COUNT 128
+#else
 #define BLOCK_128_COUNT 1
 #define BLOCK_64_COUNT 3
 #define BLOCK_32_COUNT 7
 #define BLOCK_16_COUNT 15
 #define BLOCK_8_COUNT 31
 #define BLOCK_4_COUNT 32
+#endif  // CONFIG_BLOCK_256
 
 #define MAKE_SM_DATA_BUF(width, height) \
   SimpleMotionData                      \
@@ -511,6 +521,9 @@ typedef struct SimpleMotionData {
 typedef struct SimpleMotionDataBufs {
   /*!\cond */
   // Square blocks
+#if CONFIG_BLOCK_256
+  MAKE_SM_DATA_BUF(256, 256);
+#endif  // CONFIG_BLOCK_256
   MAKE_SM_DATA_BUF(128, 128);
   MAKE_SM_DATA_BUF(64, 64);
   MAKE_SM_DATA_BUF(32, 32);
@@ -519,6 +532,9 @@ typedef struct SimpleMotionDataBufs {
   MAKE_SM_DATA_BUF(4, 4);
 
   // 1:2 blocks
+#if CONFIG_BLOCK_256
+  MAKE_SM_DATA_BUF(128, 256);
+#endif  // CONFIG_BLOCK_256
   MAKE_SM_DATA_BUF(64, 128);
   MAKE_SM_DATA_BUF(32, 64);
   MAKE_SM_DATA_BUF(16, 32);
@@ -526,6 +542,9 @@ typedef struct SimpleMotionDataBufs {
   MAKE_SM_DATA_BUF(4, 8);
 
   // 2:1 blocks
+#if CONFIG_BLOCK_256
+  MAKE_SM_DATA_BUF(256, 128);
+#endif  // CONFIG_BLOCK_256
   MAKE_SM_DATA_BUF(128, 64);
   MAKE_SM_DATA_BUF(64, 32);
   MAKE_SM_DATA_BUF(32, 16);

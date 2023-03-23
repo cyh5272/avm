@@ -499,9 +499,18 @@ void av1_copy_pc_tree_recursive(const AV1_COMMON *cm, PC_TREE *dst,
 }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
-static AOM_INLINE int get_pc_tree_nodes(const int is_sb_size_128,
+static AOM_INLINE int get_pc_tree_nodes(const BLOCK_SIZE sb_size,
                                         int stat_generation_stage) {
-  const int tree_nodes_inc = is_sb_size_128 ? 1024 : 0;
+  const int is_sb_size_128 = sb_size == BLOCK_128X128;
+#if CONFIG_BLOCK_256
+  const int is_sb_size_256 = sb_size == BLOCK_256X256;
+#endif  // CONFIG_BLOCK_256
+  const int tree_nodes_inc =
+#if CONFIG_BLOCK_256
+      is_sb_size_256 ? (1024 + 4 * 1024) :
+#endif  // CONFIG_BLOCK_256
+      is_sb_size_128 ? 1024
+                     : 0;
   const int tree_nodes =
       stat_generation_stage ? 1 : (tree_nodes_inc + 256 + 64 + 16 + 4 + 1);
   return tree_nodes;
@@ -511,8 +520,11 @@ void av1_setup_sms_tree(AV1_COMP *const cpi, ThreadData *td) {
   AV1_COMMON *const cm = &cpi->common;
   const int stat_generation_stage = is_stat_generation_stage(cpi);
   const int is_sb_size_128 = cm->seq_params.sb_size == BLOCK_128X128;
+#if CONFIG_BLOCK_256
+  const int is_sb_size_256 = cm->seq_params.sb_size == BLOCK_256X256;
+#endif  // CONFIG_BLOCK_256
   const int tree_nodes =
-      get_pc_tree_nodes(is_sb_size_128, stat_generation_stage);
+      get_pc_tree_nodes(cm->seq_params.sb_size, stat_generation_stage);
   int sms_tree_index = 0;
   SIMPLE_MOTION_DATA_TREE *this_sms;
   int square_index = 1;
@@ -524,7 +536,13 @@ void av1_setup_sms_tree(AV1_COMP *const cpi, ThreadData *td) {
   this_sms = &td->sms_tree[0];
 
   if (!stat_generation_stage) {
-    const int leaf_factor = is_sb_size_128 ? 4 : 1;
+    const int leaf_factor =
+#if CONFIG_BLOCK_256
+        is_sb_size_256 ? 16 :
+#endif  // CONFIG_BLOCK_256
+        is_sb_size_128 ? 4
+                       : 1;
+
     const int leaf_nodes = 256 * leaf_factor;
 
     // Sets up all the leaf nodes in the tree.

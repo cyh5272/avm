@@ -1615,6 +1615,7 @@ void av1_prune_ab_partitions(
 // Gets the number of sms data in a single dimension
 static INLINE int get_sms_count_from_length(int mi_length) {
   switch (mi_length) {
+    case 64: return BLOCK_256_COUNT;
     case 32: return BLOCK_128_COUNT;
     case 16: return BLOCK_64_COUNT;
     case 8: return BLOCK_32_COUNT;
@@ -1649,6 +1650,9 @@ static INLINE SimpleMotionData *get_sms_arr(SimpleMotionDataBufs *sms_bufs,
                                             BLOCK_SIZE bsize) {
   switch (bsize) {
     // Square blocks
+#if CONFIG_BLOCK_256
+    MAKE_SMS_ARR_SWITCH_CASE(256, 256);
+#endif  // CONFIG_BLOCK_256
     MAKE_SMS_ARR_SWITCH_CASE(128, 128);
     MAKE_SMS_ARR_SWITCH_CASE(64, 64);
     MAKE_SMS_ARR_SWITCH_CASE(32, 32);
@@ -1657,6 +1661,9 @@ static INLINE SimpleMotionData *get_sms_arr(SimpleMotionDataBufs *sms_bufs,
     MAKE_SMS_ARR_SWITCH_CASE(4, 4);
 
     // 1:2 blocks
+#if CONFIG_BLOCK_256
+    MAKE_SMS_ARR_SWITCH_CASE(128, 256);
+#endif  // CONFIG_BLOCK_256
     MAKE_SMS_ARR_SWITCH_CASE(64, 128);
     MAKE_SMS_ARR_SWITCH_CASE(32, 64);
     MAKE_SMS_ARR_SWITCH_CASE(16, 32);
@@ -1664,6 +1671,9 @@ static INLINE SimpleMotionData *get_sms_arr(SimpleMotionDataBufs *sms_bufs,
     MAKE_SMS_ARR_SWITCH_CASE(4, 8);
 
     // 2:1 blocks
+#if CONFIG_BLOCK_256
+    MAKE_SMS_ARR_SWITCH_CASE(256, 128);
+#endif  // CONFIG_BLOCK_256
     MAKE_SMS_ARR_SWITCH_CASE(128, 64);
     MAKE_SMS_ARR_SWITCH_CASE(64, 32);
     MAKE_SMS_ARR_SWITCH_CASE(32, 16);
