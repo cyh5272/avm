@@ -2743,6 +2743,14 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
 
     RestorationInfo *rsi = &cm->rst_info[0];
 
+#if CONFIG_BLOCK_256
+    if (sb_size <= 128) {
+      rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
+    }
+    if (sb_size == 64) {
+      rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
+    }
+#else
     if (sb_size == 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }
@@ -2751,6 +2759,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
     if (rsi->restoration_unit_size > 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }
+#endif  // CONFIG_BLOCK_256
   } else {
     const int size = RESTORATION_UNITSIZE_MAX;
     for (int p = 0; p < num_planes; ++p)

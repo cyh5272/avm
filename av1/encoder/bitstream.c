@@ -3100,15 +3100,21 @@ static AOM_INLINE void encode_restoration_mode(
 
     assert(rsi->restoration_unit_size >= sb_size);
     assert(RESTORATION_UNITSIZE_MAX == 256);
-
+#if CONFIG_BLOCK_256
+    if (sb_size <= 128) {
+      aom_wb_write_bit(wb, rsi->restoration_unit_size > 128);
+    }
     if (sb_size == 64) {
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 64);
     }
-    // TODO(any): We could save a bit by adding a special case for sb_size ==
-    // 128
+#else
+    if (sb_size == 64) {
+      aom_wb_write_bit(wb, rsi->restoration_unit_size > 64);
+    }
     if (rsi->restoration_unit_size > 64) {
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 128);
     }
+#endif  // CONFIG_BLOCK_256
   }
 
   if (num_planes > 1) {
