@@ -739,8 +739,11 @@ BLOCK_SIZE av1_select_sb_size(const AV1_COMP *const cpi) {
       oxcf->resize_cfg.resize_mode == RESIZE_NONE && oxcf->speed >= 1) {
     return AOMMIN(cm->width, cm->height) > 480 ? BLOCK_128X128 : BLOCK_64X64;
   }
-
+#if CONFIG_BLOCK_256
+  return BLOCK_256X256;
+#else
   return BLOCK_128X128;
+#endif  // CONFIG_BLOCK_256
 }
 
 void av1_setup_frame(AV1_COMP *cpi) {
