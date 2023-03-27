@@ -3010,12 +3010,6 @@ static AOM_INLINE void init_allowed_partitions(
       (tree_type == CHROMA_PART && bsize == BLOCK_8X8) ||
       (has_rows && has_cols &&
        is_bsize_geq(blk_params->bsize, blk_params->min_partition_size));
-#if CONFIG_BLOCK_256
-  if (bsize == BLOCK_256X256 || bsize == BLOCK_256X128 ||
-      bsize == BLOCK_128X256) {
-    part_search_state->partition_none_allowed = 0;
-  }
-#endif  // CONFIG_BLOCK_256
   part_search_state->partition_rect_allowed[HORZ] =
       part_cfg->enable_rect_partitions &&
       is_bsize_geq(horz_subsize, blk_params->min_partition_size) &&
