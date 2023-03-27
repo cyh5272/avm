@@ -2754,6 +2754,7 @@ typedef struct AV1_COMP {
    * Resize related parameters.
    */
   ResizePendingParams resize_pending_params;
+  int resize_denominator;
 
   /*!
    * Pointer to struct holding adaptive data/contexts/models for the tile during

@@ -474,6 +474,7 @@ static size_params_type calculate_next_size_params(AV1_COMP *cpi) {
                            SCALE_NUMERATOR };
 #endif  // CONFIG_EXT_SUPERRES
   int resize_denom = SCALE_NUMERATOR;
+  cpi->resize_denominator = SCALE_NUMERATOR;
   if (is_stat_generation_stage(cpi)) return rsz;
   if (resize_pending_params->width && resize_pending_params->height) {
     rsz.resize_width = resize_pending_params->width;
@@ -482,6 +483,7 @@ static size_params_type calculate_next_size_params(AV1_COMP *cpi) {
     if (oxcf->superres_cfg.superres_mode == AOM_SUPERRES_NONE) return rsz;
   } else {
     resize_denom = calculate_next_resize_scale(cpi);
+    cpi->resize_denominator = resize_denom;
     rsz.resize_width = frm_dim_cfg->width;
     rsz.resize_height = frm_dim_cfg->height;
     av1_calculate_scaled_size(&rsz.resize_width, &rsz.resize_height,
