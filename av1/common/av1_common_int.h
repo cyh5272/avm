@@ -2819,6 +2819,9 @@ static INLINE void txfm_partition_update(TXFM_CONTEXT *above_ctx,
 
 static INLINE TX_SIZE get_sqr_tx_size(int tx_dim) {
   switch (tx_dim) {
+#if CONFIG_BLOCK_256
+    case 256:
+#endif  // CONFIG_BLOCK_256
     case 128:
     case 64: return TX_64X64; break;
     case 32: return TX_32X32; break;
@@ -2993,7 +2996,7 @@ static INLINE int txfm_partition_split4_inter_context(
         (txsize_sqr_up_map[tx_size] != max_tx_size && max_tx_size > TX_8X8) +
         (TX_SIZES - 1 - max_tx_size) * 2;
   }
-  assert(category != TXFM_PARTITION_INTER_CONTEXTS);
+  assert(category < TXFM_PARTITION_INTER_CONTEXTS);
   return category * 3 + above + left;
 }
 
