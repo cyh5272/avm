@@ -398,7 +398,11 @@ typedef struct CHROMA_REF_INFO {
   BLOCK_SIZE bsize_base;
 } CHROMA_REF_INFO;
 
+#if CONFIG_BLOCK_256
+#define INTER_TX_SIZE_BUF_LEN 64
+#else
 #define INTER_TX_SIZE_BUF_LEN 16
+#endif  // CONFIG_BLOCK_256
 #define TXK_TYPE_BUF_LEN 64
 /*!\endcond */
 
