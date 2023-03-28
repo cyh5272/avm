@@ -2614,10 +2614,14 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
                                        const PARTITION_TREE *ptree_luma,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
                                        aom_writer *w) {
-  if (!is_partition_point(bsize)) return;
+  if (!is_partition_point(bsize)) {
+    return;
+  }
 
   const int plane = xd->tree_type == CHROMA_PART;
-  if (bsize == BLOCK_8X8 && plane > 0) return;
+  if (bsize == BLOCK_8X8 && plane > 0) {
+    return;
+  }
 
 #if CONFIG_EXT_RECUR_PARTITIONS
   const int ssx = cm->seq_params.subsampling_x;

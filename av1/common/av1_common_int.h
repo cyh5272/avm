@@ -2601,7 +2601,11 @@ static INLINE void set_blk_offsets(const CommonModeInfoParams *const mi_params,
 // Currently this is set to BLOCK_128X128 (e.g. chroma always follows luma at
 // BLOCK_128X128, but can be de-coupled later).
 static AOM_INLINE bool is_bsize_above_decoupled_thresh(BLOCK_SIZE bsize) {
+#if CONFIG_BLOCK_256
+  return bsize >= BLOCK_128X128 && bsize <= BLOCK_256X256;
+#else
   return bsize == BLOCK_128X128;
+#endif  // CONFIG_BLOCK_256
 }
 
 // Whether the partition tree contains a block size that is strictly smaller

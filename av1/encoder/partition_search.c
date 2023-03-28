@@ -2224,9 +2224,15 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
   const int track_ptree_luma =
       is_luma_chroma_share_same_partition(xd->tree_type, ptree_luma, bsize);
 
-  if (track_ptree_luma && partition != PARTITION_NONE) {
-    assert(ptree_luma);
-    assert(ptree_luma->sub_tree);
+  if (track_ptree_luma) {
+    assert(partition ==
+           sdp_chroma_part_from_luma(bsize, ptree_luma->partition,
+                                     cm->seq_params.subsampling_x,
+                                     cm->seq_params.subsampling_x));
+    if (partition != PARTITION_NONE) {
+      assert(ptree_luma);
+      assert(ptree_luma->sub_tree);
+    }
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   switch (partition) {
@@ -3403,9 +3409,17 @@ static AOM_INLINE int is_rect_part_allowed(
 #if CONFIG_EXT_RECUR_PARTITIONS
 static AOM_INLINE PARTITION_TYPE get_forced_partition_type(
     const AV1_COMMON *const cm, MACROBLOCK *x, int mi_row, int mi_col,
-    BLOCK_SIZE bsize, const PARTITION_TREE *template_tree) {
+    BLOCK_SIZE bsize, const PARTITION_TREE *template_tree,
+    const PARTITION_TREE *ptree_luma) {
   if (template_tree) {
     return template_tree->partition;
+  }
+
+  const int ssx = cm->seq_params.subsampling_x;
+  const int ssy = cm->seq_params.subsampling_y;
+  if (is_luma_chroma_share_same_partition(x->e_mbd.tree_type, ptree_luma,
+                                          bsize)) {
+    return sdp_chroma_part_from_luma(bsize, ptree_luma->partition, ssx, ssy);
   }
 
   if (should_reuse_mode(x, REUSE_PARTITION_MODE_FLAG)) {
@@ -3450,7 +3464,7 @@ static void rectangular_partition_search(
   const int ss_y = xd->plane[1].subsampling_y;
   PARTITION_TYPE forced_partition =
       get_forced_partition_type(cm, x, blk_params.mi_row, blk_params.mi_col,
-                                blk_params.bsize, template_tree);
+                                blk_params.bsize, template_tree, ptree_luma);
 #else   // !CONFIG_EXT_RECUR_PARTITIONS
   (void)part_none_rd;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -5118,8 +5132,8 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
                                      mi_row, mi_col, bsize);
   PartitionBlkParams blk_params = part_search_state.part_blk_params;
 #if CONFIG_EXT_RECUR_PARTITIONS
-  PARTITION_TYPE forced_partition =
-      get_forced_partition_type(cm, x, mi_row, mi_col, bsize, template_tree);
+  PARTITION_TYPE forced_partition = get_forced_partition_type(
+      cm, x, mi_row, mi_col, bsize, template_tree, ptree_luma);
   if (sms_tree != NULL)
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
     sms_tree->partitioning = PARTITION_NONE;
@@ -5263,7 +5277,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 #if CONFIG_EXT_RECUR_PARTITIONS
     forced_partition =
         get_forced_partition_type(cm, x, blk_params.mi_row, blk_params.mi_col,
-                                  blk_params.bsize, template_tree);
+                                  blk_params.bsize, template_tree, ptree_luma);
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
