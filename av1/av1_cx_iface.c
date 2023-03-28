@@ -490,7 +490,11 @@ static struct av1_extracfg default_extra_cfg = {
   1,    // enable joint mvd coding
 #endif  // CONFIG_JOINT_MVD
   4,    // min_partition_size
-  128,  // max_partition_size
+#if CONFIG_BLOCK_256
+  256,  // max_partition_size
+#else
+  128,                      // max_partition_size
+#endif  // CONFIG_BLOCK_256
   1,    // enable intra edge filter
   1,    // frame order hint
   1,    // enable 64-pt transform usage
@@ -835,6 +839,15 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   RANGE_CHECK(extra_cfg, mode_cost_upd_freq, 0, 2);
   RANGE_CHECK(extra_cfg, mv_cost_upd_freq, 0, 3);
 
+#if CONFIG_BLOCK_256
+  RANGE_CHECK(extra_cfg, min_partition_size, 4, 256);
+  // when sdp is enabled, the maximum partition size must be equal to or greater
+  // than 8x8
+  if (extra_cfg->enable_sdp)
+    RANGE_CHECK(extra_cfg, max_partition_size, 8, 256);
+  else
+    RANGE_CHECK(extra_cfg, max_partition_size, 4, 256);
+#else
   RANGE_CHECK(extra_cfg, min_partition_size, 4, 128);
   // when sdp is enabled, the maximum partition size must be equal to or greater
   // than 8x8
@@ -842,6 +855,7 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
     RANGE_CHECK(extra_cfg, max_partition_size, 8, 128);
   else
     RANGE_CHECK(extra_cfg, max_partition_size, 4, 128);
+#endif  // CONFIG_BLOCK_256
   RANGE_CHECK_HI(extra_cfg, min_partition_size, extra_cfg->max_partition_size);
 
   for (int i = 0; i < MAX_NUM_OPERATING_POINTS; ++i) {

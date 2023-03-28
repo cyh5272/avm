@@ -235,12 +235,12 @@ typedef struct {
    * Indicates the minimum partition size that should be allowed. Both width and
    * height of a partition cannot be smaller than the min_partition_size.
    */
-  BLOCK_SIZE min_partition_size;
+  unsigned int min_partition_size;
   /*!
    * Indicates the maximum partition size that should be allowed. Both width and
    * height of a partition cannot be larger than the max_partition_size.
    */
-  BLOCK_SIZE max_partition_size;
+  unsigned int max_partition_size;
 } PartitionCfg;
 
 /*!
