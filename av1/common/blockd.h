@@ -1331,8 +1331,13 @@ typedef struct macroblockd_plane {
   // - Current superblock, on decoder side.
   uint8_t *color_index_map;
 
+#if CONFIG_BLOCK_256
+  // block size in pixels
+  uint16_t width, height;
+#else
   // block size in pixels
   uint8_t width, height;
+#endif  // CONFIG_BLOCK_256
 
   qm_val_t *seg_iqmatrix[MAX_SEGMENTS][TX_SIZES_ALL];
   qm_val_t *seg_qmatrix[MAX_SEGMENTS][TX_SIZES_ALL];
