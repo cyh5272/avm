@@ -3163,8 +3163,12 @@ static INLINE int is_motion_variation_allowed_compound(
   return !has_second_ref(mbmi);
 }
 
+#if CONFIG_BLOCK_256
+static const int max_neighbor_obmc[MAX_SB_SIZE - 1] = { 0, 1, 2, 3, 4, 4, 4 };
+#else
 // input: log2 of length, 0(4), 1(8), ...
-static const int max_neighbor_obmc[6] = { 0, 1, 2, 3, 4, 4 };
+static const int max_neighbor_obmc[MAX_SB_SIZE - 1] = { 0, 1, 2, 3, 4, 4 };
+#endif  // BLOCK_256
 
 static INLINE int check_num_overlappable_neighbors(const MB_MODE_INFO *mbmi) {
   return !(mbmi->overlappable_neighbors[0] == 0 &&
