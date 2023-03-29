@@ -39,7 +39,11 @@ if ($opts{arch} eq "x86_64") {
   $avx2_x86_64 = 'avx2';
 }
 
-@block_widths = (4, 8, 16, 32, 64, 128);
+if (aom_config("CONFIG_BLOCK_256") eq "yes"){
+  @block_widths = (4, 8, 16, 32, 64, 128, 256);
+} else {
+  @block_widths = (4, 8, 16, 32, 64, 128);
+}
 
 @block_sizes = ();
 foreach $w (@block_widths) {
@@ -291,7 +295,7 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     add_proto qw/unsigned int/, "aom_highbd_sad${w}x${h}", "const uint16_t *src_ptr, int src_stride, const uint16_t *ref_ptr, int ref_stride";
     add_proto qw/unsigned int/, "aom_highbd_sad_skip_${w}x${h}", "const uint16_t *src_ptr, int src_stride, const uint16_t *ref_ptr, int ref_stride";
     add_proto qw/unsigned int/, "aom_highbd_sad${w}x${h}_avg", "const uint16_t *src_ptr, int src_stride, const uint16_t *ref_ptr, int ref_stride, const uint16_t *second_pred";
-    if ($w != 128 && $h != 128 && $w != 4) {
+    if ($w != 128 && $h != 128 && $w != 4 && $w != 256 && $h != 256) {
       specialize "aom_highbd_sad${w}x${h}", qw/sse2/;
       specialize "aom_highbd_sad${w}x${h}_avg", qw/sse2/;
     }
@@ -368,7 +372,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   foreach (@block_sizes) {
     ($w, $h) = @$_;
     add_proto qw/unsigned int/, "aom_highbd_masked_sad${w}x${h}", "const uint16_t *src8, int src_stride, const uint16_t *ref8, int ref_stride, const uint16_t *second_pred8, const uint8_t *msk, int msk_stride, int invert_mask";
-    specialize "aom_highbd_masked_sad${w}x${h}", qw/ssse3 avx2/;
+    if ($w != 256 && $h != 256) {
+      specialize "aom_highbd_masked_sad${w}x${h}", qw/ssse3 avx2/;
+    }
   }
 
   #
@@ -377,7 +383,7 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   foreach (@block_sizes) {
     ($w, $h) = @$_;
     add_proto qw/unsigned int/, "aom_highbd_obmc_sad${w}x${h}", "const uint16_t *pre, int pre_stride, const int32_t *wsrc, const int32_t *mask";
-    if (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128))) {
+    if (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128)) && $w != 256 && $h != 256) {
       specialize "aom_highbd_obmc_sad${w}x${h}", qw/sse4_1 avx2/;
     }
   }
@@ -389,7 +395,7 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     ($w, $h) = @$_;
     add_proto qw/void/, "aom_highbd_sad${w}x${h}x4d", "const uint16_t *src_ptr, int src_stride, const uint16_t * const ref_ptr[], int ref_stride, uint32_t *sad_array";
     add_proto qw/void/, "aom_highbd_sad_skip_${w}x${h}x4d", "const uint16_t *src_ptr, int src_stride, const uint16_t * const ref_ptr[], int ref_stride, uint32_t *sad_array";
-    if ($w != 128 && $h != 128) {
+    if ($w != 128 && $h != 128 && $w != 256 && $h != 256) {
       specialize "aom_highbd_sad${w}x${h}x4d", qw/sse2/;
     }
   }
@@ -524,21 +530,19 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
       add_proto qw/unsigned int/, "aom_highbd_${bd}_variance${w}x${h}", "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse";
       add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_variance${w}x${h}", "const uint16_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse";
       add_proto qw/uint32_t/, "aom_highbd_${bd}_sub_pixel_avg_variance${w}x${h}", "const uint16_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse, const uint16_t *second_pred";
-      if ($w != 128 && $h != 128 && $w != 4 && $h != 4) {
+      if ($w != 128 && $h != 128 && $w != 4 && $h != 4 && $w != 256 && $h != 256) {
         specialize "aom_highbd_${bd}_variance${w}x${h}", "sse2";
       }
       # TODO(rachelbarker): When ext-partition-types is enabled, we currently
       # don't have vectorized 4x16 highbd variance functions
       if ($w == 4 && $h == 4) {
           specialize "aom_highbd_${bd}_variance${w}x${h}", "sse4_1";
-        }
-      if ($w != 128 && $h != 128 && $w != 4) {
-        specialize "aom_highbd_${bd}_sub_pixel_variance${w}x${h}", qw/sse2/;
-        specialize "aom_highbd_${bd}_sub_pixel_avg_variance${w}x${h}", qw/sse2/;
-      }
-      if ($w == 4 && $h == 4) {
         specialize "aom_highbd_${bd}_sub_pixel_variance${w}x${h}", "sse4_1";
         specialize "aom_highbd_${bd}_sub_pixel_avg_variance${w}x${h}", "sse4_1";
+      }
+      if ($w != 128 && $h != 128 && $w != 4 && $w != 256 && $h != 256) {
+        specialize "aom_highbd_${bd}_sub_pixel_variance${w}x${h}", qw/sse2/;
+        specialize "aom_highbd_${bd}_sub_pixel_avg_variance${w}x${h}", qw/sse2/;
       }
 
       add_proto qw/uint32_t/, "aom_highbd_${bd}_dist_wtd_sub_pixel_avg_variance${w}x${h}", "const uint16_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse, const uint16_t *second_pred, const DIST_WTD_COMP_PARAMS* jcp_param";
@@ -551,7 +555,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     foreach (@block_sizes) {
       ($w, $h) = @$_;
       add_proto qw/unsigned int/, "aom_highbd${bd}masked_sub_pixel_variance${w}x${h}", "const uint16_t *src, int src_stride, int xoffset, int yoffset, const uint16_t *ref, int ref_stride, const uint16_t *second_pred, const uint8_t *msk, int msk_stride, int invert_mask, unsigned int *sse";
-      specialize "aom_highbd${bd}masked_sub_pixel_variance${w}x${h}", qw/ssse3/;
+      if ($w != 256 && $h != 256) {
+        specialize "aom_highbd${bd}masked_sub_pixel_variance${w}x${h}", qw/ssse3/;
+      }
     }
   }
 
@@ -563,7 +569,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
       ($w, $h) = @$_;
       add_proto qw/unsigned int/, "aom_highbd${bd}obmc_variance${w}x${h}", "const uint16_t *pre, int pre_stride, const int32_t *wsrc, const int32_t *mask, unsigned int *sse";
       add_proto qw/unsigned int/, "aom_highbd${bd}obmc_sub_pixel_variance${w}x${h}", "const uint16_t *pre, int pre_stride, int xoffset, int yoffset, const int32_t *wsrc, const int32_t *mask, unsigned int *sse";
-      specialize "aom_highbd${bd}obmc_variance${w}x${h}", qw/sse4_1/;
+      if ($w != 256 && $h != 256) {
+        specialize "aom_highbd${bd}obmc_variance${w}x${h}", qw/sse4_1/;
+      }
     }
   }
 
