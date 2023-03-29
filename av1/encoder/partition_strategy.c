@@ -1254,6 +1254,7 @@ int av1_ml_predict_breakout(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
       nn_config = &av1_partition_breakout_nnconfig_128;
       thresh = cpi->sf.part_sf.ml_partition_search_breakout_thresh[4];
       break;
+    case BLOCK_256X256: return 0; break;
     default: assert(0 && "Unexpected bsize.");
   }
   if (!nn_config || thresh < 0) return 0;
