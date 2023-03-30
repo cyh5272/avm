@@ -611,6 +611,10 @@ void av1_simple_motion_search_early_term_none(
     ml_mean = av1_simple_motion_search_term_none_mean_16;
     ml_std = av1_simple_motion_search_term_none_std_16;
     ml_model = av1_simple_motion_search_term_none_model_16;
+#if CONFIG_BLOCK_256
+  } else if (bsize == BLOCK_256X256) {
+    return;
+#endif  // CONFIG_BLOCK_256
   } else {
     assert(0 && "Unexpected block size in simple_motion_term_none");
   }

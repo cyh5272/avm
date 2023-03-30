@@ -319,6 +319,9 @@ static void set_good_speed_feature_framesize_dependent(
       sf->inter_sf.prune_ref_mv_idx_search = 1;
     }
   }
+#if CONFIG_BLOCK_256
+  sf->part_sf.use_square_partition_only_threshold = BLOCK_MAX;
+#endif  // CONFIG_BLOCK_256
 }
 
 static void set_good_speed_features_framesize_independent(
