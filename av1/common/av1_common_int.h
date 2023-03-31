@@ -2501,15 +2501,15 @@ static INLINE void av1_zero_left_context(MACROBLOCKD *const xd) {
 #pragma GCC diagnostic warning "-Warray-bounds"
 #endif
 
-static INLINE void set_txfm_ctx(TXFM_CONTEXT *txfm_ctx, uint8_t txs, int len) {
+static INLINE void set_txfm_ctx(TXFM_CONTEXT *txfm_ctx, uint16_t txs, int len) {
   int i;
   for (i = 0; i < len; ++i) txfm_ctx[i] = txs;
 }
 
 static INLINE void set_txfm_ctxs(TX_SIZE tx_size, int n4_w, int n4_h, int skip,
                                  const MACROBLOCKD *xd) {
-  uint8_t bw = tx_size_wide[tx_size];
-  uint8_t bh = tx_size_high[tx_size];
+  uint16_t bw = tx_size_wide[tx_size];
+  uint16_t bh = tx_size_high[tx_size];
 
   if (skip) {
     bw = n4_w * MI_SIZE;
