@@ -962,7 +962,7 @@ enum {
 #else
 #define TXFM_PARTITION_CONTEXTS ((TX_SIZES - TX_8X8) * 6 - 3)
 #endif  // CONFIG_NEW_TX_PARTITION
-typedef uint8_t TXFM_CONTEXT;
+typedef uint16_t TXFM_CONTEXT;
 
 #if CONFIG_TIP
 #define TIP_CONTEXTS 3
