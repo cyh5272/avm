@@ -3332,14 +3332,12 @@ static void rd_pick_rect_partition(
   RD_STATS best_remain_rdcost;
   PC_TREE **sub_tree =
       (rect_type == HORZ) ? pc_tree->horizontal : pc_tree->vertical;
-  const int track_ptree_luma =
-      ptree_luma && ptree_luma->partition == partition_type;
   *both_blocks_skippable = true;
   av1_rd_stats_subtraction(x->rdmult, best_rdc, sum_rdc, &best_remain_rdcost);
   bool partition_found = av1_rd_pick_partition(
       cpi, td, tile_data, tp, mi_pos_rect[rect_type][0][0],
       mi_pos_rect[rect_type][0][1], bsize, &this_rdc, best_remain_rdcost,
-      sub_tree[0], track_ptree_luma ? ptree_luma->sub_tree[0] : NULL,
+      sub_tree[0], get_partition_subtree_const(ptree_luma, 0),
       get_partition_subtree_const(template_tree, 0), max_recursion_depth, NULL,
       NULL, multi_pass_mode, NULL);
   av1_rd_cost_update(x->rdmult, &this_rdc);
@@ -3359,7 +3357,7 @@ static void rd_pick_rect_partition(
     partition_found = av1_rd_pick_partition(
         cpi, td, tile_data, tp, mi_pos_rect[rect_type][1][0],
         mi_pos_rect[rect_type][1][1], bsize, &this_rdc, best_remain_rdcost,
-        sub_tree[1], track_ptree_luma ? ptree_luma->sub_tree[1] : NULL,
+        sub_tree[1], get_partition_subtree_const(ptree_luma, 1),
         get_partition_subtree_const(template_tree, 1), max_recursion_depth,
         NULL, NULL, multi_pass_mode, NULL);
     av1_rd_cost_update(x->rdmult, &this_rdc);
@@ -3607,10 +3605,16 @@ static void rectangular_partition_search(
 
     bool both_blocks_skippable = true;
 
+    const int track_ptree_luma =
+        is_luma_chroma_share_same_partition(x->e_mbd.tree_type, ptree_luma,
+                                            bsize) &&
+        partition_type ==
+            sdp_chroma_part_from_luma(bsize, ptree_luma->partition, ss_x, ss_y);
     rd_pick_rect_partition(
         cpi, td, tile_data, tp, x, pc_tree, part_search_state, best_rdc, i,
         mi_pos_rect, blk_params.subsize, is_not_edge_block, multi_pass_mode,
-        ptree_luma, template_tree, &both_blocks_skippable, max_recursion_depth);
+        track_ptree_luma ? ptree_luma : NULL, template_tree,
+        &both_blocks_skippable, max_recursion_depth);
 #else
     int sub_part_idx = 0;
     for (int j = 0; j < SUB_PARTITIONS_RECT; j++) {
@@ -5312,6 +5316,13 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 
     // TODO(yuec): Need to make sure there is at least one valid partition
     // mode
+    assert(IMPLIES(
+        is_luma_chroma_share_same_partition(xd->tree_type, ptree_luma, bsize),
+        forced_partition == PARTITION_INVALID ||
+            forced_partition == sdp_chroma_part_from_luma(
+                                    bsize, ptree_luma->partition,
+                                    cpi->common.seq_params.subsampling_x,
+                                    cpi->common.seq_params.subsampling_x)));
   }
 #else   // CONFIG_EXT_RECUR_PARTITIONS
   const CommonModeInfoParams *const mi_params = &cm->mi_params;

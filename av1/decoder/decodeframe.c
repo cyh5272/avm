@@ -2167,7 +2167,7 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #endif
                                         PARTITION_TREE *ptree,
 #if CONFIG_EXT_RECUR_PARTITIONS
-                                        PARTITION_TREE *ptree_luma,
+                                        const PARTITION_TREE *ptree_luma,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
                                         int parse_decode_flag) {
   assert(bsize < BLOCK_SIZES_ALL);
@@ -2244,6 +2244,13 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
                              bsize);
 
+#if CONFIG_EXT_RECUR_PARTITIONS
+    if (!is_luma_chroma_share_same_partition(xd->tree_type, ptree_luma,
+                                             bsize)) {
+      ptree_luma = NULL;
+    }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+
     ptree->partition = partition;
 
     switch (partition) {
@@ -2309,9 +2316,6 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                        block_size_wide[test_subsize],
                        block_size_high[test_subsize]);
   }
-
-  const int track_ptree_luma =
-      ptree_luma ? (partition == ptree_luma->partition) : 0;
 #else
   if (get_plane_block_size(subsize, pd_u->subsampling_x, pd_u->subsampling_y) ==
       BLOCK_INVALID) {
@@ -2328,10 +2332,10 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                                  reader, DEC_BLOCK_EPT_ARG(db_subsize), ptree, \
                                  index)
 #if CONFIG_FLEX_MVRES && CONFIG_EXT_RECUR_PARTITIONS
-#define DEC_PARTITION(db_r, db_c, db_subsize, index)                      \
-  decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader,      \
-                   (db_subsize), sbi, ptree->sub_tree[(index)],           \
-                   track_ptree_luma ? ptree_luma->sub_tree[index] : NULL, \
+#define DEC_PARTITION(db_r, db_c, db_subsize, index)                 \
+  decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader, \
+                   (db_subsize), sbi, ptree->sub_tree[(index)],      \
+                   get_partition_subtree_const(ptree_luma, index),   \
                    parse_decode_flag)
 #elif CONFIG_FLEX_MVRES
 #define DEC_PARTITION(db_r, db_c, db_subsize, index)                 \
@@ -2339,10 +2343,10 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                    (db_subsize), sbi, ptree->sub_tree[(index)],      \
                    parse_decode_flag)
 #elif CONFIG_EXT_RECUR_PARTITIONS
-#define DEC_PARTITION(db_r, db_c, db_subsize, index)                      \
-  decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader,      \
-                   (db_subsize), ptree->sub_tree[(index)],                \
-                   track_ptree_luma ? ptree_luma->sub_tree[index] : NULL, \
+#define DEC_PARTITION(db_r, db_c, db_subsize, index)                 \
+  decode_partition(pbi, td, DEC_BLOCK_STX_ARG(db_r), (db_c), reader, \
+                   (db_subsize), ptree->sub_tree[(index)],           \
+                   get_partition_subtree_const(ptree_luma, index),   \
                    parse_decode_flag)
 #else
 #define DEC_PARTITION(db_r, db_c, db_subsize, index)                 \
