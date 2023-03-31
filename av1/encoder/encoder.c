@@ -1955,7 +1955,8 @@ static void init_motion_estimation(AV1_COMP *cpi) {
 
 #define COUPLED_CHROMA_FROM_LUMA_RESTORATION 0
 static void set_restoration_unit_size(int width, int height, int sx, int sy,
-                                      RestorationInfo *rst) {
+                                      RestorationInfo *rst,
+                                      BLOCK_SIZE sb_size) {
   (void)width;
   (void)height;
   (void)sx;
@@ -1969,7 +1970,8 @@ static void set_restoration_unit_size(int width, int height, int sx, int sy,
   if (width * height > 352 * 288)
     rst[0].restoration_unit_size = RESTORATION_UNITSIZE_MAX;
   else
-    rst[0].restoration_unit_size = (RESTORATION_UNITSIZE_MAX >> 1);
+    rst[0].restoration_unit_size =
+        AOMMAX((RESTORATION_UNITSIZE_MAX >> 1), block_size_wide[sb_size]);
   rst[1].restoration_unit_size = rst[0].restoration_unit_size >> s;
   rst[2].restoration_unit_size = rst[1].restoration_unit_size;
 }
@@ -2112,9 +2114,9 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
 
   const int frame_width = cm->superres_upscaled_width;
   const int frame_height = cm->superres_upscaled_height;
-  set_restoration_unit_size(frame_width, frame_height,
-                            seq_params->subsampling_x,
-                            seq_params->subsampling_y, cm->rst_info);
+  set_restoration_unit_size(
+      frame_width, frame_height, seq_params->subsampling_x,
+      seq_params->subsampling_y, cm->rst_info, cm->seq_params.sb_size);
   for (int i = 0; i < num_planes; ++i)
     cm->rst_info[i].frame_restoration_type = RESTORE_NONE;
 
