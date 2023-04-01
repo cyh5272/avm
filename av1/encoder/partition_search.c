@@ -3708,10 +3708,15 @@ static void rectangular_partition_search(
 #if CONFIG_EXT_RECUR_PARTITIONS
     if (sum_rdc->rdcost < INT64_MAX && both_blocks_skippable &&
         !frame_is_intra_only(cm)) {
-      const int64_t dist_breakout_thr =
-          (int64_t)(cpi->sf.part_sf.partition_search_breakout_dist_thr / 4) >>
-          ((2 * (BLOCK_32_SIZE_LOG2)) -
+      const int right_shift =
+          ((2 * (BLOCK_128_MI_SIZE_LOG2)) -
            (mi_size_wide_log2[bsize] + mi_size_high_log2[bsize]));
+      const int64_t dist_breakout_thr =
+          (right_shift >= 0)
+              ? ((cpi->sf.part_sf.partition_search_breakout_dist_thr / 4) >>
+                 right_shift)
+              : ((cpi->sf.part_sf.partition_search_breakout_dist_thr / 4)
+                 << (-right_shift));
       const int rate_breakout_thr =
           (int64_t)25 * cpi->sf.part_sf.partition_search_breakout_rate_thr *
           num_pels_log2_lookup[bsize];
@@ -4278,10 +4283,15 @@ static void prune_partitions_after_none(AV1_COMP *const cpi, MACROBLOCK *x,
     }
 
     // Adjust dist breakout threshold according to the partition size.
-    const int64_t dist_breakout_thr =
-        cpi->sf.part_sf.partition_search_breakout_dist_thr >>
-        ((2 * (BLOCK_32_SIZE_LOG2)) -
+    const int right_shift =
+        ((2 * (BLOCK_128_MI_SIZE_LOG2)) -
          (mi_size_wide_log2[bsize] + mi_size_high_log2[bsize]));
+    const int64_t dist_breakout_thr =
+        (right_shift >= 0)
+            ? (cpi->sf.part_sf.partition_search_breakout_dist_thr >>
+               right_shift)
+            : (cpi->sf.part_sf.partition_search_breakout_dist_thr
+               << (-right_shift));
     const int rate_breakout_thr =
         cpi->sf.part_sf.partition_search_breakout_rate_thr *
         num_pels_log2_lookup[bsize];

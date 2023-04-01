@@ -2713,8 +2713,13 @@ int av1_full_pixel_search(const FULLPEL_MV start_mv,
   // Should we allow a follow on exhaustive search?
   if (!run_mesh_search && search_method == NSTEP) {
     int exhaustive_thr = ms_params->force_mesh_thresh;
-    exhaustive_thr >>=
+    const int right_shift =
         10 - (mi_size_wide_log2[bsize] + mi_size_high_log2[bsize]);
+    if (right_shift >= 0) {
+      exhaustive_thr >>= right_shift;
+    } else {
+      exhaustive_thr <<= (-right_shift);
+    }
     // Threshold variance for an exhaustive full search.
     if (var > exhaustive_thr) run_mesh_search = 1;
   }
