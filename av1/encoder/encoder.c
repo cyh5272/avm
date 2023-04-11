@@ -2224,6 +2224,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
     if (cm->cdef_info.cdef_frame_enable)
 #endif  // CONFIG_FIX_CDEF_SYNTAX
       av1_cdef_frame(&cm->cur_frame->buf, cm, xd);
+
 #if CONFIG_COLLECT_COMPONENT_TIMING
     end_timing(cpi, cdef_time);
 #endif
