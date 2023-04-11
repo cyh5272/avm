@@ -3081,9 +3081,20 @@ static AOM_INLINE void encode_restoration_mode(
 #endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
+#if CONFIG_BLOCK_256
+    assert(cm->seq_params.sb_size == BLOCK_64X64 ||
+           cm->seq_params.sb_size == BLOCK_128X128 ||
+           cm->seq_params.sb_size == BLOCK_256X256);
+#else
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
            cm->seq_params.sb_size == BLOCK_128X128);
-    const int sb_size = cm->seq_params.sb_size == BLOCK_128X128 ? 128 : 64;
+#endif  // CONFIG_BLOCK_256
+    const int sb_size =
+#if CONFIG_BLOCK_256
+        cm->seq_params.sb_size == BLOCK_256X256 ? 256 :
+#endif  // CONFIG_BLOCK_256
+        cm->seq_params.sb_size == BLOCK_128X128 ? 128
+                                                : 64;
 
     RestorationInfo *rsi = &cm->rst_info[0];
 
@@ -3093,6 +3104,8 @@ static AOM_INLINE void encode_restoration_mode(
     if (sb_size == 64) {
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 64);
     }
+    // TODO(any): We could save a bit by adding a special case for sb_size ==
+    // 128
     if (rsi->restoration_unit_size > 64) {
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 128);
     }

@@ -5534,9 +5534,9 @@ BEGIN_PARTITION_SEARCH:
       &cm->mi_params, xd->tree_type, part_search_state.ss_x,
       part_search_state.ss_y, mi_row, mi_col, bsize, &pc_tree->chroma_ref_info,
       NULL);
-  const int partition_3_allowed =
-      ext_partition_allowed && bsize != BLOCK_128X128 &&
-      max_recursion_depth > 0 && cpi->oxcf.part_cfg.enable_ext_partitions;
+  const int partition_3_allowed = ext_partition_allowed &&
+                                  max_recursion_depth > 0 &&
+                                  cpi->oxcf.part_cfg.enable_ext_partitions;
   const int is_wide_block = block_size_wide[bsize] > block_size_high[bsize];
   const int is_tall_block = block_size_wide[bsize] < block_size_high[bsize];
   const PARTITION_SPEED_FEATURES *part_sf = &cpi->sf.part_sf;

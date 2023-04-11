@@ -2278,8 +2278,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
   const BLOCK_SIZE subsize = get_partition_subsize(bsize, partition);
   if (subsize == BLOCK_INVALID) {
     aom_internal_error(xd->error_info, AOM_CODEC_CORRUPT_FRAME,
-                       "Partition is invalid for block size %dx%d",
-                       block_size_wide[bsize], block_size_high[bsize]);
+                       "Partition %d is invalid for block size %dx%d",
+                       partition, block_size_wide[bsize],
+                       block_size_high[bsize]);
   }
   // Check the bitstream is conformant: if there is subsampling on the
   // chroma planes, subsize must subsample to a valid block size.
@@ -2722,9 +2723,20 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
 #endif  // CONFIG_WIENER_NONSEP
   }
   if (!all_none) {
+#if CONFIG_BLOCK_256
+    assert(cm->seq_params.sb_size == BLOCK_64X64 ||
+           cm->seq_params.sb_size == BLOCK_128X128 ||
+           cm->seq_params.sb_size == BLOCK_256X256);
+#else
     assert(cm->seq_params.sb_size == BLOCK_64X64 ||
            cm->seq_params.sb_size == BLOCK_128X128);
-    const int sb_size = cm->seq_params.sb_size == BLOCK_128X128 ? 128 : 64;
+#endif  // CONFIG_BLOCK_256
+    const int sb_size =
+#if CONFIG_BLOCK_256
+        cm->seq_params.sb_size == BLOCK_256X256 ? 256 :
+#endif  // CONFIG_BLOCK_256
+        cm->seq_params.sb_size == BLOCK_128X128 ? 128
+                                                : 64;
 
     for (int p = 0; p < num_planes; ++p)
       cm->rst_info[p].restoration_unit_size = sb_size;
@@ -2734,6 +2746,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
     if (sb_size == 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }
+    // TODO(any): We could save a bit by adding a special case for sb_size ==
+    // 128
     if (rsi->restoration_unit_size > 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }

@@ -279,6 +279,7 @@ static BLOCK_SIZE dim_to_size(int dim) {
     case 32: return BLOCK_32X32;
     case 64: return BLOCK_64X64;
     case 128: return BLOCK_128X128;
+    case 256: return BLOCK_256X256;
     default: assert(0); return 0;
   }
 }

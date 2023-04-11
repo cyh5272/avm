@@ -849,6 +849,7 @@ static INLINE int get_sqr_bsize_idx(BLOCK_SIZE bsize) {
     case BLOCK_32X32: return 3;
     case BLOCK_64X64: return 4;
     case BLOCK_128X128: return 5;
+    case BLOCK_256X256: return 6;
     default: return SQR_BLOCK_SIZES;
   }
 }

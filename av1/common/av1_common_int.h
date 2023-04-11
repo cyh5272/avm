@@ -2312,7 +2312,11 @@ static INLINE void partition_gather_horz_alike(aom_cdf_prob *out,
   out[0] -= cdf_element_prob(in, PARTITION_HORZ_A);
   out[0] -= cdf_element_prob(in, PARTITION_HORZ_B);
   out[0] -= cdf_element_prob(in, PARTITION_VERT_A);
+#if CONFIG_BLOCK_256
+  if (bsize < BLOCK_128X128) out[0] -= cdf_element_prob(in, PARTITION_HORZ_4);
+#else
   if (bsize != BLOCK_128X128) out[0] -= cdf_element_prob(in, PARTITION_HORZ_4);
+#endif  // CONFIG_BLOCK_256
   out[0] = AOM_ICDF(out[0]);
   out[1] = AOM_ICDF(CDF_PROB_TOP);
 }
@@ -2327,7 +2331,11 @@ static INLINE void partition_gather_vert_alike(aom_cdf_prob *out,
   out[0] -= cdf_element_prob(in, PARTITION_HORZ_A);
   out[0] -= cdf_element_prob(in, PARTITION_VERT_A);
   out[0] -= cdf_element_prob(in, PARTITION_VERT_B);
+#if CONFIG_BLOCK_256
+  if (bsize < BLOCK_128X128) out[0] -= cdf_element_prob(in, PARTITION_VERT_4);
+#else
   if (bsize != BLOCK_128X128) out[0] -= cdf_element_prob(in, PARTITION_VERT_4);
+#endif  // CONFIG_BLOCK_256
   out[0] = AOM_ICDF(out[0]);
   out[1] = AOM_ICDF(CDF_PROB_TOP);
 }
@@ -2413,10 +2421,14 @@ static INLINE int partition_plane_context(const MACROBLOCKD *xd, int mi_row,
 // Return the number of elements in the partition CDF when
 // partitioning the (square) block with luma block size of bsize.
 static INLINE int partition_cdf_length(BLOCK_SIZE bsize) {
-  if (bsize <= BLOCK_8X8)
-    return PARTITION_TYPES;
+  if (bsize <= BLOCK_8X8) return PARTITION_TYPES;
+#if CONFIG_BLOCK_256
+  else if (bsize >= BLOCK_128X128)
+    return EXT_PARTITION_TYPES - 2;
+#else
   else if (bsize == BLOCK_128X128)
     return EXT_PARTITION_TYPES - 2;
+#endif  // CONFIG_BLOCK_256
   else
     return EXT_PARTITION_TYPES;
 }
