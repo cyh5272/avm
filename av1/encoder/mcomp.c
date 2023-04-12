@@ -5362,7 +5362,6 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   MV *best_mv = &mbmi->mv[0].as_mv;
   WarpedMotionParams best_wm_params;
   int rate, sse;
-  int delta;
   uint64_t best_rd, inc_rd, dec_rd;
 
   static const MV neighbors[8] = { { 0, -1 }, { 1, 0 }, { 0, 1 },   { -1, 0 },
@@ -5378,15 +5377,34 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   const int error_per_bit = ms_params->mv_cost_params.error_per_bit;
 #endif
 
+  // Derive the target precision for each parameter
+  MvSubpelPrecision mv_prec = mbmi->pb_mv_precision;
+  int bsize_log2 =
+      AOMMAX(mi_size_wide_log2[bsize], mi_size_high_log2[bsize]) + MI_SIZE_LOG2;
+  int precision = (mv_prec - MV_PRECISION_ONE_PEL) + bsize_log2 - 1;
+  precision =
+      clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
+
+  int round_bits = WARPEDMODEL_PREC_BITS - precision;
+  int max_coded_value = 1 << (precision - 2);
+
   // Set up initial model by copying global motion model
   // and adjusting for the chosen motion vector
   params->wmtype = ROTZOOM;
-  params->wmmat[2] = base_params.wmmat[2];
-  params->wmmat[3] = base_params.wmmat[3];
+  params->wmmat[2] =
+      (ROUND_POWER_OF_TWO_SIGNED(
+           base_params.wmmat[2] - (1 << WARPEDMODEL_PREC_BITS), round_bits)
+       << round_bits) +
+      (1 << WARPEDMODEL_PREC_BITS);
+  params->wmmat[3] = ROUND_POWER_OF_TWO_SIGNED(base_params.wmmat[3], round_bits)
+                     << round_bits;
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
   av1_reduce_warp_model(params);
-  int valid = av1_get_shear_params(params);
+  bool model_allowed = abs((params->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) >>
+                           round_bits) <= max_coded_value &&
+                       abs(params->wmmat[3] >> round_bits) <= max_coded_value;
+  int valid = model_allowed && av1_get_shear_params(params);
   params->invalid = !valid;
   if (!valid) {
     // Don't try to refine from a broken starting point
@@ -5411,7 +5429,7 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   // by 1/8th, then each parameter by 1/16, etc.
   // This will rapidly and efficiently explore the space of valid models,
   // as the maximum value of any single parameter is between 1/8 and 1/4.
-  const int step_size = (1 << WARP_DELTA_STEP_BITS);
+  const int step_size = (1 << round_bits);
 
   for (int iter = 0; iter < MAX_WARP_DELTA_ITERS; iter++) {
     int center_best_so_far = 1;
@@ -5465,8 +5483,11 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // Try increasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] += step_size;
-      delta = params->wmmat[param_index] - base_params.wmmat[param_index];
-      if (abs(delta) > WARP_DELTA_MAX) {
+
+      model_allowed = abs((params->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) >>
+                          round_bits) <= max_coded_value &&
+                      abs(params->wmmat[3] >> round_bits) <= max_coded_value;
+      if (!model_allowed) {
         inc_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];
@@ -5492,8 +5513,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // Try decreasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] -= step_size;
-      delta = params->wmmat[param_index] - base_params.wmmat[param_index];
-      if (abs(delta) > WARP_DELTA_MAX) {
+      model_allowed = abs((params->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) >>
+                          round_bits) <= max_coded_value &&
+                      abs(params->wmmat[3] >> round_bits) <= max_coded_value;
+      if (!model_allowed) {
         dec_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];

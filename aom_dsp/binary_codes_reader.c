@@ -55,3 +55,14 @@ uint16_t aom_read_primitive_refsubexpfin_(aom_reader *r, uint16_t n, uint16_t k,
   return inv_recenter_finite_nonneg(
       n, ref, aom_read_primitive_subexpfin(r, n, k, ACCT_INFO_NAME));
 }
+
+int16_t aom_read_signed_primitive_refsubexpfin_(aom_reader *r, uint16_t n,
+                                                uint16_t k,
+                                                int16_t ref ACCT_INFO_PARAM) {
+  assert(n > 0);
+  const uint16_t offset = n - 1;
+  const uint16_t scaled_n = (n << 1) - 1;
+  return aom_read_primitive_refsubexpfin(r, scaled_n, k, ref + offset,
+                                         ACCT_INFO_NAME) -
+         offset;
+}

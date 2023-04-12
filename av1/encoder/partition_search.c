@@ -993,23 +993,6 @@ static void update_cwp_idx_stats(FRAME_CONTEXT *fc, FRAME_COUNTS *counts,
 #endif  // CONFIG_CWP
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-static void update_warp_delta_param_stats(int index, int value,
-#if CONFIG_ENTROPY_STATS
-                                          FRAME_COUNTS *counts,
-#endif  // CONFIG_ENTROPY_STATS
-                                          FRAME_CONTEXT *fc) {
-  assert(2 <= index && index <= 5);
-  int index_type = (index == 2 || index == 5) ? 0 : 1;
-  int coded_value = (value / WARP_DELTA_STEP) + WARP_DELTA_CODED_MAX;
-  assert(0 <= coded_value && coded_value < WARP_DELTA_NUM_SYMBOLS);
-
-  update_cdf(fc->warp_delta_param_cdf[index_type], coded_value,
-             WARP_DELTA_NUM_SYMBOLS);
-#if CONFIG_ENTROPY_STATS
-  counts->warp_delta_param[index_type][coded_value]++;
-#endif  // CONFIG_ENTROPY_STATS
-}
-
 static void update_warp_delta_stats(const AV1_COMMON *cm,
 #if !CONFIG_WARP_REF_LIST
                                     const MACROBLOCKD *xd,
@@ -1020,7 +1003,8 @@ static void update_warp_delta_stats(const AV1_COMMON *cm,
                                     FRAME_COUNTS *counts,
 #endif  // CONFIG_ENTROPY_STATS
                                     FRAME_CONTEXT *fc) {
-
+  (void)cm;
+  (void)mbmi_ext;
 #if CONFIG_WARP_REF_LIST
   if (mbmi->max_num_warp_candidates > 1) {
     assert(mbmi->warp_ref_idx < mbmi->max_num_warp_candidates);
@@ -1030,49 +1014,6 @@ static void update_warp_delta_stats(const AV1_COMMON *cm,
       update_cdf(warp_ref_idx_cdf, mbmi->warp_ref_idx != bit_idx, 2);
       if (mbmi->warp_ref_idx == bit_idx) break;
     }
-  }
-  if (allow_warp_parameter_signaling(
-#if CONFIG_CWG_D067_IMPROVED_WARP
-          cm,
-#endif  // CONFIG_CWG_D067_IMPROVED_WARP
-          mbmi)) {
-#endif  // CONFIG_WARP_REF_LIST
-    const WarpedMotionParams *params = &mbmi->wm_params[0];
-    WarpedMotionParams base_params;
-    av1_get_warp_base_params(
-        cm,
-#if !CONFIG_WARP_REF_LIST
-        xd,
-#endif  //! CONFIG_WARP_REF_LIST
-        mbmi,
-#if !CONFIG_WARP_REF_LIST
-        mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  //! CONFIG_WARP_REF_LIST
-        &base_params, NULL
-#if CONFIG_WARP_REF_LIST
-        ,
-        mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif  // CONFIG_WARP_REF_LIST
-
-    );
-
-    // The RDO stage should not give us a model which is not warpable.
-    // Such models can still be signalled, but are effectively useless
-    // as we'll just fall back to translational motion
-    assert(!params->invalid);
-
-    // TODO(rachelbarker): Allow signaling warp type?
-    update_warp_delta_param_stats(2, params->wmmat[2] - base_params.wmmat[2],
-#if CONFIG_ENTROPY_STATS
-                                  counts,
-#endif  // CONFIG_ENTROPY_STATS
-                                  fc);
-    update_warp_delta_param_stats(3, params->wmmat[3] - base_params.wmmat[3],
-#if CONFIG_ENTROPY_STATS
-                                  counts,
-#endif  // CONFIG_ENTROPY_STATS
-                                  fc);
-#if CONFIG_WARP_REF_LIST
   }
 #endif  // CONFIG_WARP_REF_LIST
 }

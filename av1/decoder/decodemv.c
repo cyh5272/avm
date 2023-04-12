@@ -34,6 +34,7 @@
 #include "av1/decoder/decodemv.h"
 
 #include "aom_dsp/aom_dsp_common.h"
+#include "aom_dsp/binary_codes_reader.h"
 
 #define DEC_MISMATCH_DEBUG 0
 
@@ -428,19 +429,44 @@ static void read_warpmv_with_mvd_flag(FRAME_CONTEXT *ec_ctx, MB_MODE_INFO *mbmi,
 #endif  // CONFIG_CWG_D067_IMPROVED_WARP
 
 #endif  // CONFIG_WARP_REF_LIST
+
 // Read the delta for a single warp parameter
-// Each delta is coded as a symbol in the range
-// -WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX
 static int read_warp_delta_param(const MACROBLOCKD *xd, int index,
-                                 aom_reader *r) {
+                                 int base_value, aom_reader *r) {
+  (void)xd;
   assert(2 <= index && index <= 5);
-  int index_type = (index == 2 || index == 5) ? 0 : 1;
+  if (index == 2 || index == 5) {
+    base_value -= (1 << WARPEDMODEL_PREC_BITS);
+  }
 
-  int coded_value =
-      aom_read_symbol(r, xd->tile_ctx->warp_delta_param_cdf[index_type],
-                      WARP_DELTA_NUM_SYMBOLS, ACCT_INFO());
+  // Derive the target precision for each parameter
+  const MB_MODE_INFO *mbmi = xd->mi[0];
+  MvSubpelPrecision mv_prec = mbmi->pb_mv_precision;
+  BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  int bsize_log2 =
+      AOMMAX(mi_size_wide_log2[bsize], mi_size_high_log2[bsize]) + MI_SIZE_LOG2;
+  int precision = (mv_prec - MV_PRECISION_ONE_PEL) + bsize_log2 - 1;
+  precision =
+      clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
 
-  return (coded_value - WARP_DELTA_CODED_MAX) * WARP_DELTA_STEP;
+  int round_bits = WARPEDMODEL_PREC_BITS - precision;
+  int max_coded_value = 1 << (precision - 2);
+  int round_mask = (1 << round_bits) - 1;
+  (void)round_mask;
+
+  int ref = ROUND_POWER_OF_TWO_SIGNED(base_value, round_bits);
+  assert(abs(ref) <= max_coded_value);
+
+  int coded_value = aom_read_signed_primitive_refsubexpfin(
+      r, max_coded_value + 1, SUBEXPFIN_K, ref,
+      ACCT_INFO("warp_delta_coded_value"));
+  int value = coded_value * (1 << round_bits);
+
+  if (index == 2 || index == 5) {
+    value += (1 << WARPEDMODEL_PREC_BITS);
+  }
+
+  return value;
 }
 
 static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
@@ -487,8 +513,8 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
           mbmi)) {
 #endif  // CONFIG_WARP_REF_LIST
     params->wmtype = ROTZOOM;
-    params->wmmat[2] = base_params.wmmat[2] + read_warp_delta_param(xd, 2, r);
-    params->wmmat[3] = base_params.wmmat[3] + read_warp_delta_param(xd, 3, r);
+    params->wmmat[2] = read_warp_delta_param(xd, 2, base_params.wmmat[2], r);
+    params->wmmat[3] = read_warp_delta_param(xd, 3, base_params.wmmat[3], r);
     params->wmmat[4] = -params->wmmat[3];
     params->wmmat[5] = params->wmmat[2];
 #if CONFIG_WARP_REF_LIST

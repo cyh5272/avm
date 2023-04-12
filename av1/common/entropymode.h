@@ -95,25 +95,6 @@ extern "C" {
 #endif  // CONFIG_WIENER_NONSEP
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-// Parameters which determine the warp delta coding
-// The raw values which can be signaled are
-//   {-WARP_DELTA_CODED_MAX, ..., 0, ..., +WARP_DELTA_CODED_MAX}
-// inclusive.
-//
-// This raw value is then scaled by WARP_DELTA_STEP (on a scale where
-// (1 << WARPEDMODEL_PREC_BITS) == (1 << 16) represents the value 1.0).
-// Hence:
-//  WARP_DELTA_STEP = (1 << 10) => Each step represents 1/64
-//  WARP_DELTA_STEP = (1 << 11) => Each step represents 1/32
-//
-// Note that each coefficient must be < 1/4 (and one must be < 1/7),
-// so `WARP_DELTA_MAX` here should work out to something < (1 << 14)
-#define WARP_DELTA_STEP_BITS 10
-#define WARP_DELTA_STEP (1 << WARP_DELTA_STEP_BITS)
-#define WARP_DELTA_CODED_MAX 7
-#define WARP_DELTA_NUM_SYMBOLS (2 * WARP_DELTA_CODED_MAX + 1)
-#define WARP_DELTA_MAX (WARP_DELTA_STEP * WARP_DELTA_CODED_MAX)
-
 // The use_warp_extend symbol has two components to its context:
 // First context is the extension type (copy, extend from warp model, etc.)
 // Second context is log2(number of MI units along common edge)
@@ -250,7 +231,6 @@ typedef struct frame_contexts {
   aom_cdf_prob warpmv_with_mvd_flag_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];
 #endif  // CONFIG_CWG_D067_IMPROVED_WARP
 #endif  // CONFIG_WARP_REF_LIST
-  aom_cdf_prob warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)];
 
   aom_cdf_prob warp_extend_cdf[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2]
                               [CDF_SIZE(2)];

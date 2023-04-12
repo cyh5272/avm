@@ -31,6 +31,9 @@ extern "C" {
   aom_read_primitive_subexpfin_(r, n, k ACCT_INFO_ARG(ACCT_INFO_NAME))
 #define aom_read_primitive_refsubexpfin(r, n, k, ref, ACCT_INFO_NAME) \
   aom_read_primitive_refsubexpfin_(r, n, k, ref ACCT_INFO_ARG(ACCT_INFO_NAME))
+#define aom_read_signed_primitive_refsubexpfin(r, n, k, ref, ACCT_INFO_NAME) \
+  aom_read_signed_primitive_refsubexpfin_(r, n, k,                           \
+                                          ref ACCT_INFO_ARG(ACCT_INFO_NAME))
 
 uint16_t aom_read_primitive_quniform_(aom_reader *r,
                                       uint16_t n ACCT_INFO_PARAM);
@@ -38,6 +41,9 @@ uint16_t aom_read_primitive_subexpfin_(aom_reader *r, uint16_t n,
                                        uint16_t k ACCT_INFO_PARAM);
 uint16_t aom_read_primitive_refsubexpfin_(aom_reader *r, uint16_t n, uint16_t k,
                                           uint16_t ref ACCT_INFO_PARAM);
+int16_t aom_read_signed_primitive_refsubexpfin_(aom_reader *r, uint16_t n,
+                                                uint16_t k,
+                                                int16_t ref ACCT_INFO_PARAM);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -651,10 +651,6 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
       av1_cost_tokens_from_cdf(mode_costs->warp_delta_cost[i],
                                fc->warp_delta_cdf[i], NULL);
     }
-    for (i = 0; i < 2; i++) {
-      av1_cost_tokens_from_cdf(mode_costs->warp_delta_param_cost[i],
-                               fc->warp_delta_param_cdf[i], NULL);
-    }
     for (i = 0; i < WARP_EXTEND_CTXS1; i++) {
       for (j = 0; j < WARP_EXTEND_CTXS2; j++) {
         av1_cost_tokens_from_cdf(mode_costs->warp_extend_cost[i][j],

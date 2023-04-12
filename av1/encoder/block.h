@@ -1040,8 +1040,6 @@ typedef struct {
   int refinemv_flag_cost[NUM_REFINEMV_CTX][REFINEMV_NUM_MODES];
 #endif  // CONFIG_REFINEMV
 
-  //! warp_delta_param_cost
-  int warp_delta_param_cost[2][WARP_DELTA_NUM_SYMBOLS];
 #if CONFIG_WARP_REF_LIST
   //! warp_ref_idx_cost
   int warp_ref_idx_cost[3][WARP_REF_CONTEXTS][2];
