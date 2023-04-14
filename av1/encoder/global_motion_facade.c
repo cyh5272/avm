@@ -485,8 +485,6 @@ void av1_compute_global_motion_facade(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   GlobalMotionInfo *const gm_info = &cpi->gm_info;
 
-  av1_zero(cpi->td.rd_counts.global_motion_used);
-
   if (cpi->common.current_frame.frame_type == INTER_FRAME && cpi->source &&
       cpi->oxcf.tool_cfg.enable_global_motion && !gm_info->search_done) {
     setup_global_motion_info_params(cpi);

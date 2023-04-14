@@ -1629,8 +1629,6 @@ typedef struct TileDataEnc {
 
 typedef struct RD_COUNTS {
   int64_t comp_pred_diff[REFERENCE_MODES];
-  // Stores number of 4x4 blocks using global motion per reference frame.
-  int global_motion_used[INTER_REFS_PER_FRAME];
   int compound_ref_used_flag;
   int skip_mode_used_flag;
   int tx_type_used[TX_SIZES_ALL][TX_TYPES];
