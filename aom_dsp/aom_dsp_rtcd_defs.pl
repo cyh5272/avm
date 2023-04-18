@@ -382,7 +382,10 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   foreach (@block_sizes) {
     ($w, $h) = @$_;
     add_proto qw/unsigned int/, "aom_highbd_masked_sad${w}x${h}", "const uint16_t *src8, int src_stride, const uint16_t *ref8, int ref_stride, const uint16_t *second_pred8, const uint8_t *msk, int msk_stride, int invert_mask";
-    if ($w != 256 && $h != 256) {
+    # TODO(any): Add ssse3 optimization
+    if ($w == 256 || $h == 256) {
+      specialize "aom_highbd_masked_sad${w}x${h}", qw/avx2/;
+    } else {
       specialize "aom_highbd_masked_sad${w}x${h}", qw/ssse3 avx2/;
     }
   }
@@ -393,7 +396,10 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   foreach (@block_sizes) {
     ($w, $h) = @$_;
     add_proto qw/unsigned int/, "aom_highbd_obmc_sad${w}x${h}", "const uint16_t *pre, int pre_stride, const int32_t *wsrc, const int32_t *mask";
-    if (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128)) && $w != 256 && $h != 256) {
+    # TODO(any): Add sse4.1 optimization
+    if ($w == 256 || $h == 256) {
+      specialize "aom_highbd_obmc_sad${w}x${h}", qw/avx2/;
+    } elsif (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128))) {
       specialize "aom_highbd_obmc_sad${w}x${h}", qw/sse4_1 avx2/;
     }
   }
