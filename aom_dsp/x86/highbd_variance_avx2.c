@@ -785,6 +785,11 @@ static AOM_INLINE void highbd_8_variance_avx2(
     return (var >= 0) ? (uint32_t)var : 0;                                 \
   }
 
+#if CONFIG_BLOCK_256
+VAR_FN(256, 256, 16, 16);
+VAR_FN(256, 128, 16, 15);
+VAR_FN(128, 256, 16, 15);
+#endif  // CONFIG_BLOCK_256
 VAR_FN(128, 128, 16, 14);
 VAR_FN(128, 64, 16, 13);
 VAR_FN(64, 128, 16, 13);
@@ -804,6 +809,11 @@ VAR_FN(16, 64, 16, 10);
 VAR_FN(64, 16, 16, 10);
 VAR_FN(8, 16, 8, 7);
 
+#if CONFIG_BLOCK_256
+VAR_FN_BD12(256, 256, 8, 16);
+VAR_FN_BD12(256, 128, 8, 15);
+VAR_FN_BD12(128, 256, 8, 15);
+#endif  // CONFIG_BLOCK_256
 VAR_FN_BD12(128, 128, 8, 14);
 VAR_FN_BD12(128, 64, 8, 13);
 VAR_FN_BD12(64, 128, 8, 13);
@@ -822,8 +832,8 @@ VAR_FN_BD12(32, 8, 8, 8);
 VAR_FN_BD12(16, 64, 8, 10);
 VAR_FN_BD12(64, 16, 8, 10);
 VAR_FN_BD12(8, 16, 8, 7);
-
 #undef VAR_FN
+#undef VAR_FN_BD12
 
 #define SSE2_Height(H)                                                 \
   uint32_t aom_highbd_10_sub_pixel_variance8x##H##_sse2(               \
