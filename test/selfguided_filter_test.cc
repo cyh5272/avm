@@ -168,7 +168,7 @@ class AV1HighbdSelfguidedFilterTest
                                                           SGRPROJ_PRJ_MIN0),
                      SGRPROJ_PRJ_MIN1 + rnd.PseudoUniform(SGRPROJ_PRJ_MAX1 + 1 -
                                                           SGRPROJ_PRJ_MIN1) };
-      int eps = rnd.PseudoUniform(1 << SGRPROJ_PARAMS_BITS);
+      int eps = rnd.PseudoUniform(SGRPROJ_PARAMS);
 
       // Test various tile sizes around 256x256
       int test_w = max_w - (i / 9);

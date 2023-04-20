@@ -262,6 +262,7 @@ set_aom_config_var(
 )
 
 set_aom_config_var(CONFIG_TEMP_LR 0 "AV2 experiment flag to use temporal LR")
+set_aom_config_var(CONFIG_NEW_SGR 0 "AV2 experiment flag to use improved SGR")
 
 set_aom_config_var(CONFIG_C071_SUBBLK_WARPMV 1
                    "AV2 experiment flag to use subblock warp MV for SMVP")

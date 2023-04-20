@@ -2939,7 +2939,14 @@ static AOM_INLINE void read_sgrproj_filter(MACROBLOCKD *xd,
 #endif  // CONFIG_LR_MERGE_COEFFS
   SgrprojInfo *ref_sgrproj_info = av1_ref_from_sgrproj_bank(bank, ref);
 
+#if CONFIG_NEW_SGR
+  // Use a quasi-uniform code that works with any alphabet size N with a first
+  // set of symbols using floor(log2 N) bits and the rest using ceil(log2 N)
+  // bits.
+  sgrproj_info->ep = aom_read_primitive_quniform(rb, SGRPROJ_PARAMS, ACCT_STR);
+#else
   sgrproj_info->ep = aom_read_literal(rb, SGRPROJ_PARAMS_BITS, ACCT_STR);
+#endif  // CONFIG_NEW_SGR
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
 
   if (params->r[0] == 0) {

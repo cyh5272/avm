@@ -3296,7 +3296,11 @@ static AOM_INLINE void write_sgrproj_filter(MACROBLOCKD *xd,
 #endif  // CONFIG_LR_MERGE_COEFFS
   const SgrprojInfo *ref_sgrproj_info = av1_ref_from_sgrproj_bank(bank, ref);
 
+#if CONFIG_NEW_SGR
+  aom_write_primitive_quniform(wb, SGRPROJ_PARAMS, sgrproj_info->ep);
+#else
   aom_write_literal(wb, sgrproj_info->ep, SGRPROJ_PARAMS_BITS);
+#endif  // CONFIG_NEW_SGR
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
 
   if (params->r[0] == 0) {

@@ -780,7 +780,7 @@ static SgrprojInfo search_selfguided_restoration(
          pu_width == RESTORATION_PROC_UNIT_SIZE);
   assert(pu_height == (RESTORATION_PROC_UNIT_SIZE >> 1) ||
          pu_height == RESTORATION_PROC_UNIT_SIZE);
-  if (!enable_sgr_ep_pruning) {
+  if (CONFIG_NEW_SGR || !enable_sgr_ep_pruning) {
     for (ep = 0; ep < SGRPROJ_PARAMS; ep++) {
       int64_t err = calc_sgrproj_err(rsc, limits, bit_depth, pu_width,
                                      pu_height, ep, flt0, flt1, exqd);
@@ -839,7 +839,12 @@ static int64_t count_sgrproj_bits(const ModeCosts *mode_costs,
 #else
   const SgrprojInfo *ref_sgrproj_info = av1_constref_from_sgrproj_bank(bank, 0);
 #endif  // CONFIG_LR_MERGE_COEFFS
+#if CONFIG_NEW_SGR
+  bits += (aom_count_primitive_quniform(SGRPROJ_PARAMS, sgrproj_info->ep)
+           << AV1_PROB_COST_SHIFT);
+#else
   bits += (SGRPROJ_PARAMS_BITS << AV1_PROB_COST_SHIFT);
+#endif  // CONFIG_NEW_SGR
   const sgr_params_type *params = &av1_sgr_params[sgrproj_info->ep];
   if (params->r[0] > 0) {
     bits += aom_count_primitive_refsubexpfin(
