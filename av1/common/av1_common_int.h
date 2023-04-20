@@ -2389,6 +2389,25 @@ static INLINE void update_ext_partition_context(MACROBLOCKD *xd, int mi_row,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 }
 
+#if CONFIG_EXT_RECUR_PARTITIONS
+static INLINE int square_split_context(const MACROBLOCKD *xd, int mi_row,
+                                       int mi_col, BLOCK_SIZE bsize) {
+  const int plane = xd->tree_type == CHROMA_PART;
+  const PARTITION_CONTEXT *above_ctx =
+      xd->above_partition_context[plane] + mi_col;
+  const PARTITION_CONTEXT *left_ctx =
+      xd->left_partition_context[plane] + (mi_row & MAX_MIB_MASK);
+  assert(bsize < BLOCK_SIZES);
+  const int bsl_w = mi_size_wide_log2[bsize];
+  const int bsl_h = mi_size_high_log2[bsize];
+
+  const int above = (*above_ctx >> AOMMAX(bsl_w - 1, 0)) & 1;
+  const int left = (*left_ctx >> AOMMAX(bsl_h - 1, 0)) & 1;
+
+  return (left * 2 + above) + (bsize == BLOCK_256X256) * PARTITION_PLOFFSET;
+}
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+
 static INLINE int partition_plane_context(const MACROBLOCKD *xd, int mi_row,
                                           int mi_col, BLOCK_SIZE bsize) {
   const int plane = xd->tree_type == CHROMA_PART;

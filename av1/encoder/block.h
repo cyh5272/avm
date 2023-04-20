@@ -758,17 +758,23 @@ typedef struct {
    * \name Partition Costs
    ****************************************************************************/
   /**@{*/
-  //! Cost for coding the partition.
-  int partition_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
-                    [EXT_PARTITION_TYPES];
 #if CONFIG_EXT_RECUR_PARTITIONS
   /*! Cost for sending split token. */
   int do_split_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS][2];
+  /*! Cost for sending square split token. */
+  int do_square_split_cost[PARTITION_STRUCTURE_NUM][SQUARE_SPLIT_CONTEXTS][2];
   /*! Cost for sending rectangular type token. */
   int rect_type_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS][2];
   /*! Cost for sending do_ext_partition token. */
   int do_ext_partition_cost[PARTITION_STRUCTURE_NUM][NUM_RECT_PARTS]
                            [PARTITION_CONTEXTS][2];
+  //! Cost for coding the partition.
+  int partition_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
+                    [ALL_PARTITION_TYPES];
+#else
+  //! Cost for coding the partition.
+  int partition_cost[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
+                    [EXT_PARTITION_TYPES];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   /**@}*/
 

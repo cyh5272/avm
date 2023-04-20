@@ -14,6 +14,8 @@
 #include <math.h>
 #include <stdio.h>
 
+#include "av1/common/blockd.h"
+#include "av1/common/enums.h"
 #include "config/av1_rtcd.h"
 
 #include "aom_dsp/aom_dsp_common.h"
@@ -111,6 +113,13 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   }
   for (int plane_index = (xd->tree_type == CHROMA_PART);
        plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
+    for (i = 0; i < SQUARE_SPLIT_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->do_square_split_cost[plane_index][i],
+                               fc->do_square_split_cdf[plane_index][i], NULL);
+    }
+  }
+  for (int plane_index = (xd->tree_type == CHROMA_PART);
+       plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
     for (i = 0; i < PARTITION_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->rect_type_cost[plane_index][i],
                                fc->rect_type_cdf[plane_index][i], NULL);
@@ -132,13 +141,22 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
        plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
     const TREE_TYPE tree_type = plane_index ? CHROMA_PART : LUMA_PART;
     for (BLOCK_SIZE bsize = 0; bsize < BLOCK_SIZES; bsize++) {
-      for (PARTITION_TYPE part = 0; part < EXT_PARTITION_TYPES; part++) {
+      for (PARTITION_TYPE part = 0; part < ALL_PARTITION_TYPES; part++) {
         for (int context = 0; context < PARTITION_PLOFFSET; context++) {
           const int ctx = PARTITION_PLOFFSET * bsize + context;
           const bool do_split = part != PARTITION_NONE;
+          const bool do_square_split = part == PARTITION_SPLIT;
           mode_costs->partition_cost[plane_index][ctx][part] +=
               mode_costs->do_split_cost[plane_index][ctx][do_split];
           if (!do_split) {
+            continue;
+          }
+          if (is_square_split_eligible(bsize)) {
+            mode_costs->partition_cost[plane_index][ctx][part] +=
+                mode_costs->do_square_split_cost[plane_index][context]
+                                                [do_square_split];
+          }
+          if (do_square_split) {
             continue;
           }
           RECT_PART_TYPE rect_type = get_rect_part_type(part);

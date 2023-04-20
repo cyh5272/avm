@@ -13,10 +13,12 @@
 #include "aom_mem/aom_mem.h"
 
 #include "av1/common/av1_common_int.h"
+#include "av1/common/enums.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/scan.h"
 #include "av1/common/seg_common.h"
 #include "av1/common/txb_common.h"
+#include "av1/encoder/mcomp.h"
 
 #if !CONFIG_AIMC
 static const aom_cdf_prob
@@ -347,6 +349,7 @@ static aom_cdf_prob
       }
     };
 
+
 static aom_cdf_prob
     default_rect_type_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS][CDF_SIZE(2)] = {
       // Luma
@@ -619,6 +622,26 @@ static aom_cdf_prob default_do_ext_partition_cdf
         }
       }
     };
+
+
+static aom_cdf_prob
+    default_do_square_split_cdf[PARTITION_STRUCTURE_NUM][SQUARE_SPLIT_CONTEXTS][CDF_SIZE(2)] = {
+      // Luma
+      {
+        // BLOCK_128X128,
+        { AOM_CDF2(28847) }, { AOM_CDF2(7433) },  { AOM_CDF2(7570) }, { AOM_CDF2(805) },
+        // BLOCK_256X256,
+        { AOM_CDF2(28847) }, { AOM_CDF2(7433) },  { AOM_CDF2(7570) }, { AOM_CDF2(805) }
+      },
+      // Chroma
+      {
+        // BLOCK_128X128,
+        { AOM_CDF2(26187) }, { AOM_CDF2(14749) }, { AOM_CDF2(15794) }, { AOM_CDF2(6386) },
+        // BLOCK_256X256,
+        { AOM_CDF2(26187) }, { AOM_CDF2(14749) }, { AOM_CDF2(15794) }, { AOM_CDF2(6386) },
+      },
+    };
+
 // clang-format on
 #else
 static const aom_cdf_prob
@@ -2954,6 +2977,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
 #if CONFIG_EXT_RECUR_PARTITIONS
   av1_copy(fc->do_split_cdf, default_do_split_cdf);
+  av1_copy(fc->do_square_split_cdf, default_do_square_split_cdf);
   av1_copy(fc->rect_type_cdf, default_rect_type_cdf);
   av1_copy(fc->do_ext_partition_cdf, default_do_ext_partition_cdf);
 #else

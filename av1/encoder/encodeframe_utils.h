@@ -133,7 +133,7 @@ typedef struct PartitionSearchState {
   // Array holding partition type cost.
   int tmp_partition_cost[PARTITION_TYPES];
 #if CONFIG_EXT_RECUR_PARTITIONS
-  int partition_cost_table[EXT_PARTITION_TYPES];
+  int partition_cost_table[ALL_PARTITION_TYPES];
 #endif
 
   // Pointer to partition cost buffer

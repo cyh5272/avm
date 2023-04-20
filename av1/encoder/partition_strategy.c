@@ -1820,7 +1820,7 @@ static INLINE void add_start_mv_to_partition(
   assert(bsize < BLOCK_SIZES_ALL);
   const int quarter_step_h = block_size_high[bsize] / 4;
   const int quarter_step_w = block_size_wide[bsize] / 4;
-  static const int subblock_count[EXT_PARTITION_TYPES] = {
+  static const int subblock_count[ALL_PARTITION_TYPES] = {
     1,  // PARTITION_NONE
     2,  // PARTITION_HORZ
     2,  // PARTITION_VERT
@@ -1831,9 +1831,10 @@ static INLINE void add_start_mv_to_partition(
     3,                                           // PARTITION_HORZ_3
     3,                                           // PARTITION_VERT_3
 #endif  // CONFIG_H_PARTITION
+    4,  // PARTITION_SPLIT
   };
   // PARTITION x NUM_SUBBLOCKS x (ROW and COL)
-  static const int step_multiplier[EXT_PARTITION_TYPES][4][2] = {
+  static const int step_multiplier[ALL_PARTITION_TYPES][4][2] = {
     { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } },  // PARTITION_NONE
     { { 0, 0 }, { 2, 0 }, { 0, 0 }, { 0, 0 } },  // PARTITION_HORZ
     { { 0, 0 }, { 0, 2 }, { 0, 0 }, { 0, 0 } },  // PARTITION_VERT
@@ -1843,7 +1844,8 @@ static INLINE void add_start_mv_to_partition(
 #else
     { { 0, 0 }, { 1, 0 }, { 3, 0 }, { 0, 0 } },  // PARTITION_HORZ_3
     { { 0, 0 }, { 0, 1 }, { 0, 3 }, { 0, 0 } },  // PARTITION_VERT_3
-#endif  // CONFIG_H_PARTITION
+#endif                                           // CONFIG_H_PARTITION
+    { { 0, 0 }, { 0, 2 }, { 2, 0 }, { 2, 2 } },  // PARTITION_SPLIT
   };
 
   const BLOCK_SIZE part_subsize = get_partition_subsize(bsize, partition);

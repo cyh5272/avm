@@ -804,6 +804,11 @@ rect_type_implied_by_bsize(BLOCK_SIZE bsize, TREE_TYPE tree_type) {
   return RECT_INVALID;
 }
 
+/*!\brief Returns whether square split is allowed for current bsize. */
+static AOM_INLINE bool is_square_split_eligible(BLOCK_SIZE bsize) {
+  return bsize == BLOCK_128X128 || bsize == BLOCK_256X256;
+}
+
 /*!\brief Returns whether the current partition is horizontal type for vertical
  * type. */
 static AOM_INLINE RECT_PART_TYPE get_rect_part_type(PARTITION_TYPE partition) {
@@ -975,9 +980,6 @@ static INLINE int get_h_partition_offset_mi_col(BLOCK_SIZE bsize, int index,
 #endif  // CONFIG_H_PARTITION
 
 static INLINE int is_partition_valid(BLOCK_SIZE bsize, PARTITION_TYPE p) {
-#if CONFIG_EXT_RECUR_PARTITIONS
-  if (p == PARTITION_SPLIT) return 0;
-#endif  // CONFIG_EXT_RECUR_PARTITIONS
   if (is_partition_point(bsize))
     return get_partition_subsize(bsize, p) < BLOCK_SIZES_ALL;
   else

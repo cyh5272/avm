@@ -22,6 +22,7 @@
 #include "aom_ports/bitops.h"
 #include "aom_ports/mem_ops.h"
 #include "aom_ports/system_state.h"
+#include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
 #include "av1/common/enums.h"
 #if CONFIG_BITSTREAM_DEBUG
@@ -2650,6 +2651,16 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
   if (!do_split) {
     return;
   }
+  const bool do_square_split = p == PARTITION_SPLIT;
+  if (is_square_split_eligible(bsize)) {
+    const int square_split_ctx =
+        square_split_context(xd, mi_row, mi_col, bsize);
+    aom_write_symbol(w, do_square_split,
+                     ec_ctx->do_square_split_cdf[plane][square_split_ctx], 2);
+  }
+  if (do_square_split) {
+    return;
+  }
   RECT_PART_TYPE rect_type = get_rect_part_type(p);
   if (rect_type_implied_by_bsize(bsize, xd->tree_type) == RECT_INVALID) {
     aom_write_symbol(w, rect_type, ec_ctx->rect_type_cdf[plane][ctx], 2);
@@ -2849,6 +2860,20 @@ static AOM_INLINE void write_modes_sb(
                      mi_col + 3 * qbs_w, subsize);
       break;
 #endif  // CONFIG_H_PARTITION
+    case PARTITION_SPLIT:
+      write_modes_sb(cpi, tile, w, tok, tok_end, ptree->sub_tree[0],
+                     get_partition_subtree_const(ptree_luma, 0), mi_row, mi_col,
+                     subsize);
+      write_modes_sb(cpi, tile, w, tok, tok_end, ptree->sub_tree[1],
+                     get_partition_subtree_const(ptree_luma, 1), mi_row,
+                     mi_col + hbs_w, subsize);
+      write_modes_sb(cpi, tile, w, tok, tok_end, ptree->sub_tree[2],
+                     get_partition_subtree_const(ptree_luma, 2), mi_row + hbs_h,
+                     mi_col, subsize);
+      write_modes_sb(cpi, tile, w, tok, tok_end, ptree->sub_tree[3],
+                     get_partition_subtree_const(ptree_luma, 3), mi_row + hbs_h,
+                     mi_col + hbs_w, subsize);
+      break;
 #else
     case PARTITION_SPLIT:
       write_modes_sb(cpi, tile, w, tok, tok_end, ptree->sub_tree[0], mi_row,

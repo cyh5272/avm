@@ -77,125 +77,87 @@ static const uint8_t num_pels_log2_lookup[BLOCK_SIZES_ALL] = {
 };
 
 #if CONFIG_EXT_RECUR_PARTITIONS
-/*! \brief Maps the symbol transmitted through the bitstream to the partition
- * type for a wide block. */
-static const PARTITION_TYPE
-    partition_map_from_symbol_block_wgth[PARTITION_TYPES_REC] = {
-      PARTITION_NONE,
-      PARTITION_VERT,
-      PARTITION_VERT_3,
-      PARTITION_HORZ,
-    };
-
-/*! \brief Maps the partition type to the symbol to be transmitted through the
- * bitstream for a wide block. */
-static const PARTITION_TYPE_REC
-    symbol_map_from_partition_block_wgth[EXT_PARTITION_TYPES] = {
-      PARTITION_NONE_REC,        PARTITION_SHORT_SIDE_2_REC,
-      PARTITION_LONG_SIDE_2_REC, PARTITION_INVALID_REC,
-      PARTITION_LONG_SIDE_3_REC,
-    };
-
-/*! \brief Maps the symbol transmitted through the bitstream to the partition
- * type for a tall block. */
-static const PARTITION_TYPE
-    partition_map_from_symbol_block_hgtw[PARTITION_TYPES_REC] = {
-      PARTITION_NONE,
-      PARTITION_HORZ,
-      PARTITION_HORZ_3,
-      PARTITION_VERT,
-    };
-
-/*! \brief Maps the partition type to the symbol to be transmitted through the
- * bitstream for a tall block. */
-static const PARTITION_TYPE_REC
-    symbol_map_from_partition_block_hgtw[EXT_PARTITION_TYPES] = {
-      PARTITION_NONE_REC,         PARTITION_LONG_SIDE_2_REC,
-      PARTITION_SHORT_SIDE_2_REC, PARTITION_LONG_SIDE_3_REC,
-      PARTITION_INVALID_REC,
-    };
-
 /* clang-format off */
 // This table covers all square blocks and 1:2/2:1 rectangular blocks
 static const BLOCK_SIZE
     subsize_lookup[EXT_PARTITION_TYPES + 1][BLOCK_SIZES_ALL] = { {
     // PARTITION_NONE
-    BLOCK_4X4,
-    BLOCK_4X8,     BLOCK_8X4,     BLOCK_8X8,
-    BLOCK_8X16,    BLOCK_16X8,    BLOCK_16X16,
-    BLOCK_16X32,   BLOCK_32X16,   BLOCK_32X32,
-    BLOCK_32X64,   BLOCK_64X32,   BLOCK_64X64,
-    BLOCK_64X128,  BLOCK_128X64,  BLOCK_128X128,
-    BLOCK_128X256, BLOCK_256X128, BLOCK_256X256,
-    BLOCK_4X16,    BLOCK_16X4,
-    BLOCK_8X32,    BLOCK_32X8,
-    BLOCK_16X64,   BLOCK_64X16,
+    BLOCK_4X4,                                   // 4
+    BLOCK_4X8,     BLOCK_8X4,     BLOCK_8X8,     // 8
+    BLOCK_8X16,    BLOCK_16X8,    BLOCK_16X16,   // 16
+    BLOCK_16X32,   BLOCK_32X16,   BLOCK_32X32,   // 32
+    BLOCK_32X64,   BLOCK_64X32,   BLOCK_64X64,   // 64
+    BLOCK_64X128,  BLOCK_128X64,  BLOCK_128X128, // 128
+    BLOCK_128X256, BLOCK_256X128, BLOCK_256X256, // 256
+    BLOCK_4X16,    BLOCK_16X4,                   // 4,16
+    BLOCK_8X32,    BLOCK_32X8,                   // 8,32
+    BLOCK_16X64,   BLOCK_64X16,                  // 32,64
   }, {
     // PARTITION_HORZ
-    BLOCK_INVALID,
-    BLOCK_4X4,     BLOCK_INVALID, BLOCK_8X4,
-    BLOCK_8X8,     BLOCK_16X4,    BLOCK_16X8,
-    BLOCK_16X16,   BLOCK_32X8,    BLOCK_32X16,
-    BLOCK_32X32,   BLOCK_64X16,   BLOCK_64X32,
-    BLOCK_64X64,   BLOCK_INVALID, BLOCK_128X64,
-    BLOCK_128X128, BLOCK_INVALID, BLOCK_256X128,
-    BLOCK_4X8,     BLOCK_INVALID,
-    BLOCK_8X16,    BLOCK_INVALID,
-    BLOCK_16X32,   BLOCK_INVALID,
+    BLOCK_INVALID,                               // 4
+    BLOCK_4X4,     BLOCK_INVALID, BLOCK_8X4,     // 8
+    BLOCK_8X8,     BLOCK_16X4,    BLOCK_16X8,    // 16
+    BLOCK_16X16,   BLOCK_32X8,    BLOCK_32X16,   // 32
+    BLOCK_32X32,   BLOCK_64X16,   BLOCK_64X32,   // 64
+    BLOCK_64X64,   BLOCK_INVALID, BLOCK_128X64,  // 128
+    BLOCK_128X128, BLOCK_INVALID, BLOCK_256X128, // 256
+    BLOCK_4X8,     BLOCK_INVALID,                // 4,16
+    BLOCK_8X16,    BLOCK_INVALID,                // 8,32
+    BLOCK_16X32,   BLOCK_INVALID,                // 32,64
   }, {
     // PARTITION_VERT
-    BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_4X4,     BLOCK_4X8,
-    BLOCK_4X16,    BLOCK_8X8,     BLOCK_8X16,
-    BLOCK_8X32,    BLOCK_16X16,   BLOCK_16X32,
-    BLOCK_16X64,   BLOCK_32X32,   BLOCK_32X64,
-    BLOCK_INVALID, BLOCK_64X64,   BLOCK_64X128,
-    BLOCK_INVALID, BLOCK_128X128, BLOCK_128X256,
-    BLOCK_INVALID, BLOCK_8X4,
-    BLOCK_INVALID, BLOCK_16X8,
-    BLOCK_INVALID, BLOCK_32X16,
+    BLOCK_INVALID,                               // 4
+    BLOCK_INVALID, BLOCK_4X4,     BLOCK_4X8,     // 8
+    BLOCK_4X16,    BLOCK_8X8,     BLOCK_8X16,    // 16
+    BLOCK_8X32,    BLOCK_16X16,   BLOCK_16X32,   // 32
+    BLOCK_16X64,   BLOCK_32X32,   BLOCK_32X64,   // 64
+    BLOCK_INVALID, BLOCK_64X64,   BLOCK_64X128,  // 128
+    BLOCK_INVALID, BLOCK_128X128, BLOCK_128X256, // 256
+    BLOCK_INVALID, BLOCK_8X4,                    // 4,16
+    BLOCK_INVALID, BLOCK_16X8,                   // 8,32
+    BLOCK_INVALID, BLOCK_32X16,                  // 32,64
   }, {
     // PARTITION_HORZ_3
-    BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_8X4,     BLOCK_INVALID, BLOCK_16X4,
-    BLOCK_16X8,    BLOCK_INVALID, BLOCK_32X8,
-    BLOCK_32X16,   BLOCK_INVALID, BLOCK_64X16,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_4X4,     BLOCK_INVALID,
-    BLOCK_8X8,     BLOCK_INVALID,
-    BLOCK_16X16,   BLOCK_INVALID,
+    BLOCK_INVALID,                               // 4
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 8
+    BLOCK_8X4,     BLOCK_INVALID, BLOCK_16X4,    // 16
+    BLOCK_16X8,    BLOCK_INVALID, BLOCK_32X8,    // 32
+    BLOCK_32X16,   BLOCK_INVALID, BLOCK_64X16,   // 64
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 128
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 256
+    BLOCK_4X4,     BLOCK_INVALID,                // 4,16
+    BLOCK_8X8,     BLOCK_INVALID,                // 8,32
+    BLOCK_16X16,   BLOCK_INVALID,                // 32,64
   }, {
     // PARTITION_VERT_3
-    BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_4X8,     BLOCK_4X16,
-    BLOCK_INVALID, BLOCK_8X16,    BLOCK_8X32,
-    BLOCK_INVALID, BLOCK_16X32,   BLOCK_16X64,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_4X4,
-    BLOCK_INVALID, BLOCK_8X8,
-    BLOCK_INVALID, BLOCK_16X16,
+    BLOCK_INVALID,                               // 4
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 8
+    BLOCK_INVALID, BLOCK_4X8,     BLOCK_4X16,    // 16
+    BLOCK_INVALID, BLOCK_8X16,    BLOCK_8X32,    // 32
+    BLOCK_INVALID, BLOCK_16X32,   BLOCK_16X64,   // 64
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 128
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID, // 256
+    BLOCK_INVALID, BLOCK_4X4,                    // 4,16
+    BLOCK_INVALID, BLOCK_8X8,                    // 8,32
+    BLOCK_INVALID, BLOCK_16X16,                  // 32,64
   }, {
     // PARTITION_SPLIT
-    BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X4,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X8,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X16,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X32,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X64,
-    BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X128,
-    BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID,
-    BLOCK_INVALID, BLOCK_INVALID,
+    BLOCK_INVALID,                               // 4
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X4,     // 8
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X8,     // 16
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X16,   // 32
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X32,   // 64
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X64,   // 128
+    BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X128, // 256
+    BLOCK_INVALID, BLOCK_INVALID,                // 4,16
+    BLOCK_INVALID, BLOCK_INVALID,                // 8,32
+    BLOCK_INVALID, BLOCK_INVALID,                // 32,64
   },
 };
+/* clang-format on */
 
-static AOM_INLINE PARTITION_TYPE sdp_chroma_part_from_luma(BLOCK_SIZE bsize,
-                                         PARTITION_TYPE luma_part, int ssx,
-                                         int ssy) {
+static AOM_INLINE PARTITION_TYPE sdp_chroma_part_from_luma(
+    BLOCK_SIZE bsize, PARTITION_TYPE luma_part, int ssx, int ssy) {
   const int bh_chr = block_size_high[bsize] >> ssy;
   const int bw_chr = block_size_wide[bsize] >> ssx;
 
@@ -213,12 +175,14 @@ static AOM_INLINE PARTITION_TYPE sdp_chroma_part_from_luma(BLOCK_SIZE bsize,
         return PARTITION_VERT_3;
       else
         return (bw_chr < 8) ? PARTITION_NONE : PARTITION_VERT;
+    case PARTITION_SPLIT:
+      return (bh_chr < 8 || bw_chr < 8) ? PARTITION_NONE : PARTITION_SPLIT;
     default: assert(0);
   }
   return PARTITION_INVALID;
 }
 
-#else  // CONFIG_EXT_RECUR_PARTITIONS
+#else   // CONFIG_EXT_RECUR_PARTITIONS
 // A compressed version of the Partition_Subsize table in the spec (9.3.
 // Conversion tables), for square block sizes only.
 /* clang-format off */
@@ -255,7 +219,10 @@ static const BLOCK_SIZE subsize_lookup[EXT_PARTITION_TYPES][SQR_BLOCK_SIZES] = {
     BLOCK_8X32, BLOCK_16X64, BLOCK_INVALID
   }
 };
+/* clang-format on */
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
+        //
+/* clang-format off */
 
 static const TX_SIZE max_txsize_lookup[BLOCK_SIZES_ALL] = {
   //                   4X4

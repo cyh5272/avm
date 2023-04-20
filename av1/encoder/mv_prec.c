@@ -659,15 +659,16 @@ static AOM_INLINE void collect_mv_stats_sb(MV_STATS *mv_stats,
       collect_mv_stats_b(mv_stats, cpi, mi_row, mi_col + hbs_w);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
       break;
-#if !CONFIG_EXT_RECUR_PARTITIONS
     case PARTITION_SPLIT:
-      collect_mv_stats_sb(mv_stats, cpi, mi_row, mi_col, subsize);
-      collect_mv_stats_sb(mv_stats, cpi, mi_row, mi_col + hbs_w, subsize);
-      collect_mv_stats_sb(mv_stats, cpi, mi_row + hbs_h, mi_col, subsize);
+      collect_mv_stats_sb(mv_stats, cpi, mi_row, mi_col, subsize,
+                          ptree->sub_tree[0]);
+      collect_mv_stats_sb(mv_stats, cpi, mi_row, mi_col + hbs_w, subsize,
+                          ptree->sub_tree[1]);
+      collect_mv_stats_sb(mv_stats, cpi, mi_row + hbs_h, mi_col, subsize,
+                          ptree->sub_tree[2]);
       collect_mv_stats_sb(mv_stats, cpi, mi_row + hbs_h, mi_col + hbs_w,
-                          subsize);
+                          subsize, ptree->sub_tree[3]);
       break;
-#endif  // !CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_H_PARTITION
     case PARTITION_HORZ_3:

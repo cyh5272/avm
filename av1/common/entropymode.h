@@ -15,6 +15,7 @@
 
 #include "av1/common/entropy.h"
 #include "av1/common/entropymv.h"
+#include "av1/common/enums.h"
 #include "av1/common/filter.h"
 #include "av1/common/seg_common.h"
 #include "aom_dsp/aom_filter.h"
@@ -338,15 +339,18 @@ typedef struct frame_contexts {
   aom_cdf_prob uv_mode_cdf[CFL_ALLOWED_TYPES][UV_MODE_CONTEXTS]
                           [CDF_SIZE(UV_INTRA_MODES)];
 #endif  // CONFIG_AIMC
-  aom_cdf_prob partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
-                            [CDF_SIZE(EXT_PARTITION_TYPES)];
 #if CONFIG_EXT_RECUR_PARTITIONS
   aom_cdf_prob do_split_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                            [CDF_SIZE(2)];
+  aom_cdf_prob do_square_split_cdf[PARTITION_STRUCTURE_NUM]
+                                  [SQUARE_SPLIT_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob rect_type_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                             [CDF_SIZE(2)];
   aom_cdf_prob do_ext_partition_cdf[PARTITION_STRUCTURE_NUM][NUM_RECT_PARTS]
                                    [PARTITION_CONTEXTS][CDF_SIZE(2)];
+#else
+  aom_cdf_prob partition_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
+                            [CDF_SIZE(EXT_PARTITION_TYPES)];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   aom_cdf_prob switchable_interp_cdf[SWITCHABLE_FILTER_CONTEXTS]
                                     [CDF_SIZE(SWITCHABLE_FILTERS)];

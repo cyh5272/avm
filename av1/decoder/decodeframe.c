@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
 #include "av1/common/enums.h"
 #include "config/aom_config.h"
@@ -2096,6 +2097,14 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   if (!do_split) {
     return PARTITION_NONE;
   }
+  const int square_split_ctx = square_split_context(xd, mi_row, mi_col, bsize);
+  if (is_square_split_eligible(bsize)) {
+    const bool do_square_split = aom_read_symbol(
+        r, ec_ctx->do_square_split_cdf[plane][square_split_ctx], 2, ACCT_STR);
+    if (do_square_split) {
+      return PARTITION_SPLIT;
+    }
+  }
 
   RECT_PART_TYPE rect_type = rect_type_implied_by_bsize(bsize, xd->tree_type);
   if (rect_type == RECT_INVALID) {
@@ -2288,6 +2297,7 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                        "Partition %d is invalid for block size %dx%d",
                        partition, block_size_wide[bsize],
                        block_size_high[bsize]);
+    assert(0);
   }
   // Check the bitstream is conformant: if there is subsampling on the
   // chroma planes, subsize must subsample to a valid block size.
@@ -2430,6 +2440,12 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
       break;
     }
 #endif  // CONFIG_H_PARTITION
+    case PARTITION_SPLIT:
+      DEC_PARTITION(mi_row, mi_col, subsize, 0);
+      DEC_PARTITION(mi_row, mi_col + hbs_w, subsize, 1);
+      DEC_PARTITION(mi_row + hbs_h, mi_col, subsize, 2);
+      DEC_PARTITION(mi_row + hbs_h, mi_col + hbs_w, subsize, 3);
+      break;
 #else
     case PARTITION_SPLIT:
       DEC_PARTITION(mi_row, mi_col, subsize, 0);
