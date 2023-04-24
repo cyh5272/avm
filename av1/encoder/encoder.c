@@ -998,9 +998,21 @@ static INLINE void init_tip_ref_frame(AV1_COMMON *const cm) {
   cm->tip_ref.tip_frame = aom_calloc(1, sizeof(*cm->tip_ref.tip_frame));
 }
 
+static INLINE void init_grf_ref_frame(AV1_COMMON *const cm) {
+  cm->grf_frame[0] = aom_calloc(1, sizeof(*cm->grf_frame[0]));
+  cm->grf_frame[1] = aom_calloc(1, sizeof(*cm->grf_frame[1]));
+}
+
 static INLINE void free_tip_ref_frame(AV1_COMMON *const cm) {
   aom_free_frame_buffer(&cm->tip_ref.tip_frame->buf);
   aom_free(cm->tip_ref.tip_frame);
+}
+
+static INLINE void free_grf_ref_frame(AV1_COMMON *const cm) {
+  aom_free_frame_buffer(&cm->grf_frame[0]->buf);
+  aom_free_frame_buffer(&cm->grf_frame[1]->buf);
+  aom_free(cm->grf_frame[0]);
+  aom_free(cm->grf_frame[1]);
 }
 
 #if CONFIG_OPTFLOW_ON_TIP
@@ -1267,6 +1279,7 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf, BufferPool *const pool,
   cm->superres_upscaled_height = oxcf->frm_dim_cfg.height;
   av1_loop_restoration_precal();
 
+  init_grf_ref_frame(cm);
 #if CONFIG_TIP
   init_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
@@ -1480,6 +1493,7 @@ void av1_remove_compressor(AV1_COMP *cpi) {
   cpi->ssim_vars = NULL;
 #endif  // CONFIG_INTERNAL_STATS
 
+  free_grf_ref_frame(cm);
 #if CONFIG_TIP
   free_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
@@ -2065,6 +2079,24 @@ static void setup_tip_frame_size(AV1_COMP *cpi) {
 }
 #endif  // CONFIG_TIP
 
+static void setup_grf_frame_size(AV1_COMP *cpi) {
+  AV1_COMMON *const cm = &cpi->common;
+  for (int ref = 0; ref < 2; ++ref) {
+    RefCntBuffer *grf_frame = cm->grf_frame[ref];
+    // Reset the frame pointers to the current frame size.
+    if (aom_realloc_frame_buffer(
+            &grf_frame->buf, cm->width, cm->height,
+            cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
+            cpi->oxcf.border_in_pixels, cm->features.byte_alignment, NULL, NULL,
+            NULL)) {
+      aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                         "Failed to allocate frame buffer");
+    }
+
+    grf_frame->frame_type = INTER_FRAME;
+  }
+}
+
 void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   AV1_COMMON *const cm = &cpi->common;
   const SequenceHeader *const seq_params = &cm->seq_params;
@@ -2143,6 +2175,22 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
     }
     if (buf != NULL) {
       struct scale_factors *sf = get_ref_scale_factors(cm, TIP_FRAME);
+      av1_setup_scale_factors_for_frame(sf, buf->buf.y_crop_width,
+                                        buf->buf.y_crop_height, cm->width,
+                                        cm->height);
+      if (av1_is_scaled(sf)) aom_extend_frame_borders(&buf->buf, num_planes);
+    }
+  }
+
+  for (int ref = 0; ref < 2; ++ref) {
+    RefCntBuffer *buf = get_ref_frame_buf(cm, TIP_FRAME + 1 + ref);
+    if (buf == NULL || (buf->buf.y_crop_width != cm->width ||
+                        buf->buf.y_crop_height != cm->height)) {
+      setup_grf_frame_size(cpi);
+      buf = get_ref_frame_buf(cm, TIP_FRAME + 1 + ref);
+    }
+    if (buf != NULL) {
+      struct scale_factors *sf = get_ref_scale_factors(cm, TIP_FRAME + 1 + ref);
       av1_setup_scale_factors_for_frame(sf, buf->buf.y_crop_width,
                                         buf->buf.y_crop_height, cm->width,
                                         cm->height);

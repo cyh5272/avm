@@ -405,6 +405,7 @@ static INLINE void av1_set_ref_frame(MV_REFERENCE_FRAME *rf,
 #if CONFIG_TIP
       is_tip_ref_frame(ref_frame_type) ||
 #endif  // CONFIG_TIP
+      is_grf_ref_frame(ref_frame_type) ||
       ref_frame_type < INTER_REFS_PER_FRAME) {
     rf[0] = ref_frame_type;
     rf[1] = NONE_FRAME;

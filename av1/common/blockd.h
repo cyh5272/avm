@@ -717,6 +717,10 @@ static INLINE int is_tip_ref_frame(MV_REFERENCE_FRAME ref_frame) {
 }
 #endif  // CONFIG_TIP
 
+static INLINE int is_grf_ref_frame(MV_REFERENCE_FRAME ref_frame) {
+  return ref_frame > TIP_FRAME;
+}
+
 static INLINE int is_inter_block(const MB_MODE_INFO *mbmi, int tree_type) {
   return is_intrabc_block(mbmi, tree_type) ||
          is_inter_ref_frame(mbmi->ref_frame[0]);

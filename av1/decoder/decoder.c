@@ -14,6 +14,7 @@
 #include <limits.h>
 #include <stdio.h>
 
+#include "aom_scale/yv12config.h"
 #include "config/av1_rtcd.h"
 #include "config/aom_dsp_rtcd.h"
 #include "config/aom_scale_rtcd.h"
@@ -146,6 +147,11 @@ static INLINE void dec_init_tip_ref_frame(AV1_COMMON *const cm) {
   tip_ref->tip_frame = aom_calloc(1, sizeof(*tip_ref->tip_frame));
 }
 
+static INLINE void dec_init_grf_ref_frame(AV1_COMMON *const cm) {
+  cm->grf_frame[0] = aom_calloc(1, sizeof(*cm->grf_frame[0]));
+  cm->grf_frame[1] = aom_calloc(1, sizeof(*cm->grf_frame[1]));
+}
+
 static INLINE void dec_free_tip_ref_frame(AV1_COMMON *const cm) {
   aom_free(cm->tip_ref.available_flag);
   cm->tip_ref.available_flag = NULL;
@@ -155,6 +161,14 @@ static INLINE void dec_free_tip_ref_frame(AV1_COMMON *const cm) {
   aom_free_frame_buffer(&cm->tip_ref.tip_frame->buf);
   aom_free(cm->tip_ref.tip_frame);
   cm->tip_ref.tip_frame = NULL;
+}
+
+static INLINE void dec_free_grf_ref_frame(AV1_COMMON *const cm) {
+  aom_free_frame_buffer(&cm->grf_frame[0]->buf);
+  aom_free_frame_buffer(&cm->grf_frame[1]->buf);
+  aom_free(cm->grf_frame[0]);
+  aom_free(cm->grf_frame[1]);
+  cm->grf_frame[0] = cm->grf_frame[1] = NULL;
 }
 
 #if CONFIG_OPTFLOW_ON_TIP
@@ -228,6 +242,7 @@ AV1Decoder *av1_decoder_create(BufferPool *const pool) {
   aom_accounting_init(&pbi->accounting);
 #endif
 
+  dec_init_grf_ref_frame(cm);
 #if CONFIG_TIP
   dec_init_tip_ref_frame(cm);
 #if CONFIG_OPTFLOW_ON_TIP
@@ -315,6 +330,7 @@ void av1_decoder_remove(AV1Decoder *pbi) {
     av1_dealloc_dec_jobs(&pbi->tile_mt_info);
   }
 
+  dec_free_grf_ref_frame(&pbi->common);
 #if CONFIG_TIP
   dec_free_tip_ref_frame(&pbi->common);
 #if CONFIG_OPTFLOW_ON_TIP

@@ -1684,6 +1684,8 @@ typedef struct AV1Common {
   FILE *fDecCoeffLog;
 #endif
 
+  RefCntBuffer *grf_frame[2];
+
 #if CONFIG_TIP
   /*!
    * Flag to indicate if current frame has backward ref frame
@@ -1769,6 +1771,9 @@ static INLINE YV12_BUFFER_CONFIG *get_ref_frame(AV1_COMMON *cm, int index) {
 #if CONFIG_TIP
   if (is_tip_ref_frame(index)) return &cm->tip_ref.tip_frame->buf;
 #endif  // CONFIG_TIP
+  if (is_grf_ref_frame(index))
+    return &cm->grf_frame[index - TIP_FRAME - 1]->buf;
+
   if (index < 0 || index >= REF_FRAMES) return NULL;
   if (cm->ref_frame_map[index] == NULL) return NULL;
   return &cm->ref_frame_map[index]->buf;
@@ -1865,6 +1870,9 @@ static INLINE RefCntBuffer *get_ref_frame_buf(
     return cm->tip_ref.tip_frame;
   }
 #endif  // CONFIG_TIP
+  if (is_grf_ref_frame(ref_frame)) {
+    return cm->grf_frame[ref_frame - TIP_FRAME - 1];
+  }
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }
@@ -1889,6 +1897,10 @@ static INLINE struct scale_factors *get_ref_scale_factors(
     return &cm->tip_ref.scale_factor;
   }
 #endif  // CONFIG_TIP
+  if (is_grf_ref_frame(ref_frame)) {
+    const int map_idx = get_ref_frame_map_idx(cm, 0);
+    return (map_idx != INVALID_IDX) ? &cm->ref_scale_factors[map_idx] : NULL;
+  }
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? &cm->ref_scale_factors[map_idx] : NULL;
 }
@@ -1902,6 +1914,9 @@ static INLINE RefCntBuffer *get_primary_ref_frame_buf(
     return cm->tip_ref.tip_frame;
   }
 #endif  // CONFIG_TIP
+  if (is_grf_ref_frame(primary_ref_frame)) {
+    assert(0);
+  }
   const int map_idx = get_ref_frame_map_idx(cm, primary_ref_frame);
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;
 }

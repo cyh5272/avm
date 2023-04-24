@@ -3559,6 +3559,35 @@ static AOM_INLINE void resize_context_buffers(AV1_COMMON *cm, int width,
   cm->cur_frame->height = cm->height;
 }
 
+static AOM_INLINE void setup_grf_frame_size(AV1_COMMON *cm) {
+  const SequenceHeader *const seq_params = &cm->seq_params;
+
+  for (int ref = 0; ref < 2; ++ref) {
+    YV12_BUFFER_CONFIG *grf_frame_buf = &cm->grf_frame[ref]->buf;
+    if (aom_realloc_frame_buffer(
+            grf_frame_buf, cm->width, cm->height, seq_params->subsampling_x,
+            seq_params->subsampling_y, AOM_DEC_BORDER_IN_PIXELS,
+            cm->features.byte_alignment, NULL, NULL, NULL)) {
+      aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                         "Failed to allocate frame buffer");
+    }
+
+    if (grf_frame_buf) {
+      grf_frame_buf->bit_depth = (unsigned int)seq_params->bit_depth;
+      grf_frame_buf->color_primaries = seq_params->color_primaries;
+      grf_frame_buf->transfer_characteristics =
+          seq_params->transfer_characteristics;
+      grf_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+      grf_frame_buf->monochrome = seq_params->monochrome;
+      grf_frame_buf->chroma_sample_position =
+          seq_params->chroma_sample_position;
+      grf_frame_buf->color_range = seq_params->color_range;
+      grf_frame_buf->render_width = cm->render_width;
+      grf_frame_buf->render_height = cm->render_height;
+    }
+  }
+}
+
 #if CONFIG_TIP
 static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
   const SequenceHeader *const seq_params = &cm->seq_params;
@@ -3622,6 +3651,11 @@ static AOM_INLINE void setup_buffer_pool(AV1_COMMON *cm) {
     }
   }
 #endif  // CONFIG_TIP
+  const RefCntBuffer *const grf_buf = get_ref_frame_buf(cm, TIP_FRAME + 1);
+  if (grf_buf == NULL || (grf_buf->buf.y_crop_width != cm->width ||
+                          grf_buf->buf.y_crop_height != cm->height)) {
+    setup_grf_frame_size(cm);
+  }
 }
 
 static AOM_INLINE void setup_frame_size(AV1_COMMON *cm,
@@ -7057,6 +7091,20 @@ static int read_uncompressed_header(AV1Decoder *pbi,
   tip_frame_buf->render_width = cm->render_width;
   tip_frame_buf->render_height = cm->render_height;
 #endif  // CONFIG_TIP
+
+  for (int ref = 0; ref < 2; ++ref) {
+    YV12_BUFFER_CONFIG *grf_frame_buf = &cm->grf_frame[ref]->buf;
+    grf_frame_buf->bit_depth = seq_params->bit_depth;
+    grf_frame_buf->color_primaries = seq_params->color_primaries;
+    grf_frame_buf->transfer_characteristics =
+        seq_params->transfer_characteristics;
+    grf_frame_buf->matrix_coefficients = seq_params->matrix_coefficients;
+    grf_frame_buf->monochrome = seq_params->monochrome;
+    grf_frame_buf->chroma_sample_position = seq_params->chroma_sample_position;
+    grf_frame_buf->color_range = seq_params->color_range;
+    grf_frame_buf->render_width = cm->render_width;
+    grf_frame_buf->render_height = cm->render_height;
+  }
 
   if (pbi->need_resync) {
     aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,

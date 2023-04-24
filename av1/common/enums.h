@@ -964,7 +964,7 @@ typedef uint8_t TXFM_CONTEXT;
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
 #define MODE_CTX_REF_FRAMES                                \
   (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 3) / 2 + \
-   2)  // additional combinations for the same reference of compound mode
+   4)  // additional combinations for the same reference of compound mode
 #else
 #define MODE_CTX_REF_FRAMES \
   (INTER_REFS_PER_FRAME * (INTER_REFS_PER_FRAME + 1) / 2 + 2)
@@ -1010,7 +1010,7 @@ typedef uint8_t TXFM_CONTEXT;
 #define COMP_REFS (FWD_REFS * BWD_REFS + UNIDIR_COMP_REFS)
 
 #if CONFIG_TIP
-#define TIP_FRAME (MODE_CTX_REF_FRAMES - 1)
+#define TIP_FRAME (MODE_CTX_REF_FRAMES - 3)
 #define TIP_FRAME_INDEX (INTER_REFS_PER_FRAME + 1)
 #define EXTREF_FRAMES (REF_FRAMES + 1)
 #endif  // CONFIG_TIP

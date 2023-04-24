@@ -6516,7 +6516,7 @@ static AOM_INLINE void set_params_rd_pick_inter_mode(
   if (is_comp_ref_allowed(bsize)) {
     // No second reference on RT ref set, so no need to initialize
 #if CONFIG_TIP
-    for (; ref_frame < MODE_CTX_REF_FRAMES - 1; ++ref_frame) {
+    for (; ref_frame < TIP_FRAME; ++ref_frame) {
 #else
     for (; ref_frame < MODE_CTX_REF_FRAMES; ++ref_frame) {
 #endif  // CONFIG_TIP
