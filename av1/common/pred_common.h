@@ -173,6 +173,20 @@ static INLINE int get_dir_rank(const AV1_COMMON *const cm, int refrank,
   return -1;
 }
 
+static INLINE int get_grf_ctx(const MACROBLOCKD *xd) {
+  int ctx = 0;
+  for (int i = 0; i < MAX_NUM_NEIGHBORS; ++i) {
+    const MB_MODE_INFO *const neighbor = xd->neighbors[i];
+    if (neighbor != NULL) {
+      ctx += is_grf_ref_frame(neighbor->ref_frame[0]);
+      ctx += is_grf_ref_frame(neighbor->ref_frame[1]);
+    }
+  }
+
+  ctx = AOMMIN(ctx, MAX_NUM_NEIGHBORS);
+  return ctx;
+}
+
 #if CONFIG_TIP
 static INLINE int get_tip_ctx(const MACROBLOCKD *xd) {
   int ctx = 0;

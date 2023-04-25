@@ -2905,6 +2905,7 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->angle_delta_cdf, default_angle_delta_cdf);
 #endif  // !CONFIG_AIMC
   av1_copy(fc->comp_inter_cdf, default_comp_inter_cdf);
+  av1_copy(fc->grf_cdf, default_tip_cdf);
 #if CONFIG_TIP
   av1_copy(fc->tip_cdf, default_tip_cdf);
 #endif  // CONFIG_TIP

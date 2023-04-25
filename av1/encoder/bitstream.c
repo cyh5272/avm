@@ -1903,7 +1903,15 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
                        ec_ctx->tip_cdf[tip_ctx], 2);
     }
 
-    if (!is_tip_ref_frame(mbmi->ref_frame[0])) write_ref_frames(cm, xd, w);
+    if (!is_tip_ref_frame(mbmi->ref_frame[0])) {
+      const int grf_ctx = get_grf_ctx(xd);
+      aom_write_symbol(w, is_grf_ref_frame(mbmi->ref_frame[0]),
+                       ec_ctx->grf_cdf[grf_ctx], 2);
+    }
+
+    if (!is_tip_ref_frame(mbmi->ref_frame[0]) &&
+        !is_grf_ref_frame(mbmi->ref_frame[0]))
+      write_ref_frames(cm, xd, w);
 #else
     write_ref_frames(cm, xd, w);
 #endif  // CONFIG_TIP
@@ -2094,7 +2102,6 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
         && !is_joint_amvd_coding_mode(mbmi->mode)
 #endif  // IMPROVED_AMVD && CONFIG_JOINT_MVD
     ) {
-
       const int masked_compound_used = is_any_masked_compound_used(bsize) &&
                                        cm->seq_params.enable_masked_compound;
 

@@ -201,6 +201,7 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
 #if CONFIG_BAWP
   RESET_CDF_COUNTER(fc->bawp_cdf, 2);
 #endif  // CONFIG_BAWP
+  RESET_CDF_COUNTER(fc->grf_cdf, 2);
 #if CONFIG_TIP
   RESET_CDF_COUNTER(fc->tip_cdf, 2);
 #endif  // CONFIG_TIP

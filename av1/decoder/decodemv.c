@@ -1973,6 +1973,13 @@ static void read_ref_frames(AV1_COMMON *const cm, MACROBLOCKD *const xd,
     }
   }
 
+  if (!is_tip_ref_frame(ref_frame[0])) {
+    const int grf_ctx = get_grf_ctx(xd);
+    if (aom_read_symbol(r, xd->tile_ctx->grf_cdf[grf_ctx], 2, ACCT_STR)) {
+      ref_frame[0] = TIP_FRAME + 1;
+    }
+  }
+
   if (is_tip_ref_frame(ref_frame[0])) return;
 #endif  // CONFIG_TIP
 

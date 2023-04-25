@@ -955,6 +955,9 @@ typedef uint8_t TXFM_CONTEXT;
 #define TIP_CONTEXTS 3
 #endif  // CONFIG_TIP
 
+// TODO(jingning): Update the context model
+#define GRF_CONTEXTS 3
+
 #define INTER_REFS_PER_FRAME 7
 #define REF_FRAMES (INTER_REFS_PER_FRAME + 1)
 // NOTE: A limited number of unidirectional reference pairs can be signalled for

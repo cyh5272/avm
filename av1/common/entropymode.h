@@ -225,6 +225,7 @@ typedef struct frame_contexts {
 #if CONFIG_BAWP
   aom_cdf_prob bawp_cdf[CDF_SIZE(2)];
 #endif  // CONFIG_BAWP
+  aom_cdf_prob grf_cdf[TIP_CONTEXTS][CDF_SIZE(2)];
 #if CONFIG_TIP
   aom_cdf_prob tip_cdf[TIP_CONTEXTS][CDF_SIZE(2)];
 #endif  // CONFIG_TIP
