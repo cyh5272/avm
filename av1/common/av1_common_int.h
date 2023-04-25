@@ -99,9 +99,15 @@ extern "C" {
 // This macros maps the ref_frame indices to corresponding array indices, where
 // intra ref_frame index, INTRA_FRAME (28) is mapped to INTRA_FRAME_INDEX (7).
 // and tip ref_frame index, TIP_FRAME (29) is mapped to TIP_FRAME_INDEX (8)
-#define COMPACT_INDEX0_NRS(r)               \
-  (((r) == INTRA_FRAME) ? INTRA_FRAME_INDEX \
-                        : (((r) == TIP_FRAME) ? TIP_FRAME_INDEX : (r)))
+#define COMPACT_INDEX0_NRS(r)                                            \
+  (((r) == INTRA_FRAME)                                                  \
+       ? INTRA_FRAME_INDEX                                               \
+       : (((r) == TIP_FRAME)                                             \
+              ? TIP_FRAME_INDEX                                          \
+              : (((r) == WEIGHTED_FRAME_0)                               \
+                     ? WEIGHTED_REF_0_INDEX                              \
+                     : (((r) == WEIGHTED_FRAME_1) ? WEIGHTED_REF_1_INDEX \
+                                                  : (r)))))
 #else
 // Some arrays (e.g. x->pred_sse and yv12_mb) are defined such that their
 // indices 0-7 correspond to inter ref0, ref1,... ref6, and intra ref. This
@@ -199,6 +205,25 @@ enum {
 } UENUM1BYTE(TIP_FRAME_MODE);
 #endif  // CONFIG_TIP
 
+enum {
+  /**
+   * TIP frame generation is disabled
+   */
+  GRF_DISABLED = 0,
+  /**
+   * grf index 0 is used as a reference frame
+   */
+  GRF_0_AS_REF,
+  /**
+   * grf index 1 is used as a reference frame
+   */
+  GRF_1_AS_REF,
+  /**
+   * grf maximum mode
+   */
+  GRF_MODES,
+} UENUM1BYTE(GRF_MODE);
+
 typedef struct {
   int_mv mfmv0;
   uint8_t ref_frame_offset;
@@ -290,6 +315,12 @@ typedef struct RefCntBuffer {
   FrameHash raw_frame_hash;
   FrameHash grain_frame_hash;
 } RefCntBuffer;
+
+typedef struct WeightingParam {
+  bool weighting_flag[3];  //[0: Y, 1: U, 2: V], 0: off, 1: on
+  uint8_t weight[3];       //[0: Y, 1: U, 2: V], range is from (0, 255]
+  int8_t offset[3];        //[0: Y, 1: U, 2: V], range is from [-128, 127]
+} WeightingParam;
 
 typedef struct BufferPool {
 // Protect BufferPool from being accessed by several FrameWorkers at
@@ -697,6 +728,10 @@ typedef struct {
    */
   bool allow_tip_hole_fill;
 #endif  // CONFIG_TIP
+  /*!
+   * GRF mode.
+   */
+  GRF_MODE grf_mode;
 #if CONFIG_PEF
   /*!
    * Enables/disables prediction enhancement filter
@@ -1299,6 +1334,36 @@ typedef struct TIP_Buffer {
 #endif  // CONFIG_TIP
 
 /*!
+ * \brief Structure used for weighted ref frames
+ */
+typedef struct GRF_Buffer {
+  /*!
+   * Buffer into which the weighted reference frame will be stored and other
+   * related info.
+   */
+  RefCntBuffer *grf_frame_buffer;
+  /*!
+   * Reference frame type of GRF's reference frames.
+   */
+  MV_REFERENCE_FRAME non_weighted_frame[2];
+  /*!
+   * Scale factors of tip frame.
+   */
+  struct scale_factors scale_factor;
+  /*!
+   * Buffer into which the scaled weighted ref frame will be stored and
+   * other related info. This is required for generating inter prediction and
+   * will be non-identity for a reference frame, if it has different dimensions
+   * than the coded dimensions of the current frame.
+   */
+  RefCntBuffer *scaled_grf_frame[2];
+  /*!
+   * Weighting parameters.
+   */
+  WeightingParam weighting_param;
+} GRF;
+
+/*!
  * \brief Top level common structure used by both encoder and decoder.
  */
 typedef struct AV1Common {
@@ -1683,8 +1748,10 @@ typedef struct AV1Common {
   FILE *fEncCoeffLog;
   FILE *fDecCoeffLog;
 #endif
-
-  RefCntBuffer *grf_frame[2];
+  /*!
+   * Weighted reference frame
+   */
+  GRF grf_frame[2];
 
 #if CONFIG_TIP
   /*!
@@ -1772,7 +1839,7 @@ static INLINE YV12_BUFFER_CONFIG *get_ref_frame(AV1_COMMON *cm, int index) {
   if (is_tip_ref_frame(index)) return &cm->tip_ref.tip_frame->buf;
 #endif  // CONFIG_TIP
   if (is_grf_ref_frame(index))
-    return &cm->grf_frame[index - TIP_FRAME - 1]->buf;
+    return &cm->grf_frame[index - TIP_FRAME - 1].grf_frame_buffer->buf;
 
   if (index < 0 || index >= REF_FRAMES) return NULL;
   if (cm->ref_frame_map[index] == NULL) return NULL;
@@ -1871,7 +1938,7 @@ static INLINE RefCntBuffer *get_ref_frame_buf(
   }
 #endif  // CONFIG_TIP
   if (is_grf_ref_frame(ref_frame)) {
-    return cm->grf_frame[ref_frame - TIP_FRAME - 1];
+    return cm->grf_frame[ref_frame - TIP_FRAME - 1].grf_frame_buffer;
   }
   const int map_idx = get_ref_frame_map_idx(cm, ref_frame);
   return (map_idx != INVALID_IDX) ? cm->ref_frame_map[map_idx] : NULL;

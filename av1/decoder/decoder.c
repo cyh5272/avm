@@ -148,8 +148,10 @@ static INLINE void dec_init_tip_ref_frame(AV1_COMMON *const cm) {
 }
 
 static INLINE void dec_init_grf_ref_frame(AV1_COMMON *const cm) {
-  cm->grf_frame[0] = aom_calloc(1, sizeof(*cm->grf_frame[0]));
-  cm->grf_frame[1] = aom_calloc(1, sizeof(*cm->grf_frame[1]));
+  cm->grf_frame[0].grf_frame_buffer =
+      aom_calloc(1, sizeof(*cm->grf_frame[0].grf_frame_buffer));
+  cm->grf_frame[1].grf_frame_buffer =
+      aom_calloc(1, sizeof(*cm->grf_frame[1].grf_frame_buffer));
 }
 
 static INLINE void dec_free_tip_ref_frame(AV1_COMMON *const cm) {
@@ -164,11 +166,11 @@ static INLINE void dec_free_tip_ref_frame(AV1_COMMON *const cm) {
 }
 
 static INLINE void dec_free_grf_ref_frame(AV1_COMMON *const cm) {
-  aom_free_frame_buffer(&cm->grf_frame[0]->buf);
-  aom_free_frame_buffer(&cm->grf_frame[1]->buf);
-  aom_free(cm->grf_frame[0]);
-  aom_free(cm->grf_frame[1]);
-  cm->grf_frame[0] = cm->grf_frame[1] = NULL;
+  aom_free_frame_buffer(&cm->grf_frame[0].grf_frame_buffer->buf);
+  aom_free_frame_buffer(&cm->grf_frame[1].grf_frame_buffer->buf);
+  aom_free(cm->grf_frame[0].grf_frame_buffer);
+  aom_free(cm->grf_frame[1].grf_frame_buffer);
+  cm->grf_frame[0].grf_frame_buffer = cm->grf_frame[1].grf_frame_buffer = NULL;
 }
 
 #if CONFIG_OPTFLOW_ON_TIP

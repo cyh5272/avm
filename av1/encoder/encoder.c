@@ -999,8 +999,10 @@ static INLINE void init_tip_ref_frame(AV1_COMMON *const cm) {
 }
 
 static INLINE void init_grf_ref_frame(AV1_COMMON *const cm) {
-  cm->grf_frame[0] = aom_calloc(1, sizeof(*cm->grf_frame[0]));
-  cm->grf_frame[1] = aom_calloc(1, sizeof(*cm->grf_frame[1]));
+  cm->grf_frame[0].grf_frame_buffer =
+      aom_calloc(1, sizeof(*cm->grf_frame[0].grf_frame_buffer));
+  cm->grf_frame[1].grf_frame_buffer =
+      aom_calloc(1, sizeof(*cm->grf_frame[1].grf_frame_buffer));
 }
 
 static INLINE void free_tip_ref_frame(AV1_COMMON *const cm) {
@@ -1009,10 +1011,10 @@ static INLINE void free_tip_ref_frame(AV1_COMMON *const cm) {
 }
 
 static INLINE void free_grf_ref_frame(AV1_COMMON *const cm) {
-  aom_free_frame_buffer(&cm->grf_frame[0]->buf);
-  aom_free_frame_buffer(&cm->grf_frame[1]->buf);
-  aom_free(cm->grf_frame[0]);
-  aom_free(cm->grf_frame[1]);
+  aom_free_frame_buffer(&cm->grf_frame[0].grf_frame_buffer->buf);
+  aom_free_frame_buffer(&cm->grf_frame[1].grf_frame_buffer->buf);
+  aom_free(cm->grf_frame[0].grf_frame_buffer);
+  aom_free(cm->grf_frame[1].grf_frame_buffer);
 }
 
 #if CONFIG_OPTFLOW_ON_TIP
@@ -2082,7 +2084,7 @@ static void setup_tip_frame_size(AV1_COMP *cpi) {
 static void setup_grf_frame_size(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   for (int ref = 0; ref < 2; ++ref) {
-    RefCntBuffer *grf_frame = cm->grf_frame[ref];
+    RefCntBuffer *grf_frame = cm->grf_frame[ref].grf_frame_buffer;
     // Reset the frame pointers to the current frame size.
     if (aom_realloc_frame_buffer(
             &grf_frame->buf, cm->width, cm->height,

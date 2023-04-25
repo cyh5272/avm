@@ -3563,7 +3563,8 @@ static AOM_INLINE void setup_grf_frame_size(AV1_COMMON *cm) {
   const SequenceHeader *const seq_params = &cm->seq_params;
 
   for (int ref = 0; ref < 2; ++ref) {
-    YV12_BUFFER_CONFIG *grf_frame_buf = &cm->grf_frame[ref]->buf;
+    YV12_BUFFER_CONFIG *grf_frame_buf =
+        &cm->grf_frame[ref].grf_frame_buffer->buf;
     if (aom_realloc_frame_buffer(
             grf_frame_buf, cm->width, cm->height, seq_params->subsampling_x,
             seq_params->subsampling_y, AOM_DEC_BORDER_IN_PIXELS,
@@ -7093,7 +7094,8 @@ static int read_uncompressed_header(AV1Decoder *pbi,
 #endif  // CONFIG_TIP
 
   for (int ref = 0; ref < 2; ++ref) {
-    YV12_BUFFER_CONFIG *grf_frame_buf = &cm->grf_frame[ref]->buf;
+    YV12_BUFFER_CONFIG *grf_frame_buf =
+        &cm->grf_frame[ref].grf_frame_buffer->buf;
     grf_frame_buf->bit_depth = seq_params->bit_depth;
     grf_frame_buf->color_primaries = seq_params->color_primaries;
     grf_frame_buf->transfer_characteristics =
