@@ -1535,7 +1535,7 @@ static const uint8_t pc_wiener_collapse_2[1][2] = {
 /* clang-format on */
 
 // qindex ranges 0 : [0, 130), 1: [130, 190), 2: [190, 220), 3: [220, 270)]
-static AOM_INLINE int get_filter_bank_index(int base_qindex) {
+static AOM_INLINE int get_filter_set_index(int base_qindex) {
   if (base_qindex < 130)
     return 0;
   else if (base_qindex < 190)
@@ -1547,8 +1547,8 @@ static AOM_INLINE int get_filter_bank_index(int base_qindex) {
 }
 
 static AOM_INLINE const int16_t (
-    *get_filter_bank(int filter_bank_index))[NUM_PC_WIENER_TAPS_LUMA] {
-  switch (filter_bank_index) {
+    *get_filter_set(int filter_set_index))[NUM_PC_WIENER_TAPS_LUMA] {
+  switch (filter_set_index) {
     case 0: return pcwiener_filters_luma_0;
     case 1: return pcwiener_filters_luma_1;
     case 2: return pcwiener_filters_luma_2;
@@ -1557,9 +1557,9 @@ static AOM_INLINE const int16_t (
   }
 }
 
-static AOM_INLINE const uint8_t *get_filter_selector(int filter_bank_index) {
+static AOM_INLINE const uint8_t *get_filter_selector(int filter_set_index) {
   assert(NUM_PC_WIENER_FILTERS == 64);
-  switch (filter_bank_index) {
+  switch (filter_set_index) {
     case 0: return pc_wiener_sub_classify_to_64_0;
     case 1: return pc_wiener_sub_classify_to_64_1;
     case 2: return pc_wiener_sub_classify_to_64_2;
@@ -1606,9 +1606,9 @@ static const PcWienerSubClassifiers subclass3 = {
 };
 
 static AOM_INLINE const PcWienerSubClassifiers *get_sub_classifiers(
-    int filter_bank_index) {
+    int filter_set_index) {
   assert(NUM_PC_WIENER_FILTERS == 64);
-  switch (filter_bank_index) {
+  switch (filter_set_index) {
     case 0: return &subclass0;
     case 1: return &subclass1;
     case 2: return &subclass2;
@@ -1617,11 +1617,12 @@ static AOM_INLINE const PcWienerSubClassifiers *get_sub_classifiers(
   }
 }
 
-// Number of bits needed to fir the output of encode_num_classes().
-#define NUM_FILTER_CLASSES_BITS 2
+// Number of bits needed to write the number of classes.
+#define NUM_FILTER_CLASSES_BITS 3
 
 // Returns a number to encode for each possible value of num_classes.
 static AOM_INLINE int encode_num_filter_classes(int num_classes) {
+  assert((1 << NUM_FILTER_CLASSES_BITS) > 4);
   switch (num_classes) {
     case 16: return 4;
     case 8: return 3;
@@ -1634,6 +1635,7 @@ static AOM_INLINE int encode_num_filter_classes(int num_classes) {
 
 // Returns a number to encode for each possible value of num_classes.
 static AOM_INLINE int decode_num_filter_classes(int encoded_num_classes) {
+  assert((1 << NUM_FILTER_CLASSES_BITS) > 4);
   switch (encoded_num_classes) {
     case 4: return 16;
     case 3: return 8;
@@ -1644,7 +1646,7 @@ static AOM_INLINE int decode_num_filter_classes(int encoded_num_classes) {
   }
 }
 
-static AOM_INLINE const uint8_t *get_converter(int filter_bank_index,
+static AOM_INLINE const uint8_t *get_converter(int filter_set_index,
                                                int num_classes,
                                                int target_classes) {
   if (num_classes < target_classes) {
@@ -1667,7 +1669,7 @@ static AOM_INLINE const uint8_t *get_converter(int filter_bank_index,
   while (num_classes >> row > target_classes) ++row;
   --row;
 
-  switch (filter_bank_index) {
+  switch (filter_set_index) {
     case 0:
       switch (num_classes) {
         case 16: return pc_wiener_collapse_16_0[row];
