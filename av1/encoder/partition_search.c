@@ -5453,7 +5453,8 @@ BEGIN_PARTITION_SEARCH:
   WARP_PARAM_BANK best_level_warp_bank = x->e_mbd.warp_param_bank;
 #endif  // WARP_CU_BANK
 #if CONFIG_EXT_RECUR_PARTITIONS
-  if (IS_FORCED_PARTITION_TYPE(PARTITION_NONE)) {
+  if (IS_FORCED_PARTITION_TYPE(PARTITION_NONE) &&
+      (forced_partition == PARTITION_NONE || bsize != BLOCK_256X256)) {
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
     none_partition_search(cpi, td, tile_data, x, pc_tree, sms_tree, &x_ctx,
                           &part_search_state, &best_rdc, &pb_source_variance,
@@ -5529,6 +5530,39 @@ BEGIN_PARTITION_SEARCH:
   prune_partitions_after_split(cpi, x, sms_tree, &part_search_state, &best_rdc,
                                part_none_rd, part_split_rd);
 #endif  // !CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_EXT_RECUR_PARTITIONS
+  bool prune_none = false;
+  if (forced_partition == PARTITION_INVALID && bsize == BLOCK_256X256) {
+    for (int idx = 0; idx < 4; idx++) {
+      prune_none |= (pc_tree->split[idx]->partitioning != PARTITION_NONE);
+    }
+  }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_EXT_RECUR_PARTITIONS
+  if (forced_partition == PARTITION_INVALID && bsize == BLOCK_256X256 &&
+      !prune_none) {
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+    none_partition_search(cpi, td, tile_data, x, pc_tree, sms_tree, &x_ctx,
+                          &part_search_state, &best_rdc, &pb_source_variance,
+                          none_rd, &part_none_rd
+#if CONFIG_C043_MVP_IMPROVEMENTS
+                          ,
+                          &best_level_bank
+#endif  // CONFIG_C043_MVP_IMPROVEMENTS
+#if WARP_CU_BANK
+                          ,
+                          &best_level_warp_bank
+#endif  // WARP_CU_BANK
+    );
+#if CONFIG_C043_MVP_IMPROVEMENTS
+    x->e_mbd.ref_mv_bank = curr_level_bank;
+#endif  // CONFIG_C043_MVP_IMPROVEMENTS
+#if WARP_CU_BANK
+    x->e_mbd.warp_param_bank = curr_level_warp_bank;
+#endif  // WARP_CU_BANK
+#if CONFIG_EXT_RECUR_PARTITIONS
+  }
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
 
   // Rectangular partitions search stage.
 #if CONFIG_EXT_RECUR_PARTITIONS
