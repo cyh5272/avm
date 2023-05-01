@@ -223,20 +223,52 @@ typedef struct RstUnitSnapshot {
 } RstUnitSnapshot;
 #endif  // CONFIG_LR_MERGE_COEFFS
 
-static AOM_INLINE void reset_all_banks(RestSearchCtxt *rsc) {
-  av1_reset_wiener_bank(&rsc->wiener_bank);
-  av1_reset_sgrproj_bank(&rsc->sgrproj_bank);
+static AOM_INLINE void reset_all_banks(RestSearchCtxt *rsc
+#if CONFIG_TEMP_LR
+                                       ,
+                                       int tile_row, int tile_col
+#endif  // CONFIG_TEMP_LR
+) {
+  av1_reset_wiener_bank(
+      &rsc->wiener_bank,
+#if CONFIG_TEMP_LR
+      rsc->cm->prev_frame ? rsc->cm->prev_frame->rst_info + rsc->plane : NULL,
+      rsc->cm->rst_info + rsc->plane, tile_row, tile_col,
+#endif  // CONFIG_TEMP_LR
+      rsc->plane);
+  av1_reset_sgrproj_bank(
+      &rsc->sgrproj_bank,
+#if CONFIG_TEMP_LR
+      rsc->cm->prev_frame ? rsc->cm->prev_frame->rst_info + rsc->plane : NULL,
+      rsc->cm->rst_info + rsc->plane, tile_row, tile_col,
+#endif  // CONFIG_TEMP_LR
+      rsc->plane);
 #if CONFIG_WIENER_NONSEP
-  av1_reset_wienerns_bank(&rsc->wienerns_bank,
-                          rsc->cm->quant_params.base_qindex,
-                          rsc->num_filter_classes, rsc->plane != AOM_PLANE_Y);
+  av1_reset_wienerns_bank(
+      &rsc->wienerns_bank, rsc->cm->quant_params.base_qindex,
+      rsc->num_filter_classes,
+#if CONFIG_TEMP_LR
+      rsc->cm->prev_frame ? rsc->cm->prev_frame->rst_info + rsc->plane : NULL,
+      rsc->cm->rst_info + rsc->plane, tile_row, tile_col,
+#endif  // CONFIG_TEMP_LR
+      rsc->plane);
 #endif  // CONFIG_WIENER_NONSEP
 }
 
-static AOM_INLINE void rsc_on_tile(void *priv, int idx_base) {
+static AOM_INLINE void rsc_on_tile(void *priv, int tile_row, int tile_col,
+                                   int idx_base) {
+  (void)tile_row;
+  (void)tile_col;
   RestSearchCtxt *rsc = (RestSearchCtxt *)priv;
-  reset_all_banks(rsc);
+  reset_all_banks(rsc
+#if CONFIG_TEMP_LR
+                  ,
+                  tile_row, tile_col
+#endif  // CONFIG_TEMP_LR
+  );
   rsc->tile_stripe0 = 0;
+  assert(rsc->cm->rst_info[rsc->plane]
+             .tile_helper.ru_base_idx[tile_row][tile_col] == idx_base);
   rsc->ru_idx_base = idx_base;
 }
 
@@ -2543,6 +2575,8 @@ static int64_t count_wienerns_bits_set(
     }
     total_bits += best_bits;
     info->bank_ref_for_class[c_id] = AOMMAX(0, best_ref);
+    assert(info->bank_ref_for_class[c_id] <
+           AOMMAX(1, bank->bank_size_for_class[c_id]));
   }
   return total_bits;
 }
@@ -4110,6 +4144,9 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
   rsi->sw_lr_tools_disable_mask = 0;
   uint8_t sw_lr_tools_disable_mask = 0;
 #endif  // CONFIG_LR_FLEX_SYNTAX
+#if CONFIG_WIENER_NONSEP
+  rsi->num_filter_classes = rsc->num_filter_classes;
+#endif
   if (rsi->frame_restoration_type == RESTORE_NONE) return;
   int tool_count[RESTORE_SWITCHABLE_TYPES] = { 0 };
   for (int u = 0; u < plane_ntiles; ++u) {
@@ -4141,9 +4178,6 @@ static void adjust_frame_rtype(RestorationInfo *rsi, int plane_ntiles,
     }
   }
   rsi->frame_restoration_type = ntools < 2 ? rused : RESTORE_SWITCHABLE;
-#if CONFIG_WIENER_NONSEP
-  rsi->num_filter_classes = rsc->num_filter_classes;
-#endif
 #if CONFIG_LR_FLEX_SYNTAX
   if (rsi->frame_restoration_type == RESTORE_SWITCHABLE &&
       rsc->cm->features.lr_tools_count[rsc->plane] > 2) {
@@ -4239,6 +4273,7 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
   const int ss_y = is_uv && rsc->cm->seq_params.subsampling_y;
   const RestorationInfo *rsi = &rsc->cm->rst_info[rsc->plane];
   const int ru_size = rsi->restoration_unit_size;
+  assert(ru_size == rsi->tile_helper.ru_size);
   TileInfo tile_info;
   av1_tile_set_row(&tile_info, rsc->cm, tile_row);
   av1_tile_set_col(&tile_info, rsc->cm, tile_col);
@@ -4246,7 +4281,7 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
   assert(tile_info.mi_col_start < tile_info.mi_col_end);
 
   reset_rsc(rsc);
-  rsc_on_tile(rsc, *processed);
+  rsc_on_tile(rsc, tile_row, tile_col, *processed);
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += rsc->cm->seq_params.mib_size) {
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;

@@ -34,7 +34,6 @@ int av1_get_MBs(int width, int height) {
 
 void av1_free_ref_frame_buffers(BufferPool *pool) {
   int i;
-
   for (i = 0; i < FRAME_BUFFERS; ++i) {
     if (pool->frame_bufs[i].ref_count > 0 &&
         pool->frame_bufs[i].raw_frame_buffer.data != NULL) {
@@ -49,6 +48,11 @@ void av1_free_ref_frame_buffers(BufferPool *pool) {
     aom_free(pool->frame_bufs[i].seg_map);
     pool->frame_bufs[i].seg_map = NULL;
     aom_free_frame_buffer(&pool->frame_bufs[i].buf);
+#if CONFIG_TEMP_LR
+    for (int p = 0; p < MAX_MB_PLANE; ++p) {
+      av1_free_restoration_struct(&pool->frame_bufs[i].rst_info[p]);
+    }
+#endif  // CONFIG_TEMP_LR
   }
 }
 
@@ -56,7 +60,7 @@ void av1_free_ref_frame_buffers(BufferPool *pool) {
 void av1_alloc_restoration_buffers(AV1_COMMON *cm) {
   const int num_planes = av1_num_planes(cm);
   for (int p = 0; p < num_planes; ++p)
-    av1_alloc_restoration_struct(cm, &cm->rst_info[p], p > 0);
+    av1_alloc_restoration_struct(cm, &cm->rst_info[p], p);
 
   if (cm->rst_tmpbuf == NULL) {
     CHECK_MEM_ERROR(cm, cm->rst_tmpbuf,
@@ -572,3 +576,18 @@ int av1_duplicate_mi(AV1_COMMON *cm, CommonModeInfoParams *to) {
 
   return av1_copy_mi_neq(cm, to, from);
 }
+
+#if CONFIG_TEMP_LR
+int av1_copy_rst_info(RestorationInfo *to, RestorationInfo *from) {
+  av1_free_restoration_struct(to);
+  memcpy(to, from, sizeof(*to));
+  if (to->units_per_tile) {
+    to->unit_info = (RestorationUnitInfo *)aom_memalign(
+        16, sizeof(*to->unit_info) * to->units_per_tile);
+    if (to->unit_info == NULL) return 1;
+    memcpy(to->unit_info, from->unit_info,
+           sizeof(*to->unit_info) * to->units_per_tile);
+  }
+  return 0;
+}
+#endif  // CONFIG_TEMP_LR

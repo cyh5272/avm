@@ -374,6 +374,19 @@ AV1PixelRect av1_whole_frame_rect(const AV1_COMMON *cm, int is_uv) {
   return rect;
 }
 
+AV1PixelRect av1_coded_frame_rect(const AV1_COMMON *cm, int is_uv) {
+  AV1PixelRect rect;
+
+  int ss_x = is_uv && cm->seq_params.subsampling_x;
+  int ss_y = is_uv && cm->seq_params.subsampling_y;
+
+  rect.top = 0;
+  rect.bottom = ROUND_POWER_OF_TWO(cm->height, ss_y);
+  rect.left = 0;
+  rect.right = ROUND_POWER_OF_TWO(cm->width, ss_x);
+  return rect;
+}
+
 // Count horizontal or vertical units per tile (use a width or height for
 // tile_size, respectively). We basically want to divide the tile size by the
 // size of a restoration unit. Rather than rounding up unconditionally as you
@@ -426,7 +439,8 @@ AV1PixelRect av1_get_rutile_rect(const AV1_COMMON *cm, int plane,
 }
 
 void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
-                                  int is_uv) {
+                                  int plane) {
+  const int is_uv = plane > 0;
   // We need to allocate enough space for restoration units to cover the
   // largest tile. Without CONFIG_MAX_TILE, this is always the tile at the
   // top-left and we can use av1_get_tile_rect(). With CONFIG_MAX_TILE, we have
@@ -435,6 +449,8 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);
   const int max_tile_w = tile_rect.right - tile_rect.left;
   const int max_tile_h = tile_rect.bottom - tile_rect.top;
+
+  const AV1PixelRect coded_rect = av1_coded_frame_rect(cm, is_uv);
 
   // To calculate hpertile and vpertile (horizontal and vertical units per
   // tile), we basically want to divide the largest tile width or height by the
@@ -447,6 +463,10 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   const int hpertile = av1_lr_count_units_in_tile(unit_size, max_tile_w);
   const int vpertile = av1_lr_count_units_in_tile(unit_size, max_tile_h);
 
+  rsi->width = max_tile_w;
+  rsi->height = max_tile_h;
+  rsi->coded_width = coded_rect.right - coded_rect.left;
+  rsi->coded_height = coded_rect.bottom - coded_rect.top;
   rsi->units_per_tile = hpertile * vpertile;
   rsi->horz_units_per_tile = hpertile;
   rsi->vert_units_per_tile = vpertile;
@@ -458,6 +478,11 @@ void av1_alloc_restoration_struct(AV1_COMMON *cm, RestorationInfo *rsi,
   CHECK_MEM_ERROR(cm, rsi->unit_info,
                   (RestorationUnitInfo *)aom_memalign(
                       16, sizeof(*rsi->unit_info) * nunits));
+#if CONFIG_WIENER_NONSEP
+  rsi->num_filter_classes =
+      is_uv ? NUM_WIENERNS_CLASS_INIT_CHROMA : NUM_WIENERNS_CLASS_INIT_LUMA;
+#endif  // CONFIG_WIENER_NONSEP
+  rsi->tile_helper = av1_get_rus_per_tile_helper(cm, plane);
 }
 
 void av1_free_restoration_struct(RestorationInfo *rst_info) {
@@ -2813,4 +2838,104 @@ void av1_loop_restoration_save_boundary_lines(const YV12_BUFFER_CONFIG *frame,
   for (int p = 0; p < num_planes; ++p) {
     save_tile_row_boundary_lines(frame, p, cm, after_cdef);
   }
+}
+
+void av1_get_ru_limits_in_tile(const AV1_COMMON *cm, int plane, int tile_row,
+                               int tile_col, int *ru_row_start, int *ru_row_end,
+                               int *ru_col_start, int *ru_col_end) {
+  TileInfo tile_info;
+  av1_tile_set_row(&tile_info, cm, tile_row);
+  av1_tile_set_col(&tile_info, cm, tile_col);
+  assert(tile_info.mi_row_start < tile_info.mi_row_end);
+  assert(tile_info.mi_col_start < tile_info.mi_col_end);
+
+  *ru_row_start = 0;
+  *ru_col_start = 0;
+  *ru_row_end = 0;
+  *ru_col_end = 0;
+  int rrow0, rrow1, rcol0, rcol1;
+  // Scan SBs row by row, left to right to find first SB that has RU info in it.
+  int found = 0;
+  for (int mi_row = tile_info.mi_row_start;
+       mi_row < tile_info.mi_row_end && !found;
+       mi_row += cm->seq_params.mib_size) {
+    for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
+         mi_col += cm->seq_params.mib_size) {
+      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
+                                             cm->seq_params.sb_size, &rcol0,
+                                             &rcol1, &rrow0, &rrow1)) {
+        *ru_row_start = rrow0;  // this is the RU row start limit in RU terms.
+        *ru_col_start = rcol0;  // this is the RU col start limit in RU terms.
+        found = 1;
+        break;
+      }
+    }
+  }
+  // Scan SBs in reverse row by row, right to left to find first SB that has RU
+  // info in it.
+  found = 0;
+  const int sb_mi_row_end =
+      tile_info.mi_row_end - 1 -
+      (tile_info.mi_row_end - 1) % cm->seq_params.mib_size;
+  const int sb_mi_col_end =
+      tile_info.mi_col_end - 1 -
+      (tile_info.mi_col_end - 1) % cm->seq_params.mib_size;
+  for (int mi_row = sb_mi_row_end; mi_row >= tile_info.mi_row_start && !found;
+       mi_row -= cm->seq_params.mib_size) {
+    for (int mi_col = sb_mi_col_end; mi_col >= tile_info.mi_col_start;
+         mi_col -= cm->seq_params.mib_size) {
+      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col,
+                                             cm->seq_params.sb_size, &rcol0,
+                                             &rcol1, &rrow0, &rrow1)) {
+        *ru_row_end = rrow1;  // this is the RU row end limit in RU terms.
+        *ru_col_end = rcol1;  // this is the RU col end limit in RU terms.
+        found = 1;
+        break;
+      }
+    }
+  }
+}
+
+RusPerTileHelper av1_get_rus_per_tile_helper(const struct AV1Common *cm,
+                                             int plane) {
+  RusPerTileHelper helper = { 0 };
+
+  if (cm->rst_info[plane].restoration_unit_size == 0) return helper;
+
+  helper.ru_size = cm->rst_info[plane].restoration_unit_size;
+
+  const CommonTileParams *actual_tiles = &cm->tiles;
+  helper.tile_cols = actual_tiles->cols;
+  helper.tile_rows = actual_tiles->rows;
+  assert(helper.tile_rows > 0 && helper.tile_cols > 0);
+  int ru_row_start;
+  int ru_row_end;
+  int ru_col_start;
+  int ru_col_end;
+  for (int tile_row = 0; tile_row < helper.tile_rows; tile_row++) {
+    int tile_col = 0;
+    av1_get_ru_limits_in_tile(cm, plane, tile_row, tile_col, &ru_row_start,
+                              &ru_row_end, &ru_col_start, &ru_col_end);
+    helper.begin_ru_row_in_tile[tile_row] = ru_row_start;
+    helper.end_ru_row_in_tile[tile_row] = ru_row_end;
+  }
+  for (int tile_col = 0; tile_col < helper.tile_cols; tile_col++) {
+    int tile_row = 0;
+    av1_get_ru_limits_in_tile(cm, plane, tile_row, tile_col, &ru_row_start,
+                              &ru_row_end, &ru_col_start, &ru_col_end);
+    helper.begin_ru_col_in_tile[tile_col] = ru_col_start;
+    helper.end_ru_col_in_tile[tile_col] = ru_col_end;
+  }
+  int ru_base_idx = 0;
+  for (int tile_row = 0; tile_row < helper.tile_rows; tile_row++) {
+    for (int tile_col = 0; tile_col < helper.tile_cols; tile_col++) {
+      const int ru_start_row = helper.begin_ru_row_in_tile[tile_row];
+      const int ru_end_row = helper.end_ru_row_in_tile[tile_row];
+      const int ru_start_col = helper.begin_ru_col_in_tile[tile_col];
+      const int ru_end_col = helper.end_ru_col_in_tile[tile_col];
+      helper.ru_base_idx[tile_row][tile_col] = ru_base_idx;
+      ru_base_idx += (ru_end_col - ru_start_col) * (ru_end_row - ru_start_row);
+    }
+  }
+  return helper;
 }
