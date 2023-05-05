@@ -165,20 +165,20 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
 
 // TODO(urvang@google.com): replace quantSet with struct.
 // guided conv unet with attention intra
-int qp255_quadtree_model_quantSet_intra[] = { 460, 356, -5, 1 };
-int qp205_quadtree_model_quantSet_intra[] = { 26206, 22062, -17, -12 };
-int qp175_quadtree_model_quantSet_intra[] = { 326, 626, 5, -8 };
-int qp145_quadtree_model_quantSet_intra[] = { 11729, 21508, 2, -12 };
-int qp120_quadtree_model_quantSet_intra[] = { 10913, 9068, -33, -7 };
-int qp90_quadtree_model_quantSet_intra[] = { 211238, 307325, -3, 9 };
+int qp90_quadtree_model_quantSet_intra[] =  { 12800, 12800, -16, -12 };
+int qp120_quadtree_model_quantSet_intra[] = { 140960, 20480, 7, -16 };
+int qp145_quadtree_model_quantSet_intra[] = { 1024, 832, -33, 17 };
+int qp175_quadtree_model_quantSet_intra[] = { 2048, 256, 0, -25 };
+int qp205_quadtree_model_quantSet_intra[] = { 1024, 16, -4, -14 };
+int qp255_quadtree_model_quantSet_intra[] = { 20, 500, -20, 3 };
 
 // guided conv unet with attention inter
-int qp255_quadtree_model_quantSet_inter[] = { 821, 645, -18, -6 };
-int qp205_quadtree_model_quantSet_inter[] = { 553, 489, 0, -6 };
-int qp175_quadtree_model_quantSet_inter[] = { 1457, 1933, -11, -25 };
-int qp145_quadtree_model_quantSet_inter[] = { 169214, 80256, -11, -28 };
-int qp120_quadtree_model_quantSet_inter[] = { 3395, 3166, -30, -3 };
-int qp90_quadtree_model_quantSet_inter[] = { 1920, 14281, -21, -7 };
+int qp255_quadtree_model_quantSet_inter[] = { 20, 500, -20, 3 };
+int qp205_quadtree_model_quantSet_inter[] = { 1024, 16, -4, -14 };
+int qp175_quadtree_model_quantSet_inter[] = { 2048, 256, 0, -25 };
+int qp145_quadtree_model_quantSet_inter[] = { 1024, 832, -33, 17 };
+int qp120_quadtree_model_quantSet_inter[] = { 140960, 20480, 7, -16 };
+int qp90_quadtree_model_quantSet_inter[] =  { 12800, 12800, -16, -12 };
 
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index) {
