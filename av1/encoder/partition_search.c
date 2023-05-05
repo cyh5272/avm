@@ -5106,6 +5106,51 @@ static INLINE void search_partition_vert_3(
 }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
+static AOM_INLINE int get_partition_depth(const PC_TREE *pc_tree,
+                                          int curr_depth) {
+  const PARTITION_TYPE partition = pc_tree->partitioning;
+  int max_depth = curr_depth;
+  switch (partition) {
+    case PARTITION_NONE: break;
+    case PARTITION_SPLIT:
+      for (int idx = 0; idx < 4; idx++) {
+        max_depth = AOMMAX(max_depth, get_partition_depth(pc_tree->split[idx],
+                                                          curr_depth + 2));
+      }
+      break;
+    case PARTITION_HORZ:
+      for (int idx = 0; idx < 2; idx++) {
+        max_depth = AOMMAX(
+            max_depth,
+            get_partition_depth(pc_tree->horizontal[idx], curr_depth + 1));
+      }
+      break;
+    case PARTITION_VERT:
+      for (int idx = 0; idx < 2; idx++) {
+        max_depth =
+            AOMMAX(max_depth,
+                   get_partition_depth(pc_tree->vertical[idx], curr_depth + 1));
+      }
+      break;
+    case PARTITION_HORZ_3:
+      for (int idx = 0; idx < 4; idx++) {
+        max_depth = AOMMAX(
+            max_depth,
+            get_partition_depth(pc_tree->horizontal3[idx], curr_depth + 1));
+      }
+      break;
+    case PARTITION_VERT_3:
+      for (int idx = 0; idx < 4; idx++) {
+        max_depth = AOMMAX(
+            max_depth,
+            get_partition_depth(pc_tree->vertical3[idx], curr_depth + 1));
+      }
+      break;
+    default: assert(0); break;
+  }
+  return max_depth;
+}
+
 #if CONFIG_EXT_RECUR_PARTITIONS
 /*!\brief AV1 block partition search (full search).
 *
@@ -5533,9 +5578,18 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_EXT_RECUR_PARTITIONS
   bool prune_none = false;
   if (forced_partition == PARTITION_INVALID && bsize == BLOCK_256X256) {
+    int min_depth = INT_MAX, max_depth = 0;
     for (int idx = 0; idx < 4; idx++) {
-      prune_none |= (pc_tree->split[idx]->partitioning != PARTITION_NONE);
+      const int depth = get_partition_depth(pc_tree->split[idx], 0);
+      prune_none |= depth > 0;
+      min_depth = AOMMIN(min_depth, depth);
+      max_depth = AOMMAX(max_depth, depth);
     }
+    if (min_depth > 4) {
+      part_search_state.prune_rect_part[HORZ] =
+          part_search_state.prune_rect_part[VERT] = true;
+    }
+    (void)max_depth;
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_EXT_RECUR_PARTITIONS
