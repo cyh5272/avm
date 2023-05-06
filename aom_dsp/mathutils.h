@@ -64,6 +64,11 @@ static INLINE void matrix_show(const Matrix *a) {
   }
 }
 
+#define MATRIX_SHOW(matrix)  \
+  printf("-- " #matrix " --\n"); \
+  matrix_show(matrix);       \
+  printf("----\n")
+
 static INLINE void matrix_diagnal(const Matrix *diag_vec, Matrix *diag_mat) {
   assert(diag_vec->cols == 1);
   assert(diag_vec->rows == diag_mat->rows || diag_vec->rows == diag_mat->cols);
