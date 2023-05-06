@@ -39,7 +39,7 @@ TEST(MathUtilsTest, MatrixDiagnal) {
   MATRIX_CREATE(mmat, mat, 2, 3, { 0 });
   MATRIX_CREATE(mref_mat, ref_mat, 2, 3, { { 6, 0, 0 }, { 0, 7, 0 } });
   MATRIX_CREATE(mvec, vec, 2, 1, { { 6 }, { 7 } });
-  matrix_diagnal(&mvec, &mmat);
+  matrix_diagonal(&mvec, &mmat);
   EXPECT_TRUE(matrix_match(&mmat, &mref_mat));
 }
 
@@ -62,7 +62,7 @@ TEST(MathUtilsTest, SVD) {
   MATRIX_CREATE(mF2, F2, 2, 2, { 0 });
 
   SVD(&U2[0][0], &S2_vec[0][0], &V2[0][0], &F[0][0], 2, 2);
-  matrix_diagnal(&mS2_vec, &mS2);
+  matrix_diagonal(&mS2_vec, &mS2);
   matrix_transpose(&mV2, &mVT2);
   matrix_mult(&mU2, &mS2, &mUS2);
   matrix_mult(&mUS2, &mVT2, &mF2);
