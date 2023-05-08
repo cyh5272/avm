@@ -5578,10 +5578,16 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_EXT_RECUR_PARTITIONS
   bool prune_none = false;
   if (forced_partition == PARTITION_INVALID && bsize == BLOCK_256X256) {
-    int min_depth = INT_MAX, max_depth = 0;
     for (int idx = 0; idx < 4; idx++) {
       const int depth = get_partition_depth(pc_tree->split[idx], 0);
       prune_none |= depth > 0;
+    }
+  }
+  if (forced_partition == PARTITION_INVALID && pc_tree->split[0] &&
+      pc_tree->split[1] && pc_tree->split[2] && pc_tree->split[3]) {
+    int min_depth = INT_MAX, max_depth = 0;
+    for (int idx = 0; idx < 4; idx++) {
+      const int depth = get_partition_depth(pc_tree->split[idx], 0);
       min_depth = AOMMIN(min_depth, depth);
       max_depth = AOMMAX(max_depth, depth);
     }
