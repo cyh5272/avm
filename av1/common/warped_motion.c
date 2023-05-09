@@ -19,6 +19,7 @@
 
 #include "config/av1_rtcd.h"
 
+#include "av1/common/reconinter.h"
 #include "av1/common/warped_motion.h"
 #include "av1/common/scale.h"
 
@@ -1355,6 +1356,10 @@ static int find_affine_unconstrained_int(int np, const int *pts1,
   // Adjust y displacement for the offset
   wm->wmmat[1] = get_mult_shift_dy_u(Py[2], shift, u, &wm->wmmat[4]);
 
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  av1_reduce_warp_model(wm);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+
   wm->wmmat[6] = wm->wmmat[7] = 0;
   wm->wmtype = AFFINE;
   return 0;
@@ -1372,3 +1377,137 @@ int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
   return 0;
 }
 #endif  // CONFIG_TEMPORAL_GLOBAL_MV
+
+#if CONFIG_INTERINTRA_WARP
+static int get_gradient(const uint16_t *x, int stride) {
+  static const int16_t gradient[2] = { 88, -12 };
+  int g = (x[stride] - x[-stride]) * gradient[0] +
+          (x[2 * stride] - x[-2 * stride]) * gradient[1];
+  g = ROUND_POWER_OF_TWO_SIGNED(g, FILTER_BITS);
+  return g;
+}
+
+/* src - pointer to current block, but only the pixels of top and left in
+ * the causal intra region are expected to be used
+ * ref - pointer to reference block obtained by floor(mv) interger offset
+ * in reference buffer. A 4-pixel border is expected to be available for
+ * use around this reference block.
+ * mv - motion vector
+ */
+static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
+                                       const uint16_t *ref, int ref_stride,
+                                       BLOCK_SIZE bsize, MV mv,
+                                       WarpedMotionParams *wm, int mi_row,
+                                       int mi_col, int bd) {
+  const int border = MAX_INTERINTRA_BORDER;
+  const int inner_border = MAX_INTERINTRA_INNER_BORDER;
+
+  const int bw = block_size_wide[bsize];
+  const int bh = block_size_high[bsize];
+  uint16_t top[MAX_INTERINTRA_TOPLEFT_SIZE];
+  uint16_t left[MAX_INTERINTRA_TOPLEFT_SIZE];
+  const int top_stride = bw;
+  const int left_stride = border + inner_border + 2;
+  av1_prepare_inter_topleft(ref, ref_stride, bsize, border, inner_border, mv,
+                            top, top_stride, left, left_stride, bd);
+  int32_t A[2][2] = { { 0, 0 }, { 0, 0 } };
+  int32_t B[2] = { 0, 0 };
+  for (int i = 2; i < border; ++i) {
+    for (int j = 2; j < bw - 2; ++j) {
+      const int d = (*(top + i * top_stride + j) -
+                     *(src + (i - border) * src_stride + j));
+      const int y = (i - border) - (bh / 2 - 1);
+      const int x = j - (bw / 2 - 1);
+      const int gx = get_gradient(top + i * top_stride + j, 1);
+      const int gy = get_gradient(top + i * top_stride + j, top_stride);
+      const int p1 = x * gx + y * gy;
+      const int p2 = y * gx - x * gy;
+      A[0][0] += p1 * p1;
+      A[1][1] += p2 * p2;
+      A[0][1] += p1 * p2;
+      B[0] += p1 * d;
+      B[1] += p2 * d;
+    }
+  }
+  for (int i = 2; i < bh - 2; ++i) {
+    for (int j = 2; j < border; ++j) {
+      const int d = (*(left + i * left_stride + j) -
+                     *(src + i * src_stride + j - border));
+      const int y = i - (bh / 2 - 1);
+      const int x = (j - border) - (bw / 2 - 1);
+      const int gx = get_gradient(left + i * left_stride + j, 1);
+      const int gy = get_gradient(left + i * left_stride + j, left_stride);
+      const int p1 = x * gx + y * gy;
+      const int p2 = y * gx - x * gy;
+      A[0][0] += p1 * p1;
+      A[1][1] += p2 * p2;
+      A[0][1] += p1 * p2;
+      B[0] += p1 * d;
+      B[1] += p2 * d;
+    }
+  }
+  A[1][0] = A[0][1];
+
+  // Compute Determinant of A
+  const int64_t Det = (int64_t)A[0][0] * A[1][1] - (int64_t)A[0][1] * A[0][1];
+  if (Det == 0) return 1;
+
+  int16_t shift;
+  int16_t iDet = resolve_divisor_64(llabs(Det), &shift) * (Det < 0 ? -1 : 1);
+  shift -= WARPEDMODEL_PREC_BITS;
+  if (shift < 0) {
+    iDet <<= (-shift);
+    shift = 0;
+  }
+
+  int64_t P[2];
+  // These divided by the Det, are the least squares solutions
+  P[0] = (int64_t)A[1][1] * B[0] - (int64_t)A[0][1] * B[1];
+  P[1] = -(int64_t)A[0][1] * B[0] + (int64_t)A[0][0] * B[1];
+
+  wm->wmmat[2] =
+      get_mult_shift_diag(P[0], iDet, shift) + (1 << WARPEDMODEL_PREC_BITS);
+  wm->wmmat[3] = get_mult_shift_ndiag(P[1], iDet, shift);
+  wm->wmmat[4] = -wm->wmmat[3];
+  wm->wmmat[5] = wm->wmmat[2];
+
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  av1_reduce_warp_model(wm);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+  // check compatibility with the fast warp filter
+  if (!av1_get_shear_params(wm)) return 1;
+  av1_set_warp_translation(mi_row, mi_col, bsize, mv, wm);
+#if !CONFIG_EXTENDED_WARP_PREDICTION
+  wm->wmmat[0] = clamp(wm->wmmat[0], -WARPEDMODEL_TRANS_CLAMP,
+                       WARPEDMODEL_TRANS_CLAMP - 1);
+  wm->wmmat[1] = clamp(wm->wmmat[1], -WARPEDMODEL_TRANS_CLAMP,
+                       WARPEDMODEL_TRANS_CLAMP - 1);
+#endif  // !CONFIG_EXTENDED_WARP_PREDICTION
+  wm->wmtype = ROTZOOM;
+
+  wm->wmmat[6] = wm->wmmat[7] = 0;
+  return 0;
+}
+
+/* src - pointer to current block, but only the pixels of top and left in
+ * the causal intra region are expected to be used
+ * ref - pointer to reference block obtained by floor(mv) interger offset
+ * in reference buffer. A 4-pixel border is expected to be available for
+ * use around this reference block.
+ * mv - motion vector
+ */
+int av1_find_projection_interintra(const uint16_t *src, int src_stride,
+                                   const uint16_t *ref, int ref_stride,
+                                   BLOCK_SIZE bsize, MV mv,
+                                   WarpedMotionParams *wm_params, int mi_row,
+                                   int mi_col, int bd) {
+  if (find_interintra_rotzoom_int(src, src_stride, ref, ref_stride, bsize, mv,
+                                  wm_params, mi_row, mi_col, bd))
+    return 1;
+
+  // check compatibility with the fast warp filter
+  if (!av1_get_shear_params(wm_params)) return 1;
+
+  return 0;
+}
+#endif  // CONFIG_INTERINTRA_WARP

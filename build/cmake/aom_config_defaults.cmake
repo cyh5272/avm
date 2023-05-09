@@ -241,6 +241,10 @@ set_aom_config_var(CONFIG_WARPMV 1 "Enable warpmv modes")
 set_aom_config_var(CONFIG_TEMPORAL_GLOBAL_MV 0
                    "AV2 experiment flag for temporal global MV")
 set_aom_config_var(CONFIG_EXT_WARP 1 "Enable extended warp filter")
+set_aom_config_var(CONFIG_THICK_INTERINTRA_BORDER 0
+                   "AV2 experiment flag for inter with thick border")
+set_aom_config_var(CONFIG_INTERINTRA_WARP 0
+                   "AV2 experiment flag for interintra warp estimation")
 
 # This is an encode-only change.
 set_aom_config_var(CONFIG_MV_SEARCH_RANGE 1

@@ -40,6 +40,21 @@
 extern "C" {
 #endif
 
+#if CONFIG_THICK_INTERINTRA_BORDER
+#define MAX_INTERINTRA_BORDER 4
+#define MAX_INTERINTRA_INNER_BORDER \
+  2  // May be neded to calculate gradient.
+     // This border is one the inner side so
+     // the load area does not change.
+#define MAX_INTERINTRA_TOPLEFT_SIZE \
+  ((MAX_INTERINTRA_BORDER + MAX_INTERINTRA_INNER_BORDER + 2) + MAX_SB_SIZE)
+
+void av1_prepare_inter_topleft(const uint16_t *ref, int ref_stride,
+                               BLOCK_SIZE bsize, int border, int inner_border,
+                               MV mv, uint16_t *top, int top_stride,
+                               uint16_t *left, int left_stride, int bd);
+#endif  // CONFIG_THICK_INTERINTRA_BORDER
+
 #if !CONFIG_WEDGE_MOD_EXT
 #define MAX_WEDGE_TYPES 16
 #endif

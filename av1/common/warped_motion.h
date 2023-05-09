@@ -306,4 +306,11 @@ int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
                                       WarpedMotionParams *wm_params, int mi_row,
                                       int mi_col);
 #endif  // CONFIG_TEMPORAL_GLOBAL_MV
+#if CONFIG_INTERINTRA_WARP
+int av1_find_projection_interintra(const uint16_t *src, int src_stride,
+                                   const uint16_t *ref, int ref_stride,
+                                   BLOCK_SIZE bsize, MV mv,
+                                   WarpedMotionParams *wm_params, int mi_row,
+                                   int mi_col, int bd);
+#endif  // CONFIG_INTERINTRA_WARP
 #endif  // AOM_AV1_COMMON_WARPED_MOTION_H_

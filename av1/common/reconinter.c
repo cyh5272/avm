@@ -2519,5 +2519,190 @@ int is_pb_mv_precision_active(const AV1_COMMON *const cm,
          cm->features.use_pb_mv_precision &&
          have_newmv_in_inter_mode(mbmi->mode);
 }
+#endif  // CONFIG_FLEX_MVRES
 
-#endif
+#if CONFIG_THICK_INTERINTRA_BORDER
+DECLARE_ALIGNED(256, static const int16_t,
+                sub_pel_filters_ps[SUBPEL_SHIFTS][4]) = { {
+                                                              0,
+                                                              128,
+                                                              0,
+                                                              0,
+                                                          },
+                                                          {
+                                                              -4,
+                                                              126,
+                                                              8,
+                                                              -2,
+                                                          },
+                                                          {
+                                                              -8,
+                                                              122,
+                                                              18,
+                                                              -4,
+                                                          },
+                                                          {
+                                                              -10,
+                                                              116,
+                                                              28,
+                                                              -6,
+                                                          },
+                                                          {
+                                                              -12,
+                                                              110,
+                                                              38,
+                                                              -8,
+                                                          },
+                                                          {
+                                                              -12,
+                                                              102,
+                                                              48,
+                                                              -10,
+                                                          },
+                                                          {
+                                                              -14,
+                                                              94,
+                                                              58,
+                                                              -10,
+                                                          },
+                                                          {
+                                                              -12,
+                                                              84,
+                                                              66,
+                                                              -10,
+                                                          },
+                                                          {
+                                                              -12,
+                                                              76,
+                                                              76,
+                                                              -12,
+                                                          },
+                                                          {
+                                                              -10,
+                                                              66,
+                                                              84,
+                                                              -12,
+                                                          },
+                                                          {
+                                                              -10,
+                                                              58,
+                                                              94,
+                                                              -14,
+                                                          },
+                                                          {
+                                                              -10,
+                                                              48,
+                                                              102,
+                                                              -12,
+                                                          },
+                                                          {
+                                                              -8,
+                                                              38,
+                                                              110,
+                                                              -12,
+                                                          },
+                                                          {
+                                                              -6,
+                                                              28,
+                                                              116,
+                                                              -10,
+                                                          },
+                                                          {
+                                                              -4,
+                                                              18,
+                                                              122,
+                                                              -8,
+                                                          },
+                                                          {
+                                                              -2,
+                                                              8,
+                                                              126,
+                                                              -4,
+                                                          } };
+
+static void cubic_phase_shift1(const uint16_t *x, int x_stride, int len,
+                               int phase_q4, int ext, uint16_t *out,
+                               int out_stride) {
+  const int16_t *filter = sub_pel_filters_ps[phase_q4];
+  if (ext) {
+    for (int i = 0; i < len; ++i) {
+      int v = x[i - 1 * x_stride] * filter[0] + x[i] * filter[1] +
+              x[i + 1 * x_stride] * filter[2] + x[i + 2 * x_stride] * filter[3];
+      v = ROUND_POWER_OF_TWO_SIGNED(v, 4);
+      out[i * out_stride] = v < 0 ? 0 : v >= (1 << 16) ? (1 << 16) - 1 : v;
+    }
+  } else {
+    int v = x[0] * filter[0] + x[0] * filter[1] + x[1 * x_stride] * filter[2] +
+            x[2 * x_stride] * filter[3];
+    v = ROUND_POWER_OF_TWO_SIGNED(v, 4);
+    out[0] = v < 0 ? 0 : v >= (1 << 16) ? (1 << 16) - 1 : v;
+    for (int i = 1; i < len; ++i) {
+      v = x[i - 1 * x_stride] * filter[0] + x[i] * filter[1] +
+          x[i + 1 * x_stride] * filter[2] + x[i + 2 * x_stride] * filter[3];
+      v = ROUND_POWER_OF_TWO_SIGNED(v, 4);
+      out[i * out_stride] = v < 0 ? 0 : v >= (1 << 16) ? (1 << 16) - 1 : v;
+    }
+  }
+}
+
+static void cubic_phase_shift2(uint16_t *x, int x_stride, int len, int phase_q4,
+                               int ext, uint16_t *out, int out_stride, int bd) {
+  const int16_t *filter = sub_pel_filters_ps[phase_q4];
+  if (ext) {
+    for (int i = 0; i < len; ++i) {
+      int v = x[i - 1 * x_stride] * filter[0] + x[i] * filter[1] +
+              x[i + 1 * x_stride] * filter[2] + x[i + 2 * x_stride] * filter[3];
+      v = ROUND_POWER_OF_TWO_SIGNED(v, 2 * FILTER_BITS - 4);
+      out[i * out_stride] = (uint16_t)clip_pixel_highbd(v, bd);
+    }
+  } else {
+    int v = x[0] * filter[0] + x[0] * filter[1] + x[1 * x_stride] * filter[2] +
+            x[2 * x_stride] * filter[3];
+    v = ROUND_POWER_OF_TWO_SIGNED(v, 2 * FILTER_BITS - 4);
+    out[0] = (uint16_t)clip_pixel_highbd(v, bd);
+    for (int i = 1; i < len; ++i) {
+      v = x[i - 1 * x_stride] * filter[0] + x[i] * filter[1] +
+          x[i + 1 * x_stride] * filter[2] + x[i + 2 * x_stride] * filter[3];
+      v = ROUND_POWER_OF_TWO_SIGNED(v, 2 * FILTER_BITS - 4);
+      out[i * out_stride] = (uint16_t)clip_pixel_highbd(v, bd);
+    }
+  }
+}
+
+// The goal of  this function is to generate top and left pixel extension
+// buffers that are phase shifted based on the fractional portion of the
+// motion vector mv so that the pixels are correctly aligned.
+// ref is an integer shifted buffer based on floor of the motion vector mv.
+// Note top is assumed to have alllocaton of at least (border +
+// inner_border) * bw, with top_stride being at least bw.
+// Likewise left is assumed to have alllocaton of at least (border +
+// inner_border) * bh, with left_stride being at least border + inner_border.
+void av1_prepare_inter_topleft(const uint16_t *ref, int ref_stride,
+                               BLOCK_SIZE bsize, int border, int inner_border,
+                               MV mv, uint16_t *top, int top_stride,
+                               uint16_t *left, int left_stride, int bd) {
+  const int phase_x = (mv.col << 1) & 15;
+  const int phase_y = (mv.row << 1) & 15;
+  const int bw = block_size_wide[bsize];
+  const int bh = block_size_high[bsize];
+  uint16_t scratch[MAX_INTERINTRA_TOPLEFT_SIZE];
+
+  int scratch_stride = bw;
+  for (int i = -border; i < 2 + inner_border; ++i) {
+    cubic_phase_shift1(ref + i * ref_stride, 1, bw, phase_x, 1,
+                       scratch + (i + border) * scratch_stride, 1);
+  }
+  for (int i = 0; i < bw; ++i) {
+    cubic_phase_shift2(scratch + i, scratch_stride, border + inner_border,
+                       phase_y, 0, top + i, top_stride, bd);
+  }
+  scratch_stride = border + inner_border + 2;
+  for (int i = -border; i < 2 + inner_border; ++i)
+    cubic_phase_shift1(ref + i, ref_stride, bh, phase_y, 1,
+                       scratch + i + border, scratch_stride);
+  for (int i = 0; i < bh; ++i) {
+    cubic_phase_shift2(scratch + i * scratch_stride, 1, border + inner_border,
+                       phase_x, 0, left + i * left_stride, 1, bd);
+  }
+}
+#endif  // CONFIG_THICK_INTERINTRA_BORDER

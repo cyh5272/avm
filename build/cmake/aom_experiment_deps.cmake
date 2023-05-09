@@ -93,4 +93,10 @@ macro(fix_experiment_configs)
   if(NOT CONFIG_TIP AND CONFIG_TEMPORAL_GLOBAL_MV)
     change_config_and_warn(CONFIG_TEMPORAL_GLOBAL_MV 0 !CONFIG_TIP)
   endif()
+
+  # CONFIG_INTERINTRA_WARP depends on CONFIG_THICK_INTERINTRA_BORDER
+  if(CONFIG_INTERINTRA_WARP)
+    change_config_and_warn(CONFIG_THICK_INTERINTRA_BORDER 1
+                           CONFIG_INTERINTRA_WARP)
+  endif()
 endmacro()
