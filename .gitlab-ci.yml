@@ -190,7 +190,7 @@ Tool-off Test:
       if echo "$CI_COMMIT_MESSAGE" | grep -q BUILD_CHANGED; then
         BUILD_FLAG=$(echo "$CI_COMMIT_MESSAGE" | grep BUILD_CHANGED |  cut -d " " -f 2)
         echo $BUILD_FLAG
-        CMAKE_FLAGS="$CMAKE_FLAGS -D{BUILD_FLAG}=0 "
+        CMAKE_FLAGS="$CMAKE_FLAGS -D${BUILD_FLAG}=0 "
         echo "CMake Flags: $CMAKE_FLAGS"
         cmake -B aom_build -S . -GNinja -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS $EXTRA_CMAKE_FLAGS
         cmake --build aom_build -j 2
@@ -200,6 +200,5 @@ Tool-off Test:
     paths:
       - aom_build/aomenc
       - aom_build/aomdec
-      - aom_example_build/config
-      - aom_example_build/examples
-      - aom_example_build/tools
+      - aom_build/config
+      - aom_build/tools
