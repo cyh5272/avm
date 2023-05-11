@@ -428,6 +428,30 @@ Example Build (x86_64-gcc):
       - aom_example_build/examples
       - aom_example_build/tools
 
+# Tool off test for testing compile-time build flags
+Tool-off Test:
+  stage: build
+  interruptible: true
+  script:
+    - echo "$CI_COMMIT_MESSAGE"
+    - |
+      if echo "$CI_COMMIT_MESSAGE" | grep -q BUILD_CHANGED; then
+        BUILD_FLAG=$(echo "$CI_COMMIT_MESSAGE" | grep BUILD_CHANGED |  cut -d " " -f 2)
+        echo $BUILD_FLAG
+        CMAKE_FLAGS="$CMAKE_FLAGS -D{BUILD_FLAG}=0 "
+        echo "CMake Flags: $CMAKE_FLAGS"
+        cmake -B aom_build -S . -GNinja -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS $EXTRA_CMAKE_FLAGS
+        cmake --build aom_build -j 2
+      fi
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - aom_build/aomenc
+      - aom_build/aomdec
+      - aom_example_build/config
+      - aom_example_build/examples
+      - aom_example_build/tools
+
 Linux Sanitizers (x86_64-clang):
   stage: build
   interruptible: true
