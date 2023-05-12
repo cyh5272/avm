@@ -30,13 +30,13 @@ TEST(MathUtilsTest, MatrixMult) {
   MATRIX_CREATE(ref_mab, ref_ab, 2, 1, { { 8 }, { 18 } });
   MATRIX_CREATE(ma, a, 2, 2, { { 1, 2 }, { 3, 4 } });
   MATRIX_CREATE(mb, b, 2, 1, { { 2 }, { 3 } });
-  MATRIX_CREATE(mab, ab, 2, 1, { 0 });
+  MATRIX_CREATE(mab, ab, 2, 1, { { 0 } });
   matrix_mult(&ma, &mb, &mab);
   EXPECT_TRUE(matrix_match(&mab, &ref_mab));
 }
 
 TEST(MathUtilsTest, MatrixDiagnal) {
-  MATRIX_CREATE(mmat, mat, 2, 3, { 0 });
+  MATRIX_CREATE(mmat, mat, 2, 3, { { 0 } });
   MATRIX_CREATE(mref_mat, ref_mat, 2, 3, { { 6, 0, 0 }, { 0, 7, 0 } });
   MATRIX_CREATE(mvec, vec, 2, 1, { { 6 }, { 7 } });
   matrix_diagonal(&mvec, &mmat);
@@ -47,19 +47,19 @@ TEST(MathUtilsTest, SVD) {
   MATRIX_CREATE(mU, U, 2, 2, { { 0.6, 0.8 }, { -0.8, 0.6 } });
   MATRIX_CREATE(mS, S, 2, 2, { { 1, 0 }, { 0, 2 } });
   MATRIX_CREATE(mVt, Vt, 2, 2, { {0.6, -0.8}, {0.8, 0.6} });
-  MATRIX_CREATE(mUS, US, 2, 2, { 0 });
-  MATRIX_CREATE(mF, F, 2, 2, { 0 });
+  MATRIX_CREATE(mUS, US, 2, 2, { { 0 } });
+  MATRIX_CREATE(mF, F, 2, 2, { { 0 } });
 
   matrix_mult(&mU, &mS, &mUS);
   matrix_mult(&mUS, &mVt, &mF);
 
-  MATRIX_CREATE(mU2, U2, 2, 2, { 0 });
-  MATRIX_CREATE(mV2, V2, 2, 2, { 0 });
-  MATRIX_CREATE(mVT2, VT2, 2, 2, { 0 });
-  MATRIX_CREATE(mS2_vec, S2_vec, 2, 1, { 0 });
-  MATRIX_CREATE(mS2, S2, 2, 2, { 0 });
-  MATRIX_CREATE(mUS2, US2, 2, 2, { 0 });
-  MATRIX_CREATE(mF2, F2, 2, 2, { 0 });
+  MATRIX_CREATE(mU2, U2, 2, 2, { { 0 } });
+  MATRIX_CREATE(mV2, V2, 2, 2, { { 0 } });
+  MATRIX_CREATE(mVT2, VT2, 2, 2, { { 0 } });
+  MATRIX_CREATE(mS2_vec, S2_vec, 2, 1, { { 0 } });
+  MATRIX_CREATE(mS2, S2, 2, 2, { { 0 } });
+  MATRIX_CREATE(mUS2, US2, 2, 2, { { 0 } });
+  MATRIX_CREATE(mF2, F2, 2, 2, { { 0 } });
 
   SVD(&U2[0][0], &S2_vec[0][0], &V2[0][0], &F[0][0], 2, 2);
   matrix_diagonal(&mS2_vec, &mS2);
