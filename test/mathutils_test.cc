@@ -46,7 +46,7 @@ TEST(MathUtilsTest, MatrixDiagnal) {
 TEST(MathUtilsTest, SVD) {
   MATRIX_CREATE(mU, U, 2, 2, { { 0.6, 0.8 }, { -0.8, 0.6 } });
   MATRIX_CREATE(mS, S, 2, 2, { { 1, 0 }, { 0, 2 } });
-  MATRIX_CREATE(mVt, Vt, 2, 2, { {0.6, -0.8}, {0.8, 0.6} });
+  MATRIX_CREATE(mVt, Vt, 2, 2, { { 0.6, -0.8 }, { 0.8, 0.6 } });
   MATRIX_CREATE(mUS, US, 2, 2, { { 0 } });
   MATRIX_CREATE(mF, F, 2, 2, { { 0 } });
 
