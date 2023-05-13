@@ -1489,20 +1489,18 @@ static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
   return 0;
 }
 
-/* src - pointer to current block, but only the pixels of top and left in
- * the causal intra region are expected to be used
- * ref - pointer to reference block obtained by floor(mv) interger offset
- * in reference buffer. A 4-pixel border is expected to be available for
- * use around this reference block.
- * mv - motion vector
- */
-int av1_find_projection_interintra(const uint16_t *src, int src_stride,
-                                   const uint16_t *ref, int ref_stride,
-                                   BLOCK_SIZE bsize, MV mv,
-                                   WarpedMotionParams *wm_params, int mi_row,
-                                   int mi_col, int bd) {
-  if (find_interintra_rotzoom_int(src, src_stride, ref, ref_stride, bsize, mv,
-                                  wm_params, mi_row, mi_col, bd))
+int av1_find_projection_interintra(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
+                                   MV mv, WarpedMotionParams *wm_params,
+                                   int mi_row, int mi_col) {
+  const struct macroblockd_plane *pd = &xd->plane[0];
+  const int dst_stride = pd->dst.stride;
+  uint16_t *const dst = pd->dst.buf;
+  const int ref_stride = pd->pre[0].stride;
+  uint16_t *const ref = pd->pre[0].buf +
+                        (mv.row >> (SUBPEL_BITS - 1)) * ref_stride +
+                        (mv.col >> (SUBPEL_BITS - 1));
+  if (find_interintra_rotzoom_int(dst, dst_stride, ref, ref_stride, bsize, mv,
+                                  wm_params, mi_row, mi_col, xd->bd))
     return 1;
 
   // check compatibility with the fast warp filter

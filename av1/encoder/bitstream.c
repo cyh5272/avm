@@ -513,11 +513,12 @@ static AOM_INLINE void write_motion_mode(
 #if CONFIG_WARPMV
   if (mbmi->mode == WARPMV) {
     assert(mbmi->motion_mode == WARP_DELTA ||
-           mbmi->motion_mode == WARPED_CAUSAL);
+           warped_causal_idx_map(mbmi->motion_mode));
     // Signal if the motion mode is WARP_CAUSAL or WARP_DELTA
-    if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
-      aom_write_symbol(w, motion_mode == WARPED_CAUSAL,
-                       xd->tile_ctx->warped_causal_warpmv_cdf[bsize], 2);
+    if (allowed_motion_modes & WARPED_CAUSAL_MASK) {
+      aom_write_symbol(w, warped_causal_idx_map(motion_mode),
+                       xd->tile_ctx->warped_causal_warpmv_cdf[bsize],
+                       WARPED_CAUSAL_MODES + 1);
     }
     return;
   }
@@ -567,11 +568,12 @@ static AOM_INLINE void write_motion_mode(
     }
   }
 
-  if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
-    aom_write_symbol(w, motion_mode == WARPED_CAUSAL,
-                     xd->tile_ctx->warped_causal_cdf[bsize], 2);
+  if (allowed_motion_modes & WARPED_CAUSAL_MASK) {
+    aom_write_symbol(w, warped_causal_idx_map(motion_mode),
+                     xd->tile_ctx->warped_causal_cdf[bsize],
+                     WARPED_CAUSAL_MODES + 1);
 
-    if (motion_mode == WARPED_CAUSAL) {
+    if (warped_causal_idx_map(motion_mode)) {
       return;
     }
   }
@@ -1845,7 +1847,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
   if (mbmi->mode == WARPMV) {
     assert(mbmi->skip_mode == 0);
     assert(mbmi->motion_mode == WARP_DELTA ||
-           mbmi->motion_mode == WARPED_CAUSAL);
+           warped_causal_idx_map(mbmi->motion_mode));
     assert(mbmi->ref_mv_idx == 0);
     assert(!is_tip_ref_frame(mbmi->ref_frame[0]));
     assert(is_inter);
@@ -1940,7 +1942,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif
       write_motion_mode(cm, xd, mbmi, mbmi_ext_frame, w);
       int is_warpmv_warp_causal =
-          (mbmi->motion_mode == WARPED_CAUSAL && mbmi->mode == WARPMV);
+          (warped_causal_idx_map(mbmi->motion_mode) && mbmi->mode == WARPMV);
       if (mbmi->motion_mode == WARP_DELTA || is_warpmv_warp_causal)
         write_warp_ref_idx(xd->tile_ctx, mbmi, w);
 #endif  // CONFIG_WARPMV

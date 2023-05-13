@@ -1752,7 +1752,7 @@ static int64_t motion_mode_rd(
 
 #if CONFIG_WARPMV
     int is_warpmv_warp_causal =
-        (mode_index == WARPED_CAUSAL) && (base_mbmi.mode == WARPMV);
+        warped_causal_idx_map(mode_index) && (base_mbmi.mode == WARPMV);
 #endif  // CONFIG_WARPMV
 
 #if CONFIG_WARP_REF_LIST
@@ -1926,13 +1926,13 @@ static int64_t motion_mode_rd(
 #if CONFIG_EXTENDED_WARP_PREDICTION
         if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
                                  mbmi->mv[0].as_mv, &mbmi->wm_params[0], mi_row,
-                                 mi_col)) {
+                                 mi_col))
 #else
       if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
                                mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
-                               mi_col)) {
+                               mi_col))
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-
+        {
           assert(!is_comp_pred);
           if (this_mode == NEWMV
 #if CONFIG_FLEX_MVRES
@@ -1993,12 +1993,111 @@ static int64_t motion_mode_rd(
         } else {
           continue;
         }
+#if CONFIG_INTERINTRA_WARP
+      } else if (mbmi->motion_mode == WARPED_CAUSAL_INTERINTRA) {
+#if CONFIG_EXTENDED_WARP_PREDICTION
+        mbmi->wm_params[0].wmtype = ROTZOOM;
+#else
+        mbmi->wm_params.wmtype = ROTZOOM;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+
+#if CONFIG_WARPMV
+        // Build the motion vector of the WARPMV mode
+        if (mbmi->mode == WARPMV) {
+          WarpedMotionParams ref_model =
+              mbmi_ext
+                  ->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
+                                    [mbmi->warp_ref_idx]
+                  .wm_params;
+          mbmi->mv[0] = get_mv_from_wrl(xd, &ref_model,
+#if CONFIG_FLEX_MVRES
+                                        MV_PRECISION_ONE_EIGHTH_PEL,
+#else
+                                        1, 0,
+#endif
+                                        bsize, xd->mi_col, xd->mi_row);
+          if (!is_warp_candidate_inside_of_frame(cm, xd, mbmi->mv[0])) continue;
+#if CONFIG_FLEX_MVRES
+          assert(mbmi->pb_mv_precision == mbmi->max_mv_precision);
+#endif
+        }
+#endif  // CONFIG_WARPMV
+        // Compute the warped motion parameters with a least squares fit
+        //  using the collected samples
+#if CONFIG_EXTENDED_WARP_PREDICTION
+        if (!av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
+                                            &mbmi->wm_params[0], mi_row,
+                                            mi_col))
+#else
+        if (!av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
+                                            &mbmi->wm_params, mi_row, mi_col))
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+        {
+          assert(!is_comp_pred);
+          if (this_mode == NEWMV
+#if CONFIG_FLEX_MVRES
+              && (mbmi->pb_mv_precision >= MV_PRECISION_ONE_PEL)
+#endif
+          ) {
+            // Refine MV for NEWMV mode
+            const int_mv mv0 = mbmi->mv[0];
+
+            const int_mv ref_mv = av1_get_ref_mv(x, 0);
+#if CONFIG_FLEX_MVRES
+            const MvSubpelPrecision pb_mv_precision = mbmi->pb_mv_precision;
+#endif
+            SUBPEL_MOTION_SEARCH_PARAMS ms_params;
+            av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
+                                              &ref_mv.as_mv,
+#if CONFIG_FLEX_MVRES
+                                              pb_mv_precision,
+#endif
+                                              NULL);
+
+            // Refine MV in a small range.
+            av1_refine_warped_interintra_mv(xd, cm, &ms_params, bsize,
+                                            cpi->sf.mv_sf.warp_search_method,
+                                            cpi->sf.mv_sf.warp_search_iters);
+
+            if (mv0.as_int != mbmi->mv[0].as_int) {
+              // Keep the refined MV and WM parameters.
+#if CONFIG_FLEX_MVRES
+              tmp_rate_mv =
+                  av1_mv_bit_cost(&mbmi->mv[0].as_mv, &ref_mv.as_mv,
+                                  pb_mv_precision, &x->mv_costs, MV_COST_WEIGHT
+#if CONFIG_ADAPTIVE_MVD
+                                  ,
+                                  ms_params.mv_cost_params.is_adaptive_mvd
+#endif
+                  );
+#else
+              tmp_rate_mv = av1_mv_bit_cost(
+                  &mbmi->mv[0].as_mv, &ref_mv.as_mv, x->mv_costs.nmv_joint_cost,
+                  x->mv_costs.mv_cost_stack, MV_COST_WEIGHT);
+#endif
+              tmp_rate2 = rate2_nocoeff - rate_mv0 + tmp_rate_mv;
+            }
+          }
+#if CONFIG_C071_SUBBLK_WARPMV
+#if CONFIG_EXTENDED_WARP_PREDICTION
+          assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params[0], mi_row,
+                        mi_col);
+#else
+          assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params, mi_row, mi_col);
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#endif  // CONFIG_C071_SUBBLK_WARPMV
+        // Build the warped predictor
+          av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize, 0,
+                                        av1_num_planes(cm) - 1);
+        } else {
+          continue;
+        }
+#endif  // CONFIG_INTERINTRA_WARP
 #if CONFIG_EXTENDED_WARP_PREDICTION
       } else if (mbmi->motion_mode == INTERINTRA) {
 #else
     } else if (is_interintra_mode) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-
         const int ret =
             av1_handle_inter_intra_mode(cpi, x, bsize, mbmi, args, ref_best_rd,
                                         &tmp_rate_mv, &tmp_rate2, orig_dst);
@@ -2057,7 +2156,6 @@ static int64_t motion_mode_rd(
               cpi->sf.mv_sf.warp_search_iters);
         } else {
 #endif  // CONFIG_WARP_REF_LIST
-
           valid = av1_pick_warp_delta(
               cm, xd, mbmi, mbmi_ext, &ms_params, &x->mode_costs
 #if CONFIG_WARP_REF_LIST
@@ -2331,10 +2429,11 @@ static int64_t motion_mode_rd(
       }
 
       if (continue_motion_mode_signaling &&
-          allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+          allowed_motion_modes & WARPED_CAUSAL_MASK) {
         rd_stats->rate +=
-            mode_costs->warped_causal_cost[bsize][motion_mode == WARPED_CAUSAL];
-        if (motion_mode == WARPED_CAUSAL) {
+            mode_costs
+                ->warped_causal_cost[bsize][warped_causal_idx_map(motion_mode)];
+        if (warped_causal_idx_map(motion_mode)) {
           continue_motion_mode_signaling = false;
         }
       }
@@ -2347,10 +2446,11 @@ static int64_t motion_mode_rd(
 
 #if CONFIG_WARPMV
       if (mbmi->mode == WARPMV) {
-        if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+        if (allowed_motion_modes & WARPED_CAUSAL_MASK) {
           rd_stats->rate +=
-              mode_costs->warped_causal_warpmv_cost[bsize][motion_mode ==
-                                                           WARPED_CAUSAL];
+              mode_costs
+                  ->warped_causal_warpmv_cost[bsize][warped_causal_idx_map(
+                      motion_mode)];
         } else {
           assert(motion_mode == WARP_DELTA);
         }
@@ -2359,7 +2459,7 @@ static int64_t motion_mode_rd(
 
       if (motion_mode == WARP_DELTA
 #if CONFIG_WARPMV
-          || (motion_mode == WARPED_CAUSAL && mbmi->mode == WARPMV)
+          || (warped_causal_idx_map(motion_mode) && mbmi->mode == WARPMV)
 #endif  // CONFIG_WARPMV
       ) {
 #if CONFIG_WARP_REF_LIST
@@ -8808,7 +8908,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 #if CONFIG_WARP_REF_LIST
   if (mbmi->motion_mode == WARP_DELTA
 #if CONFIG_WARPMV
-      || (mbmi->motion_mode == WARPED_CAUSAL && mbmi->mode == WARPMV)
+      || (warped_causal_idx_map(mbmi->motion_mode) && mbmi->mode == WARPMV)
 #endif  // CONFIG_WARPMV
   ) {
     // Rebuild the warp candidate list with the best coding results

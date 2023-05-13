@@ -1369,6 +1369,24 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
                            &mbmi->chroma_ref_info);
     }
   }
+#if CONFIG_INTERINTRA_WARP
+  if (mbmi->motion_mode == WARPED_CAUSAL_INTERINTRA) {
+    mbmi->wm_params[0].wmtype = ROTZOOM;
+    mbmi->wm_params[0].invalid = 0;
+    MV mv = mbmi->mv[0].as_mv;
+
+    if (av1_find_projection_interintra(xd, bsize, mv, &mbmi->wm_params[0],
+                                       mi_row, mi_col)) {
+#if WARPED_MOTION_DEBUG
+      printf("Warning: unexpected warped model from aomenc\n");
+#endif
+      mbmi->wm_params[0].invalid = 1;
+    }
+#if CONFIG_C071_SUBBLK_WARPMV
+    assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params[0], mi_row, mi_col);
+#endif  // CONFIG_C071_SUBBLK_WARPMV
+  }
+#endif  // CONFIG_INTERINTRA_WARP
 
   dec_build_inter_predictor(cm, dcb, mi_row, mi_col, bsize);
   if (mbmi->motion_mode == OBMC_CAUSAL) {

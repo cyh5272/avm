@@ -1462,12 +1462,12 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
   // TODO(rachelbarker): Rework pruning into something more unified in phase 2
   int enabled_motion_modes = cm->seq_params.seq_enabled_motion_modes;
 
-  if ((enabled_motion_modes & (1 << WARPED_CAUSAL)) != 0 &&
+  if ((enabled_motion_modes & WARPED_CAUSAL_MASK) != 0 &&
       cpi->sf.inter_sf.prune_warped_prob_thresh > 0) {
     const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
     if (frame_probs->warped_probs[update_type] <
         cpi->sf.inter_sf.prune_warped_prob_thresh)
-      enabled_motion_modes &= ~(1 << WARPED_CAUSAL);
+      enabled_motion_modes &= ~WARPED_CAUSAL_MASK;
   }
 
   features->enabled_motion_modes = enabled_motion_modes;
@@ -1768,8 +1768,10 @@ static AOM_INLINE void encode_frame_internal(AV1_COMP *cpi) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
     const FRAME_UPDATE_TYPE update_type = get_frame_update_type(&cpi->gf_group);
     int sum = 0;
-    for (i = 0; i < 2; i++) sum += cpi->td.rd_counts.warped_used[i];
-    const int new_prob = sum ? 128 * cpi->td.rd_counts.warped_used[1] / sum : 0;
+    for (i = 0; i <= WARPED_CAUSAL_MODES; i++)
+      sum += cpi->td.rd_counts.warped_used[i];
+    const int new_prob =
+        sum ? 128 * (sum - cpi->td.rd_counts.warped_used[0]) / sum : 0;
     frame_probs->warped_probs[update_type] =
         (frame_probs->warped_probs[update_type] + new_prob) >> 1;
   }

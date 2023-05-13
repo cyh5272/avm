@@ -454,10 +454,12 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
 
 #if CONFIG_WARPMV
   if (mbmi->mode == WARPMV) {
-    if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
-      int use_warped_causal = aom_read_symbol(
-          r, xd->tile_ctx->warped_causal_warpmv_cdf[bsize], 2, ACCT_STR);
-      return use_warped_causal ? WARPED_CAUSAL : WARP_DELTA;
+    if (allowed_motion_modes & WARPED_CAUSAL_MASK) {
+      int use_warped_causal =
+          aom_read_symbol(r, xd->tile_ctx->warped_causal_warpmv_cdf[bsize],
+                          WARPED_CAUSAL_MODES + 1, ACCT_STR);
+      return use_warped_causal ? use_warped_causal + WARPED_CAUSAL - 1
+                               : WARP_DELTA;
     }
     return WARP_DELTA;
   }
@@ -513,11 +515,12 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
   }
 
-  if (allowed_motion_modes & (1 << WARPED_CAUSAL)) {
+  if (allowed_motion_modes & WARPED_CAUSAL_MASK) {
     int use_warped_causal =
-        aom_read_symbol(r, xd->tile_ctx->warped_causal_cdf[bsize], 2, ACCT_STR);
+        aom_read_symbol(r, xd->tile_ctx->warped_causal_cdf[bsize],
+                        WARPED_CAUSAL_MODES + 1, ACCT_STR);
     if (use_warped_causal) {
-      return WARPED_CAUSAL;
+      return use_warped_causal + WARPED_CAUSAL - 1;
     }
   }
 
@@ -2671,7 +2674,7 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       av1_count_overlappable_neighbors(cm, xd);
       mbmi->motion_mode = read_motion_mode(cm, xd, mbmi, r);
       int is_warpmv_warp_causal =
-          (mbmi->motion_mode == WARPED_CAUSAL && mbmi->mode == WARPMV);
+          (warped_causal_idx_map(mbmi->motion_mode) && mbmi->mode == WARPMV);
       if (mbmi->motion_mode == WARP_DELTA || is_warpmv_warp_causal) {
         mbmi->max_num_warp_candidates =
             (mbmi->mode == GLOBALMV || mbmi->mode == NEARMV)
@@ -2944,6 +2947,13 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params[0], mi_row, mi_col);
 #endif  // CONFIG_C071_SUBBLK_WARPMV
   }
+#if CONFIG_INTERINTRA_WARP
+  if (mbmi->motion_mode == WARPED_CAUSAL_INTERINTRA) {
+    mbmi->wm_params[0].wmtype = ROTZOOM;
+    mbmi->wm_params[0].invalid = 1;
+    // Note the actual affine estimnation needs to be done at reconstruction
+  }
+#endif  // CONFIG_INTERINTRA_WARP
 
   if (mbmi->motion_mode == WARP_EXTEND) {
     CANDIDATE_MV *neighbor = &xd->ref_mv_stack[ref_frame][mbmi->ref_mv_idx];
@@ -3002,6 +3012,22 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params, mi_row, mi_col);
 #endif  // CONFIG_C071_SUBBLK_WARPMV
   }
+#if CONFIG_INTERINTRA_WARP
+  if (mbmi->motion_mode == WARPED_CAUSAL_INTERINTRA) {
+    mbmi->wm_params.wmtype = ROTZOOM;
+    mbmi->wm_params.invalid = 0;
+    if (av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
+                                       &mbmi->wm_params, mi_row, mi_col)) {
+#if WARPED_MOTION_DEBUG
+      printf("Warning: unexpected warped model from aomenc\n");
+#endif
+      mbmi->wm_params.invalid = 1;
+    }
+#if CONFIG_C071_SUBBLK_WARPMV
+    assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params, mi_row, mi_col);
+#endif  // CONFIG_C071_SUBBLK_WARPMV
+  }
+#endif  // CONFIG_INTERINTRA_WARP
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
   if (xd->tree_type != LUMA_PART) xd->cfl.store_y = store_cfl_required(cm, xd);

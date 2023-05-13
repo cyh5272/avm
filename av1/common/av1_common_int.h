@@ -3515,6 +3515,13 @@ static inline int is_this_mv_precision_compliant(
 }
 #endif  // CONFIG_FLEX_MVRES
 
+#if CONFIG_INTERINTRA_WARP
+#define WARPED_CAUSAL_MASK \
+  ((1 << WARPED_CAUSAL) | (1 << WARPED_CAUSAL_INTERINTRA))
+#else
+#define WARPED_CAUSAL_MASK (1 << WARPED_CAUSAL)
+#endif  // CONFIG_INTERINTRA_WARP
+
 static INLINE bool is_warp_mode(MOTION_MODE motion_mode) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
   return (motion_mode >= WARPED_CAUSAL);
@@ -3565,6 +3572,13 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     if (frame_warp_causal_allowed && mbmi->num_proj_ref >= 1) {
       allowed_motion_mode_warpmv |= (1 << WARPED_CAUSAL);
     }
+#if CONFIG_INTERINTRA_WARP
+    int frame_warp_causal_interintra_allowed =
+        cm->features.enabled_motion_modes & (1 << WARPED_CAUSAL_INTERINTRA);
+    if (frame_warp_causal_interintra_allowed) {
+      allowed_motion_mode_warpmv |= (1 << WARPED_CAUSAL_INTERINTRA);
+    }
+#endif  // CONFIG_INTERINTRA_WARP
     return (allowed_motion_mode_warpmv & enabled_motion_modes);
   }
 #endif  // CONFIG_WARPMV
@@ -3633,6 +3647,15 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   ) {
     allowed_motion_modes |= (1 << WARPED_CAUSAL);
   }
+#if CONFIG_INTERINTRA_WARP
+  if (obmc_allowed && allow_warped_motion
+#if CONFIG_WARPMV
+      && mbmi->mode != NEARMV
+#endif  // CONFIG_WARPMV
+  ) {
+    allowed_motion_modes |= (1 << WARPED_CAUSAL_INTERINTRA);
+  }
+#endif  // CONFIG_INTERINTRA_WARP
 
   bool warp_extend_allowed = false;
   PREDICTION_MODE mode = mbmi->mode;

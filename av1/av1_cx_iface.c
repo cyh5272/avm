@@ -189,8 +189,11 @@ struct av1_extracfg {
   int enable_warp_extend;    // enable warp extension for sequence
 #else
   int allow_warped_motion;  // enable local warped motion for frame
-#endif                      // CONFIG_EXTENDED_WARP_PREDICTION
-  int enable_filter_intra;  // enable filter intra for sequence
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  int enable_warped_causal_interintra;  // enable interintra warp prediction
+#endif                                  // CONFIG_INTERINTRA_WARP
+  int enable_filter_intra;              // enable filter intra for sequence
   int enable_smooth_intra;  // enable smooth intra modes for sequence
   int enable_paeth_intra;   // enable Paeth intra mode for sequence
   int enable_cfl_intra;     // enable CFL uv intra mode for sequence
@@ -519,7 +522,10 @@ static struct av1_extracfg default_extra_cfg = {
   1,  // enable_warp_extend at sequence level
 #else
   1,                        // allow_warped_motion at frame level
-#endif                     // CONFIG_EXTENDED_WARP_PREDICTION
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  1,                       // enable warped_causal_interintra at seq level
+#endif                     // CONFIG_INTERINTRA_WARP
   1,                       // enable filter intra at sequence level
   1,                       // enable smooth intra modes usage for sequence
   1,                       // enable Paeth intra mode usage for sequence
@@ -1006,6 +1012,10 @@ static void update_encoder_config(cfg_options_t *cfg,
   cfg->enable_warp_delta = extra_cfg->enable_warp_delta;
   cfg->enable_warp_extend = extra_cfg->enable_warp_extend;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  cfg->enable_warped_causal_interintra =
+      extra_cfg->enable_warped_causal_interintra;
+#endif  // CONFIG_INTERINTRA_WARP
   cfg->enable_filter_intra = extra_cfg->enable_filter_intra;
   cfg->enable_smooth_intra = extra_cfg->enable_smooth_intra;
   cfg->enable_paeth_intra = extra_cfg->enable_paeth_intra;
@@ -1120,6 +1130,10 @@ static void update_default_encoder_config(const cfg_options_t *cfg,
   extra_cfg->enable_warp_delta = cfg->enable_warp_delta;
   extra_cfg->enable_warp_extend = cfg->enable_warp_extend;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  extra_cfg->enable_warped_causal_interintra =
+      cfg->enable_warped_causal_interintra;
+#endif  // CONFIG_INTERINTRA_WARP
   extra_cfg->enable_filter_intra = cfg->enable_filter_intra;
   extra_cfg->enable_smooth_intra = cfg->enable_smooth_intra;
   extra_cfg->enable_paeth_intra = cfg->enable_paeth_intra;
@@ -1621,6 +1635,11 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
     if (extra_cfg->enable_warped_causal) {
       seq_enabled_motion_modes |= (1 << WARPED_CAUSAL);
     }
+#if CONFIG_INTERINTRA_WARP
+    if (extra_cfg->enable_warped_causal_interintra) {
+      seq_enabled_motion_modes |= (1 << WARPED_CAUSAL_INTERINTRA);
+    }
+#endif  // CONFIG_INTERINTRA_WARP
     if (extra_cfg->enable_warp_delta) {
       seq_enabled_motion_modes |= (1 << WARP_DELTA);
     }
@@ -3938,6 +3957,13 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
                               argv, err_string)) {
     extra_cfg.enable_warp_extend = arg_parse_int_helper(&arg, err_string);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  } else if (arg_match_helper(
+                 &arg, &g_av1_codec_arg_defs.enable_warped_causal_interintra,
+                 argv, err_string)) {
+    extra_cfg.enable_warped_causal_interintra =
+        arg_parse_int_helper(&arg, err_string);
+#endif  // CONFIG_INTERINTRA_WARP
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.enable_filter_intra,
                               argv, err_string)) {
     extra_cfg.enable_filter_intra = arg_parse_int_helper(&arg, err_string);
@@ -4349,6 +4375,9 @@ static const aom_codec_enc_cfg_t encoder_usage_cfg[] = { {
 #if CONFIG_EXTENDED_WARP_PREDICTION
         1, 1,   1,
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+        1,
+#endif  // CONFIG_INTERINTRA_WARP
         1, 1,   1,   1, 0, 0, 1,
 #if CONFIG_IBC_SR_EXT
         1,

@@ -5262,6 +5262,99 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
   return bestmse;
 }
 
+#if CONFIG_INTERINTRA_WARP
+// Refines MV in a small range
+unsigned int av1_refine_warped_interintra_mv(
+    MACROBLOCKD *xd, const AV1_COMMON *const cm,
+    const SUBPEL_MOTION_SEARCH_PARAMS *ms_params, BLOCK_SIZE bsize,
+    WARP_SEARCH_METHOD search_method, int num_iterations) {
+  MB_MODE_INFO *mbmi = xd->mi[0];
+
+  const MV *neighbors = warp_search_info[search_method].neighbors;
+  const int num_neighbors = warp_search_info[search_method].num_neighbors;
+  const uint8_t *neighbor_mask = warp_search_info[search_method].neighbor_mask;
+
+  MV *best_mv = &mbmi->mv[0].as_mv;
+
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  WarpedMotionParams best_wm_params = mbmi->wm_params[0];
+#else
+  WarpedMotionParams best_wm_params = mbmi->wm_params;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+  unsigned int bestmse;
+  const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
+
+#if CONFIG_FLEX_MVRES
+  const int mv_shift =
+      (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
+#else
+  const int mv_shift = ms_params->allow_hp ? 0 : 1;
+#endif
+
+  // Calculate the center position's error
+  assert(av1_is_subpelmv_in_range(mv_limits, *best_mv));
+  bestmse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
+
+  // MV search
+  const int mi_row = xd->mi_row;
+  const int mi_col = xd->mi_col;
+
+  // First iteration always scans all neighbors
+  uint8_t valid_neighbors = UINT8_MAX;
+
+  for (int ite = 0; ite < num_iterations; ++ite) {
+    int best_idx = -1;
+
+    for (int idx = 0; idx < num_neighbors; ++idx) {
+      if ((valid_neighbors & (1 << idx)) == 0) {
+        continue;
+      }
+
+      unsigned int thismse;
+
+      MV this_mv = { best_mv->row + neighbors[idx].row * (1 << mv_shift),
+                     best_mv->col + neighbors[idx].col * (1 << mv_shift) };
+      if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
+#if CONFIG_EXTENDED_WARP_PREDICTION
+        if (!av1_find_projection_interintra(
+                xd, bsize, this_mv, &mbmi->wm_params[0], mi_row, mi_col)) {
+#else
+        if (!av1_find_projection_interintra(xd, bsize, this_mv,
+                                            &mbmi->wm_params, mi_row, mi_col)) {
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+          thismse = compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
+
+          if (thismse < bestmse) {
+            best_idx = idx;
+#if CONFIG_EXTENDED_WARP_PREDICTION
+            best_wm_params = mbmi->wm_params[0];
+#else
+            best_wm_params = mbmi->wm_params;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+            bestmse = thismse;
+          }
+        }
+      }
+    }
+
+    if (best_idx == -1) break;
+
+    if (best_idx >= 0) {
+      best_mv->row += neighbors[best_idx].row * (1 << mv_shift);
+      best_mv->col += neighbors[best_idx].col * (1 << mv_shift);
+      valid_neighbors = neighbor_mask[best_idx];
+    }
+  }
+
+#if CONFIG_EXTENDED_WARP_PREDICTION
+  mbmi->wm_params[0] = best_wm_params;
+#else
+  mbmi->wm_params = best_wm_params;
+#endif  // CONFIG_EXTENDED_WARP_PREDICTION
+  return bestmse;
+}
+#endif  // CONFIG_INTERINTRA_WARP
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
 // Amount to increase/decrease parameters by each step
 //

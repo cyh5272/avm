@@ -47,7 +47,7 @@ extern "C" {
      // This border is one the inner side so
      // the load area does not change.
 #define MAX_INTERINTRA_TOPLEFT_SIZE \
-  ((MAX_INTERINTRA_BORDER + MAX_INTERINTRA_INNER_BORDER + 2) + MAX_SB_SIZE)
+  ((MAX_INTERINTRA_BORDER + MAX_INTERINTRA_INNER_BORDER + 2) * MAX_SB_SIZE)
 
 void av1_prepare_inter_topleft(const uint16_t *ref, int ref_stride,
                                BLOCK_SIZE bsize, int border, int inner_border,

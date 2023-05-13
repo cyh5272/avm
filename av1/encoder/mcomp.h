@@ -500,6 +500,13 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                   WARP_SEARCH_METHOD search_method,
                                   int num_iterations);
 
+#if CONFIG_INTERINTRA_WARP
+unsigned int av1_refine_warped_interintra_mv(
+    MACROBLOCKD *xd, const AV1_COMMON *const cm,
+    const SUBPEL_MOTION_SEARCH_PARAMS *ms_params, BLOCK_SIZE bsize,
+    WARP_SEARCH_METHOD search_method, int num_iterations);
+#endif  // CONFIG_INTERINTRA_WARP
+
 #if CONFIG_EXTENDED_WARP_PREDICTION
 // Returns 1 if able to select a good model, 0 if not
 int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,

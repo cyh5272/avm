@@ -99,4 +99,10 @@ macro(fix_experiment_configs)
     change_config_and_warn(CONFIG_THICK_INTERINTRA_BORDER 1
                            CONFIG_INTERINTRA_WARP)
   endif()
+
+  # CONFIG_INTERINTRA_WARP depends on CONFIG_EXTENDED_WARP_PREDICTION
+  if(CONFIG_INTERINTRA_WARP)
+    change_config_and_warn(CONFIG_EXTENDED_WARP_PREDICTION 1
+                           CONFIG_INTERINTRA_WARP)
+  endif()
 endmacro()

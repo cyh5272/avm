@@ -46,7 +46,7 @@ static AOM_INLINE void accumulate_rd_opt(ThreadData *td, ThreadData *td_t) {
     }
   }
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i <= WARPED_CAUSAL_MODES; i++) {
     td->rd_counts.warped_used[i] += td_t->rd_counts.warped_used[i];
   }
 }

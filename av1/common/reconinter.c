@@ -1939,7 +1939,8 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
   // Can be removed later on
   if (mi->mode == WARPMV) {
     assert(mi->ref_mv_idx == 0);
-    assert(mi->motion_mode == WARP_DELTA || mi->motion_mode == WARPED_CAUSAL);
+    assert(mi->motion_mode == WARP_DELTA ||
+           warped_causal_idx_map(mi->motion_mode));
   }
 #endif  // CONFIG_WARPMV
   if (is_sub8x8_inter(xd, mi, plane, is_intrabc_block(mi, xd->tree_type),

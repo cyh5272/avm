@@ -429,6 +429,12 @@ typedef struct cfg_options {
    */
   unsigned int enable_warp_extend;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+#if CONFIG_INTERINTRA_WARP
+  /*!\brief enable interintra warp prediction
+   *
+   */
+  unsigned int enable_warped_causal_interintra;
+#endif  // CONFIG_INTERINTRA_WARP
   /*!\brief enable global motion
    *
    */

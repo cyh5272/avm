@@ -1331,7 +1331,7 @@ typedef struct FRAME_COUNTS {
   unsigned int compound_type[BLOCK_SIZES_ALL][MASKED_COMPOUND_TYPES];
 #if CONFIG_EXTENDED_WARP_PREDICTION
   unsigned int obmc[BLOCK_SIZES_ALL][2];
-  unsigned int warped_causal[BLOCK_SIZES_ALL][2];
+  unsigned int warped_causal[BLOCK_SIZES_ALL][WARPED_CAUSAL_MODES + 1];
   unsigned int warp_delta[BLOCK_SIZES_ALL][2];
   unsigned int warp_delta_param[2][WARP_DELTA_NUM_SYMBOLS];
   unsigned int warp_extend[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2][2];
@@ -1632,7 +1632,7 @@ typedef struct RD_COUNTS {
   int skip_mode_used_flag;
   int tx_type_used[TX_SIZES_ALL][TX_TYPES];
   int obmc_used[BLOCK_SIZES_ALL][2];
-  int warped_used[2];
+  int warped_used[WARPED_CAUSAL_MODES + 1];
 } RD_COUNTS;
 
 typedef struct ThreadData {

@@ -779,11 +779,19 @@ enum {
 #endif            // CONFIG_EXTENDED_WARP_PREDICTION
   OBMC_CAUSAL,    // 2-sided OBMC
   WARPED_CAUSAL,  // Warp estimation from spatial MVs
+#if CONFIG_INTERINTRA_WARP
+  WARPED_CAUSAL_INTERINTRA,  // Warp estimation from spatial pixels
+#endif                       // CONFIG_INTERINTRA_WARP
 #if CONFIG_EXTENDED_WARP_PREDICTION
   WARP_DELTA,   // Directly-signaled warp model
   WARP_EXTEND,  // Extension of an existing warp model into another block
 #endif
-  MOTION_MODES
+  MOTION_MODES,
+#if CONFIG_INTERINTRA_WARP
+  WARPED_CAUSAL_MODES = 2
+#else
+  WARPED_CAUSAL_MODES = 1
+#endif  // CONFIG_INTERINTRA_WARP
 } UENUM1BYTE(MOTION_MODE);
 
 enum {

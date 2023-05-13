@@ -25,6 +25,7 @@
 #include "aom_ports/mem.h"
 #include "aom_dsp/aom_dsp_common.h"
 #include "av1/common/mv.h"
+#include "av1/common/blockd.h"
 #include "av1/common/convolve.h"
 
 #define LEAST_SQUARES_SAMPLES_MAX_BITS 3
@@ -307,10 +308,18 @@ int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
                                       int mi_col);
 #endif  // CONFIG_TEMPORAL_GLOBAL_MV
 #if CONFIG_INTERINTRA_WARP
-int av1_find_projection_interintra(const uint16_t *src, int src_stride,
-                                   const uint16_t *ref, int ref_stride,
-                                   BLOCK_SIZE bsize, MV mv,
-                                   WarpedMotionParams *wm_params, int mi_row,
-                                   int mi_col, int bd);
+int av1_find_projection_interintra(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
+                                   MV mv, WarpedMotionParams *wm_params,
+                                   int mi_row, int mi_col);
 #endif  // CONFIG_INTERINTRA_WARP
+
+static INLINE int warped_causal_idx_map(int motion_mode) {
+#if CONFIG_INTERINTRA_WARP
+  return motion_mode == WARPED_CAUSAL || motion_mode == WARPED_CAUSAL_INTERINTRA
+             ? motion_mode - WARPED_CAUSAL + 1
+             : 0;
+#else
+  return motion_mode == WARPED_CAUSAL;
+#endif  // CONFIG_INTERINTRA_WARP
+}
 #endif  // AOM_AV1_COMMON_WARPED_MOTION_H_
