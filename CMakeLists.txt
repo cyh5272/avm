@@ -166,6 +166,8 @@ list(
 list(
   APPEND
   AOM_DECODER_APP_UTIL_SOURCES
+  "${AOM_ROOT}/av1/common/lanczos_resample.h"
+  "${AOM_ROOT}/av1/common/lanczos_resample.c"
   "${AOM_ROOT}/common/ivfdec.c"
   "${AOM_ROOT}/common/ivfdec.h"
   "${AOM_ROOT}/common/obudec.c"

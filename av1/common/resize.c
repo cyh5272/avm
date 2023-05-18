@@ -17,8 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "aom_ports/system_state.h"
-
 #include "config/aom_config.h"
 
 #include "aom_dsp/aom_dsp_common.h"
@@ -989,54 +987,6 @@ Error:
   aom_free(arrbuf2);
 }
 
-#define LANCZOS_A_NORMATIVE_HOR_Y 6  // Normative hor Lanczos a Luma
-#define LANCZOS_A_NORMATIVE_HOR_C 4  // Normative hor Lanczos a Chroma
-#define LANCZOS_A_NORMATIVE_VER_Y 4  // Normative ver Lanczos a Luma
-#define LANCZOS_A_NORMATIVE_VER_C 4  // Normative ver Lanczos a Chroma
-
-#define LANCZOS_A_NONNORMATIVE_HOR_Y 6  // Non-normative hor Lanczos a Luma
-#define LANCZOS_A_NONNORMATIVE_HOR_C 4  // Non-normative hor Lanczos a Chroma
-#define LANCZOS_A_NONNORMATIVE_VER_Y 6  // Non-normative ver Lanczos a Luma
-#define LANCZOS_A_NONNORMATIVE_VER_C \
-  4  // Non-normative ver Lanczos a Chroma
-     // Chroma
-void av1_resample_plane_2d_lanczos(const uint16_t *const input, int height,
-                                   int width, int in_stride, uint16_t *output,
-                                   int height2, int width2, int out_stride,
-                                   int subx, int suby, int bd, int denom,
-                                   int num, int lanczos_a_hor,
-                                   int lanczos_a_ver) {
-  (void)suby;
-
-  int coeff_prec_bits = 14;
-  int extra_prec_bits = 2;
-  WIN_TYPE win = WIN_LANCZOS;
-  EXT_TYPE ext = EXT_REPEAT;
-  ClipProfile clip = { bd, 0 };
-  int horz_a = lanczos_a_hor;
-  int vert_a = lanczos_a_ver;
-  double horz_x0 = subx ? (double)('d') : (double)('c');
-  double vert_x0 = (double)('c');
-
-  RationalResampleFilter horz_rf;
-  RationalResampleFilter vert_rf;
-
-  if (!get_resample_filter(num, denom, horz_a, horz_x0, ext, win, subx,
-                           coeff_prec_bits, &horz_rf)) {
-    fprintf(stderr, "Cannot generate filter, exiting!\n");
-    exit(1);
-  }
-  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, 0,
-                           coeff_prec_bits, &vert_rf)) {
-    fprintf(stderr, "Cannot generate filter, exiting!\n");
-    exit(1);
-  }
-
-  av1_resample_2d((const int16_t *)input, width, height, in_stride, &horz_rf,
-                  &vert_rf, extra_prec_bits, &clip, (int16_t *)output, width2,
-                  height2, out_stride);
-}
-
 void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
                                          YV12_BUFFER_CONFIG *dst, int bd,
                                          const int num_planes, const int subx,
@@ -1055,41 +1005,6 @@ void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
         is_uv ? suby : 0, bd, denom, num, lanczos_a_hor, lanczos_a_ver);
   }
   aom_extend_frame_borders(dst, num_planes);
-}
-
-static void derive_scale_factor(int width, int width_scaled, int *p, int *q) {
-  assert(width > 0);
-  assert(width_scaled > 0);
-
-  *p = -1;
-  *q = -1;
-
-  // Lanczos library supports a scaling factor p/q with both p and q <= 16.
-  if ((width > (width_scaled << 4)) || (width_scaled > (width << 4))) return;
-
-  aom_clear_system_state();
-
-  const float scale_factor = (float)width_scaled / (float)width;
-  const float error_thresh = 0.05f;
-  float error_min = 1.0f;
-
-  for (int denom = 1; denom <= 16; ++denom) {
-    for (int num = 1; num <= 16; ++num) {
-      float error = fabsf((float)num / (float)denom - scale_factor);
-
-      if (error < error_min) {
-        *p = num;
-        *q = denom;
-        error_min = error;
-      }
-    }
-  }
-
-  if (error_min > error_thresh) {
-    *p = -1;
-    *q = -1;
-  }
-  return;
 }
 
 #if CONFIG_EXT_SUPERRES
@@ -1449,8 +1364,8 @@ YV12_BUFFER_CONFIG *av1_scale_if_required(
       // TODO(yuec): implement 1D superres based on lanczos resampling
       if (cm->superres_scale_denominator == SCALE_NUMERATOR)
 #endif
-        derive_scale_factor(unscaled->y_crop_width, scaled->y_crop_width,
-                            &scale_num, &scale_denom);
+        av1_derive_scale_factor(unscaled->y_crop_width, scaled->y_crop_width,
+                                &scale_num, &scale_denom);
 
       if (scale_denom > 0 && scale_num > 0) {
         av1_resize_lanczos_and_extend_frame(

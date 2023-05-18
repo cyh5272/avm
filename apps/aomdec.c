@@ -31,6 +31,7 @@
 #include "aom/aomdx.h"
 #include "aom_ports/aom_timer.h"
 #include "aom_ports/mem_ops.h"
+#include "av1/common/lanczos_resample.h"
 #include "common/args.h"
 #include "common/ivfdec.h"
 #include "common/md5_utils.h"
@@ -119,6 +120,53 @@ static const arg_def_t *all_args[] = {
   &outbitdeptharg, &isannexb,   &oppointarg,    &outallarg,
   &skipfilmgrain,  NULL
 };
+
+static INLINE int get_plane_size_i420(int size, int is_uv) {
+  return is_uv ? (size + 1) >> 1 : size;
+  return size;
+}
+
+static INLINE int lanczos_scale(aom_image_t *src, aom_image_t *dst, int bd) {
+  if (src->fmt != dst->fmt ||
+      (src->fmt != AOM_IMG_FMT_I42016 && src->fmt != AOM_IMG_FMT_I420))
+    return -1;
+
+  int scale_q = -1;
+  int scale_p = -1;
+  av1_derive_scale_factor(src->d_w, dst->d_w, &scale_p, &scale_q);
+  if (scale_p <= 0 || scale_q <= 0) return -1;
+
+  int scale_q_h = -1;
+  int scale_p_h = -1;
+  av1_derive_scale_factor(src->d_h, dst->d_h, &scale_p_h, &scale_q_h);
+  if (scale_p != scale_p_h || scale_q != scale_q_h) return -1;
+
+  for (int i = 0; i < 3; ++i) {
+    const int is_uv = (i > 0);
+    const int lanczos_a_hor =
+        is_uv ? LANCZOS_A_NORMATIVE_HOR_C : LANCZOS_A_NORMATIVE_HOR_Y;
+    const int lanczos_a_ver =
+        is_uv ? LANCZOS_A_NORMATIVE_VER_C : LANCZOS_A_NORMATIVE_VER_Y;
+    const int src_h = get_plane_size_i420(src->d_h, is_uv);
+    const int src_w = get_plane_size_i420(src->d_w, is_uv);
+    const int dst_h = get_plane_size_i420(dst->d_h, is_uv);
+    const int dst_w = get_plane_size_i420(dst->d_w, is_uv);
+
+    if (src->fmt == AOM_IMG_FMT_I420) {
+      av1_resample_plane_2d_8b_lanczos(
+          src->planes[i], src_h, src_w, src->stride[i], dst->planes[i], dst_h,
+          dst_w, dst->stride[i], is_uv ? 1 : 0, is_uv ? 1 : 0, bd, scale_q,
+          scale_p, lanczos_a_hor, lanczos_a_ver);
+    } else {
+      av1_resample_plane_2d_lanczos(
+          (uint16_t *)src->planes[i], src_h, src_w, src->stride[i] / 2,
+          (uint16_t *)dst->planes[i], dst_h, dst_w, dst->stride[i] / 2,
+          is_uv ? 1 : 0, is_uv ? 1 : 0, bd, scale_q, scale_p, lanczos_a_hor,
+          lanczos_a_ver);
+    }
+  }
+  return 0;
+}
 
 #if CONFIG_LIBYUV
 static INLINE int libyuv_scale(aom_image_t *src, aom_image_t *dst,
@@ -940,18 +988,22 @@ static int main_loop(int argc, const char **argv_) {
           }
 
           if (img->d_w != scaled_img->d_w || img->d_h != scaled_img->d_h) {
+            if (!lanczos_scale(img, scaled_img, img->bit_depth)) {
+              img = scaled_img;
+            } else {
 #if CONFIG_LIBYUV
-            libyuv_scale(img, scaled_img, kFilterBox);
-            img = scaled_img;
+              libyuv_scale(img, scaled_img, kFilterBox);
+              img = scaled_img;
 #else
-            fprintf(
-                stderr,
-                "Failed to scale output frame: %s.\n"
-                "libyuv is required for scaling but is currently disabled.\n"
-                "Be sure to specify -DCONFIG_LIBYUV=1 when running cmake.\n",
-                aom_codec_error(&decoder));
-            goto fail;
+              fprintf(
+                  stderr,
+                  "Failed to scale output frame: %s.\n"
+                  "libyuv is required for scaling but is currently disabled.\n"
+                  "Be sure to specify -DCONFIG_LIBYUV=1 when running cmake.\n",
+                  aom_codec_error(&decoder));
+              goto fail;
 #endif
+            }
           }
         }
         // Default to codec bit depth if output bit depth not set

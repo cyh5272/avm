@@ -20,6 +20,32 @@
 #define MAX_RATIONAL_FACTOR 16
 #define MAX_FILTER_LEN 320
 
+void av1_derive_scale_factor(int width, int width_scaled, int *p, int *q);
+
+#define LANCZOS_A_NORMATIVE_HOR_Y 6  // Normative hor Lanczos a Luma
+#define LANCZOS_A_NORMATIVE_HOR_C 4  // Normative hor Lanczos a Chroma
+#define LANCZOS_A_NORMATIVE_VER_Y 4  // Normative ver Lanczos a Luma
+#define LANCZOS_A_NORMATIVE_VER_C 4  // Normative ver Lanczos a Chroma
+
+#define LANCZOS_A_NONNORMATIVE_HOR_Y 6  // Non-normative hor Lanczos a Luma
+#define LANCZOS_A_NONNORMATIVE_HOR_C 4  // Non-normative hor Lanczos a Chroma
+#define LANCZOS_A_NONNORMATIVE_VER_Y 6  // Non-normative ver Lanczos a Luma
+#define LANCZOS_A_NONNORMATIVE_VER_C \
+  4  // Non-normative ver Lanczos a Chroma
+     // Chroma
+void av1_resample_plane_2d_lanczos(const uint16_t *const input, int height,
+                                   int width, int in_stride, uint16_t *output,
+                                   int height2, int width2, int out_stride,
+                                   int subx, int suby, int bd, int denom,
+                                   int num, int lanczos_a_hor,
+                                   int lanczos_a_ver);
+void av1_resample_plane_2d_8b_lanczos(const uint8_t *const input, int height,
+                                      int width, int in_stride, uint8_t *output,
+                                      int height2, int width2, int out_stride,
+                                      int subx, int suby, int bd, int denom,
+                                      int num, int lanczos_a_hor,
+                                      int lanczos_a_ver);
+
 // Note: check window() function implementation for values of any
 // other params used by these windowing functions.
 typedef enum {
@@ -95,6 +121,26 @@ void resample_horz(const int16_t *x, int inwidth, int inheight, int instride,
 void resample_vert(const int16_t *x, int inwidth, int inheight, int instride,
                    RationalResampleFilter *rfv, ClipProfile *clip, int16_t *y,
                    int outheight, int outstride);
+
+// 8-bit versions of high-level resampling functions
+
+// Assume no extension of the input x buffer
+void resample_1d_8b(const uint8_t *x, int inlen, RationalResampleFilter *rf,
+                    int downshift, ClipProfile *clip, uint8_t *y, int outlen);
+
+void av1_resample_2d_8b(const uint8_t *x, int inwidth, int inheight,
+                        int instride, RationalResampleFilter *rfh,
+                        RationalResampleFilter *rfv, int int_extra_bits,
+                        ClipProfile *clip, uint8_t *y, int outwidth,
+                        int outheight, int outstride);
+
+void resample_horz_8b(const uint8_t *x, int inwidth, int inheight, int instride,
+                      RationalResampleFilter *rfh, ClipProfile *clip,
+                      uint8_t *y, int outwidth, int outstride);
+
+void resample_vert_8b(const uint8_t *x, int inwidth, int inheight, int instride,
+                      RationalResampleFilter *rfv, ClipProfile *clip,
+                      uint8_t *y, int outheight, int outstride);
 
 void show_resample_filter(RationalResampleFilter *rf);
 
