@@ -378,6 +378,10 @@ typedef struct GLOBAL_MOTION_SPEED_FEATURES {
 
   // Number of refinement steps to apply after initial model generation
   int num_refinement_steps;
+
+  // Disable global motion estimation based on stats of previous frames in the
+  // GF group
+  int disable_gm_search_based_on_stats;
 } GLOBAL_MOTION_SPEED_FEATURES;
 
 typedef struct PARTITION_SPEED_FEATURES {
