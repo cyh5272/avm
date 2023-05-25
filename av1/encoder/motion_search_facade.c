@@ -554,7 +554,10 @@ void av1_amvd_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
                                 &best_mv.as_mv, &dis, &sse);
 
   // Restore the pointer to the first unscaled prediction buffer.
-  if (ref_idx) pd->pre[0] = orig_yv12;
+  if (ref_idx) {
+    pd->pre[ref_idx] = pd->pre[0];
+    pd->pre[0] = orig_yv12;
+  }
 
   if (bestsme < INT_MAX) {
     *this_mv = best_mv.as_mv;
@@ -660,6 +663,12 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     ms_params.forced_stop = EIGHTH_PEL;
     bestsme = adaptive_mvd_search(cm, xd, &ms_params, ref_mv.as_mv,
                                   &best_mv.as_mv, &dis, &sse);
+    if (scaled_ref_frame) {
+      // Swap back the original buffers for subpel motion search
+      for (int i = 0; i < num_planes; i++) {
+        xd->plane[i].pre[0] = backup_yv12[i];
+      }
+    }
   } else
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_JOINT_MVD
@@ -684,6 +693,12 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
                                  &best_mv.as_mv, &dis, &sse, ref_idx, other_mv,
                                  &best_other_mv.as_mv, second_pred,
                                  &inter_pred_params, NULL);
+    if (scaled_ref_frame) {
+      // Swap back the original buffers for subpel motion search
+      for (int i = 0; i < num_planes; i++) {
+        xd->plane[i].pre[0] = backup_yv12[i];
+      }
+    }
   } else
 #endif  // CONFIG_JOINT_MVD
 #if CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
@@ -736,7 +751,10 @@ void av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 #endif  // CONFIG_ADAPTIVE_MVD || CONFIG_JOINT_MVD
 
   // Restore the pointer to the first unscaled prediction buffer.
-  if (ref_idx) pd->pre[0] = orig_yv12;
+  if (ref_idx) {
+    pd->pre[ref_idx] = pd->pre[0];
+    pd->pre[0] = orig_yv12;
+  }
 
   if (bestsme < INT_MAX) *this_mv = best_mv.as_mv;
 

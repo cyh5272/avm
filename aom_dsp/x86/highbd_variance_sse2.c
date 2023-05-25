@@ -723,10 +723,10 @@ void aom_highbd_comp_avg_upsampled_pred_sse2(
     MACROBLOCKD *xd, const struct AV1Common *const cm, int mi_row, int mi_col,
     const MV *const mv, uint8_t *comp_pred8, const uint8_t *pred8, int width,
     int height, int subpel_x_q3, int subpel_y_q3, const uint8_t *ref8,
-    int ref_stride, int bd, int subpel_search) {
+    int ref_stride, int bd, int subpel_search, int is_scaled_ref) {
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, mv, comp_pred8, width,
                             height, subpel_x_q3, subpel_y_q3, ref8, ref_stride,
-                            bd, subpel_search, 0);
+                            bd, subpel_search, is_scaled_ref);
   uint16_t *pred = CONVERT_TO_SHORTPTR(pred8);
   uint16_t *comp_pred16 = CONVERT_TO_SHORTPTR(comp_pred8);
   /*The total number of pixels must be a multiple of 8 (e.g., 4x4).*/
@@ -812,13 +812,13 @@ void aom_highbd_dist_wtd_comp_avg_upsampled_pred_sse2(
     const MV *const mv, uint8_t *comp_pred8, const uint8_t *pred8, int width,
     int height, int subpel_x_q3, int subpel_y_q3, const uint8_t *ref8,
     int ref_stride, int bd, const DIST_WTD_COMP_PARAMS *jcp_param,
-    int subpel_search) {
+    int subpel_search, int is_scaled_ref) {
   uint16_t *pred = CONVERT_TO_SHORTPTR(pred8);
   int n;
   int i;
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, mv, comp_pred8, width,
                             height, subpel_x_q3, subpel_y_q3, ref8, ref_stride,
-                            bd, subpel_search, 0);
+                            bd, subpel_search, is_scaled_ref);
   assert(!(width * height & 7));
   n = width * height >> 3;
 

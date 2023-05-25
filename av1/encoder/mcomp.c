@@ -2775,12 +2775,12 @@ static int upsampled_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
       aom_highbd_comp_mask_upsampled_pred(
           xd, cm, mi_row, mi_col, this_mv, pred8, second_pred, w, h,
           subpel_x_q3, subpel_y_q3, ref, ref_stride, mask, mask_stride,
-          invert_mask, xd->bd, subpel_search_type);
+          invert_mask, xd->bd, subpel_search_type, is_scaled_ref);
     } else {
       aom_highbd_comp_avg_upsampled_pred(xd, cm, mi_row, mi_col, this_mv, pred8,
                                          second_pred, w, h, subpel_x_q3,
                                          subpel_y_q3, ref, ref_stride, xd->bd,
-                                         subpel_search_type);
+                                         subpel_search_type, is_scaled_ref);
     }
   } else {
     aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, this_mv, pred8, w, h,
@@ -4143,12 +4143,15 @@ static int upsampled_obmc_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
 
+  const int is_scaled_ref = ms_buffers->src->width == ms_buffers->ref->width &&
+                            ms_buffers->src->height == ms_buffers->ref->height;
+
   unsigned int besterr;
   DECLARE_ALIGNED(16, uint8_t, pred[2 * MAX_SB_SQUARE]);
   uint8_t *pred8 = CONVERT_TO_BYTEPTR(pred);
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, this_mv, pred8, w, h,
                             subpel_x_q3, subpel_y_q3, ref, ref_stride, xd->bd,
-                            subpel_search_type, 0);
+                            subpel_search_type, is_scaled_ref);
   besterr = vfp->ovf(pred8, w, wsrc, mask, sse);
 
   return besterr;

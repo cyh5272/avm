@@ -51,7 +51,7 @@ typedef void (*highbddistwtdcompavgupsampled_func)(
     const MV *const mv, uint8_t *comp_pred8, const uint8_t *pred8, int width,
     int height, int subpel_x_q3, int subpel_y_q3, const uint8_t *ref8,
     int ref_stride, int bd, const DIST_WTD_COMP_PARAMS *jcp_param,
-    int subpel_search);
+    int subpel_search, int is_scaled_ref);
 
 typedef std::tuple<int, highbddistwtdcompavgupsampled_func, BLOCK_SIZE>
     HighbdDISTWTDCOMPAVGUPSAMPLEDParam;
@@ -241,12 +241,12 @@ class AV1HighBDDISTWTDCOMPAVGUPSAMPLEDTest
                   CONVERT_TO_BYTEPTR(pred8) + offset_r * w + offset_c, in_w,
                   in_h, sub_x_q3, sub_y_q3,
                   CONVERT_TO_BYTEPTR(ref8) + offset_r * w + offset_c, in_w, bd,
-                  &dist_wtd_comp_params, subpel_search);
+                  &dist_wtd_comp_params, subpel_search, 0);
               test_impl(NULL, NULL, 0, 0, NULL, CONVERT_TO_BYTEPTR(output2),
                         CONVERT_TO_BYTEPTR(pred8) + offset_r * w + offset_c,
                         in_w, in_h, sub_x_q3, sub_y_q3,
                         CONVERT_TO_BYTEPTR(ref8) + offset_r * w + offset_c,
-                        in_w, bd, &dist_wtd_comp_params, subpel_search);
+                        in_w, bd, &dist_wtd_comp_params, subpel_search, 0);
 
               for (int i = 0; i < in_h; ++i) {
                 for (int j = 0; j < in_w; ++j) {
@@ -298,7 +298,7 @@ class AV1HighBDDISTWTDCOMPAVGUPSAMPLEDTest
           NULL, NULL, 0, 0, NULL, CONVERT_TO_BYTEPTR(output),
           CONVERT_TO_BYTEPTR(pred8), in_w, in_h, sub_x_q3, sub_y_q3,
           CONVERT_TO_BYTEPTR(ref8), in_w, bd, &dist_wtd_comp_params,
-          subpel_search);
+          subpel_search, 0);
 
     aom_usec_timer_mark(&timer);
     const int elapsed_time = static_cast<int>(aom_usec_timer_elapsed(&timer));
@@ -312,7 +312,7 @@ class AV1HighBDDISTWTDCOMPAVGUPSAMPLEDTest
       test_impl(NULL, NULL, 0, 0, NULL, CONVERT_TO_BYTEPTR(output2),
                 CONVERT_TO_BYTEPTR(pred8), in_w, in_h, sub_x_q3, sub_y_q3,
                 CONVERT_TO_BYTEPTR(ref8), in_w, bd, &dist_wtd_comp_params,
-                subpel_search);
+                subpel_search, 0);
 
     aom_usec_timer_mark(&timer1);
     const int elapsed_time1 = static_cast<int>(aom_usec_timer_elapsed(&timer1));
