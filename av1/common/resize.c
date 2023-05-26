@@ -1008,6 +1008,8 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
                                    int subx, int suby, int bd, int denom,
                                    int num, int lanczos_a_hor,
                                    int lanczos_a_ver) {
+  (void)suby;
+
   int coeff_prec_bits = 14;
   int extra_prec_bits = 2;
   WIN_TYPE win = WIN_LANCZOS;
@@ -1016,7 +1018,7 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
   int horz_a = lanczos_a_hor;
   int vert_a = lanczos_a_ver;
   double horz_x0 = subx ? (double)('d') : (double)('c');
-  double vert_x0 = suby ? (double)('d') : (double)('c');
+  double vert_x0 = (double)('c');
 
   RationalResampleFilter horz_rf;
   RationalResampleFilter vert_rf;
@@ -1026,7 +1028,7 @@ void av1_resample_plane_2d_lanczos(const uint8_t *const input, int height,
     fprintf(stderr, "Cannot generate filter, exiting!\n");
     exit(1);
   }
-  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, suby,
+  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, 0,
                            coeff_prec_bits, &vert_rf)) {
     fprintf(stderr, "Cannot generate filter, exiting!\n");
     exit(1);
