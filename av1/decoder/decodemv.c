@@ -3025,17 +3025,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
 #if CONFIG_INTERINTRA_WARP
   if (mbmi->motion_mode == WARPED_CAUSAL_INTERINTRA) {
     mbmi->wm_params.wmtype = ROTZOOM;
-    mbmi->wm_params.invalid = 0;
-    if (av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
-                                       &mbmi->wm_params, mi_row, mi_col)) {
-#if WARPED_MOTION_DEBUG
-      printf("Warning: unexpected warped model from aomenc\n");
-#endif
-      mbmi->wm_params.invalid = 1;
-    }
-#if CONFIG_C071_SUBBLK_WARPMV
-    assign_warpmv(cm, xd->submi, bsize, &mbmi->wm_params, mi_row, mi_col);
-#endif  // CONFIG_C071_SUBBLK_WARPMV
+    mbmi->wm_params.invalid = 1;
+    // Note the actual affine estimnation needs to be done at reconstruction
   }
 #endif  // CONFIG_INTERINTRA_WARP
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION

@@ -5296,9 +5296,6 @@ unsigned int av1_refine_warped_interintra_mv(
   bestmse = compute_motion_cost(xd, cm, ms_params, bsize, best_mv);
 
   // MV search
-  const int mi_row = xd->mi_row;
-  const int mi_col = xd->mi_col;
-
   // First iteration always scans all neighbors
   uint8_t valid_neighbors = UINT8_MAX;
 
@@ -5316,11 +5313,11 @@ unsigned int av1_refine_warped_interintra_mv(
                      best_mv->col + neighbors[idx].col * (1 << mv_shift) };
       if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
-        if (!av1_find_projection_interintra(
-                xd, bsize, this_mv, &mbmi->wm_params[0], mi_row, mi_col)) {
+        if (!av1_find_projection_interintra(xd, bsize, this_mv,
+                                            &mbmi->wm_params[0])) {
 #else
         if (!av1_find_projection_interintra(xd, bsize, this_mv,
-                                            &mbmi->wm_params, mi_row, mi_col)) {
+                                            &mbmi->wm_params)) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
           thismse = compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
 

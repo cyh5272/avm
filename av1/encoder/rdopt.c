@@ -2026,11 +2026,10 @@ static int64_t motion_mode_rd(
         //  using the collected samples
 #if CONFIG_EXTENDED_WARP_PREDICTION
         if (!av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
-                                            &mbmi->wm_params[0], mi_row,
-                                            mi_col))
+                                            &mbmi->wm_params[0]))
 #else
         if (!av1_find_projection_interintra(xd, bsize, mbmi->mv[0].as_mv,
-                                            &mbmi->wm_params, mi_row, mi_col))
+                                            &mbmi->wm_params))
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
         {
           assert(!is_comp_pred);

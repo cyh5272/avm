@@ -1338,8 +1338,8 @@ static AOM_INLINE void predict_inter_block(AV1_COMMON *const cm,
     mbmi->wm_params[0].invalid = 0;
     MV mv = mbmi->mv[0].as_mv;
     if (av1_find_projection_interintra_ext(xd, bsize, mv, &mbmi->wm_params[0],
-                                           mi_row, mi_col, cm->width,
-                                           cm->height, dcb->mc_buf[0])) {
+                                           cm->width, cm->height,
+                                           dcb->mc_buf[0])) {
 #if WARPED_MOTION_DEBUG
       printf("Warning: unexpected warped model from aomenc\n");
 #endif
