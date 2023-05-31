@@ -5559,16 +5559,36 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     }
 
     for (int param_index = 2; param_index < 4; param_index++) {
+      // Calculate the same range as av1_reduce_warp_model(), as we should
+      // reject any model which lies outside the clamping range.
+      int offset = (param_index == 2 || param_index == 5)
+                       ? (1 << WARPEDMODEL_PREC_BITS)
+                       : 0;
+#if CONFIG_EXT_WARP_FILTER
+      const int max_value =
+          (1 << (WARPEDMODEL_PREC_BITS - 1)) - (1 << WARP_PARAM_REDUCE_BITS);
+      const int min_value = -max_value;
+#else
+      const int min_value = -(1 << (WARPEDMODEL_PREC_BITS - 1));
+      const int max_value =
+          (1 << (WARPEDMODEL_PREC_BITS - 1)) - (1 << WARP_PARAM_REDUCE_BITS);
+#endif  // CONFIG_EXT_WARP_FILTER
+
       // Try increasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] += step_size;
+      assert(params->wmmat[param_index] - offset >= min_value);
       delta = params->wmmat[param_index] - base_params.wmmat[param_index];
       if (abs(delta) > WARP_DELTA_MAX) {
+        // Reject values we can't encode
+        inc_rd = UINT64_MAX;
+      } else if (params->wmmat[param_index] - offset > max_value) {
+        // Reject models which are outside the range allowed by
+        // av1_reduce_warp_model()
         inc_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_reduce_warp_model(params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
@@ -5589,13 +5609,18 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       // Try decreasing the parameter
       *params = best_wm_params;
       params->wmmat[param_index] -= step_size;
+      assert(params->wmmat[param_index] - offset <= max_value);
       delta = params->wmmat[param_index] - base_params.wmmat[param_index];
       if (abs(delta) > WARP_DELTA_MAX) {
+        // Reject values we can't encode
+        dec_rd = UINT64_MAX;
+      } else if (params->wmmat[param_index] - offset < min_value) {
+        // Reject models which are outside the range allowed by
+        // av1_reduce_warp_model()
         dec_rd = UINT64_MAX;
       } else {
         params->wmmat[4] = -params->wmmat[3];
         params->wmmat[5] = params->wmmat[2];
-        av1_reduce_warp_model(params);
         valid = av1_get_shear_params(params);
         params->invalid = !valid;
         if (valid) {
