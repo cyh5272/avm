@@ -204,6 +204,8 @@ set_aom_config_var(CONFIG_EXT_SUPERRES 0 NUMBER
 set_aom_config_var(
   CONFIG_ACROSS_SCALE_TPL_MVS 0 NUMBER
   "AV2 experiment flag to enable across scale temporal mv projection.")
+set_aom_config_var(CONFIG_ACROSS_SCALE_WARP 0 NUMBER
+                   "AV2 experiment flag to enable across scale warp modes.")
 set_aom_config_var(
   CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES 0 NUMBER
   "AV2 experiment flag to enable TIP direct mode across scale.")

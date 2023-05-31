@@ -6151,6 +6151,7 @@ void av1_read_sequence_header_beyond_av1(struct aom_read_bit_buffer *rb,
 static int read_global_motion_params(WarpedMotionParams *params,
                                      const WarpedMotionParams *ref_params,
                                      struct aom_read_bit_buffer *rb,
+                                     const struct scale_factors *sf,
 #if !CONFIG_FLEX_MVRES
                                      int allow_hp) {
 #else
@@ -6235,7 +6236,7 @@ static int read_global_motion_params(WarpedMotionParams *params,
 #if CONFIG_EXTENDED_WARP_PREDICTION
     av1_reduce_warp_model(params);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-    int good_shear_params = av1_get_shear_params(params);
+    int good_shear_params = av1_get_shear_params(params, sf);
     if (!good_shear_params) return 0;
   }
 
@@ -6251,9 +6252,11 @@ static AOM_INLINE void read_global_motion(AV1_COMMON *cm,
     int good_params =
 #if !CONFIG_FLEX_MVRES
         read_global_motion_params(&cm->global_motion[frame], ref_params, rb,
+                                  get_ref_scale_factors_const(cm, frame),
                                   cm->features.allow_high_precision_mv);
 #else
         read_global_motion_params(&cm->global_motion[frame], ref_params, rb,
+                                  get_ref_scale_factors_const(cm, frame),
                                   cm->features.fr_mv_precision);
 #endif
     if (!good_params) {
@@ -6272,6 +6275,7 @@ static AOM_INLINE void read_global_motion(AV1_COMMON *cm,
         cm->height == ref_buf->y_crop_height) {
       read_global_motion_params(&cm->global_motion[frame],
                                 &cm->prev_frame->global_motion[frame], rb,
+                                get_ref_scale_factors_const(cm, frame),
                                 cm->features.allow_high_precision_mv);
     } else {
       cm->global_motion[frame] = default_warp_params;

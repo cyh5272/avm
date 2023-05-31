@@ -262,10 +262,41 @@ static int is_affine_shear_allowed(int16_t alpha, int16_t beta, int16_t gamma,
     return 1;
 }
 
+#if CONFIG_ACROSS_SCALE_WARP
+static void scale_warp_params(const WarpedMotionParams *wm,
+                              WarpedMotionParams *wm_scaled,
+                              const struct scale_factors *sf) {
+  wm_scaled->wmmat[0] = sf->scale_value_x_gen(wm->wmmat[0], sf);
+  wm_scaled->wmmat[1] = sf->scale_value_y_gen(wm->wmmat[1], sf);
+
+  wm_scaled->wmmat[2] = sf->scale_value_x_gen(wm->wmmat[2], sf);
+  wm_scaled->wmmat[3] = sf->scale_value_x_gen(wm->wmmat[3], sf);
+  wm_scaled->wmmat[4] = sf->scale_value_y_gen(wm->wmmat[4], sf);
+  wm_scaled->wmmat[5] = sf->scale_value_y_gen(wm->wmmat[5], sf);
+}
+#endif  // CONFIG_ACROSS_SCALE_WARP
+
 // Returns 1 on success or 0 on an invalid affine set
-int av1_get_shear_params(WarpedMotionParams *wm) {
-  const int32_t *mat = wm->wmmat;
+int av1_get_shear_params(WarpedMotionParams *wm,
+                         const struct scale_factors *sf) {
+  (void)sf;
   if (!is_affine_valid(wm)) return 0;
+#if CONFIG_ACROSS_SCALE_WARP
+  // Note alpha, beta, gamma, delta are generated in scaled domain,
+  // but wmmat is maintained at the resolution of the source frame.
+  const int is_scaled = sf ? av1_is_scaled(sf) : 0;
+  const int32_t *mat;
+  WarpedMotionParams wm_scaled;
+  if (is_scaled) {
+    scale_warp_params(wm, &wm_scaled, sf);
+    mat = wm_scaled.wmmat;
+  } else {
+    mat = wm->wmmat;
+  }
+#else
+  const int32_t *mat = wm->wmmat;
+#endif  // CONFIG_ACROSS_SCALE_WARP
+
   wm->alpha =
       clamp(mat[2] - (1 << WARPEDMODEL_PREC_BITS), INT16_MIN, INT16_MAX);
   wm->beta = clamp(mat[3], INT16_MIN, INT16_MAX);
@@ -763,7 +794,8 @@ static int32_t get_mult_shift_diag(int64_t Px, int16_t iDet, int shift) {
 
 static int find_affine_int(int np, const int *pts1, const int *pts2,
                            BLOCK_SIZE bsize, MV mv, WarpedMotionParams *wm,
-                           int mi_row, int mi_col) {
+                           int mi_row, int mi_col,
+                           const struct scale_factors *sf) {
   int32_t A[2][2] = { { 0, 0 }, { 0, 0 } };
   int32_t Bx[2] = { 0, 0 };
   int32_t By[2] = { 0, 0 };
@@ -856,7 +888,7 @@ static int find_affine_int(int np, const int *pts1, const int *pts2,
   av1_reduce_warp_model(wm);
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
   // check compatibility with the fast warp filter
-  if (!av1_get_shear_params(wm)) return 1;
+  if (!av1_get_shear_params(wm, sf)) return 1;
 
   av1_set_warp_translation(mi_row, mi_col, bsize, mv, wm);
 #if !CONFIG_EXTENDED_WARP_PREDICTION
@@ -872,12 +904,17 @@ static int find_affine_int(int np, const int *pts1, const int *pts2,
 
 int av1_find_projection(int np, const int *pts1, const int *pts2,
                         BLOCK_SIZE bsize, MV mv, WarpedMotionParams *wm_params,
-                        int mi_row, int mi_col) {
+                        int mi_row, int mi_col,
+                        const struct scale_factors *sf) {
+  (void)sf;
   assert(wm_params->wmtype == AFFINE);
 
-  if (find_affine_int(np, pts1, pts2, bsize, mv, wm_params, mi_row, mi_col))
+  if (find_affine_int(np, pts1, pts2, bsize, mv, wm_params, mi_row, mi_col,
+                      sf)) {
+    wm_params->invalid = 1;
     return 1;
-
+  }
+  wm_params->invalid = 0;
   return 0;
 }
 
@@ -898,7 +935,8 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
                           const MV *center_mv, const int mi_row,
                           const int mi_col,
                           const WarpedMotionParams *neighbor_wm,
-                          WarpedMotionParams *wm_params) {
+                          WarpedMotionParams *wm_params,
+                          const struct scale_factors *sf) {
   const int half_width_log2 = mi_size_wide_log2[bsize] + MI_SIZE_LOG2 - 1;
   const int half_height_log2 = mi_size_high_log2[bsize] + MI_SIZE_LOG2 - 1;
   const int center_x = (mi_col * MI_SIZE) + (1 << half_width_log2) - 1;
@@ -975,10 +1013,14 @@ int av1_extend_warp_model(const bool neighbor_is_above, const BLOCK_SIZE bsize,
 
   av1_reduce_warp_model(wm_params);
   // check compatibility with the fast warp filter
-  if (!av1_get_shear_params(wm_params)) return 1;
+  if (!av1_get_shear_params(wm_params, sf)) {
+    wm_params->invalid = 1;
+    return 1;
+  }
 
   // Derive translational part from signaled MV
   av1_set_warp_translation(mi_row, mi_col, bsize, *center_mv, wm_params);
+  wm_params->invalid = 0;
 
   return 0;
 }

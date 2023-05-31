@@ -141,6 +141,7 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
              (MAX_PARAMDIM - 1) * sizeof(*(params_by_motion[i].params)));
       params_by_motion[i].num_inliers = 0;
     }
+    cm->global_motion[frame].invalid = 0;
 
     av1_compute_global_motion(model, src_buffer, src_width, src_height,
                               src_stride, src_corners, num_src_corners,
@@ -186,7 +187,8 @@ static AOM_INLINE void compute_global_motion_for_ref_frame(
       }
     }
     if (cm->global_motion[frame].wmtype <= AFFINE)
-      if (!av1_get_shear_params(&cm->global_motion[frame]))
+      if (!av1_get_shear_params(&cm->global_motion[frame],
+                                get_ref_scale_factors_const(cm, frame)))
         cm->global_motion[frame] = default_warp_params;
 
     if (cm->global_motion[frame].wmtype == TRANSLATION) {
@@ -361,7 +363,15 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
       cpi->gm_info.params_cost[frame] = 0;
       continue;
     } else {
+#if CONFIG_ACROSS_SCALE_WARP
+      // Get the scaled buffer
+      if (av1_is_scaled(get_ref_scale_factors(cm, frame)))
+        ref_buf[frame] = &cpi->scaled_ref_buf[frame]->buf;
+      else
+        ref_buf[frame] = &buf->buf;
+#else
       ref_buf[frame] = &buf->buf;
+#endif  // CONFIG_ACROSS_SCALE_WARP
     }
 
     int prune_ref_frames =
