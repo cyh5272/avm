@@ -751,6 +751,46 @@ BLOCK_SIZE av1_select_sb_size(const AV1_COMP *const cpi) {
 #endif  // CONFIG_BLOCK_256
 }
 
+static AOM_INLINE void reallocate_sb_size_dependent_buffers(AV1_COMP *cpi) {
+  // Note: this is heavier than it needs to be. We can avoid reallocating some
+  // of the buffers.
+  AV1_COMMON *const cm = &cpi->common;
+  const int num_planes = av1_num_planes(cm);
+
+  av1_set_tile_info(cm, &cpi->oxcf.tile_cfg);
+  av1_free_context_buffers(cm);
+  av1_free_shared_coeff_buffer(&cpi->td.shared_coeff_buf);
+  av1_free_sms_tree(&cpi->td);
+#if CONFIG_EXT_RECUR_PARTITIONS
+  av1_free_sms_bufs(&cpi->td);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+  av1_free_pmc(cpi->td.firstpass_ctx, num_planes);
+  cpi->td.firstpass_ctx = NULL;
+  alloc_compressor_data(cpi);
+  if (av1_alloc_above_context_buffers(&cm->above_contexts, cm->tiles.rows,
+                                      cm->mi_params.mi_cols, num_planes)) {
+    aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                       "Failed to allocate context buffers");
+  }
+
+  const int old_restoration_unit_size = cm->rst_info[0].restoration_unit_size;
+
+  const SequenceHeader *const seq_params = &cm->seq_params;
+  const int frame_width = cm->superres_upscaled_width;
+  const int frame_height = cm->superres_upscaled_height;
+
+  av1_set_restoration_unit_size(
+      frame_width, frame_height, seq_params->subsampling_x,
+      seq_params->subsampling_y, cm->rst_info, seq_params->sb_size);
+
+  if (old_restoration_unit_size != cm->rst_info[0].restoration_unit_size) {
+    for (int i = 0; i < num_planes; ++i)
+      cm->rst_info[i].frame_restoration_type = RESTORE_NONE;
+
+    av1_alloc_restoration_buffers(cm);
+  }
+}
+
 void av1_setup_frame(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   // Set up entropy context depending on frame type. The decoder mandates
@@ -764,6 +804,7 @@ void av1_setup_frame(AV1_COMP *cpi) {
     av1_setup_past_independence(cm);
   }
 
+  const BLOCK_SIZE old_sb_size = cm->seq_params.sb_size;
   if ((cm->current_frame.frame_type == KEY_FRAME && cm->show_frame) ||
       frame_is_sframe(cm)) {
     if (!cpi->seq_params_locked) {
@@ -778,6 +819,11 @@ void av1_setup_frame(AV1_COMP *cpi) {
     } else {
       *cm->fc = primary_ref_buf->frame_context;
     }
+  }
+
+  if (cm->seq_params.sb_size != old_sb_size) {
+    // Reallocate sb_size-dependent buffers if the sb_size has changed.
+    reallocate_sb_size_dependent_buffers(cpi);
   }
 
   av1_zero(cm->cur_frame->interp_filter_selected);

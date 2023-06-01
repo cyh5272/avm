@@ -1088,6 +1088,83 @@ void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi);
 
 void av1_save_all_coding_context(AV1_COMP *cpi);
 
+static AOM_INLINE void av1_set_tile_info(AV1_COMMON *const cm,
+                                         const TileConfig *const tile_cfg) {
+  const CommonModeInfoParams *const mi_params = &cm->mi_params;
+  const SequenceHeader *const seq_params = &cm->seq_params;
+  CommonTileParams *const tiles = &cm->tiles;
+  int i, start_sb;
+
+  av1_get_tile_limits(cm);
+
+  // configure tile columns
+  if (tile_cfg->tile_width_count == 0 || tile_cfg->tile_height_count == 0) {
+    tiles->uniform_spacing = 1;
+    tiles->log2_cols = AOMMAX(tile_cfg->tile_columns, tiles->min_log2_cols);
+    tiles->log2_cols = AOMMIN(tiles->log2_cols, tiles->max_log2_cols);
+  } else {
+    int mi_cols =
+        ALIGN_POWER_OF_TWO(mi_params->mi_cols, seq_params->mib_size_log2);
+    int sb_cols = mi_cols >> seq_params->mib_size_log2;
+    int size_sb, j = 0;
+    tiles->uniform_spacing = 0;
+    for (i = 0, start_sb = 0; start_sb < sb_cols && i < MAX_TILE_COLS; i++) {
+      tiles->col_start_sb[i] = start_sb;
+      size_sb = tile_cfg->tile_widths[j++];
+      if (j >= tile_cfg->tile_width_count) j = 0;
+      start_sb += AOMMIN(size_sb, tiles->max_width_sb);
+    }
+    tiles->cols = i;
+    tiles->col_start_sb[i] = sb_cols;
+  }
+  av1_calculate_tile_cols(seq_params, mi_params->mi_rows, mi_params->mi_cols,
+                          tiles);
+
+  // configure tile rows
+  if (tiles->uniform_spacing) {
+    tiles->log2_rows = AOMMAX(tile_cfg->tile_rows, tiles->min_log2_rows);
+    tiles->log2_rows = AOMMIN(tiles->log2_rows, tiles->max_log2_rows);
+  } else {
+    int mi_rows =
+        ALIGN_POWER_OF_TWO(mi_params->mi_rows, seq_params->mib_size_log2);
+    int sb_rows = mi_rows >> seq_params->mib_size_log2;
+    int size_sb, j = 0;
+    for (i = 0, start_sb = 0; start_sb < sb_rows && i < MAX_TILE_ROWS; i++) {
+      tiles->row_start_sb[i] = start_sb;
+      size_sb = tile_cfg->tile_heights[j++];
+      if (j >= tile_cfg->tile_height_count) j = 0;
+      start_sb += AOMMIN(size_sb, tiles->max_height_sb);
+    }
+    tiles->rows = i;
+    tiles->row_start_sb[i] = sb_rows;
+  }
+  av1_calculate_tile_rows(seq_params, mi_params->mi_rows, tiles);
+}
+
+#define COUPLED_CHROMA_FROM_LUMA_RESTORATION 0
+static AOM_INLINE void av1_set_restoration_unit_size(int width, int height,
+                                                     int sx, int sy,
+                                                     RestorationInfo *rst,
+                                                     BLOCK_SIZE sb_size) {
+  (void)width;
+  (void)height;
+  (void)sx;
+  (void)sy;
+#if COUPLED_CHROMA_FROM_LUMA_RESTORATION
+  int s = AOMMIN(sx, sy);
+#else
+  int s = 0;
+#endif  // !COUPLED_CHROMA_FROM_LUMA_RESTORATION
+
+  if (width * height > 352 * 288)
+    rst[0].restoration_unit_size = RESTORATION_UNITSIZE_MAX;
+  else
+    rst[0].restoration_unit_size =
+        AOMMAX((RESTORATION_UNITSIZE_MAX >> 1), block_size_wide[sb_size]);
+  rst[1].restoration_unit_size = rst[0].restoration_unit_size >> s;
+  rst[2].restoration_unit_size = rst[1].restoration_unit_size;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
