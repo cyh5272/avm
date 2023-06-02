@@ -2706,7 +2706,7 @@ static INLINE int check_is_chroma_size_valid(
 }
 
 // Returns true if partition is implied for blocks near bottom/right
-// border, and not signaled in the bistream. And when it returns true, it also
+// border, and not signaled in the bitstream. And when it returns true, it also
 // sets `implied_partition` appropriately.
 // Note: `implied_partition` can be passed NULL.
 static AOM_INLINE bool is_partition_implied_at_boundary(
@@ -2722,6 +2722,13 @@ static AOM_INLINE bool is_partition_implied_at_boundary(
   const int hbs_h = mi_size_high[bsize] / 2;
   const int has_rows = (mi_row + hbs_h) < mi_params->mi_rows;
   const int has_cols = (mi_col + hbs_w) < mi_params->mi_cols;
+
+  if (tree_type != SHARED_PART && bsize == BLOCK_256X256) {
+    if (implied_partition) {
+      *implied_partition = PARTITION_SPLIT;
+    }
+    return true;
+  }
 
   if (has_rows && has_cols) return false;  // Not at boundary.
   assert(!has_rows || !has_cols);
