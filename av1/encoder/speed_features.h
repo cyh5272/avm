@@ -513,6 +513,9 @@ typedef struct PARTITION_SPEED_FEATURES {
 
   // The recursion depth allowed for ext partitions
   int ext_recur_depth;
+
+  // Prune rect partitions if PARTITION_SPLIT goes deep.
+  int prune_rect_with_split_depth;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 } PARTITION_SPEED_FEATURES;
 
