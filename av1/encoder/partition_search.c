@@ -5632,7 +5632,7 @@ BEGIN_PARTITION_SEARCH:
       prune_none |= depth > 0;
     }
   }
-  if (cpi->sf.part_sf.prune_rect_with_split_depth &&
+  if (cpi->sf.part_sf.prune_rect_with_split_depth && !frame_is_intra_only(cm) &&
       forced_partition == PARTITION_INVALID && pc_tree->split[0] &&
       pc_tree->split[1] && pc_tree->split[2] && pc_tree->split[3]) {
     int min_depth = INT_MAX, max_depth = 0;
