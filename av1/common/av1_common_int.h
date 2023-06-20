@@ -3579,8 +3579,10 @@ int allow_extend_nb(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
                                       const MACROBLOCKD *xd,
                                       const CANDIDATE_MV *ref_mv_stack,
-                                      const MB_MODE_INFO *mbmi) {
+                                      const MB_MODE_INFO *mbmi,
+                                      int ref_base_qindex) {
   (void)ref_mv_stack;
+  (void)ref_base_qindex;
   const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
   int enabled_motion_modes = cm->features.enabled_motion_modes;
 

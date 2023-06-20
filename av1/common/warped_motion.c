@@ -1395,10 +1395,30 @@ int av1_find_projection_unconstrained(int np, const int *pts1, const int *pts2,
 #endif  // CONFIG_TEMPORAL_GLOBAL_MV
 
 #if CONFIG_INTERINTRA_WARP
-static int get_gradient(const uint16_t *x, int stride) {
+// Note ext1 = 1 corresponds to the case when 2 prior samples are available
+// in the beginning of the sequence and so no padding is needed.
+// ext1 = 0 corresponds to the case when only 1 prior sample is available
+// in the beginning of the sequence.
+// Likewise ext2 = 1 corresponds to the case when 2 external samples are
+// available at the end of the sequence and so no padding is needed at the end.
+// ext2 = 0 corresponds to the case when only 1 xeternal sample is available
+// at the end of the sequence.
+static int get_gradient(const uint16_t *x, int stride, int ext1, int ext2) {
   static const int16_t gradient[2] = { 88, -12 };
-  int g = (x[stride] - x[-stride]) * gradient[0] +
-          (x[2 * stride] - x[-2 * stride]) * gradient[1];
+  int g;
+  if (ext1 && ext2) {
+    g = (x[stride] - x[-stride]) * gradient[0] +
+        (x[2 * stride] - x[-2 * stride]) * gradient[1];
+  } else if (!ext1 && ext2) {
+    g = (x[stride] - x[-stride]) * gradient[0] +
+        (x[2 * stride] - 2 * x[-1 * stride] + x[0]) * gradient[1];
+  } else if (ext1 && !ext2) {
+    g = (x[stride] - x[-stride]) * gradient[0] +
+        (2 * x[1 * stride] - x[0] - x[-2 * stride]) * gradient[1];
+  } else {
+    g = (x[stride] - x[-stride]) * gradient[0] +
+        (2 * x[1 * stride] - 2 * x[-1 * stride]) * gradient[1];
+  }
   g = ROUND_POWER_OF_TWO_SIGNED(g, FILTER_BITS);
   return g;
 }
@@ -1410,6 +1430,7 @@ static int get_gradient(const uint16_t *x, int stride) {
  * use around this reference block.
  * mv - motion vector
  */
+#define GRAD_THRESH 1
 static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
                                        const uint16_t *ref, int ref_stride,
                                        BLOCK_SIZE bsize, MV mv,
@@ -1417,25 +1438,33 @@ static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
                                        int mi_col, int bd) {
   const int border = MAX_INTERINTRA_BORDER;
   const int inner_border = MAX_INTERINTRA_INNER_BORDER;
+  const int overhang = MAX_INTERINTRA_OVERHANG;
 
   const int bw = block_size_wide[bsize];
   const int bh = block_size_high[bsize];
   uint16_t top[MAX_INTERINTRA_TOPLEFT_SIZE];
   uint16_t left[MAX_INTERINTRA_TOPLEFT_SIZE];
-  const int top_stride = bw;
+  const int top_stride = bw + 2 * overhang;
   const int left_stride = border + inner_border;
-  av1_prepare_inter_topleft(ref, ref_stride, bsize, border, inner_border, mv,
-                            top, top_stride, left, left_stride, bd);
+  av1_prepare_inter_topleft(ref, ref_stride, bsize, border, inner_border,
+                            overhang, mv, top, top_stride, left, left_stride,
+                            bd);
+  const int off = 1;
   int32_t A[2][2] = { { 0, 0 }, { 0, 0 } };
   int32_t B[2] = { 0, 0 };
-  for (int i = 2; i < border; ++i) {
-    for (int j = 2; j < bw - 2; ++j) {
-      const int d = (*(top + i * top_stride + j) -
+  for (int i = 1; i < border; ++i) {
+    for (int j = off; j < bw - off; ++j) {
+      const int d = (*(top + i * top_stride + j + overhang) -
                      *(src + (i - border) * src_stride + j));
       const int y = (i - border) - (bh / 2 - 1);
       const int x = j - (bw / 2 - 1);
-      const int gx = get_gradient(top + i * top_stride + j, 1);
-      const int gy = get_gradient(top + i * top_stride + j, top_stride);
+      const int gx = get_gradient(top + i * top_stride + j + overhang, 1,
+                                  j > 1 - overhang, j < bw - 2 + overhang);
+      const int gy = get_gradient(top + i * top_stride + j + overhang,
+                                  top_stride, i > 1, 1);
+#if GRAD_THRESH
+      if (abs(gx) < GRAD_THRESH && abs(gy) < GRAD_THRESH) continue;
+#endif  // GRAD_THRESH
       const int p1 = x * gx + y * gy;
       const int p2 = y * gx - x * gy;
       A[0][0] += p1 * p1;
@@ -1445,14 +1474,20 @@ static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
       B[1] += p2 * d;
     }
   }
-  for (int i = 2; i < bh - 2; ++i) {
-    for (int j = 2; j < border; ++j) {
-      const int d = (*(left + i * left_stride + j) -
+  for (int i = off; i < bh - off; ++i) {
+    for (int j = 1; j < border; ++j) {
+      const int d = (*(left + (i + overhang) * left_stride + j) -
                      *(src + i * src_stride + j - border));
       const int y = i - (bh / 2 - 1);
       const int x = (j - border) - (bw / 2 - 1);
-      const int gx = get_gradient(left + i * left_stride + j, 1);
-      const int gy = get_gradient(left + i * left_stride + j, left_stride);
+      const int gx =
+          get_gradient(left + (i + overhang) * left_stride + j, 1, j > 1, 1);
+      const int gy =
+          get_gradient(left + (i + overhang) * left_stride + j, left_stride,
+                       i > 1 - overhang, i < bh - 2 + overhang);
+#if GRAD_THRESH
+      if (abs(gx) < GRAD_THRESH && abs(gy) < GRAD_THRESH) continue;
+#endif  // GRAD_THRESH
       const int p1 = x * gx + y * gy;
       const int p2 = y * gx - x * gy;
       A[0][0] += p1 * p1;
@@ -1506,10 +1541,9 @@ static int find_interintra_rotzoom_int(const uint16_t *src, int src_stride,
 }
 
 int av1_find_projection_interintra(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
-                                   MV mv, WarpedMotionParams *wm_params) {
+                                   const uint16_t *dst, int dst_stride, MV mv,
+                                   WarpedMotionParams *wm_params) {
   const struct macroblockd_plane *pd = &xd->plane[0];
-  const int dst_stride = pd->dst.stride;
-  uint16_t *const dst = pd->dst.buf;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
 
@@ -1528,12 +1562,11 @@ int av1_find_projection_interintra(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
 }
 
 int av1_find_projection_interintra_ext(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
+                                       const uint16_t *dst, int dst_stride,
                                        MV mv, WarpedMotionParams *wm_params,
                                        int width, int height,
                                        uint16_t *tmpbuf) {
   const struct macroblockd_plane *pd = &xd->plane[0];
-  const int dst_stride = pd->dst.stride;
-  uint16_t *const dst = pd->dst.buf;
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
 

@@ -5178,7 +5178,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 #else
   WarpedMotionParams best_wm_params = mbmi->wm_params;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-  int best_num_proj_ref = mbmi->num_proj_ref;
+  int best_num_proj_ref_pruned = mbmi->num_proj_ref_pruned;
   unsigned int bestmse;
   const SubpelMvLimits *mv_limits = &ms_params->mv_limits;
 
@@ -5217,16 +5217,17 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
         memcpy(pts, pts0, total_samples * 2 * sizeof(*pts0));
         memcpy(pts_inref, pts_inref0, total_samples * 2 * sizeof(*pts_inref0));
         if (total_samples > 1)
-          mbmi->num_proj_ref =
+          mbmi->num_proj_ref_pruned =
               av1_selectSamples(&this_mv, pts, pts_inref, total_samples, bsize);
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-        if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                                 this_mv, &mbmi->wm_params[0], mi_row,
+        if (!av1_find_projection(mbmi->num_proj_ref_pruned, pts, pts_inref,
+                                 bsize, this_mv, &mbmi->wm_params[0], mi_row,
                                  mi_col)) {
 #else
-        if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                                 this_mv, &mbmi->wm_params, mi_row, mi_col)) {
+        if (!av1_find_projection(mbmi->num_proj_ref_pruned, pts, pts_inref,
+                                 bsize, this_mv, &mbmi->wm_params, mi_row,
+                                 mi_col)) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
           thismse = compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
 
@@ -5237,7 +5238,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 #else
             best_wm_params = mbmi->wm_params;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-            best_num_proj_ref = mbmi->num_proj_ref;
+            best_num_proj_ref_pruned = mbmi->num_proj_ref_pruned;
             bestmse = thismse;
           }
         }
@@ -5258,16 +5259,16 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 #else
   mbmi->wm_params = best_wm_params;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
-  mbmi->num_proj_ref = best_num_proj_ref;
+  mbmi->num_proj_ref_pruned = best_num_proj_ref_pruned;
   return bestmse;
 }
 
 #if CONFIG_INTERINTRA_WARP
 // Refines MV in a small range
 unsigned int av1_refine_warped_interintra_mv(
-    MACROBLOCKD *xd, const AV1_COMMON *const cm,
-    const SUBPEL_MOTION_SEARCH_PARAMS *ms_params, BLOCK_SIZE bsize,
-    WARP_SEARCH_METHOD search_method, int num_iterations) {
+    MACROBLOCKD *xd, const AV1_COMMON *const cm, const uint16_t *dst,
+    int dst_stride, const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
+    BLOCK_SIZE bsize, WARP_SEARCH_METHOD search_method, int num_iterations) {
   MB_MODE_INFO *mbmi = xd->mi[0];
 
   const MV *neighbors = warp_search_info[search_method].neighbors;
@@ -5313,10 +5314,10 @@ unsigned int av1_refine_warped_interintra_mv(
                      best_mv->col + neighbors[idx].col * (1 << mv_shift) };
       if (av1_is_subpelmv_in_range(mv_limits, this_mv)) {
 #if CONFIG_EXTENDED_WARP_PREDICTION
-        if (!av1_find_projection_interintra(xd, bsize, this_mv,
+        if (!av1_find_projection_interintra(xd, bsize, dst, dst_stride, this_mv,
                                             &mbmi->wm_params[0])) {
 #else
-        if (!av1_find_projection_interintra(xd, bsize, this_mv,
+        if (!av1_find_projection_interintra(xd, bsize, dst, dst_stride, this_mv,
                                             &mbmi->wm_params)) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
           thismse = compute_motion_cost(xd, cm, ms_params, bsize, &this_mv);
