@@ -1397,7 +1397,7 @@ static AOM_INLINE void write_cdef(AV1_COMMON *cm, MACROBLOCKD *const xd,
 #endif  // CONFIG_FIX_CDEF_SYNTAX
   // At the start of a superblock, mark that we haven't yet written CDEF
   // strengths for any of the CDEF units contained in this superblock.
-  const int sb_mask = (cm->seq_params.mib_size - 1);
+  const int sb_mask = (cm->mib_size - 1);
   const int mi_row_in_sb = (xd->mi_row & sb_mask);
   const int mi_col_in_sb = (xd->mi_col & sb_mask);
   if (mi_row_in_sb == 0 && mi_col_in_sb == 0) {
@@ -1527,11 +1527,10 @@ static AOM_INLINE void write_delta_q_params(AV1_COMP *cpi, int skip,
     const MB_MODE_INFO *const mbmi = xd->mi[0];
     const BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
     const int super_block_upper_left =
-        ((xd->mi_row & (cm->seq_params.mib_size - 1)) == 0) &&
-        ((xd->mi_col & (cm->seq_params.mib_size - 1)) == 0);
+        ((xd->mi_row & (cm->mib_size - 1)) == 0) &&
+        ((xd->mi_col & (cm->mib_size - 1)) == 0);
 
-    if ((bsize != cm->seq_params.sb_size || skip == 0) &&
-        super_block_upper_left) {
+    if ((bsize != cm->sb_size || skip == 0) && super_block_upper_left) {
       assert(mbmi->current_qindex > 0);
       const int reduced_delta_qindex =
           (mbmi->current_qindex - xd->current_base_qindex) /
@@ -2499,7 +2498,7 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   const BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
   if (xd->tree_type == SHARED_PART)
     assert(mbmi->sb_type[PLANE_TYPE_Y] == mbmi->sb_type[PLANE_TYPE_UV]);
-  assert(bsize <= cm->seq_params.sb_size ||
+  assert(bsize <= cm->sb_size ||
          (bsize >= BLOCK_SIZES && bsize < BLOCK_SIZES_ALL));
 
   const int bh = mi_size_high[bsize];
@@ -2603,7 +2602,7 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   }
 #endif  // CONFIG_PC_WIENER
 
-  av1_mark_block_as_coded(xd, bsize, cm->seq_params.sb_size);
+  av1_mark_block_as_coded(xd, bsize, cm->sb_size);
 }
 
 static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
@@ -2949,10 +2948,9 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
     }
   }
 
-  for (int mi_row = mi_row_start; mi_row < mi_row_end;
-       mi_row += cm->seq_params.mib_size) {
+  for (int mi_row = mi_row_start; mi_row < mi_row_end; mi_row += cm->mib_size) {
     const int sb_row_in_tile =
-        (mi_row - tile->mi_row_start) >> cm->seq_params.mib_size_log2;
+        (mi_row - tile->mi_row_start) >> cm->mib_size_log2;
     const TokenExtra *tok =
         cpi->token_info.tplist[tile_row][tile_col][sb_row_in_tile].start;
     const TokenExtra *tok_end =
@@ -2961,8 +2959,8 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
     av1_zero_left_context(xd);
 
     for (int mi_col = mi_col_start; mi_col < mi_col_end;
-         mi_col += cm->seq_params.mib_size) {
-      av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
+         mi_col += cm->mib_size) {
+      av1_reset_is_mi_coded_map(xd, cm->mib_size);
       xd->sbi = av1_get_sb_info(cm, mi_row, mi_col);
       cpi->td.mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
       const int total_loop_num =
@@ -2976,7 +2974,7 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
 #if CONFIG_EXT_RECUR_PARTITIONS
                      NULL,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-                     mi_row, mi_col, cm->seq_params.sb_size);
+                     mi_row, mi_col, cm->sb_size);
       if (total_loop_num == 2) {
         xd->tree_type = CHROMA_PART;
         write_modes_sb(cpi, tile, w, &tok, tok_end,
@@ -2984,7 +2982,7 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
 #if CONFIG_EXT_RECUR_PARTITIONS
                        xd->sbi->ptree_root[0],
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-                       mi_row, mi_col, cm->seq_params.sb_size);
+                       mi_row, mi_col, cm->sb_size);
         xd->tree_type = SHARED_PART;
       }
     }
@@ -3112,19 +3110,17 @@ static AOM_INLINE void encode_restoration_mode(
   }
   if (!all_none) {
 #if CONFIG_BLOCK_256
-    assert(cm->seq_params.sb_size == BLOCK_64X64 ||
-           cm->seq_params.sb_size == BLOCK_128X128 ||
-           cm->seq_params.sb_size == BLOCK_256X256);
+    assert(cm->sb_size == BLOCK_64X64 || cm->sb_size == BLOCK_128X128 ||
+           cm->sb_size == BLOCK_256X256);
 #else
-    assert(cm->seq_params.sb_size == BLOCK_64X64 ||
-           cm->seq_params.sb_size == BLOCK_128X128);
+    assert(cm->sb_size == BLOCK_64X64 || cm->sb_size == BLOCK_128X128);
 #endif  // CONFIG_BLOCK_256
     const int sb_size =
 #if CONFIG_BLOCK_256
-        cm->seq_params.sb_size == BLOCK_256X256 ? 256 :
+        cm->sb_size == BLOCK_256X256 ? 256 :
 #endif  // CONFIG_BLOCK_256
-        cm->seq_params.sb_size == BLOCK_128X128 ? 128
-                                                : 64;
+        cm->sb_size == BLOCK_128X128 ? 128
+                                     : 64;
 
     RestorationInfo *rsi = &cm->rst_info[0];
 
@@ -3817,12 +3813,10 @@ static AOM_INLINE void write_frame_interp_filter(
 
 static AOM_INLINE void write_tile_info_max_tile(
     const AV1_COMMON *const cm, struct aom_write_bit_buffer *wb) {
-  int width_mi =
-      ALIGN_POWER_OF_TWO(cm->mi_params.mi_cols, cm->seq_params.mib_size_log2);
-  int height_mi =
-      ALIGN_POWER_OF_TWO(cm->mi_params.mi_rows, cm->seq_params.mib_size_log2);
-  int width_sb = width_mi >> cm->seq_params.mib_size_log2;
-  int height_sb = height_mi >> cm->seq_params.mib_size_log2;
+  int width_mi = ALIGN_POWER_OF_TWO(cm->mi_params.mi_cols, cm->mib_size_log2);
+  int height_mi = ALIGN_POWER_OF_TWO(cm->mi_params.mi_rows, cm->mib_size_log2);
+  int width_sb = width_mi >> cm->mib_size_log2;
+  int height_sb = height_mi >> cm->mib_size_log2;
   int size_sb, i;
   const CommonTileParams *const tiles = &cm->tiles;
 

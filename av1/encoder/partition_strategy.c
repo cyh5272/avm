@@ -63,8 +63,7 @@ void av1_intra_mode_cnn_partition(const AV1_COMMON *const cm, MACROBLOCK *x,
                                   int *partition_vert_allowed,
                                   int *do_rectangular_split,
                                   int *do_square_split) {
-  assert(cm->seq_params.sb_size >= BLOCK_64X64 &&
-         "Invalid sb_size for intra_cnn!");
+  assert(cm->sb_size >= BLOCK_64X64 && "Invalid sb_size for intra_cnn!");
   const int bsize_idx = convert_bsize_to_idx(bsize);
 
   if (bsize == BLOCK_128X128) {
@@ -638,7 +637,7 @@ void av1_get_max_min_partition_features(AV1_COMP *const cpi, MACROBLOCK *x,
                                         float *features) {
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
-  const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
+  const BLOCK_SIZE sb_size = cm->sb_size;
 
   assert(sb_size == BLOCK_128X128);
 
@@ -767,7 +766,7 @@ BLOCK_SIZE av1_predict_max_partition(const AV1_COMP *const cpi,
     }
   } else if (cpi->sf.part_sf.auto_max_partition_based_on_simple_motion ==
              ADAPT_PRED) {
-    const BLOCK_SIZE sb_size = cpi->common.seq_params.sb_size;
+    const BLOCK_SIZE sb_size = cpi->common.sb_size;
     const MACROBLOCKD *const xd = &x->e_mbd;
     // TODO(debargha): x->source_variance is unavailable at this point,
     // so compute. The redundant recomputation later can be removed.
@@ -1312,7 +1311,7 @@ void av1_prune_partitions_before_search(
   const int try_intra_cnn_split =
       !cpi->is_screen_content_type && frame_is_intra_only(cm) &&
       cpi->sf.part_sf.intra_cnn_split && xd->tree_type != CHROMA_PART &&
-      cm->seq_params.sb_size >= BLOCK_64X64 && bsize <= BLOCK_64X64 &&
+      cm->sb_size >= BLOCK_64X64 && bsize <= BLOCK_64X64 &&
       bsize >= BLOCK_8X8 &&
       mi_row + mi_size_high[bsize] <= mi_params->mi_rows &&
       mi_col + mi_size_wide[bsize] <= mi_params->mi_cols;
@@ -1345,22 +1344,22 @@ void av1_prune_partitions_before_search(
     if (!*partition_none_allowed) {
       if (!pc_tree->parent || pc_tree != pc_tree->parent->horizontal3[1]) {
         av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, bsize,
-                                 cm->seq_params.sb_size, PARTITION_HORZ);
+                                 cm->sb_size, PARTITION_HORZ);
         const int mi_step = block_size_high[bsize] / 2;
         BLOCK_SIZE subsize = get_partition_subsize(bsize, PARTITION_HORZ);
         av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, subsize,
-                                 cm->seq_params.sb_size, PARTITION_VERT);
+                                 cm->sb_size, PARTITION_VERT);
         av1_cache_best_partition(x->sms_bufs, mi_row + mi_step, mi_col, subsize,
-                                 cm->seq_params.sb_size, PARTITION_VERT);
+                                 cm->sb_size, PARTITION_VERT);
       } else if (pc_tree != pc_tree->parent->vertical[1]) {
         av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, bsize,
-                                 cm->seq_params.sb_size, PARTITION_VERT);
+                                 cm->sb_size, PARTITION_VERT);
         const int mi_step = block_size_wide[bsize] / 2;
         BLOCK_SIZE subsize = get_partition_subsize(bsize, PARTITION_VERT);
         av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, subsize,
-                                 cm->seq_params.sb_size, PARTITION_HORZ);
+                                 cm->sb_size, PARTITION_HORZ);
         av1_cache_best_partition(x->sms_bufs, mi_row, mi_col + mi_step, subsize,
-                                 cm->seq_params.sb_size, PARTITION_HORZ);
+                                 cm->sb_size, PARTITION_HORZ);
       }
     }
 #else
@@ -1879,7 +1878,7 @@ SimpleMotionData *av1_get_sms_data(AV1_COMP *const cpi,
                                    const TileInfo *const tile, MACROBLOCK *x,
                                    int mi_row, int mi_col, BLOCK_SIZE bsize) {
   const AV1_COMMON *const cm = &cpi->common;
-  const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
+  const BLOCK_SIZE sb_size = cm->sb_size;
   SimpleMotionDataBufs *sms_bufs = x->sms_bufs;
   SimpleMotionData *cur_block =
       av1_get_sms_data_entry(sms_bufs, mi_row, mi_col, bsize, sb_size);

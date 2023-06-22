@@ -54,7 +54,7 @@ static AOM_INLINE void accumulate_rd_opt(ThreadData *td, ThreadData *td_t) {
 static AOM_INLINE void update_delta_lf_for_row_mt(AV1_COMP *cpi) {
   AV1_COMMON *cm = &cpi->common;
   MACROBLOCKD *xd = &cpi->td.mb.e_mbd;
-  const int mib_size = cm->seq_params.mib_size;
+  const int mib_size = cm->mib_size;
   const int frame_lf_count =
       av1_num_planes(cm) > 1 ? FRAME_LF_COUNT : FRAME_LF_COUNT - 2;
   for (int row = 0; row < cm->tiles.rows; row++) {
@@ -71,8 +71,7 @@ static AOM_INLINE void update_delta_lf_for_row_mt(AV1_COMP *cpi) {
           MB_MODE_INFO **mi = cm->mi_params.mi_grid_base + idx_str;
           MB_MODE_INFO *mbmi = mi[0];
           if (mbmi->skip_txfm[xd->tree_type == CHROMA_PART] == 1 &&
-              (mbmi->sb_type[xd->tree_type == CHROMA_PART] ==
-               cm->seq_params.sb_size)) {
+              (mbmi->sb_type[xd->tree_type == CHROMA_PART] == cm->sb_size)) {
             for (int lf_id = 0; lf_id < frame_lf_count; ++lf_id)
               mbmi->delta_lf[lf_id] = xd->delta_lf[lf_id];
             mbmi->delta_lf_from_base = xd->delta_lf_from_base;
@@ -355,7 +354,7 @@ static AOM_INLINE void switch_tile_and_get_next_job(
     // which will be the least processed tile.
     *cur_tile_id = tile_id;
     get_next_job(&tile_data[tile_id], current_mi_row,
-                 is_firstpass ? FP_MIB_SIZE : cm->seq_params.mib_size);
+                 is_firstpass ? FP_MIB_SIZE : cm->mib_size);
   }
 }
 
@@ -432,7 +431,7 @@ static int enc_row_mt_worker_hook(void *arg1, void *unused) {
     pthread_mutex_lock(enc_row_mt_mutex_);
 #endif
     if (!get_next_job(&cpi->tile_data[cur_tile_id], &current_mi_row,
-                      cm->seq_params.mib_size)) {
+                      cm->mib_size)) {
       // No jobs are available for the current tile. Query for the status of
       // other tiles and get the next job if available
       switch_tile_and_get_next_job(cm, cpi->tile_data, &cur_tile_id,

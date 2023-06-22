@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "av1/common/av1_common_int.h"
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 
@@ -258,8 +259,12 @@ static void update_frame_size(AV1_COMP *cpi) {
   if (!is_stat_generation_stage(cpi))
     alloc_context_buffers_ext(cm, &cpi->mbmi_ext_info);
 
-  if (!cpi->seq_params_locked)
-    set_sb_size(&cm->seq_params, av1_select_sb_size(cpi));
+  const BLOCK_SIZE sb_size = av1_select_sb_size(cpi);
+  if (!cpi->seq_params_locked) {
+    set_sb_size(cm, sb_size);
+  } else {
+    av1_set_frame_sb_size(cm, sb_size);
+  }
 
   av1_set_tile_info(cm, &cpi->oxcf.tile_cfg);
 }
@@ -566,7 +571,7 @@ static void init_config(struct AV1_COMP *cpi, AV1EncoderConfig *oxcf) {
 
   cm->width = oxcf->frm_dim_cfg.width;
   cm->height = oxcf->frm_dim_cfg.height;
-  set_sb_size(seq_params,
+  set_sb_size(cm,
               av1_select_sb_size(cpi));  // set sb size before allocations
   alloc_compressor_data(cpi);
 
@@ -830,18 +835,20 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   cm->width = frm_dim_cfg->width;
   cm->height = frm_dim_cfg->height;
 
-  int sb_size = seq_params->sb_size;
+  BLOCK_SIZE sb_size = cm->sb_size;
+  BLOCK_SIZE new_sb_size = av1_select_sb_size(cpi);
   // Superblock size should not be updated after the first key frame.
   if (!cpi->seq_params_locked) {
-    set_sb_size(&cm->seq_params, av1_select_sb_size(cpi));
+    set_sb_size(cm, new_sb_size);
     for (int i = 0; i < MAX_NUM_OPERATING_POINTS; ++i)
       seq_params->tier[i] = (oxcf->tier_mask >> i) & 1;
+  } else {
+    av1_set_frame_sb_size(cm, new_sb_size);
   }
 
-  if (initial_dimensions->width || sb_size != seq_params->sb_size) {
+  if (initial_dimensions->width || sb_size != cm->sb_size) {
     if (cm->width > initial_dimensions->width ||
-        cm->height > initial_dimensions->height ||
-        seq_params->sb_size != sb_size) {
+        cm->height > initial_dimensions->height || cm->sb_size != sb_size) {
       av1_free_context_buffers(cm);
       av1_free_shared_coeff_buffer(&cpi->td.shared_coeff_buf);
       av1_free_sms_tree(&cpi->td);
@@ -2040,7 +2047,7 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   const int frame_height = cm->superres_upscaled_height;
   av1_set_restoration_unit_size(
       frame_width, frame_height, seq_params->subsampling_x,
-      seq_params->subsampling_y, cm->rst_info, cm->seq_params.sb_size);
+      seq_params->subsampling_y, cm->rst_info, cm->sb_size);
   for (int i = 0; i < num_planes; ++i)
     cm->rst_info[i].frame_restoration_type = RESTORE_NONE;
 

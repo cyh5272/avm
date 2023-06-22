@@ -1721,6 +1721,18 @@ typedef struct AV1Common {
   int16_t *gy1;
 #endif  // CONFIG_OPTFLOW_ON_TIP
 #endif  // CONFIG_TIP
+  /*!
+   * Size of the superblock used for this frame.
+   */
+  BLOCK_SIZE sb_size;
+  /*!
+   * Size of the superblock used for this frame in units of MI.
+   */
+  int mib_size;
+  /*!
+   * Log2 of the size of the superblock in units of MI.
+   */
+  int mib_size_log2;
 } AV1_COMMON;
 
 /*!\cond */
@@ -2460,8 +2472,7 @@ static INLINE void av1_zero_above_context(AV1_COMMON *const cm,
   const SequenceHeader *const seq_params = &cm->seq_params;
   const int num_planes = av1_num_planes(cm);
   const int width = mi_col_end - mi_col_start;
-  const int aligned_width =
-      ALIGN_POWER_OF_TWO(width, seq_params->mib_size_log2);
+  const int aligned_width = ALIGN_POWER_OF_TWO(width, cm->mib_size_log2);
   const int offset_y = mi_col_start;
   const int width_y = aligned_width;
   const int offset_uv = offset_y >> seq_params->subsampling_x;
@@ -3160,11 +3171,25 @@ static INLINE PARTITION_TYPE get_partition(const AV1_COMMON *const cm,
   return base_partitions[split_idx];
 }
 
-static INLINE void set_sb_size(SequenceHeader *const seq_params,
-                               BLOCK_SIZE sb_size) {
+static AOM_INLINE void av1_set_frame_sb_size(AV1_COMMON *cm,
+                                             BLOCK_SIZE sb_size) {
+  // BLOCK_256X256 gives no benefits in all intra encoding, so downsize the
+  // superblock size to 128x128 on key frames.
+  if (frame_is_intra_only(cm) && sb_size == BLOCK_256X256) {
+    sb_size = BLOCK_128X128;
+  }
+  cm->sb_size = sb_size;
+  cm->mib_size = mi_size_wide[sb_size];
+  cm->mib_size_log2 = mi_size_wide_log2[sb_size];
+}
+
+static INLINE void set_sb_size(AV1_COMMON *cm, BLOCK_SIZE sb_size) {
+  SequenceHeader *const seq_params = &cm->seq_params;
   seq_params->sb_size = sb_size;
-  seq_params->mib_size = mi_size_wide[seq_params->sb_size];
-  seq_params->mib_size_log2 = mi_size_wide_log2[seq_params->sb_size];
+  seq_params->mib_size = mi_size_wide[sb_size];
+  seq_params->mib_size_log2 = mi_size_wide_log2[sb_size];
+
+  av1_set_frame_sb_size(cm, sb_size);
 }
 
 #if CONFIG_LR_FLEX_SYNTAX
@@ -3206,8 +3231,8 @@ static INLINE void av1_set_lr_tools(uint8_t lr_tools_disable_mask, int plane,
 
 static INLINE SB_INFO *av1_get_sb_info(const AV1_COMMON *cm, int mi_row,
                                        int mi_col) {
-  const int sb_row = mi_row >> cm->seq_params.mib_size_log2;
-  const int sb_col = mi_col >> cm->seq_params.mib_size_log2;
+  const int sb_row = mi_row >> cm->mib_size_log2;
+  const int sb_col = mi_col >> cm->mib_size_log2;
   return cm->sbi_params.sbi_grid_base + sb_row * cm->sbi_params.sbi_stride +
          sb_col;
 }

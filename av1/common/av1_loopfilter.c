@@ -449,8 +449,7 @@ static TX_SIZE set_lpf_parameters(
           // deblock the edge if the edge belongs to a PU's edge only.
 #if DF_REDUCED_SB_EDGE
           const BLOCK_SIZE superblock_size = get_plane_block_size(
-              cm->seq_params.sb_size, plane_ptr->subsampling_x,
-              plane_ptr->subsampling_y);
+              cm->sb_size, plane_ptr->subsampling_x, plane_ptr->subsampling_y);
           const int vert_sb_mask = block_size_high[superblock_size] - 1;
           int horz_superblock_edge =
               (HORZ_EDGE == edge_dir) && !(coord & vert_sb_mask);

@@ -740,6 +740,7 @@ BLOCK_SIZE av1_select_sb_size(const AV1_COMP *const cpi) {
     return AOMMIN(cm->width, cm->height) > 480 ? BLOCK_128X128 : BLOCK_64X64;
   }
 #if CONFIG_BLOCK_256
+  return BLOCK_256X256;
   if (cm->features.allow_intrabc) {
     return BLOCK_128X128;
   }
@@ -804,11 +805,11 @@ void av1_setup_frame(AV1_COMP *cpi) {
     av1_setup_past_independence(cm);
   }
 
-  const BLOCK_SIZE old_sb_size = cm->seq_params.sb_size;
+  const BLOCK_SIZE old_sb_size = cm->sb_size;
   if ((cm->current_frame.frame_type == KEY_FRAME && cm->show_frame) ||
       frame_is_sframe(cm)) {
     if (!cpi->seq_params_locked) {
-      set_sb_size(&cm->seq_params, av1_select_sb_size(cpi));
+      set_sb_size(cm, av1_select_sb_size(cpi));
     }
   } else {
     const RefCntBuffer *const primary_ref_buf = get_primary_ref_frame_buf(cm);
@@ -818,6 +819,25 @@ void av1_setup_frame(AV1_COMP *cpi) {
       cm->seg.update_data = 1;
     } else {
       *cm->fc = primary_ref_buf->frame_context;
+    }
+  }
+  av1_set_frame_sb_size(cm, cm->seq_params.sb_size);
+  av1_set_tile_info(cm, &cpi->oxcf.tile_cfg);
+  if (cm->sb_size != old_sb_size) {
+    av1_free_context_buffers(cm);
+    av1_free_shared_coeff_buffer(&cpi->td.shared_coeff_buf);
+    av1_free_sms_tree(&cpi->td);
+#if CONFIG_EXT_RECUR_PARTITIONS
+    av1_free_sms_bufs(&cpi->td);
+#endif  // CONFIG_EXT_RECUR_PARTITIONS
+    av1_free_pmc(cpi->td.firstpass_ctx, av1_num_planes(cm));
+    cpi->td.firstpass_ctx = NULL;
+    alloc_compressor_data(cpi);
+    if (av1_alloc_above_context_buffers(&cm->above_contexts, cm->tiles.rows,
+                                        cm->mi_params.mi_cols,
+                                        av1_num_planes(cm))) {
+      aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                         "Failed to allocate context buffers");
     }
   }
 

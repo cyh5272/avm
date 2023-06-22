@@ -522,12 +522,11 @@ static AOM_INLINE int get_pc_tree_nodes(const BLOCK_SIZE sb_size,
 void av1_setup_sms_tree(AV1_COMP *const cpi, ThreadData *td) {
   AV1_COMMON *const cm = &cpi->common;
   const int stat_generation_stage = is_stat_generation_stage(cpi);
-  const int is_sb_size_128 = cm->seq_params.sb_size == BLOCK_128X128;
+  const int is_sb_size_128 = cm->sb_size == BLOCK_128X128;
 #if CONFIG_BLOCK_256
-  const int is_sb_size_256 = cm->seq_params.sb_size == BLOCK_256X256;
+  const int is_sb_size_256 = cm->sb_size == BLOCK_256X256;
 #endif  // CONFIG_BLOCK_256
-  const int tree_nodes =
-      get_pc_tree_nodes(cm->seq_params.sb_size, stat_generation_stage);
+  const int tree_nodes = get_pc_tree_nodes(cm->sb_size, stat_generation_stage);
   int sms_tree_index = 0;
   SIMPLE_MOTION_DATA_TREE *this_sms;
   int square_index = 1;

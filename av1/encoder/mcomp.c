@@ -2814,7 +2814,7 @@ int av1_get_ref_mvpred_var_cost(const AV1_COMP *cpi, const MACROBLOCKD *xd,
   const FullMvLimits *mv_limits = &ms_params->mv_limits;
   const MV *dv = ms_params->mv_cost_params.ref_mv;
   if (!av1_is_dv_valid(*dv, &cpi->common, xd, mi_row, mi_col, bsize,
-                       cpi->common.seq_params.mib_size_log2))
+                       cpi->common.mib_size_log2))
     return INT_MAX;
 
   FULLPEL_MV cur_mv = get_fullmv_from_mv(dv);
@@ -2849,7 +2849,7 @@ void get_default_ref_bv(int_mv *cur_ref_bv,
     const TileInfo *const tile = &fullms_params->xd->tile;
     const AV1_COMMON *cm = fullms_params->cm;
     const int mi_row = fullms_params->mi_row;
-    av1_find_ref_dv(cur_ref_bv, tile, cm->seq_params.mib_size, mi_row);
+    av1_find_ref_dv(cur_ref_bv, tile, cm->mib_size, mi_row);
   }
   // Ref DV should not have sub-pel.
   assert((cur_ref_bv->as_mv.col & 7) == 0);
@@ -3000,7 +3000,7 @@ int av1_intrabc_hash_search(const AV1_COMP *cpi, const MACROBLOCKD *xd,
       const MV dv = { GET_MV_SUBPEL(ref_block_hash.y - y_pos),
                       GET_MV_SUBPEL(ref_block_hash.x - x_pos) };
       if (!av1_is_dv_valid(dv, &cpi->common, xd, mi_row, mi_col, bsize,
-                           cpi->common.seq_params.mib_size_log2))
+                           cpi->common.mib_size_log2))
         continue;
 
       FULLPEL_MV hash_mv;

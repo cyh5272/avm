@@ -921,11 +921,9 @@ void av1_filter_block_plane_ver(AV1_COMMON *const cm,
   uint8_t *lfl2;
 
   // filter two rows at a time
-  for (r = 0; r < cm->seq_params.mib_size &&
-              ((mi_row + r) << MI_SIZE_LOG2 < cm->height);
+  for (r = 0; r < cm->mib_size && ((mi_row + r) << MI_SIZE_LOG2 < cm->height);
        r += r_step) {
-    for (c = 0; c < cm->seq_params.mib_size &&
-                ((mi_col + c) << MI_SIZE_LOG2 < cm->width);
+    for (c = 0; c < cm->mib_size && ((mi_col + c) << MI_SIZE_LOG2 < cm->width);
          c += MI_SIZE_64X64) {
       dst->buf += ((c << MI_SIZE_LOG2) >> ssx);
       LoopFilterMask *lfm = get_loop_filter_mask(cm, mi_row + r, mi_col + c);
@@ -995,11 +993,9 @@ void av1_filter_block_plane_hor(AV1_COMMON *const cm,
   uint64_t mask_4x4 = 0;
   uint8_t *lfl;
 
-  for (r = 0; r < cm->seq_params.mib_size &&
-              ((mi_row + r) << MI_SIZE_LOG2 < cm->height);
+  for (r = 0; r < cm->mib_size && ((mi_row + r) << MI_SIZE_LOG2 < cm->height);
        r += r_step) {
-    for (c = 0; c < cm->seq_params.mib_size &&
-                ((mi_col + c) << MI_SIZE_LOG2 < cm->width);
+    for (c = 0; c < cm->mib_size && ((mi_col + c) << MI_SIZE_LOG2 < cm->width);
          c += MI_SIZE_64X64) {
       if (mi_row + r == 0) continue;
 

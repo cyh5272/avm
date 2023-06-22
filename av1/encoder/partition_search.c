@@ -562,7 +562,7 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     }
   }
 
-  av1_mark_block_as_coded(xd, bsize, cm->seq_params.sb_size);
+  av1_mark_block_as_coded(xd, bsize, cm->sb_size);
 }
 
 void setup_block_rdmult(const AV1_COMP *const cpi, MACROBLOCK *const x,
@@ -1075,12 +1075,11 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 
 #if CONFIG_ENTROPY_STATS
   // delta quant applies to both intra and inter
-  const int super_block_upper_left =
-      ((xd->mi_row & (cm->seq_params.mib_size - 1)) == 0) &&
-      ((xd->mi_col & (cm->seq_params.mib_size - 1)) == 0);
+  const int super_block_upper_left = ((xd->mi_row & (cm->mib_size - 1)) == 0) &&
+                                     ((xd->mi_col & (cm->mib_size - 1)) == 0);
   const DeltaQInfo *const delta_q_info = &cm->delta_q_info;
   if (delta_q_info->delta_q_present_flag &&
-      (bsize != cm->seq_params.sb_size ||
+      (bsize != cm->sb_size ||
        !mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) &&
       super_block_upper_left) {
     const int dq = (mbmi->current_qindex - xd->current_base_qindex) /
@@ -1764,7 +1763,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     for (int plane = plane_start; plane < plane_end; plane++) {
       x->mbmi_ext_frame->cb_offset[plane] = x->cb_offset[plane];
       assert(x->cb_offset[plane] <
-             (1 << num_pels_log2_lookup[cpi->common.seq_params.sb_size]));
+             (1 << num_pels_log2_lookup[cpi->common.sb_size]));
     }
 #if CONFIG_PC_WIENER
     av1_init_txk_skip_array(&cpi->common, mi_row, mi_col, bsize, 0,
@@ -1786,7 +1785,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
             block_size_wide[bsize_base] * block_size_high[bsize_base];
       }
     }
-    if (bsize == cpi->common.seq_params.sb_size &&
+    if (bsize == cpi->common.sb_size &&
         mbmi->skip_txfm[xd->tree_type == CHROMA_PART] == 1 &&
         cm->delta_q_info.delta_lf_present_flag) {
       const int frame_lf_count =
@@ -1803,12 +1802,11 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     }
 
     // delta quant applies to both intra and inter
-    const int super_block_upper_left =
-        ((mi_row & (cm->seq_params.mib_size - 1)) == 0) &&
-        ((mi_col & (cm->seq_params.mib_size - 1)) == 0);
+    const int super_block_upper_left = ((mi_row & (cm->mib_size - 1)) == 0) &&
+                                       ((mi_col & (cm->mib_size - 1)) == 0);
     const DeltaQInfo *const delta_q_info = &cm->delta_q_info;
     if (delta_q_info->delta_q_present_flag &&
-        (bsize != cm->seq_params.sb_size ||
+        (bsize != cm->sb_size ||
          !mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) &&
         super_block_upper_left) {
       xd->current_base_qindex = mbmi->current_qindex;
@@ -2581,7 +2579,7 @@ void av1_build_partition_tree_fixed_partitioning(AV1_COMMON *const cm,
                                                  int mi_row, int mi_col,
                                                  BLOCK_SIZE bsize,
                                                  PARTITION_TREE *ptree) {
-  const BLOCK_SIZE sb_size = cm->seq_params.sb_size;
+  const BLOCK_SIZE sb_size = cm->sb_size;
 
   build_one_split_tree(cm, tree_type, mi_row, mi_col, sb_size, bsize, ptree);
 }
@@ -2919,11 +2917,11 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
 
   // We must have chosen a partitioning and encoding or we'll fail later on.
   // No other opportunities for success.
-  if (bsize == cm->seq_params.sb_size)
+  if (bsize == cm->sb_size)
     assert(last_part_rdc.rate < INT_MAX && last_part_rdc.dist < INT64_MAX);
 
   if (do_recon) {
-    if (bsize == cm->seq_params.sb_size) {
+    if (bsize == cm->sb_size) {
       // NOTE: To get estimate for rate due to the tokens, use:
       // int rate_coeffs = 0;
       // encode_sb(cpi, td, tile_data, tp, mi_row, mi_col, DRY_RUN_COSTCOEFFS,
@@ -3507,8 +3505,7 @@ static AOM_INLINE PARTITION_TYPE get_forced_partition_type(
   }
 
   if (should_reuse_mode(x, REUSE_PARTITION_MODE_FLAG)) {
-    return av1_get_prev_partition(x, mi_row, mi_col, bsize,
-                                  cm->seq_params.sb_size);
+    return av1_get_prev_partition(x, mi_row, mi_col, bsize, cm->sb_size);
   }
   return PARTITION_INVALID;
 }
@@ -4522,8 +4519,8 @@ static void none_partition_search(
   }
 #endif
 #if CONFIG_EXT_RECUR_PARTITIONS
-  SimpleMotionData *sms_data = av1_get_sms_data_entry(
-      x->sms_bufs, mi_row, mi_col, bsize, cm->seq_params.sb_size);
+  SimpleMotionData *sms_data =
+      av1_get_sms_data_entry(x->sms_bufs, mi_row, mi_col, bsize, cm->sb_size);
   av1_set_best_mode_cache(x, sms_data->mode_cache);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
@@ -4560,8 +4557,8 @@ static void none_partition_search(
     // Record picked ref frame to prune ref frames for other partition types.
     if (cpi->sf.inter_sf.prune_ref_frame_for_rect_partitions) {
       const int ref_type = av1_ref_frame_type(pc_tree->none->mic.ref_frame);
-      av1_update_picked_ref_frames_mask(
-          x, ref_type, bsize, cm->seq_params.mib_size, mi_row, mi_col);
+      av1_update_picked_ref_frames_mask(x, ref_type, bsize, cm->mib_size,
+                                        mi_row, mi_col);
     }
 
     // Calculate the total cost and update the best partition.
@@ -5343,8 +5340,8 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 #if WARP_CU_BANK
       x->e_mbd.warp_param_bank = counterpart_block->warp_param_bank;
 #endif  // WARP_CU_BANK
-      assert(bsize != cm->seq_params.sb_size);
-      if (bsize == cm->seq_params.sb_size) exit(0);
+      assert(bsize != cm->sb_size);
+      if (bsize == cm->sb_size) exit(0);
 
       if (!pc_tree->is_last_subblock) {
         encode_sb(cpi, td, tile_data, tp, mi_row, mi_col, DRY_RUN_NORMAL, bsize,
@@ -5361,7 +5358,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
     }
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-  if (bsize == cm->seq_params.sb_size) x->must_find_valid_partition = 0;
+  if (bsize == cm->sb_size) x->must_find_valid_partition = 0;
 
   // Override skipping rectangular partition operations for edge blocks.
   if (none_rd) *none_rd = 0;
@@ -5431,8 +5428,8 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   av1_save_context(x, &x_ctx, mi_row, mi_col, bsize, num_planes);
 #if CONFIG_EXT_RECUR_PARTITIONS
   {
-    SimpleMotionData *sms_data = av1_get_sms_data_entry(
-        x->sms_bufs, mi_row, mi_col, bsize, cm->seq_params.sb_size);
+    SimpleMotionData *sms_data =
+        av1_get_sms_data_entry(x->sms_bufs, mi_row, mi_col, bsize, cm->sb_size);
     sms_tree = sms_data->old_sms;
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -5616,7 +5613,7 @@ BEGIN_PARTITION_SEARCH:
   // when NONE and SPLIT partition rd_costs are INT64_MAX.
   if (cpi->sf.part_sf.early_term_after_none_split &&
       part_none_rd == INT64_MAX && part_split_rd == INT64_MAX &&
-      !x->must_find_valid_partition && (bsize != cm->seq_params.sb_size)) {
+      !x->must_find_valid_partition && (bsize != cm->sb_size)) {
     part_search_state.terminate_partition_search = 1;
   }
 
@@ -5904,8 +5901,7 @@ BEGIN_PARTITION_SEARCH:
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
-  if (bsize == cm->seq_params.sb_size &&
-      !part_search_state.found_best_partition) {
+  if (bsize == cm->sb_size && !part_search_state.found_best_partition) {
     if (x->must_find_valid_partition) {
       aom_internal_error(
           &cpi->common.error, AOM_CODEC_ERROR,
@@ -5949,8 +5945,8 @@ BEGIN_PARTITION_SEARCH:
     av1_invalid_rd_stats(&pc_tree->rd_cost);
   } else {
 #if CONFIG_EXT_RECUR_PARTITIONS
-    av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, bsize,
-                             cm->seq_params.sb_size, pc_tree->partitioning);
+    av1_cache_best_partition(x->sms_bufs, mi_row, mi_col, bsize, cm->sb_size,
+                             pc_tree->partitioning);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   }
 
@@ -6010,7 +6006,7 @@ BEGIN_PARTITION_SEARCH:
   // If a valid partition is found and reconstruction is required for future
   // sub-blocks in the same group.
   if (part_search_state.found_best_partition && pc_tree->index != 3) {
-    if (bsize == cm->seq_params.sb_size) {
+    if (bsize == cm->sb_size) {
       // Encode the superblock.
       const int emit_output = multi_pass_mode != SB_DRY_PASS;
       const RUN_TYPE run_type = emit_output ? OUTPUT_ENABLED : DRY_RUN_NORMAL;
@@ -6052,7 +6048,7 @@ BEGIN_PARTITION_SEARCH:
     av1_free_pc_tree_recursive(pc_tree, num_planes, 1, 1);
   }
 
-  if (bsize == cm->seq_params.sb_size) {
+  if (bsize == cm->sb_size) {
     assert(best_rdc.rate < INT_MAX);
     assert(best_rdc.dist < INT64_MAX);
   } else {

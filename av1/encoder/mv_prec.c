@@ -754,8 +754,8 @@ static AOM_INLINE void collect_mv_stats_tile(MV_STATS *mv_stats,
   const int mi_row_end = tile_info->mi_row_end;
   const int mi_col_start = tile_info->mi_col_start;
   const int mi_col_end = tile_info->mi_col_end;
-  const int sb_size_mi = cm->seq_params.mib_size;
-  BLOCK_SIZE sb_size = cm->seq_params.sb_size;
+  const int sb_size_mi = cm->mib_size;
+  BLOCK_SIZE sb_size = cm->sb_size;
   for (int mi_row = mi_row_start; mi_row < mi_row_end; mi_row += sb_size_mi) {
     for (int mi_col = mi_col_start; mi_col < mi_col_end; mi_col += sb_size_mi) {
 #if CONFIG_EXT_RECUR_PARTITIONS

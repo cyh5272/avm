@@ -1770,7 +1770,7 @@ void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
   assert(use_adaptive_rd_thresh > 0);
   const int max_rd_thresh_factor = use_adaptive_rd_thresh * RD_THRESH_MAX_FACT;
 
-  const int bsize_is_1_to_4 = bsize > cm->seq_params.sb_size;
+  const int bsize_is_1_to_4 = bsize > cm->sb_size;
   BLOCK_SIZE min_size, max_size;
   if (bsize_is_1_to_4) {
     // This part handles block sizes with 1:4 and 4:1 aspect ratios
@@ -1779,7 +1779,7 @@ void av1_update_rd_thresh_fact(const AV1_COMMON *const cm,
     max_size = bsize;
   } else {
     min_size = AOMMAX(bsize - 2, BLOCK_4X4);
-    max_size = AOMMIN(bsize + 2, (int)cm->seq_params.sb_size);
+    max_size = AOMMIN(bsize + 2, (int)cm->sb_size);
   }
 
   for (PREDICTION_MODE mode = 0; mode < MB_MODE_COUNT; ++mode) {

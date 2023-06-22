@@ -853,7 +853,7 @@ static AOM_INLINE void scan_row_mbmi(
   const int plane_type = (xd->tree_type == CHROMA_PART);
   for (int i = 0; i < end_mi;) {
 #if CONFIG_EXT_RECUR_PARTITIONS
-    const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+    const int sb_mi_size = mi_size_wide[cm->sb_size];
     const int mask_row = mi_row & (sb_mi_size - 1);
     const int mask_col = mi_col & (sb_mi_size - 1);
     const int ref_mask_row = mask_row + row_offset;
@@ -1012,7 +1012,7 @@ static AOM_INLINE void scan_col_mbmi(
 
   for (i = 0; i < end_mi;) {
 #if CONFIG_EXT_RECUR_PARTITIONS
-    const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+    const int sb_mi_size = mi_size_wide[cm->sb_size];
     const int mask_row = mi_row & (sb_mi_size - 1);
     const int mask_col = mi_col & (sb_mi_size - 1);
     const int ref_mask_row = mask_row + row_offset + i;
@@ -1223,7 +1223,7 @@ static AOM_INLINE void scan_blk_mbmi(
 #if CONFIG_EXT_RECUR_PARTITIONS
 static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                          int mi_row, int mi_col, int n4_w) {
-  const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+  const int sb_mi_size = mi_size_wide[cm->sb_size];
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
@@ -1257,7 +1257,7 @@ static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #if CONFIG_C043_MVP_IMPROVEMENTS || CONFIG_EXTENDED_WARP_PREDICTION
 static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                            int mi_row, int mi_col, int n4_h) {
-  const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+  const int sb_mi_size = mi_size_wide[cm->sb_size];
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
@@ -1288,7 +1288,7 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #else
 static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                          int mi_row, int mi_col, int bs) {
-  const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+  const int sb_mi_size = mi_size_wide[cm->sb_size];
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
@@ -1343,7 +1343,7 @@ static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #if CONFIG_C043_MVP_IMPROVEMENTS
 static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                            int mi_row, int mi_col, int bs) {
-  const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+  const int sb_mi_size = mi_size_wide[cm->sb_size];
   const int mask_row = mi_row & (sb_mi_size - 1);
   const int mask_col = mi_col & (sb_mi_size - 1);
 
@@ -1352,7 +1352,7 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
   // bs lareger than 64x64 or equals to sb_size case not allowed
   if (bs > mi_size_wide[BLOCK_64X64]) has_bl = 0;
-  if (bs == mi_size_wide[cm->seq_params.sb_size]) has_bl = 0;
+  if (bs == mi_size_wide[cm->sb_size]) has_bl = 0;
 
   // bs > 0 and bs is a power of 2
   assert(bs > 0 && !(bs & (bs - 1)));

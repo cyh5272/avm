@@ -99,7 +99,7 @@ static int has_top_right(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     if (col_off + top_right_count_unit < plane_bw_unit) return 1;
 
     // Handle the top-right intra tx block of the coding block
-    const int sb_mi_size = mi_size_wide[cm->seq_params.sb_size];
+    const int sb_mi_size = mi_size_wide[cm->sb_size];
     const int mi_row_aligned =
         is_bsize_altered_for_chroma
             ? xd->mi[0]->chroma_ref_info.mi_row_chroma_base
@@ -330,7 +330,7 @@ static int has_top_right(const AV1_COMMON *cm, BLOCK_SIZE bsize, int mi_row,
 
     const int bw_in_mi_log2 = mi_size_wide_log2[bsize];
     const int bh_in_mi_log2 = mi_size_high_log2[bsize];
-    const int sb_mi_size = mi_size_high[cm->seq_params.sb_size];
+    const int sb_mi_size = mi_size_high[cm->sb_size];
     const int blk_row_in_sb = (mi_row & (sb_mi_size - 1)) >> bh_in_mi_log2;
     const int blk_col_in_sb = (mi_col & (sb_mi_size - 1)) >> bw_in_mi_log2;
 
@@ -402,7 +402,7 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
     // The general case: neither the leftmost column nor the bottom row. The
     // bottom-left mi is in the same SB
-    const int sb_mi_size = mi_size_high[cm->seq_params.sb_size];
+    const int sb_mi_size = mi_size_high[cm->sb_size];
     const int mi_row_aligned =
         is_bsize_altered_for_chroma
             ? xd->mi[0]->chroma_ref_info.mi_row_chroma_base
@@ -416,8 +416,7 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     const int bl_mask_col = (mi_col_aligned & (sb_mi_size - 1)) - 1;
 
     if (bl_mask_col < 0) {
-      const int plane_sb_height =
-          block_size_high[cm->seq_params.sb_size] >> ss_y;
+      const int plane_sb_height = block_size_high[cm->sb_size] >> ss_y;
       const int plane_bottom_row =
           (((mi_row_aligned & (sb_mi_size - 1)) << MI_SIZE_LOG2) +
            block_size_high[bsize]) >>
@@ -1554,7 +1553,7 @@ void av1_predict_intra_block(
   const int disable_edge_filter = !cm->seq_params.enable_intra_edge_filter;
 
   const int is_sb_boundary =
-      (mi_row % cm->seq_params.mib_size == 0 && row_off == 0) ? 1 : 0;
+      (mi_row % cm->mib_size == 0 && row_off == 0) ? 1 : 0;
 
   build_intra_predictors_high(
       xd, ref, ref_stride, dst, dst_stride, mode, angle_delta,
