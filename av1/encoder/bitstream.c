@@ -4158,6 +4158,12 @@ static AOM_INLINE void write_color_config(
     aom_wb_write_unsigned_literal(
         wb, seq_params->base_uv_dc_delta_q - DELTA_DCQUANT_MIN,
         DELTA_DCQUANT_BITS);
+#if CONFIG_EXT_QUANT_UPD
+    assert(seq_params->base_uv_ac_delta_q >= DELTA_DCQUANT_MIN);
+    aom_wb_write_unsigned_literal(
+        wb, seq_params->base_uv_ac_delta_q - DELTA_DCQUANT_MIN,
+        DELTA_DCQUANT_BITS);
+#endif  // CONFIG_EXT_QUANT_UPD
   }
 }
 

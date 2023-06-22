@@ -137,6 +137,7 @@ set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
+set_aom_config_var(CONFIG_EXT_QUANT_UPD 0 "AV2 updated ext-quant.")
 set_aom_config_var(
   CONFIG_ATC_COEFCODING 1
   "AV2 enable adaptive transform coefficient coding improvement.")
@@ -263,6 +264,9 @@ set_aom_config_var(CONFIG_NEW_CONTEXT_MODELING 1
 set_aom_config_var(CONFIG_CROSS_CHROMA_TX 1
                    "AV2 cross chroma component transform experiment flag.")
 set_aom_config_var(CONFIG_WEDGE_MOD_EXT 1 "AV2 wedge modes extensions.")
+
+set_aom_config_var(CONFIG_NO_Q_OFFSET 0
+                   "Encoder-only config to disable all q offsets.")
 #
 # Variables in this section control optional features of the build system.
 #

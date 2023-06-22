@@ -521,6 +521,12 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
     }
   }
 
+  seq->base_y_dc_delta_q = 0;
+  seq->base_uv_dc_delta_q = 0;
+#if CONFIG_EXT_QUANT_UPD
+  seq->base_uv_ac_delta_q = 0;
+#endif  // CONFIG_EXT_QUANT_UPD
+#if !CONFIG_NO_Q_OFFSET
   const int is_360p_or_larger =
       AOMMIN(seq->max_frame_width, seq->max_frame_height) >= 360;
   const int is_720p_or_larger =
@@ -528,13 +534,23 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
   if (!is_360p_or_larger) {
     seq->base_y_dc_delta_q = -7;
     seq->base_uv_dc_delta_q = -6;
+#if CONFIG_EXT_QUANT_UPD
+    seq->base_uv_ac_delta_q = 0;
+#endif  // CONFIG_EXT_QUANT_UPD
   } else if (!is_720p_or_larger) {
     seq->base_y_dc_delta_q = -5;
     seq->base_uv_dc_delta_q = -4;
+#if CONFIG_EXT_QUANT_UPD
+    seq->base_uv_ac_delta_q = 0;
+#endif  // CONFIG_EXT_QUANT_UPD
   } else {
     seq->base_y_dc_delta_q = -4;
     seq->base_uv_dc_delta_q = -3;
+#if CONFIG_EXT_QUANT_UPD
+    seq->base_uv_ac_delta_q = 0;
+#endif  // CONFIG_EXT_QUANT_UPD
   }
+#endif  // !CONFIG_NO_Q_OFFSET
 
 #if CONFIG_REF_MV_BANK
   seq->enable_refmvbank = tool_cfg->enable_refmvbank;
