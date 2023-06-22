@@ -1643,6 +1643,7 @@ typedef struct ThreadData {
   SIMPLE_MOTION_DATA_TREE *sms_root;
 #if CONFIG_EXT_RECUR_PARTITIONS
   struct SimpleMotionDataBufs *sms_bufs;
+  BLOCK_SIZE sb_size;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   InterModesInfo *inter_modes_info;
   uint32_t *hash_value_buffer[2][2];

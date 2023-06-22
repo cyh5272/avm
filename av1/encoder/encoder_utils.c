@@ -822,6 +822,7 @@ void av1_setup_frame(AV1_COMP *cpi) {
     }
   }
   av1_set_frame_sb_size(cm, cm->seq_params.sb_size);
+  cpi->td.sb_size = cm->sb_size;
   av1_set_tile_info(cm, &cpi->oxcf.tile_cfg);
   if (cm->sb_size != old_sb_size) {
     av1_free_context_buffers(cm);

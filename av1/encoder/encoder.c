@@ -265,6 +265,7 @@ static void update_frame_size(AV1_COMP *cpi) {
   } else {
     av1_set_frame_sb_size(cm, sb_size);
   }
+  cpi->td.sb_size = cm->sb_size;
 
   av1_set_tile_info(cm, &cpi->oxcf.tile_cfg);
 }
@@ -571,8 +572,10 @@ static void init_config(struct AV1_COMP *cpi, AV1EncoderConfig *oxcf) {
 
   cm->width = oxcf->frm_dim_cfg.width;
   cm->height = oxcf->frm_dim_cfg.height;
-  set_sb_size(cm,
-              av1_select_sb_size(cpi));  // set sb size before allocations
+  // set sb size before allocations
+  const BLOCK_SIZE sb_size = av1_select_sb_size(cpi);
+  set_sb_size(cm, sb_size);
+  cpi->td.sb_size = sb_size;
   alloc_compressor_data(cpi);
 
   av1_update_film_grain_parameters(cpi, oxcf);
@@ -845,6 +848,7 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf) {
   } else {
     av1_set_frame_sb_size(cm, new_sb_size);
   }
+  cpi->td.sb_size = cm->sb_size;
 
   if (initial_dimensions->width || sb_size != cm->sb_size) {
     if (cm->width > initial_dimensions->width ||
