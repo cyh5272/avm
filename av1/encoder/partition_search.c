@@ -5583,7 +5583,8 @@ BEGIN_PARTITION_SEARCH:
 
   // PARTITION_SPLIT search stage.
   int64_t part_split_rd = INT64_MAX;
-  if (IS_FORCED_PARTITION_TYPE(PARTITION_SPLIT) && max_recursion_depth > 0) {
+  if (IS_FORCED_PARTITION_TYPE(PARTITION_SPLIT) && max_recursion_depth > 0 &&
+      !frame_is_intra_only(cm)) {
     split_partition_search(cpi, td, tile_data, tp, x, pc_tree, sms_tree, &x_ctx,
                            &part_search_state, &best_rdc, multi_pass_mode,
                            &part_split_rd
