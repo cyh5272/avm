@@ -740,7 +740,6 @@ BLOCK_SIZE av1_select_sb_size(const AV1_COMP *const cpi) {
     return AOMMIN(cm->width, cm->height) > 480 ? BLOCK_128X128 : BLOCK_64X64;
   }
 #if CONFIG_BLOCK_256
-  return BLOCK_256X256;
   if (cm->features.allow_intrabc) {
     return BLOCK_128X128;
   }
