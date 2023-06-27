@@ -1957,7 +1957,7 @@ static void update_partition_stats(MACROBLOCKD *const xd,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
                                    PARTITION_TYPE partition, const int mi_row,
                                    const int mi_col, BLOCK_SIZE bsize,
-                                   const int ctx) {
+                                   const int ctx, BLOCK_SIZE sb_size) {
   const int plane_index = xd->tree_type == CHROMA_PART;
   FRAME_CONTEXT *fc = xd->tile_ctx;
 
@@ -2002,7 +2002,7 @@ static void update_partition_stats(MACROBLOCKD *const xd,
     return;
   }
 
-  if (is_square_split_eligible(bsize)) {
+  if (is_square_split_eligible(bsize, sb_size)) {
     const int square_split_ctx =
         square_split_context(xd, mi_row, mi_col, bsize);
 #if CONFIG_ENTROPY_STATS
@@ -2178,7 +2178,7 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 #endif  // !CONFIG_H_PARTITION
                            ptree_luma, &pc_tree->chroma_ref_info,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-                           partition, mi_row, mi_col, bsize, ctx);
+                           partition, mi_row, mi_col, bsize, ctx, cm->sb_size);
 
   PARTITION_TREE *sub_tree[4] = { NULL, NULL, NULL, NULL };
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -4628,7 +4628,7 @@ static void split_partition_search(
   // Check if partition split is allowed.
 #if CONFIG_EXT_RECUR_PARTITIONS
   if (part_search_state->terminate_partition_search ||
-      !is_square_split_eligible(bsize)) {
+      !is_square_split_eligible(bsize, cm->sb_size)) {
     return;
   }
 

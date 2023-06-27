@@ -805,7 +805,11 @@ rect_type_implied_by_bsize(BLOCK_SIZE bsize, TREE_TYPE tree_type) {
 }
 
 /*!\brief Returns whether square split is allowed for current bsize. */
-static AOM_INLINE bool is_square_split_eligible(BLOCK_SIZE bsize) {
+static AOM_INLINE bool is_square_split_eligible(BLOCK_SIZE bsize,
+                                                BLOCK_SIZE sb_size) {
+  if (sb_size != BLOCK_256X256) {
+    return false;
+  }
   return bsize == BLOCK_128X128 || bsize == BLOCK_256X256;
 }
 

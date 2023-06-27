@@ -2651,7 +2651,7 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
     return;
   }
   const bool do_square_split = p == PARTITION_SPLIT;
-  if (is_square_split_eligible(bsize)) {
+  if (is_square_split_eligible(bsize, cm->sb_size)) {
     const int square_split_ctx =
         square_split_context(xd, mi_row, mi_col, bsize);
     aom_write_symbol(w, do_square_split,

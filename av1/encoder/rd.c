@@ -151,7 +151,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
           if (!do_split) {
             continue;
           }
-          if (is_square_split_eligible(bsize)) {
+          if (is_square_split_eligible(bsize, cm->sb_size)) {
             mode_costs->partition_cost[plane_index][ctx][part] +=
                 mode_costs->do_square_split_cost[plane_index][context]
                                                 [do_square_split];
