@@ -2933,12 +2933,18 @@ static void search_cctx_type(const AV1_COMP *cpi, MACROBLOCK *x, int block,
   // The buffer used to swap dqcoeff in macroblockd_plane so we can keep dqcoeff
   // of the best tx_type. best_dqcoeff are initialized as those dqcoeffs
   // obtained earlier with CCTX_NONE
+  const int max_sb_square_y = 1 << num_pels_log2_lookup[cm->sb_size];
+  const int max_sb_square_uv =
+      max_sb_square_y >>
+      (cm->seq_params.subsampling_x + cm->seq_params.subsampling_y);
   tran_low_t *this_dqcoeff_c1 =
-      aom_memalign(32, MAX_SB_SQUARE * sizeof(tran_low_t));
+      aom_memalign(32, max_sb_square_uv * sizeof(tran_low_t));
   tran_low_t *this_dqcoeff_c2 =
-      aom_memalign(32, MAX_SB_SQUARE * sizeof(tran_low_t));
-  memcpy(this_dqcoeff_c1, p_c1->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
-  memcpy(this_dqcoeff_c2, p_c2->dqcoeff, sizeof(tran_low_t) * MAX_SB_SQUARE);
+      aom_memalign(32, max_sb_square_uv * sizeof(tran_low_t));
+  memcpy(this_dqcoeff_c1 + BLOCK_OFFSET(block),
+         p_c1->dqcoeff + BLOCK_OFFSET(block), sizeof(tran_low_t) * max_eob);
+  memcpy(this_dqcoeff_c2 + BLOCK_OFFSET(block),
+         p_c2->dqcoeff + BLOCK_OFFSET(block), sizeof(tran_low_t) * max_eob);
   tran_low_t *orig_dqcoeff_c1 = p_c1->dqcoeff;
   tran_low_t *orig_dqcoeff_c2 = p_c2->dqcoeff;
   tran_low_t *best_dqcoeff_c1 = this_dqcoeff_c1;
