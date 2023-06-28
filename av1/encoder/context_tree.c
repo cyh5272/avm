@@ -11,6 +11,7 @@
  */
 
 #include "av1/encoder/context_tree.h"
+#include "av1/common/av1_common_int.h"
 #include "av1/encoder/encoder.h"
 #include "av1/encoder/rd.h"
 
@@ -23,9 +24,9 @@ void av1_copy_tree_context(PICK_MODE_CONTEXT *dst_ctx,
                            PICK_MODE_CONTEXT *src_ctx) {
   dst_ctx->mic = src_ctx->mic;
 #if CONFIG_C071_SUBBLK_WARPMV
-  if (is_warp_mode(src_ctx->mic.motion_mode))
-    memcpy(dst_ctx->submic, src_ctx->submic,
-           MAX_MIB_SIZE * MAX_MIB_SIZE * sizeof(*src_ctx->submic));
+  if (is_warp_mode(src_ctx->mic.motion_mode)) {
+    av1_copy_array(dst_ctx->submic, src_ctx->submic, src_ctx->num_4x4_blk);
+  }
 #endif  // CONFIG_C071_SUBBLK_WARPMV
   dst_ctx->mbmi_ext_best = src_ctx->mbmi_ext_best;
 
@@ -108,6 +109,11 @@ PICK_MODE_CONTEXT *av1_alloc_pmc(const AV1_COMMON *cm, int mi_row, int mi_col,
                       aom_calloc(num_blk, sizeof(*ctx->blk_skip)));
   AOM_CHECK_MEM_ERROR(&error, ctx->tx_type_map,
                       aom_calloc(num_blk, sizeof(*ctx->tx_type_map)));
+#if CONFIG_C071_SUBBLK_WARPMV
+  if (!frame_is_intra_only(cm)) {
+    ctx->submic = malloc(num_blk * sizeof(*ctx->submic));
+  }
+#endif  // CONFIG_C071_SUBBLK_WARPMV
 #if CONFIG_CROSS_CHROMA_TX
   AOM_CHECK_MEM_ERROR(&error, ctx->cctx_type_map,
                       aom_calloc(num_blk, sizeof(*ctx->cctx_type_map)));
@@ -139,6 +145,11 @@ PICK_MODE_CONTEXT *av1_alloc_pmc(const AV1_COMMON *cm, int mi_row, int mi_col,
 void av1_free_pmc(PICK_MODE_CONTEXT *ctx, int num_planes) {
   if (ctx == NULL) return;
 
+#if CONFIG_C071_SUBBLK_WARPMV
+  if (ctx->submic) {
+    free(ctx->submic);
+  }
+#endif  // CONFIG_C071_SUBBLK_WARPMV
   aom_free(ctx->blk_skip);
   ctx->blk_skip = NULL;
   aom_free(ctx->tx_type_map);
