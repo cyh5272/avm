@@ -3395,7 +3395,7 @@ static INLINE void init_ibp_info_per_mode(
   const int mode_idx = angle_to_mode_index[angle];
   const int dy = second_dr_intra_derivative[angle];
   weights[block_idx][mode_idx] =
-      (uint8_t *)(aom_calloc(txw * txh, sizeof(uint8_t)));
+      (uint8_t *)(aom_malloc(txw * txh * sizeof(uint8_t)));
   av1_dr_prediction_z1_info(weights[block_idx][mode_idx], txw, txh, txw_log2,
                             txh_log2, dy, mode);
   return;

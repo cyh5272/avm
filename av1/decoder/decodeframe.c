@@ -4532,7 +4532,7 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
         continue;
 
       td->bit_reader = &tile_data->bit_reader;
-      av1_zero(td->cb_buffer_base.dqcoeff);
+      // av1_zero(td->cb_buffer_base.dqcoeff);
       av1_tile_init(&td->dcb.xd.tile, cm, row, col);
       td->dcb.xd.current_base_qindex = cm->quant_params.base_qindex;
       setup_bool_decoder(tile_bs_buf->data, data_end, tile_bs_buf->size,
