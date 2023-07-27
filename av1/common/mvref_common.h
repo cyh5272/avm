@@ -981,7 +981,7 @@ static INLINE void av1_get_warp_base_params(
       }
     }
   }
-  *params = effective_global_motion(xd, mbmi->ref_frame[0]);
+  *params = *effective_global_motion(xd, mbmi->ref_frame[0]);
 #else
   assert(mbmi->warp_ref_idx < mbmi->max_num_warp_candidates);
   *params = warp_param_stack[mbmi->warp_ref_idx].wm_params;
@@ -1007,13 +1007,11 @@ static INLINE void av1_get_neighbor_warp_model(const AV1_COMMON *cm,
                                                const MACROBLOCKD *xd,
                                                const MB_MODE_INFO *neighbor_mi,
                                                WarpedMotionParams *wm_params) {
-  const WarpedMotionParams *gm_params =
-      &cm->global_motion[neighbor_mi->ref_frame[0]];
-
+  (void)cm;
   if (is_warp_mode(neighbor_mi->motion_mode)) {
     *wm_params = neighbor_mi->wm_params[0];
-  } else if (is_global_mv_block(neighbor_mi, gm_params->wmtype)) {
-    *wm_params = *gm_params;
+  } else if (neighbor_mi->global_mv_block[0]) {
+    *wm_params = neighbor_mi->wm_params[0];
   } else {
     // Neighbor block is translation-only, so doesn't have
     // a warp model. So we need to synthesize one.
@@ -1057,11 +1055,9 @@ static INLINE int av1_get_warp_extend_ctx1(const MACROBLOCKD *xd,
         xd->mi[mi_pos.row * xd->mi_stride + mi_pos.col];
     if (!is_inter_ref_frame(left_mi->ref_frame[0])) return 1;
     if (left_mi->ref_frame[0] != mbmi->ref_frame[0]) return 1;
-    const WarpedMotionParams *gm_params =
-        &xd->global_motion[left_mi->ref_frame[0]];
     if (is_warp_mode(left_mi->motion_mode)) {
       return 2;
-    } else if (is_global_mv_block(left_mi, gm_params->wmtype)) {
+    } else if (left_mi->global_mv_block[0]) {
       return 3;
     } else {
       // Neighbor block is translation-only
@@ -1084,11 +1080,9 @@ static INLINE int av1_get_warp_extend_ctx2(const MACROBLOCKD *xd,
         xd->mi[mi_pos.row * xd->mi_stride + mi_pos.col];
     if (!is_inter_ref_frame(above_mi->ref_frame[0])) return 1;
     if (above_mi->ref_frame[0] != mbmi->ref_frame[0]) return 1;
-    const WarpedMotionParams *gm_params =
-        &xd->global_motion[above_mi->ref_frame[0]];
     if (is_warp_mode(above_mi->motion_mode)) {
       return 2;
-    } else if (is_global_mv_block(above_mi, gm_params->wmtype)) {
+    } else if (above_mi->global_mv_block[0]) {
       return 3;
     } else {
       // Neighbor block is translation-only

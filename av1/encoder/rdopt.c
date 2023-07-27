@@ -5599,6 +5599,10 @@ void av1_rd_pick_intra_mode_sb(const struct AV1_COMP *cpi, struct macroblock *x,
   ctx->rd_stats.skip_txfm = 0;
   mbmi->ref_frame[0] = INTRA_FRAME;
   mbmi->ref_frame[1] = NONE_FRAME;
+  mbmi->wm_params[0] = default_warp_params;
+  mbmi->wm_params[1] = default_warp_params;
+  mbmi->global_mv_block[0] = 0;
+  mbmi->global_mv_block[1] = 0;
   mbmi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
   if (xd->tree_type != CHROMA_PART) {
     mbmi->mv[0].as_int = 0;
@@ -7154,6 +7158,11 @@ static INLINE void init_mbmi(MB_MODE_INFO *mbmi, PREDICTION_MODE curr_mode,
   mbmi->mv[0].as_int = mbmi->mv[1].as_int = 0;
   mbmi->motion_mode = SIMPLE_TRANSLATION;
   mbmi->interintra_mode = (INTERINTRA_MODE)(II_DC_PRED - 1);
+  mbmi->wm_params[0] = default_warp_params;
+  mbmi->wm_params[1] = default_warp_params;
+  mbmi->global_mv_block[0] = 0;
+  mbmi->global_mv_block[1] = 0;
+  copy_global_motion_to_mbmi(xd, mbmi);
   set_default_interp_filters(mbmi,
 #if CONFIG_OPTFLOW_REFINEMENT
                              cm,
@@ -8907,6 +8916,7 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
       assert(mbmi->interp_fltr == av1_unswitchable_filter(interp_filter));
     }
   }
+  copy_global_motion_to_mbmi(xd, mbmi);
 
   for (i = 0; i < REFERENCE_MODES; ++i) {
     if (search_state.intra_search_state.best_pred_rd[i] == INT64_MAX) {
@@ -9015,6 +9025,11 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
   const MV_REFERENCE_FRAME last_frame = get_closest_pastcur_ref_index(cm);
   mbmi->ref_frame[0] = last_frame;
   mbmi->ref_frame[1] = NONE_FRAME;
+  mbmi->wm_params[0] = default_warp_params;
+  mbmi->wm_params[1] = default_warp_params;
+  mbmi->global_mv_block[0] = 0;
+  mbmi->global_mv_block[1] = 0;
+  copy_global_motion_to_mbmi(xd, mbmi);
 #if CONFIG_TIP
   if (is_tip_ref_frame(mbmi->ref_frame[0])) {
     mbmi->mv[0].as_int = 0;
@@ -9129,6 +9144,7 @@ void av1_rd_pick_inter_mode_sb_seg_skip(const AV1_COMP *cpi,
   }
 
   av1_zero(best_pred_diff);
+  copy_global_motion_to_mbmi(xd, mbmi);
 
   store_coding_context(x, ctx, best_pred_diff, 0
 #if CONFIG_C071_SUBBLK_WARPMV

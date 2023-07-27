@@ -481,6 +481,8 @@ typedef struct MB_MODE_INFO {
 #else
   WarpedMotionParams wm_params;
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
+  /*! \brief Whether global affine warp is used for the block */
+  int global_mv_block[2];
   /*! \brief The type of intra mode used by inter-intra */
   INTERINTRA_MODE interintra_mode;
   /*! \brief The type of wedge used in interintra mode. */

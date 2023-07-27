@@ -3191,6 +3191,10 @@ void av1_read_mode_info(AV1Decoder *const pbi, DecoderCodingBlock *dcb,
   AV1_COMMON *const cm = &pbi->common;
   MACROBLOCKD *const xd = &dcb->xd;
   MB_MODE_INFO *const mi = xd->mi[0];
+  mi->wm_params[0] = default_warp_params;
+  mi->wm_params[1] = default_warp_params;
+  mi->global_mv_block[0] = 0;
+  mi->global_mv_block[1] = 0;
   mi->use_intrabc[xd->tree_type == CHROMA_PART] = 0;
 
   if (xd->tree_type == SHARED_PART)
@@ -3210,6 +3214,7 @@ void av1_read_mode_info(AV1Decoder *const pbi, DecoderCodingBlock *dcb,
                            y_inside_boundary);
   } else {
     read_inter_frame_mode_info(pbi, dcb, r);
+    copy_global_motion_to_mbmi(xd, mi);
 #if CONFIG_BVP_IMPROVEMENT && CONFIG_REF_MV_BANK
     if (cm->seq_params.enable_refmvbank) {
       MB_MODE_INFO *const mbmi = xd->mi[0];

@@ -366,6 +366,38 @@ static INLINE void set_wmtype_from_params(WarpedMotionParams *wm_params) {
   wm_params->wmtype = HOMOGRAPHY;
 }
 
+static INLINE void copy_global_motion_to_mbmi(const MACROBLOCKD *xd,
+                                              MB_MODE_INFO *mbmi) {
+  const BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  const int block_size_allowed =
+      AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >= 8;
+  mbmi->global_mv_block[0] = 0;
+  mbmi->global_mv_block[1] = 0;
+  if (!block_size_allowed) return;
+  const PREDICTION_MODE this_mode = mbmi->mode;
+  if (this_mode == GLOBALMV) {
+    const WarpedMotionParams *gm0 =
+        effective_global_motion(xd, mbmi->ref_frame[0]);
+    if (gm0->wmtype > TRANSLATION) {
+      mbmi->wm_params[0] = *gm0;
+      mbmi->global_mv_block[0] = 1;
+    }
+  } else if (this_mode == GLOBAL_GLOBALMV) {
+    const WarpedMotionParams *gm0 =
+        effective_global_motion(xd, mbmi->ref_frame[0]);
+    const WarpedMotionParams *gm1 =
+        effective_global_motion(xd, mbmi->ref_frame[1]);
+    if (gm0->wmtype > TRANSLATION) {
+      mbmi->wm_params[0] = *gm0;
+      mbmi->global_mv_block[0] = 1;
+    }
+    if (gm1->wmtype > TRANSLATION) {
+      mbmi->wm_params[1] = *gm1;
+      mbmi->global_mv_block[1] = 1;
+    }
+  }
+}
+
 #if CONFIG_IMPROVED_GLOBAL_MOTION
 static INLINE void av1_scale_warp_model(const WarpedMotionParams *in_params,
                                         int in_distance,
