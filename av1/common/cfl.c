@@ -387,8 +387,8 @@ void cfl_implicit_fetch_neighbor_chroma(const AV1_COMMON *cm,
   const int sub_x = cfl->subsampling_x;
   const int sub_y = cfl->subsampling_y;
 
-  int pic_width_c = cm->width >> sub_x;
-  int pic_height_c = cm->height >> sub_y;
+  int pic_width_c = sub_x ? (cm->width + 1) >> sub_x : cm->width;
+  int pic_height_c = sub_y ? (cm->height + 1) >> sub_y : cm->height;
 
   const int row_start = (((xd->mi_row >> sub_y) + row) << MI_SIZE_LOG2);
   const int col_start = (((xd->mi_col >> sub_x) + col) << MI_SIZE_LOG2);

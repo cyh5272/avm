@@ -428,7 +428,8 @@ static void read_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 #endif  // CONFIG_WARP_REF_LIST
 
   av1_reduce_warp_model(params);
-  int valid = av1_get_shear_params(params);
+  int valid = av1_get_shear_params(
+      params, get_ref_scale_factors_const(cm, mbmi->ref_frame[0]));
   params->invalid = !valid;
   if (!valid) {
 #if WARPED_MOTION_DEBUG
@@ -2934,7 +2935,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     }
 
     if (av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize, mv,
-                            &mbmi->wm_params[0], mi_row, mi_col)) {
+                            &mbmi->wm_params[0], mi_row, mi_col,
+                            get_ref_scale_factors(cm, mbmi->ref_frame[0]))) {
 #if WARPED_MOTION_DEBUG
       printf("Warning: unexpected warped model from aomenc\n");
 #endif
@@ -2969,7 +2971,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
       av1_get_neighbor_warp_model(cm, xd, neighbor_mi, &neighbor_params);
       if (av1_extend_warp_model(neighbor_is_above, bsize, &mbmi->mv[0].as_mv,
                                 mi_row, mi_col, &neighbor_params,
-                                &mbmi->wm_params[0])) {
+                                &mbmi->wm_params[0],
+                                get_ref_scale_factors_const(cm, ref_frame))) {
 #if WARPED_MOTION_DEBUG
         printf("Warning: unexpected warped model from aomenc\n");
 #endif
@@ -2991,8 +2994,8 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
     }
 
     if (av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
-                            mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
-                            mi_col)) {
+                            mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row, mi_col,
+                            get_ref_scale_factors(cm, mbmi->ref_frame[0]))) {
 #if WARPED_MOTION_DEBUG
       printf("Warning: unexpected warped model from aomenc\n");
 #endif

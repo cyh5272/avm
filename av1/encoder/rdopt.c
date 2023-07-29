@@ -1926,11 +1926,15 @@ static int64_t motion_mode_rd(
 #if CONFIG_EXTENDED_WARP_PREDICTION
         if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
                                  mbmi->mv[0].as_mv, &mbmi->wm_params[0], mi_row,
-                                 mi_col)) {
+                                 mi_col,
+                                 get_ref_scale_factors((AV1_COMMON *const)cm,
+                                                       mbmi->ref_frame[0]))) {
 #else
       if (!av1_find_projection(mbmi->num_proj_ref, pts, pts_inref, bsize,
                                mbmi->mv[0].as_mv, &mbmi->wm_params, mi_row,
-                               mi_col)) {
+                               mi_col,
+                               get_ref_scale_factors((AV1_COMMON *const)cm,
+                                                     mbmi->ref_frame[0]))) {
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
 
           assert(!is_comp_pred);
@@ -2167,9 +2171,10 @@ static int64_t motion_mode_rd(
           // Backup initial motion vector and resulting warp params
           int_mv mv0 = mbmi->mv[0];
           WarpedMotionParams wm_params0;
-          if (!av1_extend_warp_model(neighbor_is_above, bsize,
-                                     &mbmi->mv[0].as_mv, mi_row, mi_col,
-                                     &neighbor_params, &wm_params0)) {
+          if (!av1_extend_warp_model(
+                  neighbor_is_above, bsize, &mbmi->mv[0].as_mv, mi_row, mi_col,
+                  &neighbor_params, &wm_params0,
+                  get_ref_scale_factors_const(cm, mbmi->ref_frame[0]))) {
             // NEWMV search produced a valid model
             mbmi->wm_params[0] = wm_params0;
           } else {
@@ -2222,9 +2227,10 @@ static int64_t motion_mode_rd(
             //
             // TODO(rachelbarker): Is it worth trying to search anyway in
             // this case, in order to try to find a valid model?
-            if (av1_extend_warp_model(neighbor_is_above, bsize,
-                                      &mbmi->mv[0].as_mv, mi_row, mi_col,
-                                      &neighbor_params, &mbmi->wm_params[0])) {
+            if (av1_extend_warp_model(
+                    neighbor_is_above, bsize, &mbmi->mv[0].as_mv, mi_row,
+                    mi_col, &neighbor_params, &mbmi->wm_params[0],
+                    get_ref_scale_factors_const(cm, mbmi->ref_frame[0]))) {
               continue;
             }
           }

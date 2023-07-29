@@ -2594,8 +2594,6 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
 
   if (bsize != cm->seq_params.sb_size) return 0;
 
-  assert(!cm->features.all_lossless);
-
   const int is_uv = plane > 0;
 
   const AV1PixelRect tile_rect = av1_whole_frame_rect(cm, is_uv);

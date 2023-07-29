@@ -52,10 +52,10 @@ struct scale_factors {
   int (*scale_value_x)(int val, const struct scale_factors *sf);
   int (*scale_value_y)(int val, const struct scale_factors *sf);
 
-#if CONFIG_ACROSS_SCALE_TPL_MVS
+#if CONFIG_ACROSS_SCALE_TPL_MVS || CONFIG_ACROSS_SCALE_WARP
   int (*scale_value_x_gen)(int val, const struct scale_factors *sf);
   int (*scale_value_y_gen)(int val, const struct scale_factors *sf);
-#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS || CONFIG_ACROSS_SCALE_WARP
 };
 
 MV32 av1_scale_mv(const MV *mv, int x, int y, const struct scale_factors *sf);
