@@ -882,6 +882,18 @@ static void build_nmv_component_cost_table(int *mvcost,
 #endif  // CONFIG_SEP_COMP_DRL
     ) {
       const int8_t ref_frame_type = av1_ref_frame_type(ref_frame);
+
+      if (mbmi->mode == GLOBALMV || mbmi->mode == GLOBAL_GLOBALMV) {
+        if (is_tip_ref_frame(ref_frame_type)) {
+          int_mv zero_mv;
+          zero_mv.as_int = 0;
+          return zero_mv;
+        } else {
+          assert(ref_frame[ref_idx] < INTER_REFS_PER_FRAME);
+          return mbmi_ext->global_mvs[ref_frame[ref_idx]];
+        }
+      }
+
 #if CONFIG_SEP_COMP_DRL
       const CANDIDATE_MV *curr_ref_mv_stack =
           has_second_drl(mbmi) ? mbmi_ext->ref_mv_stack[ref_frame[ref_idx]]
