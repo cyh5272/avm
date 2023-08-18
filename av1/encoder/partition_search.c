@@ -4627,6 +4627,7 @@ static void split_partition_search(
 
   // Check if partition split is allowed.
 #if CONFIG_EXT_RECUR_PARTITIONS
+  (void)sms_tree;
   if (part_search_state->terminate_partition_search ||
       !is_square_split_eligible(bsize, cm->sb_size)) {
     return;
