@@ -289,7 +289,7 @@ else()
 
   if(CMAKE_C_COMPILER_ID MATCHES "GNU")
     if(CONFIG_BLOCK_256)
-      add_c_flag_if_supported("-Wstack-usage=400000")
+      add_c_flag_if_supported("-Wstack-usage=960000")
       add_cxx_flag_if_supported("-Wstack-usage=960000")
     elseif("${SANITIZE}" MATCHES "address|undefined")
       # This combination has more stack overhead, so we account for it by
