@@ -4635,6 +4635,7 @@ static void split_partition_search(
 
   const int num_planes = av1_num_planes(cm);
   PC_TREE **sub_tree = pc_tree->split;
+  assert(sub_tree);
   for (int idx = 0; idx < SUB_PARTITIONS_SPLIT; idx++) {
     if (sub_tree[idx]) {
       av1_free_pc_tree_recursive(sub_tree[idx], num_planes, 0, 0);
