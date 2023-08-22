@@ -5386,11 +5386,26 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
 
   int round_bits = WARPEDMODEL_PREC_BITS - precision;
+#if CONFIG_EXT_WARP_FILTER
+  int max_coded_value = (1 << (precision - 1)) - 1;
+#else
   int max_coded_value = 1 << (precision - 2);
+#endif  // CONFIG_EXT_WARP_FILTER
 
   // Set up initial model by copying global motion model
   // and adjusting for the chosen motion vector
   params->wmtype = ROTZOOM;
+
+#if CONFIG_EXT_WARP_FILTER
+  int ref2 = ROUND_POWER_OF_TWO_SIGNED(
+      base_params.wmmat[2] - (1 << WARPEDMODEL_PREC_BITS), round_bits);
+  ref2 = clamp(ref2, -max_coded_value, max_coded_value);
+  params->wmmat[2] = (ref2 * (1 << round_bits)) + (1 << WARPEDMODEL_PREC_BITS);
+
+  int ref3 = ROUND_POWER_OF_TWO_SIGNED(base_params.wmmat[3], round_bits);
+  ref3 = clamp(ref3, -max_coded_value, max_coded_value);
+  params->wmmat[3] = ref3 * (1 << round_bits);
+#else
   params->wmmat[2] =
       (ROUND_POWER_OF_TWO_SIGNED(
            base_params.wmmat[2] - (1 << WARPEDMODEL_PREC_BITS), round_bits)
@@ -5398,9 +5413,15 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
       (1 << WARPEDMODEL_PREC_BITS);
   params->wmmat[3] = ROUND_POWER_OF_TWO_SIGNED(base_params.wmmat[3], round_bits)
                      << round_bits;
+#endif  // CONFIG_EXT_WARP_FILTER
+
   params->wmmat[4] = -params->wmmat[3];
   params->wmmat[5] = params->wmmat[2];
+#if CONFIG_EXT_WARP_FILTER
+  assert(av1_is_warp_model_reduced(params));
+#else
   av1_reduce_warp_model(params);
+#endif  // CONFIG_EXT_WARP_FILTER
   bool model_allowed = abs((params->wmmat[2] - (1 << WARPEDMODEL_PREC_BITS)) >>
                            round_bits) <= max_coded_value &&
                        abs(params->wmmat[3] >> round_bits) <= max_coded_value;

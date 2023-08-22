@@ -450,12 +450,20 @@ static int read_warp_delta_param(const MACROBLOCKD *xd, int index,
       clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
 
   int round_bits = WARPEDMODEL_PREC_BITS - precision;
+#if CONFIG_EXT_WARP_FILTER
+  int max_coded_value = (1 << (precision - 1)) - 1;
+#else
   int max_coded_value = 1 << (precision - 2);
+#endif  // CONFIG_EXT_WARP_FILTER
   int round_mask = (1 << round_bits) - 1;
   (void)round_mask;
 
   int ref = ROUND_POWER_OF_TWO_SIGNED(base_value, round_bits);
+#if CONFIG_EXT_WARP_FILTER
+  ref = clamp(ref, -max_coded_value, max_coded_value);
+#else
   assert(abs(ref) <= max_coded_value);
+#endif  // CONFIG_EXT_WARP_FILTER
 
   int coded_value = aom_read_signed_primitive_refsubexpfin(
       r, max_coded_value + 1, SUBEXPFIN_K, ref,
