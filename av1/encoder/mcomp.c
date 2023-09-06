@@ -5299,37 +5299,7 @@ unsigned int av1_refine_warped_mv(MACROBLOCKD *xd, const AV1_COMMON *const cm,
 }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-// Amount to increase/decrease parameters by each step
-//
-// Some factors which feed into the precision selection:
-// i) The largest block size is 128x128, so the distance from the block
-//    center to an edge is <= 64 pixels. And the warp filter has 64
-//    sub-pixel kernels.
-//    Thus any change of less than about 1/(2^12) pixels/pixel
-//    will not change anything.
-//
-// ii) The precision of the {alpha, beta, gamma, delta} parameters
-//     which are used in the warp filter is only 10 fractional bits
-//     (see the use of WARP_PARAM_REDUCE_BITS in av1_get_shear_params())
-//
-//     Thus any changes of < 1/(2^10) pixels/pixel will generate the
-//     exact same prediction.
-//
-// iii) The maximum shift allowed by the warp filter is on the
-//      order of 1/4 to 1/8 of a pixel per pixel, and we probably
-//      want to be able to span this range in a reasonable number
-//      of steps.
-//      eg. if we allow shifts of up to +/- 1/8 pixel/pixel, split
-//      into 8 steps, then our refinement size is 1/64 pixel/pixel
-
-// How many iterations to perform?
-// The first iteration will make steps of 1/8, then 1/16, ...,
-// with the last step taking steps of 1/2^(2+MAX_WARP_DELTA_ITERS)
-#if CONFIG_WARP_REF_LIST
 #define MAX_WARP_DELTA_ITERS 8
-#else
-#define MAX_WARP_DELTA_ITERS 3
-#endif  // CONFIG_WARP_REF_LIST
 
 // Returns 1 if able to select a good model, 0 if not
 // TODO(rachelbarker):
@@ -5402,13 +5372,9 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
 #if CONFIG_FLEX_MVRES
   const int mv_shift =
       (MV_PRECISION_ONE_EIGHTH_PEL - ms_params->mv_cost_params.pb_mv_precision);
-#else
-  const int mv_shift = ms_params->allow_hp ? 0 : 1;
-#endif
-
-#if CONFIG_FLEX_MVRES
   const int error_per_bit = ms_params->mv_cost_params.mv_costs->errorperbit;
 #else
+  const int mv_shift = ms_params->allow_hp ? 0 : 1;
   const int error_per_bit = ms_params->mv_cost_params.error_per_bit;
 #endif
 
@@ -5445,18 +5411,10 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   // by 1/8th, then each parameter by 1/16, etc.
   // This will rapidly and efficiently explore the space of valid models,
   // as the maximum value of any single parameter is between 1/8 and 1/4.
-#if CONFIG_WARP_REF_LIST
   const int step_size = (1 << WARP_DELTA_STEP_BITS);
-#endif  // CONFIG_WARP_REF_LIST
 
   for (int iter = 0; iter < MAX_WARP_DELTA_ITERS; iter++) {
-#if CONFIG_WARP_REF_LIST
     int center_best_so_far = 1;
-#else
-
-    int step_size =
-        1 << (WARP_DELTA_STEP_BITS + (MAX_WARP_DELTA_ITERS - 1) - iter);
-#endif  // CONFIG_WARP_REF_LIST
 
     if (can_refine_mv) {
       int best_idx = -1;
@@ -5564,35 +5522,27 @@ int av1_pick_warp_delta(const AV1_COMMON *const cm, MACROBLOCKD *xd,
           // Decreasing is best
           best_wm_params = dec_params;
           best_rd = dec_rd;
-#if CONFIG_WARP_REF_LIST
           center_best_so_far = 0;
-#endif  // CONFIG_WARP_REF_LIST
         } else {
           // Increasing is best
           best_wm_params = inc_params;
           best_rd = inc_rd;
-#if CONFIG_WARP_REF_LIST
           center_best_so_far = 0;
-#endif  // CONFIG_WARP_REF_LIST
         }
       } else if (dec_rd < best_rd) {
         // Decreasing is best
         best_wm_params = dec_params;
         best_rd = dec_rd;
-#if CONFIG_WARP_REF_LIST
         center_best_so_far = 0;
-#endif  // CONFIG_WARP_REF_LIST
       } else {
         // Current is best
         // No need to change anything
       }
     }
 
-#if CONFIG_WARP_REF_LIST
     if (center_best_so_far) {
       break;
     }
-#endif  // CONFIG_WARP_REF_LIST
   }
 
   mbmi->wm_params[0] = best_wm_params;
@@ -5627,20 +5577,8 @@ int av1_refine_mv_for_base_param_warp_model(
   WarpedMotionParams base_params;
   int_mv center_mv;
   av1_get_warp_base_params(
-      cm,
-#if !CONFIG_WARP_REF_LIST
-      xd,
-#endif  //! CONFIG_WARP_REF_LIST
-      mbmi,
-#if !CONFIG_WARP_REF_LIST
-      mbmi_ext->ref_mv_stack[mbmi->ref_frame[0]],
-#endif  //! CONFIG_WARP_REF_LIST
-      &base_params, &center_mv
-#if CONFIG_WARP_REF_LIST
-      ,
-      mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]
-#endif  // CONFIG_WARP_REF_LIST
-  );
+      cm, mbmi, &base_params, &center_mv,
+      mbmi_ext->warp_param_stack[av1_ref_frame_type(mbmi->ref_frame)]);
 
   *params = base_params;
 
