@@ -84,9 +84,9 @@ static AOM_INLINE void loop_restoration_write_sb_coeffs(
 
 #if CONFIG_CNN_GUIDED_QUADTREE
 // Write crlc coeffs for one frame
-static void write_filter_quadtree(int qp, int cnn_index, int superres_denom,
-                                  int is_intra_only, const QUADInfo *ci,
-                                  aom_writer *wb);
+static void write_filter_quadtree(FRAME_CONTEXT *ctx, int qp, int cnn_index,
+                                  int superres_denom, int is_intra_only,
+                                  const QUADInfo *ci, aom_writer *wb);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #if CONFIG_IBC_SR_EXT
@@ -2332,12 +2332,37 @@ static AOM_INLINE void write_modes_sb(
     }
   }
 #if CONFIG_CNN_GUIDED_QUADTREE
-  if (cm->use_quadtree && !cm->postcnn_quad_info.is_write) {
+  if (cm->use_cnn[0] && !cm->postcnn_quad_info.is_write) {
     QUADInfo *qi = (QUADInfo *)&cm->postcnn_quad_info;
+    int unit_length = 0;
+    for (int s = 0; s < qi->split_info_length; s += 2) {
+      const int split_index =
+          qi->split_info[s].split * 2 + qi->split_info[s + 1].split;
+      aom_write_symbol(w, split_index, xd->tile_ctx->cnn_guided_quad_cdf, 4);
+      unit_length += split_index == 0 ? 1 : split_index == 1 ? 4 : 2;
+    }
+    int splittable_rus =
+        (cm->superres_upscaled_width / cm->postcnn_quad_info.unit_size) *
+        (cm->superres_upscaled_height / cm->postcnn_quad_info.unit_size);
+    int total_rus =
+        ((cm->superres_upscaled_width + cm->postcnn_quad_info.unit_size - 1) /
+         cm->postcnn_quad_info.unit_size) *
+        ((cm->superres_upscaled_height + cm->postcnn_quad_info.unit_size - 1) /
+         cm->postcnn_quad_info.unit_size);
+    unit_length += total_rus - splittable_rus;
+    // printf(" unit_length %d %d est\n", qi->unit_info_length, unit_length);
+    assert(qi->unit_info_length == unit_length);
     int superres_denom = cm->superres_scale_denominator;
     const int is_intra_only = frame_is_intra_only(cm);
-    write_filter_quadtree(cm->quant_params.base_qindex, cm->cnn_index,
-                          superres_denom, is_intra_only, qi, w);
+    assert(cm->postcnn_quad_info.unit_info_length ==
+           quad_tree_get_unit_info_length(
+               cm->superres_upscaled_width, cm->superres_upscaled_height,
+               cm->postcnn_quad_info.unit_size,
+               cm->postcnn_quad_info.split_info,
+               cm->postcnn_quad_info.split_info_length));
+    write_filter_quadtree(xd->tile_ctx, cm->quant_params.base_qindex,
+                          cm->cnn_indices[0], superres_denom, is_intra_only, qi,
+                          w);
     qi->is_write = 1;
   }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
@@ -3050,13 +3075,15 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 #endif  // !CONFIG_NEW_DF
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-static void write_filter_quadtree(int QP, int cnn_index, int superres_denom,
-                                  int is_intra_only, const QUADInfo *ci,
-                                  aom_writer *wb) {
+static void write_filter_quadtree(FRAME_CONTEXT *ctx, int QP, int cnn_index,
+                                  int superres_denom, int is_intra_only,
+                                  const QUADInfo *ci, aom_writer *wb) {
   int A0_min, A1_min;
   int *quadtset;
   quadtset =
       get_quadparm_from_qindex(QP, superres_denom, is_intra_only, 1, cnn_index);
+  const int norestore_ctx =
+      get_guided_norestore_ctx(QP, superres_denom, is_intra_only);
   A0_min = quadtset[2];
   A1_min = quadtset[3];
   int a0;
@@ -3067,27 +3094,40 @@ static void write_filter_quadtree(int QP, int cnn_index, int superres_denom,
   int ref_1 = 8;
   for (int i = 0; i < ci->unit_info_length; i++) {
     a0 = ci->unit_info[i].xqd[0];
-
-    b_a0 = a0 - A0_min;
-    if (b_a0 < 0) {
-      b_a0 = 0;
-    }
-    if (b_a0 > 15) {
-      b_a0 = 15;
-    }
     a1 = ci->unit_info[i].xqd[1];
-    b_a1 = a1 - A1_min;
-    if (b_a1 < 0) {
-      b_a1 = 0;
-    }
-    if (b_a1 > 15) {
-      b_a1 = 15;
-    }
+    int norestore;
+
     // printf("a0:%d  a1:%d\n", a0, a1);
-    aom_write_primitive_refsubexpfin(wb, 16, 1, ref_0, b_a0);
-    aom_write_primitive_refsubexpfin(wb, 16, 1, ref_1, b_a1);
-    ref_0 = b_a0;
-    ref_1 = b_a1;
+    if (norestore_ctx != -1) {
+      norestore = (a0 == 0 && a1 == 0);
+      aom_write_symbol(wb, norestore,
+                       ctx->cnn_guided_norestore_cdf[norestore_ctx], 2);
+    } else {
+      norestore = 0;
+    }
+    if (norestore) {
+      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + 15, 0)) - A0_min;
+      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + 15, 0)) - A1_min;
+    } else {
+      b_a0 = a0 - A0_min;
+      if (b_a0 < 0) {
+        b_a0 = 0;
+      }
+      if (b_a0 > 15) {
+        b_a0 = 15;
+      }
+      b_a1 = a1 - A1_min;
+      if (b_a1 < 0) {
+        b_a1 = 0;
+      }
+      if (b_a1 > 15) {
+        b_a1 = 15;
+      }
+      aom_write_primitive_refsubexpfin(wb, 16, 1, ref_0, b_a0);
+      aom_write_primitive_refsubexpfin(wb, 16, 1, ref_1, b_a1);
+      ref_0 = b_a0;
+      ref_1 = b_a1;
+    }
   }
 }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
@@ -3113,58 +3153,14 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
     }
   }
 #if CONFIG_CNN_GUIDED_QUADTREE
-
-  aom_wb_write_bit(wb, cm->use_quadtree);
-
-  // ��splitҲ������д��ȥ
-  if (cm->use_quadtree) {
-    // printf("writing pamrater\n");
-    aom_wb_write_bit(wb, cm->use_quad_level);
-    /*
-    ������lengthת��&λ���ȵĶ����� ����
-    */
-    int flag;
-    int unit_length = cm->postcnn_quad_info.unit_info_length;
-    int split_length = cm->postcnn_quad_info.split_info_length;
-    flag = 1;
-    for (int i = 7; i >= 0; i--) {
-      if (unit_length & flag) {
-        aom_wb_write_bit(wb, 1);
-      } else {
-        aom_wb_write_bit(wb, 0);
-      }
-      flag <<= 1;
-    }
-
-    flag = 1;
-    for (int i = 7; i >= 0; i--) {
-      if (split_length & flag) {
-        aom_wb_write_bit(wb, 1);
-      } else {
-        aom_wb_write_bit(wb, 0);
-      }
-      flag <<= 1;
-    }
-
-    for (int i = 0; i < cm->postcnn_quad_info.split_info_length; i++) {
-      aom_wb_write_bit(wb, cm->postcnn_quad_info.split_info[i].split);
-      // printf("flag:%d\n", cm->quad_info->split_info[i].split);
-      /*if (i % 2 == 0) {
-        if (cm->postcnn_quad_info.split_info[i].split == 0 &&
-            cm->postcnn_quad_info.split_info[i + 1].split == 1)
-            printf("writing split\n");
-        else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
-                 cm->postcnn_quad_info.split_info[i + 1].split == 1)
-           printf("writing horz\n");
-        else if (cm->postcnn_quad_info.split_info[i].split == 1 &&
-                 cm->postcnn_quad_info.split_info[i + 1].split == 0)
-          printf("writing vert\n");
-        else if (cm->postcnn_quad_info.split_info[i].split == 0 &&
-                 cm->postcnn_quad_info.split_info[i + 1].split == 0)
-          printf("writing all\n");
-
-      }*/
-    }
+  if (cm->use_cnn[0]) {
+    assert(cm->use_quad_level ==
+           quad_tree_get_level(cm->superres_upscaled_width,
+                               cm->superres_upscaled_height));
+    assert(cm->postcnn_quad_info.split_info_length ==
+           quad_tree_get_split_info_length(cm->superres_upscaled_width,
+                                           cm->superres_upscaled_height,
+                                           cm->postcnn_quad_info.unit_size));
   }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 }

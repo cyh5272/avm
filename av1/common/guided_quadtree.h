@@ -23,10 +23,9 @@
 extern "C" {
 #endif
 
-int computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
-                              int starty, int buf_width, int buf_height,
-                              int height, int width, int buf_stride,
-                              int src_stride);
+int64_t computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
+                                  int starty, int buf_width, int buf_height,
+                                  int buf_stride, int src_stride);
 
 double min_tflite(double a, double b, double c, double d);
 
@@ -46,12 +45,33 @@ double computePSNR_tflite_hbd(uint16_t *dgd, uint16_t *src, int height,
 int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
                           int starty, int startx, int quadtree_max_size);
 
+#if CONFIG_CNN_GUIDED_QUADTREE
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index);
 
-int64_t count_guided_quad_bits(struct AV1Common *cm);
-#if CONFIG_CNN_GUIDED_QUADTREE
+int64_t count_guided_quad_bits(struct AV1Common *cm, int *splitcosts,
+                               int (*norestorecosts)[2]);
 void quad_copy(QUADInfo *cur_quad_info, QUADInfo *postcnn_quad_info);
+// Get the length of unit info array based on dimensions and split info.
+int quad_tree_get_unit_info_length(int width, int height, int unit_length,
+                                   const QUADSplitInfo *split_info,
+                                   int split_info_length);
+// Get the length of split info array based on dimensions.
+int quad_tree_get_split_info_length(int width, int height, int unit_length);
+
+static INLINE int get_guided_norestore_ctx(int qindex, int superres_denom,
+                                           int is_intra_only) {
+  (void)qindex;
+  (void)is_intra_only;
+  if (is_intra_only) return 1;
+  if (superres_denom != SCALE_NUMERATOR) return 1;
+  return 0;
+}
+
+// Get quad tree level based on dimension.
+static INLINE int quad_tree_get_level(int width, int height) {
+  return (width * height <= 1280 * 720);
+}
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #ifdef __cplusplus

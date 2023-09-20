@@ -136,8 +136,8 @@ static AOM_INLINE void loop_restoration_read_sb_coeffs(
     int runit_idx);
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-static AOM_INLINE void read_filter_quadtree(int QP, int cnn_index,
-                                            int superres_denom,
+static AOM_INLINE void read_filter_quadtree(FRAME_CONTEXT *ctx, int QP,
+                                            int cnn_index, int superres_denom,
                                             int is_intra_only, QUADInfo *qi,
                                             aom_reader *rb);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
@@ -1822,28 +1822,43 @@ static PARTITION_TYPE read_partition(const AV1_COMMON *const cm,
   }
 }
 #if CONFIG_CNN_GUIDED_QUADTREE
-static AOM_INLINE void read_filter_quadtree(int QP, int cnn_index,
-                                            int superres_denom,
+static AOM_INLINE void read_filter_quadtree(FRAME_CONTEXT *ctx, int QP,
+                                            int cnn_index, int superres_denom,
                                             int is_intra_only, QUADInfo *qi,
                                             aom_reader *rb) {
   int A0_min, A1_min;
   int *quadtset;
   quadtset =
       get_quadparm_from_qindex(QP, superres_denom, is_intra_only, 1, cnn_index);
+  const int norestore_ctx =
+      get_guided_norestore_ctx(QP, superres_denom, is_intra_only);
+
   A0_min = quadtset[2];
   A1_min = quadtset[3];
 
   int ref_0 = 8;
   int ref_1 = 8;
   for (int i = 0; i < qi->unit_info_length; i++) {
-    qi->unit_info[i].xqd[0] =
-        aom_read_primitive_refsubexpfin(rb, 16, 1, ref_0, ACCT_STR) + A0_min;
-    qi->unit_info[i].xqd[1] =
-        aom_read_primitive_refsubexpfin(rb, 16, 1, ref_1, ACCT_STR) + A1_min;
+    const int norestore =
+        norestore_ctx == -1
+            ? 0
+            : aom_read_symbol(rb, ctx->cnn_guided_norestore_cdf[norestore_ctx],
+                              2, ACCT_STR);
+    if (norestore) {
+      qi->unit_info[i].xqd[0] = 0;
+      qi->unit_info[i].xqd[1] = 0;
+      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + 15, 0)) - A0_min;
+      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + 15, 0)) - A1_min;
+    } else {
+      qi->unit_info[i].xqd[0] =
+          aom_read_primitive_refsubexpfin(rb, 16, 1, ref_0, ACCT_STR) + A0_min;
+      qi->unit_info[i].xqd[1] =
+          aom_read_primitive_refsubexpfin(rb, 16, 1, ref_1, ACCT_STR) + A1_min;
+      ref_0 = qi->unit_info[i].xqd[0] - A0_min;
+      ref_1 = qi->unit_info[i].xqd[1] - A1_min;
+    }
     // printf("a0:%d a1:%d\n", qi->unit_info[i].xqd[0],
     // qi->unit_info[i].xqd[1]);
-    ref_0 = qi->unit_info[i].xqd[0] - A0_min;
-    ref_1 = qi->unit_info[i].xqd[1] - A1_min;
   }
 }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
@@ -1901,13 +1916,29 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
     }
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-    if (cm->use_quadtree && !cm->postcnn_quad_info.is_write) {
+    if (cm->use_cnn[0] && !cm->postcnn_quad_info.is_write) {
       cm->postcnn_quad_info.is_write = 1;
+      QUADInfo *qi = (QUADInfo *)&cm->postcnn_quad_info;
+      // int split_cnt[4] = { 0 };
+      for (int s = 0; s < qi->split_info_length; s += 2) {
+        const int split_index = aom_read_symbol(
+            reader, xd->tile_ctx->cnn_guided_quad_cdf, 4, ACCT_STR);
+        qi->split_info[s].split = split_index >> 1;
+        qi->split_info[s + 1].split = split_index & 1;
+        // unit_length += split_index == 0 ? 1 : split_index == 1 ? 4 : 2;
+        // split_cnt[split_index]++;
+      }
+      // printf("Hello %d %d %d %d\n", split_cnt[0], split_cnt[1],
+      //        split_cnt[2], split_cnt[3]);
+      qi->unit_info_length = quad_tree_get_unit_info_length(
+          cm->superres_upscaled_width, cm->superres_upscaled_height,
+          cm->postcnn_quad_info.unit_size, cm->postcnn_quad_info.split_info,
+          cm->postcnn_quad_info.split_info_length);
       int superres_denom = cm->superres_scale_denominator;
       const int is_intra_only = frame_is_intra_only(cm);
-      read_filter_quadtree(cm->quant_params.base_qindex, cm->cnn_index,
-                           superres_denom, is_intra_only,
-                           &cm->postcnn_quad_info, reader);
+      read_filter_quadtree(xd->tile_ctx, cm->quant_params.base_qindex,
+                           cm->cnn_indices[0], superres_denom, is_intra_only,
+                           qi, reader);
     }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
@@ -2148,66 +2179,36 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
   // cm->current_frame.frame_number); if (cm->current_frame.frame_number ==
   // 2)//2
   //    printf("2 frame;\n");
-  cm->use_quadtree = aom_rb_read_bit(rb);
-
-  if (cm->use_quadtree) {
-    cm->cnn_index = cm->cnn_indices[0];
-    cm->use_quad_level = aom_rb_read_bit(rb);
+  if (cm->use_cnn[0]) {
+    cm->use_quad_level = quad_tree_get_level(cm->superres_upscaled_width,
+                                             cm->superres_upscaled_height);
     cm->postcnn_quad_info.unit_size = 512 >> cm->use_quad_level;
     cm->postcnn_quad_info.is_write = false;
 
-    int flag = 1;
-    int unit_info_length = 0;
-    for (int i = 7; i >= 0; i--) {
-      if (aom_rb_read_bit(rb)) {
-        unit_info_length += flag;
-      }
-      flag <<= 1;
-    }
-
-    flag = 1;
-    int split_info_length = 0;
-    for (int i = 7; i >= 0; i--) {
-      if (aom_rb_read_bit(rb)) {
-        split_info_length += flag;
-      }
-      flag <<= 1;
-    }
-
-    cm->postcnn_quad_info.split_info_length = split_info_length;
+    // Split info.
+    cm->postcnn_quad_info.split_info_length = quad_tree_get_split_info_length(
+        cm->superres_upscaled_width, cm->superres_upscaled_height,
+        cm->postcnn_quad_info.unit_size);
     cm->postcnn_quad_info.split_info_index = 0;
-    cm->postcnn_quad_info.unit_info_length = unit_info_length;
-    cm->postcnn_quad_info.split_info_index = 0;
-    cm->postcnn_quad_info.is_write = false;
+    CHECK_MEM_ERROR(cm, cm->postcnn_quad_info.split_info,
+                    (QUADSplitInfo *)aom_memalign(
+                        16, sizeof(*cm->postcnn_quad_info.split_info) *
+                                cm->postcnn_quad_info.split_info_length));
 
-    CHECK_MEM_ERROR(
-        cm, cm->postcnn_quad_info.split_info,
-        (QUADSplitInfo *)aom_memalign(
-            16, sizeof(*cm->postcnn_quad_info.split_info) * split_info_length));
+    int splittable_rus =
+        (cm->superres_upscaled_width / cm->postcnn_quad_info.unit_size) *
+        (cm->superres_upscaled_height / cm->postcnn_quad_info.unit_size);
+    int total_rus =
+        ((cm->superres_upscaled_width + cm->postcnn_quad_info.unit_size - 1) /
+         cm->postcnn_quad_info.unit_size) *
+        ((cm->superres_upscaled_height + cm->postcnn_quad_info.unit_size - 1) /
+         cm->postcnn_quad_info.unit_size);
+    int max_units = splittable_rus * 3 + total_rus;
 
     CHECK_MEM_ERROR(
         cm, cm->postcnn_quad_info.unit_info,
         (QUADUnitInfo *)aom_memalign(
-            16, sizeof(*cm->postcnn_quad_info.unit_info) * unit_info_length));
-
-    for (int i = 0; i < split_info_length; i++) {
-      cm->postcnn_quad_info.split_info[i].split = aom_rb_read_bit(rb);
-
-      // if (i % 2 == 1) {
-      //  if (cm->postcnn_quad_info.split_info[i-1].split == 0 &&
-      //      cm->postcnn_quad_info.split_info[i].split == 1)
-      //    printf("writing split\n");
-      //  else if (cm->postcnn_quad_info.split_info[i-1].split == 1 &&
-      //           cm->postcnn_quad_info.split_info[i].split == 1)
-      //    printf("writing horz\n");
-      //  else if (cm->postcnn_quad_info.split_info[i-1].split == 1 &&
-      //           cm->postcnn_quad_info.split_info[i].split == 0)
-      //    printf("writing vert\n");
-      //  else if (cm->postcnn_quad_info.split_info[i-1].split == 0 &&
-      //           cm->postcnn_quad_info.split_info[i].split == 0)
-      //    printf("writing all\n");
-      //}
-    }
+            16, sizeof(*cm->postcnn_quad_info.unit_info) * max_units));
   }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 }
@@ -7112,7 +7113,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
         !use_ccso &&
 #endif
 #if CONFIG_CNN_GUIDED_QUADTREE
-        !cm->use_quadtree &&
+        !cm->use_cnn[0] &&
 #endif
         !do_cdef && !do_superres;
 
@@ -7136,11 +7137,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 
 #if CONFIG_CNN_RESTORATION
 #if CONFIG_CNN_GUIDED_QUADTREE
-      if (cm->use_quadtree) {
+      if (cm->use_cnn[0]) {
         // printf("using quadtree\n");
-        av1_restore_cnn_quadtree_decode_tflite(cm, pbi->num_workers,
-                                               cm->use_quadtree, cm->use_cnn,
-                                               cm->cnn_indices);
+        av1_restore_cnn_quadtree_decode_tflite(
+            cm, pbi->num_workers, cm->use_cnn[0], cm->use_cnn, cm->cnn_indices);
       }
 #else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
@@ -7174,11 +7174,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
       // loop_restoration_filter.
 #if CONFIG_CNN_RESTORATION
 #if CONFIG_CNN_GUIDED_QUADTREE
-      if (cm->use_quadtree) {
+      if (cm->use_cnn[0]) {
         printf("using quadtree\n");
-        av1_restore_cnn_quadtree_decode_tflite(cm, pbi->num_workers,
-                                               cm->use_quadtree, cm->use_cnn,
-                                               cm->cnn_indices);
+        av1_restore_cnn_quadtree_decode_tflite(
+            cm, pbi->num_workers, cm->use_cnn[0], cm->use_cnn, cm->cnn_indices);
       }
 #else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
