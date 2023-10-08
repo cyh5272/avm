@@ -697,11 +697,6 @@ int main(int argc, const char **argv) {
   optimize_cdf_table(&fc.warp_delta[0][0], probsfile, 2, cts_each_dim,
                      "static const aom_cdf_prob "
                      "default_warp_delta_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)]");
-  cts_each_dim[0] = 2;
-  cts_each_dim[1] = WARP_DELTA_NUM_SYMBOLS;
-  optimize_cdf_table(&fc.warp_delta_param[0][0], probsfile, 2, cts_each_dim,
-                     "static const aom_cdf_prob default_warp_delta_param_cdf"
-                     "[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)]");
   cts_each_dim[0] = WARP_EXTEND_CTXS1;
   cts_each_dim[1] = WARP_EXTEND_CTXS2;
   cts_each_dim[2] = 2;

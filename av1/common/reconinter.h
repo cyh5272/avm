@@ -345,7 +345,7 @@ static INLINE int allow_warp_parameter_signaling(
 #if CONFIG_CWG_D067_IMPROVED_WARP
       cm->features.allow_warpmv_mode &&
 #endif  // CONFIG_CWG_D067_IMPROVED_WARP
-      mbmi->motion_mode == WARP_DELTA && mbmi->warp_ref_idx == 1);
+      mbmi->motion_mode == WARP_DELTA && mbmi->warp_ref_idx == 0);
 }
 #endif  // CONFIG_WARP_REF_LIST
 

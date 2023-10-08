@@ -2053,13 +2053,6 @@ static const aom_cdf_prob
     };
 #endif  // CONFIG_CWG_D067_IMPROVED_WARP
 #endif  // CONFIG_WARP_REF_LIST
-static const aom_cdf_prob
-    default_warp_delta_param_cdf[2][CDF_SIZE(WARP_DELTA_NUM_SYMBOLS)] = {
-      { AOM_CDF15(2185, 4369, 6554, 8738, 10923, 13107, 15292, 17476, 19661,
-                  21845, 24030, 26214, 28399, 30583) },
-      { AOM_CDF15(2185, 4369, 6554, 8738, 10923, 13107, 15292, 17476, 19661,
-                  21845, 24030, 26214, 28399, 30583) }
-    };
 
 static const aom_cdf_prob
     default_warp_extend_cdf[WARP_EXTEND_CTXS1][WARP_EXTEND_CTXS2]
@@ -3362,7 +3355,6 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->warpmv_with_mvd_flag_cdf, default_warpmv_with_mvd_flag_cdf);
 #endif  // CONFIG_CWG_D067_IMPROVED_WARP
 #endif  // CONFIG_WARP_REF_LIST
-  av1_copy(fc->warp_delta_param_cdf, default_warp_delta_param_cdf);
   av1_copy(fc->warp_extend_cdf, default_warp_extend_cdf);
 #else
   av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);

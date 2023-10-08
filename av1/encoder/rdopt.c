@@ -20,6 +20,7 @@
 
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/blend.h"
+#include "aom_dsp/binary_codes_writer.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/aom_timer.h"
 #include "aom_ports/mem.h"
@@ -1596,19 +1597,55 @@ static int64_t handle_newmv(const AV1_COMP *const cpi, MACROBLOCK *const x,
 }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
-static int cost_warp_delta_param(int index, int value,
-                                 const ModeCosts *mode_costs) {
+static int cost_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
+                                 int base_value) {
   assert(2 <= index && index <= 5);
-  int index_type = (index == 2 || index == 5) ? 0 : 1;
-  int coded_value = (value / WARP_DELTA_STEP) + WARP_DELTA_CODED_MAX;
-  assert(0 <= coded_value && coded_value < WARP_DELTA_NUM_SYMBOLS);
-  return mode_costs->warp_delta_param_cost[index_type][coded_value];
+  if (index == 2 || index == 5) {
+    base_value -= (1 << WARPEDMODEL_PREC_BITS);
+    value -= (1 << WARPEDMODEL_PREC_BITS);
+  }
+
+  // Derive the target precision for each parameter
+  const MB_MODE_INFO *mbmi = xd->mi[0];
+  MvSubpelPrecision mv_prec = mbmi->pb_mv_precision;
+  BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  int bsize_log2 =
+      AOMMAX(mi_size_wide_log2[bsize], mi_size_high_log2[bsize]) + MI_SIZE_LOG2;
+  int precision = (mv_prec - MV_PRECISION_ONE_PEL) + bsize_log2 - 1;
+  precision =
+      clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
+
+  int round_bits = WARPEDMODEL_PREC_BITS - precision;
+#if CONFIG_EXT_WARP_FILTER
+  int max_coded_value = (1 << (precision - 1)) - 1;
+#else
+  int max_coded_value = 1 << (precision - 2);
+#endif  // CONFIG_EXT_WARP_FILTER
+  int round_mask = (1 << round_bits) - 1;
+  (void)round_mask;
+
+  int ref = ROUND_POWER_OF_TWO_SIGNED(base_value, round_bits);
+#if CONFIG_EXT_WARP_FILTER
+  ref = clamp(ref, -max_coded_value, max_coded_value);
+#else
+  assert(abs(ref) <= max_coded_value);
+#endif  // CONFIG_EXT_WARP_FILTER
+
+  assert((value & round_mask) == 0);
+  value = value >> round_bits;
+  assert(abs(value) <= max_coded_value);
+
+  int bits = aom_count_signed_primitive_refsubexpfin(max_coded_value + 1,
+                                                     SUBEXPFIN_K, ref, value);
+
+  return bits * (1 << AV1_PROB_COST_SHIFT);
 }
 
 int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                         const MB_MODE_INFO *mbmi,
                         const MB_MODE_INFO_EXT *mbmi_ext,
                         const ModeCosts *mode_costs) {
+  (void)mode_costs;
 #if CONFIG_WARP_REF_LIST
   (void)xd;
   if (!allow_warp_parameter_signaling(
@@ -1647,10 +1684,8 @@ int av1_cost_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   int rate = 0;
 
   // TODO(rachelbarker): Allow signaling warp type?
-  rate += cost_warp_delta_param(2, params->wmmat[2] - base_params.wmmat[2],
-                                mode_costs);
-  rate += cost_warp_delta_param(3, params->wmmat[3] - base_params.wmmat[3],
-                                mode_costs);
+  rate += cost_warp_delta_param(xd, 2, params->wmmat[2], base_params.wmmat[2]);
+  rate += cost_warp_delta_param(xd, 3, params->wmmat[3], base_params.wmmat[3]);
 
   return rate;
 }

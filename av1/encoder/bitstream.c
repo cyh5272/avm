@@ -529,15 +529,45 @@ static void write_wedge_mode(aom_writer *w, FRAME_CONTEXT *ec_ctx,
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
 static void write_warp_delta_param(const MACROBLOCKD *xd, int index, int value,
-                                   aom_writer *w) {
+                                   int base_value, aom_writer *w) {
   assert(2 <= index && index <= 5);
-  int index_type = (index == 2 || index == 5) ? 0 : 1;
-  int coded_value = (value / WARP_DELTA_STEP) + WARP_DELTA_CODED_MAX;
-  assert(0 <= coded_value && coded_value < WARP_DELTA_NUM_SYMBOLS);
+  if (index == 2 || index == 5) {
+    base_value -= (1 << WARPEDMODEL_PREC_BITS);
+    value -= (1 << WARPEDMODEL_PREC_BITS);
+  }
 
-  aom_write_symbol(w, coded_value,
-                   xd->tile_ctx->warp_delta_param_cdf[index_type],
-                   WARP_DELTA_NUM_SYMBOLS);
+  // Derive the target precision for each parameter
+  const MB_MODE_INFO *mbmi = xd->mi[0];
+  MvSubpelPrecision mv_prec = mbmi->pb_mv_precision;
+  BLOCK_SIZE bsize = mbmi->sb_type[PLANE_TYPE_Y];
+  int bsize_log2 =
+      AOMMAX(mi_size_wide_log2[bsize], mi_size_high_log2[bsize]) + MI_SIZE_LOG2;
+  int precision = (mv_prec - MV_PRECISION_ONE_PEL) + bsize_log2 - 1;
+  precision =
+      clamp(precision, 2, WARPEDMODEL_PREC_BITS - WARP_PARAM_REDUCE_BITS);
+
+  int round_bits = WARPEDMODEL_PREC_BITS - precision;
+#if CONFIG_EXT_WARP_FILTER
+  int max_coded_value = (1 << (precision - 1)) - 1;
+#else
+  int max_coded_value = 1 << (precision - 2);
+#endif  // CONFIG_EXT_WARP_FILTER
+  int round_mask = (1 << round_bits) - 1;
+  (void)round_mask;
+
+  int ref = ROUND_POWER_OF_TWO_SIGNED(base_value, round_bits);
+#if CONFIG_EXT_WARP_FILTER
+  ref = clamp(ref, -max_coded_value, max_coded_value);
+#else
+  assert(abs(ref) <= max_coded_value);
+#endif  // CONFIG_EXT_WARP_FILTER
+
+  assert((value & round_mask) == 0);
+  int coded_value = value >> round_bits;
+  assert(abs(coded_value) <= max_coded_value);
+
+  aom_write_signed_primitive_refsubexpfin(w, max_coded_value + 1, SUBEXPFIN_K,
+                                          ref, coded_value);
 }
 
 static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
@@ -581,8 +611,8 @@ static void write_warp_delta(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   assert(!params->invalid);
 
   // TODO(rachelbarker): Allow signaling warp type?
-  write_warp_delta_param(xd, 2, params->wmmat[2] - base_params.wmmat[2], w);
-  write_warp_delta_param(xd, 3, params->wmmat[3] - base_params.wmmat[3], w);
+  write_warp_delta_param(xd, 2, params->wmmat[2], base_params.wmmat[2], w);
+  write_warp_delta_param(xd, 3, params->wmmat[3], base_params.wmmat[3], w);
 }
 
 static AOM_INLINE void write_motion_mode(
