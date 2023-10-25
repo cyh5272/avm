@@ -219,6 +219,7 @@ TEST_P(TemporalFilterTest, DISABLED_Speed) {
   }
 }
 
+#if !CONFIG_LARGE_TF_BLOCK
 #if HAVE_AVX2
 TemporalFilterFuncParam temporal_filter_test_avx2[] = { TemporalFilterFuncParam(
     &av1_apply_temporal_filter_c, &av1_apply_temporal_filter_avx2) };
@@ -234,6 +235,7 @@ INSTANTIATE_TEST_SUITE_P(SSE2, TemporalFilterTest,
                          Combine(ValuesIn(temporal_filter_test_sse2),
                                  Range(64, 65, 4)));
 #endif  // HAVE_SSE2
+#endif  // !CONFIG_LARGE_TF_BLOCK
 
 typedef void (*HBDTemporalFilterFunc)(
     const YV12_BUFFER_CONFIG *ref_frame, const MACROBLOCKD *mbd,
@@ -440,6 +442,7 @@ TEST_P(HBDTemporalFilterTest, DISABLED_Speed) {
     RunTest(1, height, height, 100000, 10);
   }
 }
+#if !CONFIG_LARGE_TF_BLOCK
 #if HAVE_SSE2
 HBDTemporalFilterFuncParam HBDtemporal_filter_test_sse2[] = {
   HBDTemporalFilterFuncParam(&av1_highbd_apply_temporal_filter_c,
@@ -449,5 +452,6 @@ INSTANTIATE_TEST_SUITE_P(SSE2, HBDTemporalFilterTest,
                          Combine(ValuesIn(HBDtemporal_filter_test_sse2),
                                  Range(64, 65, 4)));
 #endif  // HAVE_SSE2
+#endif  // !CONFIG_LARGE_TF_BLOCK
 }  // namespace
 #endif

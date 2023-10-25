@@ -144,6 +144,9 @@ set_aom_config_var(CONFIG_EXTQUANT 1
                    "AV2 extended quantization experiment flag")
 set_aom_config_var(ZERO_DC_DELTAQ_OFS 1
                    "AV2 set zero dc_deltaq offset")
+# This is an encode-only change.
+set_aom_config_var(CONFIG_LARGE_TF_BLOCK 1
+                   "Enable large adaptively selected temporal filter blocks.")
 
 #
 # Variables in this section control optional features of the build system.
