@@ -387,6 +387,15 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->uv_mode_cdf[1], UV_INTRA_MODES);
 #endif  // CONFIG_UV_CFL
 
+#if CONFIG_INTER_SDP
+  for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;
+       plane_index++) {
+    for (int i = 0; i < INTER_SDP_BSIZE_GROUP; i++) {
+      RESET_CDF_COUNTER(fc->region_type_cdf[plane_index][i], REGION_TYPES);
+    }
+  }
+#endif  // CONFIG_INTER_SDP
+
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;
        plane_index++) {

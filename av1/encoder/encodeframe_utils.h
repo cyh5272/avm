@@ -42,6 +42,10 @@ typedef struct {
   TXFM_CONTEXT ta[MAX_MIB_SIZE];
   TXFM_CONTEXT tl[MAX_MIB_SIZE];
 #endif  // !CONFIG_TX_PARTITION_CTX
+#if CONFIG_INTER_SDP
+  INTRA_REGION_CONTEXT intra_region_above[MAX_MIB_SIZE];
+  INTRA_REGION_CONTEXT intra_region_left[MAX_MIB_SIZE];
+#endif  // CONFIG_INTER_SDP
 #if CONFIG_MVP_IMPROVEMENT
   //! The current level bank, used to restore the level bank in MACROBLOCKD.
   REF_MV_BANK curr_level_bank;
@@ -172,6 +176,11 @@ typedef struct PartitionSearchState {
 
   // Pointer to partition cost buffer
   const int *partition_cost;
+
+#if CONFIG_INTER_SDP
+  // Pointer to region type cost buffer
+  int *region_type_cost;
+#endif
 
   // RD costs for different partition types.
   int64_t none_rd;

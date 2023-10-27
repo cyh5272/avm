@@ -1252,6 +1252,10 @@ static AOM_INLINE void decode_mbmi_block(AV1Decoder *const pbi,
   set_offsets(cm, xd, bsize, mi_row, mi_col, bw, bh, x_mis, y_mis, parent,
               index);
   xd->mi[0]->partition = partition;
+#if CONFIG_INTER_SDP
+  // set region_type for each mbmi
+  xd->mi[0]->region_type = parent->region_type;
+#endif
   av1_read_mode_info(pbi, dcb, r, x_mis, y_mis);
 
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -1354,7 +1358,11 @@ static AOM_INLINE void dec_build_inter_predictor(const AV1_COMMON *cm,
 
 #if CONFIG_MORPH_PRED
   if (mbmi->morph_pred) {
+#if CONFIG_INTER_SDP
+    assert(av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type));
+#else
     assert(av1_allow_intrabc(cm));
+#endif // CONFIG_INTER_SDP
     assert(is_intrabc_block(mbmi, xd->tree_type));
     av1_build_morph_pred(cm, xd, bsize, mi_row, mi_col);
   }
@@ -2295,6 +2303,7 @@ static AOM_INLINE void parse_decode_block(AV1Decoder *const pbi,
   AV1_COMMON *cm = &pbi->common;
   const int num_planes = av1_num_planes(cm);
   MB_MODE_INFO *mbmi = xd->mi[0];
+
   int inter_block_tx = is_inter_block(mbmi, xd->tree_type) ||
                        is_intrabc_block(mbmi, xd->tree_type);
   if (xd->tree_type != CHROMA_PART) {
@@ -2393,6 +2402,55 @@ static AOM_INLINE void parse_decode_block(AV1Decoder *const pbi,
   if (mbmi->skip_txfm[xd->tree_type == CHROMA_PART])
     av1_reset_entropy_context(xd, bsize, num_planes);
   decode_token_recon_block(pbi, td, r, partition, bsize);
+
+#if CONFIG_INTER_SDP_DEBUG
+  if (file_dec && !frame_is_intra_only(cm)) {
+    BLOCK_SIZE bsize = mbmi->sb_type[xd->tree_type == CHROMA_PART];
+    int block_width = block_size_wide[bsize];
+    int block_height = block_size_high[bsize];
+    fprintf(file_dec,
+            "order_hint = %d, mi_row = %d, mi_col = %d, region_type = %d, "
+            "tree_type = %d, bsize = %d, width = %d, height = %d, use_intrabc "
+            "= %d\n",
+            cm->current_frame.order_hint, mbmi->mi_row_start,
+            mbmi->mi_col_start, mbmi->region_type, xd->tree_type,
+            mbmi->sb_type[xd->tree_type == CHROMA_PART], block_width,
+            block_height, mbmi->use_intrabc[xd->tree_type == CHROMA_PART]);
+    if (mbmi->use_intrabc[xd->tree_type == CHROMA_PART])
+      fprintf(file_dec, "intrabc_mode = %d, intra_bc_drl_idx = %d\n",
+              mbmi->intrabc_mode, mbmi->intrabc_drl_idx);
+    fprintf(file_dec,
+            "   tx_size = %d, mode = %d, uv_mode = %d, fsc_mode = %d, "
+            "skip_tranfrom = %d\n",
+            mbmi->tx_size, mbmi->mode, mbmi->uv_mode,
+            mbmi->fsc_mode[xd->tree_type == CHROMA_PART],
+            mbmi->skip_txfm[xd->tree_type == CHROMA_PART]);
+    fflush(file_dec);
+    const int plane_start = (xd->tree_type == CHROMA_PART);
+    const int plane_end = (xd->tree_type == LUMA_PART ? 1 : 3);
+    /*for (int plane = plane_start; plane < plane_end; ++plane) {
+      struct macroblockd_plane *const pd = &xd->plane[plane];
+      const int dst_stride = pd->dst.stride;
+      uint16_t *dst = &pd->dst.buf[0];
+      if (plane && !xd->is_chroma_ref) continue;
+      int plane_width = block_width;
+      int plane_height = block_height;
+      if (plane > 0) {
+        plane_width = (block_width >> 1);
+        plane_height = (block_height >> 1);
+      }
+      if (file_dec != NULL) {
+        for (int r = 0; r < plane_height; ++r) {
+          for (int c = 0; c < plane_width; ++c) {
+            fprintf(file_dec, "%5d", dst[r * dst_stride + c]);
+          }
+          fprintf(file_dec, "\n");
+        }
+        fprintf(file_dec, "\n");
+      }
+    }*/
+  }
+#endif  // CONFIG_INTER_SDP
 
 #if CONFIG_REFINED_MVS_IN_TMVP
   if (!frame_is_intra_only(cm) &&
@@ -2711,6 +2769,18 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                                                      parse_decode_block };
   const int is_sb_root = bsize == cm->sb_size;
 
+#if CONFIG_INTER_SDP
+  if (is_sb_root) {
+    if (!frame_is_intra_only(cm)) {
+      ptree->region_type = MIXED_INTER_INTRA_REGION;
+      ptree->inter_sdp_allowed_flag = 1;
+    } else {
+      ptree->region_type = INTRA_REGION;
+      ptree->inter_sdp_allowed_flag = 0;
+    }
+  }
+#endif
+
   if (parse_decode_flag & 1) {
     if (is_sb_root) {
       set_sb_mv_precision(sbi, pbi);
@@ -2766,6 +2836,34 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
     ptree->partition = partition;
+
+#if CONFIG_INTER_SDP
+    if (!is_sb_root && parent) {
+      if (parent->inter_sdp_allowed_flag == 1)
+        ptree->inter_sdp_allowed_flag =
+            is_inter_sdp_allowed(parent->bsize, parent->partition);
+      else
+        ptree->inter_sdp_allowed_flag = 0;
+      if (!frame_is_intra_only(cm) && ptree->partition &&
+          parent->region_type != INTRA_REGION &&
+          ptree->inter_sdp_allowed_flag &&
+          is_bsize_allowed_for_inter_sdp(bsize, ptree->partition)) {
+        const int plane = xd->tree_type == CHROMA_PART;
+        const int ctx = get_intra_region_context(xd, mi_row, mi_col, bsize);
+        ptree->region_type =
+            aom_read_symbol(reader, xd->tile_ctx->region_type_cdf[plane][ctx],
+                            REGION_TYPES, ACCT_INFO("region_type"));
+        if (ptree->region_type == INTRA_REGION) xd->tree_type = LUMA_PART;
+      } else if (!frame_is_intra_only(cm)) {
+        ptree->region_type = parent->region_type;
+      } else {
+        ptree->region_type = INTRA_REGION;
+      }
+    }
+#endif  // CONFIG_INTER_SDP
+#if CONFIG_INTER_SDP_DEBUG
+    fprintf(file_dec, "partition = %d\n", partition);
+#endif  // CONFIG_INTER_SDP_DEBUG
 
     switch (partition) {
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -3031,6 +3129,21 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
     default: assert(0 && "Invalid partition type");
   }
 
+#if CONFIG_INTER_SDP
+  PARTITION_TREE *parent = ptree->parent;
+  if (!is_sb_root && parent) {
+    if (!frame_is_intra_only(cm) && ptree->partition &&
+        parent->region_type != INTRA_REGION &&
+        ptree->region_type == INTRA_REGION) {
+      // decode chroma part in one intra region
+      xd->tree_type = CHROMA_PART;
+      DEC_BLOCK(mi_row, mi_col, bsize, 0);
+      // reset back to shared part
+      xd->tree_type = SHARED_PART;
+    }
+  }
+#endif  // CONFIG_INTER_SDP
+
 #undef DEC_PARTITION
 #undef DEC_BLOCK
 #undef DEC_BLOCK_EPT_ARG
@@ -3038,6 +3151,12 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 
   if (parse_decode_flag & 1)
     update_ext_partition_context(xd, mi_row, mi_col, subsize, bsize, partition);
+#if CONFIG_INTER_SDP
+  if ((parse_decode_flag & 1) && partition == PARTITION_NONE &&
+      !frame_is_intra_only(cm)) {
+    update_intra_region_context(xd, mi_row, mi_col, bsize, ptree->region_type);
+  }
+#endif  // CONFIG_INTER_SDP
 }
 
 static AOM_INLINE void setup_bool_decoder(
@@ -8411,7 +8530,11 @@ uint32_t av1_decode_frame_headers_and_setup(AV1Decoder *pbi,
       (uint32_t)aom_rb_bytes_read(rb);  // Size of the uncompressed header
   YV12_BUFFER_CONFIG *new_fb = &cm->cur_frame->buf;
   xd->cur_buf = new_fb;
+#if CONFIG_INTER_SDP
+  if (av1_allow_intrabc(cm, xd->tree_type, MIXED_INTER_INTRA_REGION)) {
+#else
   if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+#endif  // CONFIG_INTER_SDP
     av1_setup_scale_factors_for_frame(
         &cm->sf_identity, xd->cur_buf->y_crop_width, xd->cur_buf->y_crop_height,
         xd->cur_buf->y_crop_width, xd->cur_buf->y_crop_height);
@@ -8535,6 +8658,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
     return;
   }
 
+#if CONFIG_INTER_SDP_DEBUG
+  is_decoding_process = 1;
+#endif  // CONFIG_INTER_SDP
+
   if (!is_global_intrabc_allowed(cm) && !tiles->single_tile_decoding) {
     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
       if (pbi->num_workers > 1
@@ -8556,6 +8683,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
                               0, num_planes, 0);
       }
     }
+
+#if CONFIG_INTER_SDP_DEBUG
+    is_decoding_process = -1;
+#endif  // CONFIG_INTER_SDP
 
 #if CONFIG_CCSO
     const int use_ccso =

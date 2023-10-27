@@ -947,6 +947,13 @@ void av1_restore_context(const AV1_COMMON *cm, MACROBLOCK *x,
          sizeof(*xd->left_txfm_context) * mi_height);
 #endif  // !CONFIG_TX_PARTITION_CTX
   av1_mark_block_as_not_coded(xd, mi_row, mi_col, bsize, cm->sb_size);
+#if CONFIG_INTER_SDP
+  memcpy(xd->above_intra_region_context + mi_col, ctx->intra_region_above,
+         sizeof(*xd->above_intra_region_context) * mi_width);
+  memcpy(xd->left_intra_region_context + (mi_row & MAX_MIB_MASK),
+         ctx->intra_region_left,
+         sizeof(xd->left_intra_region_context[0]) * mi_height);
+#endif  // CONFIG_INTER_SDP
 }
 
 void av1_save_context(const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
@@ -982,6 +989,12 @@ void av1_save_context(const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
   ctx->p_ta = xd->above_txfm_context;
   ctx->p_tl = xd->left_txfm_context;
 #endif  // !CONFIG_TX_PARTITION_CTX
+#if CONFIG_INTER_SDP
+  memcpy(ctx->intra_region_above, xd->above_intra_region_context,
+         sizeof(*xd->above_intra_region_context) * mi_width);
+  memcpy(ctx->intra_region_left, xd->left_intra_region_context,
+         sizeof(*xd->left_intra_region_context) * mi_height);
+#endif  // CONFIG_INTER_SDP
 }
 
 static void set_partial_sb_partition(const AV1_COMMON *const cm,
@@ -1715,6 +1728,17 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
                  UV_INTRA_MODES - 1, CDF_SIZE(UV_INTRA_MODES));
   AVERAGE_CDF(ctx_left->uv_mode_cdf[1], ctx_tr->uv_mode_cdf[1], UV_INTRA_MODES);
 #endif  // CONFIG_UV_CFL
+
+#if CONFIG_INTER_SDP
+  for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;
+       plane_index++) {
+    for (int i = 0; i < INTER_SDP_BSIZE_GROUP; i++) {
+      AVERAGE_CDF(ctx_left->region_type_cdf[plane_index][i],
+                  ctx_tr->region_type_cdf[plane_index][i], REGION_TYPES);
+    }
+  }
+#endif
+
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;
        plane_index++) {

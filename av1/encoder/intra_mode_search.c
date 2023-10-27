@@ -612,7 +612,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
   // Only store reconstructed luma when there's chroma RDO. When there's no
   // chroma RDO, the reconstructed luma will be stored in encode_superblock().
-  xd->cfl.store_y = store_cfl_required_rdo(cm, x);
+#if CONFIG_INTER_SDP
+  if (frame_is_intra_only(cm) || xd->tree_type != CHROMA_PART)
+#endif  // CONFIG_INTER_SDP
+    xd->cfl.store_y = store_cfl_required_rdo(cm, x);
   if (xd->tree_type == SHARED_PART) {
     if (xd->cfl.store_y) {
       av1_encode_intra_block_plane(cpi, x, mbmi->sb_type[PLANE_TYPE_Y],
@@ -1265,7 +1268,10 @@ int64_t av1_handle_intra_mode(IntraModeSearchState *intra_search_state,
                                 [mbmi->y_mode_idx - FIRST_MODE_COUNT -
                                  SECOND_MODE_COUNT * (mode_set_index - 1)];
   }
-  mode_cost += ref_frame_cost;
+#if CONFIG_INTER_SDP
+  if (mbmi->region_type != INTRA_REGION)
+#endif
+    mode_cost += ref_frame_cost;
   mode_cost += mrl_idx_cost;
 #endif  // CONFIG_LOSSLESS_DPCM
 #else

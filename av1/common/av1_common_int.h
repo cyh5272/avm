@@ -1204,6 +1204,10 @@ struct CommonContexts {
   TXFM_CONTEXT **txfm;
 #endif  // !CONFIG_TX_PARTITION_CTX
 
+#if CONFIG_INTER_SDP
+  INTRA_REGION_CONTEXT **intra_region;
+#endif  // CONFIG_INTER_SDP
+
   /*!
    * Dimensions that were used to allocate the arrays above.
    * If these dimensions change, the arrays may have to be re-allocated.
@@ -1967,6 +1971,15 @@ static INLINE int frame_is_intra_only(const AV1_COMMON *const cm) {
          cm->current_frame.frame_type == INTRA_ONLY_FRAME;
 }
 
+#if CONFIG_INTER_SDP
+static INLINE int is_inter_sdp_chroma(const AV1_COMMON *const cm,
+                                      REGION_TYPE cur_region_type,
+                                      TREE_TYPE cur_tree_type) {
+  return !frame_is_intra_only(cm) && cur_region_type == INTRA_REGION &&
+         cur_tree_type == CHROMA_PART;
+}
+#endif
+
 static INLINE int frame_is_sframe(const AV1_COMMON *cm) {
   return cm->current_frame.frame_type == S_FRAME;
 }
@@ -2105,6 +2118,9 @@ static INLINE void av1_init_above_context(CommonContexts *above_contexts,
 #if !CONFIG_TX_PARTITION_CTX
   xd->above_txfm_context = above_contexts->txfm[tile_row];
 #endif  // !CONFIG_TX_PARTITION_CTX
+#if CONFIG_INTER_SDP
+  xd->above_intra_region_context = above_contexts->intra_region[tile_row];
+#endif  // CONFIG_INTER_SDP
 }
 
 static INLINE void av1_init_macroblockd(AV1_COMMON *cm, MACROBLOCKD *xd) {
@@ -2455,6 +2471,24 @@ static INLINE int get_mrl_index_ctx(const MB_MODE_INFO *neighbor0,
 }
 #endif  // CONFIG_IMPROVED_INTRA_DIR_PRED
 
+#if CONFIG_INTER_SDP
+static INLINE void update_intra_region_context(MACROBLOCKD *xd, int mi_row,
+                                               int mi_col, BLOCK_SIZE bsize,
+                                               REGION_TYPE cur_region_type) {
+  if (xd->tree_type == CHROMA_PART) return;
+  INTRA_REGION_CONTEXT *const above_ctx =
+      xd->above_intra_region_context + mi_col;
+  INTRA_REGION_CONTEXT *const left_ctx =
+      xd->left_intra_region_context + (mi_row & MAX_MIB_MASK);
+  assert(bsize < BLOCK_SIZES_ALL);
+
+  const int bw = mi_size_wide[bsize];
+  const int bh = mi_size_high[bsize];
+  memset(above_ctx, cur_region_type, bw);
+  memset(left_ctx, cur_region_type, bh);
+}
+#endif  // CONFIG_INTER_SDP
+
 static INLINE void update_partition_context(MACROBLOCKD *xd, int mi_row,
                                             int mi_col, BLOCK_SIZE subsize,
                                             BLOCK_SIZE bsize) {
@@ -2575,6 +2609,27 @@ static INLINE void update_ext_partition_context(MACROBLOCKD *xd, int mi_row,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 }
 
+#if CONFIG_INTER_SDP
+static INLINE int get_intra_region_context(const MACROBLOCKD *xd, int mi_row,
+                                           int mi_col, BLOCK_SIZE bsize) {
+  assert(xd->tree_type != CHROMA_PART);
+  const int width = block_size_wide[bsize];
+  const int height = block_size_high[bsize];
+  const int num_samples = width * height;
+  assert(num_samples <= 1024);
+  if (num_samples <= 64)
+    return 0;
+  else if (num_samples <= 128)
+    return 1;
+  else if (num_samples <= 256)
+    return 2;
+  else if (num_samples <= 512)
+    return 3;
+  else
+    return 4;
+}
+#endif  // CONFIG_INTER_SDP
+
 #if CONFIG_BLOCK_256
 /*!\brief Returns the context used by \ref PARTITION_SPLIT. */
 static INLINE int square_split_context(const MACROBLOCKD *xd, int mi_row,
@@ -2672,6 +2727,12 @@ static INLINE void av1_zero_above_context(AV1_COMMON *const cm,
   }
   av1_zero_array(above_contexts->partition[0][tile_row] + mi_col_start,
                  aligned_width);
+
+#if CONFIG_INTER_SDP
+  av1_zero_array(above_contexts->intra_region[tile_row] + mi_col_start,
+                 aligned_width);
+#endif  // CONFIG_INTER_SDP
+
   if (num_planes > 1) {
     if (above_contexts->partition[1][tile_row] &&
         above_contexts->partition[2][tile_row]) {
@@ -2694,6 +2755,10 @@ static INLINE void av1_zero_above_context(AV1_COMMON *const cm,
 static INLINE void av1_zero_left_context(MACROBLOCKD *const xd) {
   av1_zero(xd->left_entropy_context);
   av1_zero(xd->left_partition_context);
+
+#if CONFIG_INTER_SDP
+  av1_zero(xd->left_intra_region_context);
+#endif  // CONFIG_INTER_SDP
 
 #if !CONFIG_TX_PARTITION_CTX
   memset(xd->left_txfm_context_buffer, tx_size_high[TX_SIZES_LARGEST],

@@ -279,7 +279,11 @@ static AOM_INLINE int intra_mode_info_cost_y(const AV1_COMP *cpi,
     }
   }
 #endif  // !CONFIG_AIMC
+#if CONFIG_INTER_SDP
+  if (av1_allow_intrabc(&cpi->common, xd->tree_type, mbmi->region_type)) {
+#else
   if (av1_allow_intrabc(&cpi->common) && xd->tree_type != CHROMA_PART) {
+#endif
 #if CONFIG_NEW_CONTEXT_MODELING
     const int intrabc_ctx = get_intrabc_ctx(xd);
     total_rate += mode_costs->intrabc_cost[intrabc_ctx][use_intrabc];

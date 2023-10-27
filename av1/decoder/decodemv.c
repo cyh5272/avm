@@ -1232,6 +1232,13 @@ static void read_palette_mode_info(AV1_COMMON *const cm, MACROBLOCKD *const xd,
                           PALETTE_SIZES, ACCT_INFO("palette_size", "luma")) +
           2;
       read_palette_colors_y(xd, cm->seq_params.bit_depth, pmi, r);
+#if CONFIG_INTER_SDP_DEBUG
+      fprintf(file_dec, "y component palette size = %d\n palette color is: \n",
+              pmi->palette_size[0]);
+      for (int i = 0; i < pmi->palette_size[0]; ++i)
+        fprintf(file_dec, "%5d", pmi->palette_colors[i]);
+      fprintf(file_dec, "\n");
+#endif  // CONFIG_INTER_SDP_DEBUG
     }
   }
   if (num_planes > 1 && xd->tree_type != LUMA_PART &&
@@ -1246,6 +1253,13 @@ static void read_palette_mode_info(AV1_COMMON *const cm, MACROBLOCKD *const xd,
                           PALETTE_SIZES, ACCT_INFO("palette_size", "chroma")) +
           2;
       read_palette_colors_uv(xd, cm->seq_params.bit_depth, pmi, r);
+#if CONFIG_INTER_SDP_DEBUG
+      fprintf(file_dec, "uv component palette size = %d\n palette color is: \n",
+              pmi->palette_size[1]);
+      for (int i = 0; i < pmi->palette_size[1]; ++i)
+        fprintf(file_dec, "%5d", pmi->palette_colors[i]);
+      fprintf(file_dec, "\n");
+#endif  // CONFIG_INTER_SDP_DEBUG
     }
   }
 }
@@ -1899,7 +1913,11 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 #endif  // CONFIG_MORPH_PRED
 
 #if CONFIG_SKIP_TXFM_OPT
+#if CONFIG_INTER_SDP
+  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
+#else
   if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+#endif
 #if CONFIG_NEW_CONTEXT_MODELING
     mbmi->use_intrabc[0] = 0;
     mbmi->use_intrabc[1] = 0;
@@ -1958,7 +1976,11 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   xd->left_txfm_context =
       xd->left_txfm_context_buffer + (mi_row & MAX_MIB_MASK);
 #endif  // !CONFIG_TX_PARTITION_CTX
+#if CONFIG_INTER_SDP
+  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
+#else
   if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+#endif  // CONFIG_INTER_SDP
     read_intrabc_info(cm, dcb, r);
     if (is_intrabc_block(mbmi, xd->tree_type)) {
 #if CONFIG_LOSSLESS_DPCM
@@ -4309,7 +4331,6 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 #endif  // CONFIG_REFINEMV
 
   mbmi->segment_id = read_inter_segment_id(cm, xd, 1, r);
-
   mbmi->skip_mode = read_skip_mode(cm, xd, mbmi->segment_id, r);
 
   mbmi->fsc_mode[PLANE_TYPE_Y] = 0;
@@ -4336,7 +4357,11 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
   }
 
 #if CONFIG_IBC_SR_EXT
+#if CONFIG_INTER_SDP
+  if (!inter_block && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
+#else
   if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+#endif
 #if CONFIG_NEW_CONTEXT_MODELING
     mbmi->use_intrabc[0] = 0;
     mbmi->use_intrabc[1] = 0;
@@ -4408,7 +4433,11 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 #endif  // !CONFIG_TX_PARTITION_CTX
 
 #if CONFIG_IBC_SR_EXT
+#if CONFIG_INTER_SDP
+  if (!inter_block && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
+#else
   if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
+#endif
     mbmi->ref_frame[0] = INTRA_FRAME;
     mbmi->ref_frame[1] = NONE_FRAME;
     mbmi->palette_mode_info.palette_size[0] = 0;
@@ -4465,7 +4494,11 @@ void av1_read_mode_info(AV1Decoder *const pbi, DecoderCodingBlock *dcb,
   if (xd->tree_type == SHARED_PART)
     mi->sb_type[PLANE_TYPE_UV] = mi->sb_type[PLANE_TYPE_Y];
 
-  if (frame_is_intra_only(cm)) {
+  if (frame_is_intra_only(cm)
+#if CONFIG_INTER_SDP
+      || mi->region_type == INTRA_REGION
+#endif
+  ) {
     read_intra_frame_mode_info(cm, dcb, r);
 #if CONFIG_IBC_BV_IMPROVEMENT
     if (cm->seq_params.enable_refmvbank) {

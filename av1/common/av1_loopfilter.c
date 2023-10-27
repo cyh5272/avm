@@ -521,6 +521,18 @@ static TX_SIZE set_lpf_parameters(
   params->filter_length = 0;
 
   TREE_TYPE tree_type = SHARED_PART;
+
+#if CONFIG_INTER_SDP_DEBUG
+  FILE *file_temp = NULL;
+  if (is_decoding_process == 0)
+    file_temp = file_enc;
+  else if (is_decoding_process == 1)
+    file_temp = file_dec;
+  else
+    file_temp = NULL;
+#endif  // CONFIG_INTER_SDP
+
+#if !CONFIG_INTER_SDP
   const bool is_sdp_eligible = frame_is_intra_only(cm) &&
                                !cm->seq_params.monochrome &&
                                cm->seq_params.enable_sdp;
@@ -528,6 +540,7 @@ static TX_SIZE set_lpf_parameters(
     tree_type = (plane == AOM_PLANE_Y) ? LUMA_PART : CHROMA_PART;
   }
   const int plane_type = is_sdp_eligible && plane > 0;
+#endif  // !CONFIG_INTER_SDP
 
   // no deblocking is required
   const uint32_t width = plane_ptr->dst.width;
@@ -552,6 +565,17 @@ static TX_SIZE set_lpf_parameters(
   // filtering. One example is that if this tile is not coded, then its mbmi
   // it not set up.
   if (mbmi == NULL) return TX_INVALID;
+
+#if CONFIG_INTER_SDP
+  const bool is_sdp_eligible =
+      cm->seq_params.enable_sdp && !cm->seq_params.monochrome &&
+      (frame_is_intra_only(cm) ||
+       (!frame_is_intra_only(cm) && mbmi->region_type == INTRA_REGION));
+  if (is_sdp_eligible) {
+    tree_type = (plane == AOM_PLANE_Y) ? LUMA_PART : CHROMA_PART;
+  }
+  const int plane_type = is_sdp_eligible && plane > 0;
+#endif  // CONFIG_INTER_SDP
 
 #if CONFIG_LF_SUB_PU
   TX_SIZE ts = get_transform_size(xd, mi[0], edge_dir, mi_row, mi_col, plane,
@@ -595,9 +619,41 @@ static TX_SIZE set_lpf_parameters(
           const int pv_col =
               (VERT_EDGE == edge_dir) ? (mi_col - (1 << scale_horz)) : (mi_col);
 
+#if CONFIG_INTER_SDP
+          TREE_TYPE prev_tree_type = SHARED_PART;
+          const bool is_prev_sdp_eligible =
+              cm->seq_params.enable_sdp && !cm->seq_params.monochrome &&
+              (frame_is_intra_only(cm) ||
+               (!frame_is_intra_only(cm) &&
+                mi_prev->region_type == INTRA_REGION));
+          if (is_prev_sdp_eligible) {
+            prev_tree_type = (plane == AOM_PLANE_Y) ? LUMA_PART : CHROMA_PART;
+          }
+          const TX_SIZE pv_ts =
+              get_transform_size(xd, mi_prev, edge_dir, pv_row, pv_col, plane,
+                                 prev_tree_type, plane_ptr);
+#else
+
           const TX_SIZE pv_ts =
               get_transform_size(xd, mi_prev, edge_dir, pv_row, pv_col, plane,
                                  tree_type, plane_ptr);
+#endif  // CONFIG_INTER_SDP
+
+#if CONFIG_INTER_SDP_DEBUG
+          /*if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+            const BLOCK_SIZE prev_bsize_base =
+                get_bsize_base_from_tree_type(mi_prev, tree_type, plane);
+            fprintf(
+                file_temp,
+                "Deblocking plane = %d, mi_row = %d, mi_col = %d, pv_ts = %d, "
+                "edge_dir = %d, pv_row = %d, pv_col = %d, tree_type = %d, "
+                "mode_step = %d, prev_bsize = %d, prev_region_type = %d\n"
+                "\n",
+                plane, mi_row, mi_col, pv_ts, edge_dir, pv_row, pv_col,
+                tree_type, mode_step, prev_bsize_base, mi_prev->region_type);
+          }*/
+#endif  // CONFIG_INTER_SDP
+
           const uint32_t pv_q =
               av1_get_filter_q(&cm->lf_info, edge_dir, plane, mi_prev);
           const uint32_t pv_side =
@@ -726,6 +782,15 @@ static TX_SIZE set_lpf_parameters(
               }
             }
             const TX_SIZE min_ts = AOMMIN(clipped_ts, pv_ts);
+#if CONFIG_INTER_SDP_DEBUG
+            /*if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+              fprintf(file_temp,
+                      "Deblocking plane = %d, mi_row = %d, mi_col = %d, ts = "
+                      "%d, clipped_ts = %d, pv_ts = %d"
+                      "\n",
+                      plane, mi_row, mi_col, ts, clipped_ts, pv_ts);
+            }*/
+#endif  // CONFIG_INTER_SDP
             if (TX_4X4 >= min_ts) {
               params->filter_length = 4;
             } else if (TX_8X8 == min_ts) {
@@ -808,6 +873,15 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
   const int dst_stride = plane_ptr->dst.stride;
   const int y_range = (mib_size >> scale_vert);
   const int x_range = (mib_size >> scale_horz);
+#if CONFIG_INTER_SDP_DEBUG
+  FILE *file_temp = NULL;
+  if (is_decoding_process == 0)
+    file_temp = file_enc;
+  else if (is_decoding_process == 1)
+    file_temp = file_dec;
+  else
+    file_temp = NULL;
+#endif  // CONFIG_INTER_SDP
   for (int y = 0; y < y_range; y++) {
     uint16_t *p = dst_ptr + y * MI_SIZE * dst_stride;
     for (int x = 0; x < x_range;) {
@@ -830,6 +904,16 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
         tx_size = TX_4X4;
       }
 
+#if CONFIG_INTER_SDP_DEBUG
+      /*if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+        fprintf(file_temp,
+                "Deblocking vert plane = %d, mi_row = %d, mi_col = %d, curr_y "
+                "= %d, curr_x = %d, tx_size = %d, filter_length = %d\n",
+                plane, mi_row, mi_col, curr_y, curr_x, tx_size,
+                params.filter_length);
+      }*/
+#endif  // CONFIG_INTER_SDP
+
       const aom_bit_depth_t bit_depth = cm->seq_params.bit_depth;
       if (params.filter_length) {
         aom_highbd_lpf_vertical_generic_c(p, dst_stride, params.filter_length,
@@ -848,6 +932,19 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
       p += advance_units * MI_SIZE;
     }
   }
+#if CONFIG_INTER_SDP_DEBUG
+  /*if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+    uint16_t *p = dst_ptr;
+    fprintf(file_temp, "\nDeblocking vert plane = %d, mi_row = %d, mi_col =
+  %d\n", plane, mi_row, mi_col); for (int y = 0; y < y_range * MI_SIZE; y++) {
+      for (int x = 0; x < x_range * MI_SIZE; x++) {
+        fprintf(file_temp, "%7d", p[x]);
+      }
+      fprintf(file_temp, "\n");
+      p += dst_stride;
+    }
+  }*/
+#endif  // CONFIG_INTER_SDP
 }
 
 void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
@@ -862,6 +959,15 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
   const int dst_stride = plane_ptr->dst.stride;
   const int y_range = (mib_size >> scale_vert);
   const int x_range = (mib_size >> scale_horz);
+#if CONFIG_INTER_SDP_DEBUG
+  FILE *file_temp = NULL;
+  if (is_decoding_process == 0)
+    file_temp = file_enc;
+  else if (is_decoding_process == 1)
+    file_temp = file_dec;
+  else
+    file_temp = NULL;
+#endif  // CONFIG_INTER_SDP
   for (int x = 0; x < x_range; x++) {
     uint16_t *p = dst_ptr + x * MI_SIZE;
     for (int y = 0; y < y_range;) {
@@ -885,6 +991,17 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
       }
       const aom_bit_depth_t bit_depth = cm->seq_params.bit_depth;
 
+#if CONFIG_INTER_SDP_DEBUG
+      // if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+      //  fprintf(file_temp,
+      //          "Deblocking horz plane = %d, mi_row = %d, mi_col = %d, curr_y
+      //          "
+      //          "= %d, curr_x = %d, tx_size = %d, filter_length = %d\n",
+      //          plane, mi_row, mi_col, curr_y, curr_x, tx_size,
+      //          params.filter_length);
+      //}
+#endif  // CONFIG_INTER_SDP
+
       if (params.filter_length) {
         aom_highbd_lpf_horizontal_generic_c(p, dst_stride, params.filter_length,
                                             &params.q_threshold,
@@ -902,6 +1019,21 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
       p += advance_units * dst_stride * MI_SIZE;
     }
   }
+#if CONFIG_INTER_SDP_DEBUG
+  /*if (file_temp != NULL && cm->current_frame.order_hint > 0) {
+    uint16_t *p = dst_ptr;
+    fprintf(file_temp,
+           "\nDeblocking horz plane = %d, mi_row = %d, mi_col = %d\n", plane,
+           mi_row, mi_col);
+    for (int y = 0; y < y_range * MI_SIZE; y++) {
+      for (int x = 0; x < x_range * MI_SIZE; x++) {
+        fprintf(file_temp, "%7d", p[x]);
+      }
+      fprintf(file_temp, "\n");
+      p += dst_stride;
+    }
+  }*/
+#endif  // CONFIG_INTER_SDP
 }
 
 void av1_filter_block_plane_vert_test(const AV1_COMMON *const cm,

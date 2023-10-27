@@ -537,6 +537,11 @@ typedef struct frame_contexts {
 #endif  // CONFIG_BLOCK_256
   aom_cdf_prob rect_type_cdf[PARTITION_STRUCTURE_NUM][PARTITION_CONTEXTS]
                             [CDF_SIZE(2)];
+#if CONFIG_INTER_SDP
+  aom_cdf_prob region_type_cdf[PARTITION_STRUCTURE_NUM][INTER_SDP_BSIZE_GROUP]
+                              [CDF_SIZE(REGION_TYPES)];
+#endif  // CONFIG_INTER_SDP
+
   aom_cdf_prob do_ext_partition_cdf[PARTITION_STRUCTURE_NUM][NUM_RECT_PARTS]
                                    [PARTITION_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob do_uneven_4way_partition_cdf[PARTITION_STRUCTURE_NUM]

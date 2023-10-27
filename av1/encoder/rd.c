@@ -99,6 +99,15 @@ static const int av1_ext_tx_set_idx_to_type[2][AOMMAX(EXT_TX_SETS_INTRA,
 void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
                          ModeCosts *mode_costs, FRAME_CONTEXT *fc) {
   int i, j;
+#if CONFIG_INTER_SDP
+  for (int plane_index = (xd->tree_type == CHROMA_PART);
+       plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
+    for (i = 0; i < INTER_SDP_BSIZE_GROUP; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->region_type_cost[plane_index][i],
+                               fc->region_type_cdf[plane_index][i], NULL);
+    }
+  }
+#endif
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int plane_index = (xd->tree_type == CHROMA_PART);
        plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
