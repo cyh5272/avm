@@ -386,6 +386,18 @@ static int has_bottom_left(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
   *px_bottom_left = px_bl_common;
 
+#if CONFIG_BLOCK_256
+  // If we are reaching for a bottom left that's in a different 64-pixel row
+  // disallow using bottom left as a reference to be more hardware friendly.
+  if (block_size_high[bsize] > block_size_high[BLOCK_64X64]) {
+    const int plane_bh_unit_64 = mi_size_high[BLOCK_64X64] >> ss_y;
+    const int bl_row = row_off + tx_size_high_unit[txsz];
+    if (bl_row % plane_bh_unit_64 == 0) {
+      return 0;
+    }
+  }
+#endif  // CONFIG_BLOCK_256
+
   // Special case for 128x* blocks, when col_off is half the block width.
   // This is needed because 128x* superblocks are divided into 64x* blocks in
   // raster order
