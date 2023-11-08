@@ -131,7 +131,7 @@ set_aom_config_var(CONFIG_AV1_TEMPORAL_DENOISING 0
 set_aom_config_var(CONFIG_NN_V2 0 "Fully-connected neural nets ver.2.")
 set_aom_config_var(CONFIG_OPTICAL_FLOW_API 0
                    "AV1 experiment flag for optical flow API.")
-set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 0
+set_aom_config_var(CONFIG_ZERO_OFFSET_BITUPSHIFT 1
                    "Use zero offset for non-normative bit upshift")
 
 # AV2 experiment flags.
@@ -142,14 +142,13 @@ set_aom_config_var(CONFIG_REMOVE_DUAL_FILTER 1
 set_aom_config_var(CONFIG_SDP 0 NUMBER "AV2 Semi-Decoupled Partitioning.")
 set_aom_config_var(CONFIG_EXTQUANT 1
                    "AV2 extended quantization experiment flag")
-set_aom_config_var(ZERO_DC_DELTAQ_OFS 1
-                   "AV2 set zero dc_deltaq offset")
+set_aom_config_var(ZERO_DC_DELTAQ_OFS 1 "AV2 set zero dc_deltaq offset")
 # This is an encode-only change.
 set_aom_config_var(CONFIG_LARGE_TF_BLOCK 1
                    "Enable large adaptively selected temporal filter blocks.")
-# This is an encode-only change.                   
+# This is an encode-only change.
 set_aom_config_var(CONFIG_SCC_DETERMINATION 1
-                   "Enable the screen content tools determination improvement.")                 
+                   "Enable the screen content tools determination improvement.")
 #
 # Variables in this section control optional features of the build system.
 #
@@ -188,10 +187,10 @@ set_aom_option_var(ENABLE_VSX "Enables VSX optimizations on PowerPC targets."
                    ON)
 
 # x86/x86_64 assembly/intrinsics flags.
-set_aom_option_var(ENABLE_MMX "Enables MMX optimizations on x86/x86_64 targets."
-                   ON)
-set_aom_option_var(ENABLE_SSE "Enables SSE optimizations on x86/x86_64 targets."
-                   ON)
+set_aom_option_var(ENABLE_MMX
+                   "Enables MMX optimizations on x86/x86_64 targets." ON)
+set_aom_option_var(ENABLE_SSE
+                   "Enables SSE optimizations on x86/x86_64 targets." ON)
 set_aom_option_var(ENABLE_SSE2
                    "Enables SSE2 optimizations on x86/x86_64 targets." ON)
 set_aom_option_var(ENABLE_SSE3
@@ -202,7 +201,7 @@ set_aom_option_var(ENABLE_SSE4_1
                    "Enables SSE4_1 optimizations on x86/x86_64 targets." ON)
 set_aom_option_var(ENABLE_SSE4_2
                    "Enables SSE4_2 optimizations on x86/x86_64 targets." ON)
-set_aom_option_var(ENABLE_AVX "Enables AVX optimizations on x86/x86_64 targets."
-                   ON)
+set_aom_option_var(ENABLE_AVX
+                   "Enables AVX optimizations on x86/x86_64 targets." ON)
 set_aom_option_var(ENABLE_AVX2
                    "Enables AVX2 optimizations on x86/x86_64 targets." ON)
