@@ -2782,6 +2782,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     2,
     2,
     3,
+#if CONFIG_BLOCK_256_EXT
+    3,
+    3,
+    3,
+    3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     0,
     2,
@@ -2819,6 +2825,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     1,
     3,
     2,
+#if CONFIG_BLOCK_256_EXT
+    3,
+    3,
+    3,
+    3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     2,
     0,
@@ -2856,6 +2868,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     1,
     0,
     1,
+#if CONFIG_BLOCK_256_EXT
+    4 - 3,
+    6 - 3,
+    3 - 3,
+    5 - 3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     0,
     1,
@@ -3313,6 +3331,12 @@ static INLINE int bsize_to_max_depth(BLOCK_SIZE bsize) {
     2,
     2,
     2,
+#if CONFIG_BLOCK_256_EXT
+    2,
+    2,
+    2,
+    2,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     2,
     2,
@@ -3367,6 +3391,12 @@ static INLINE int bsize_to_tx_size_cat(BLOCK_SIZE bsize) {
     3,
     4,
     4,
+#if CONFIG_BLOCK_256_EXT
+    4,
+    4,
+    4,
+    4,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     3,
     3,

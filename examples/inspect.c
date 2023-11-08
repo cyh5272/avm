@@ -196,6 +196,20 @@ const map_entry block_size_map[] = { ENUM(BLOCK_4X4),
                                      ENUM(BLOCK_32X8),
                                      ENUM(BLOCK_16X64),
                                      ENUM(BLOCK_64X16),
+#if CONFIG_BLOCK_256_EXT
+                                     ENUM(BLOCK_64X256),
+                                     ENUM(BLOCK_256X64),
+                                     ENUM(BLOCK_32X128),
+                                     ENUM(BLOCK_128X32),
+#endif  // CONFIG_BLOCK_256_EXT
+#if CONFIG_FLEX_PARTITION
+                                     ENUM(BLOCK_4X32),
+                                     ENUM(BLOCK_32X4),
+                                     ENUM(BLOCK_8X64),
+                                     ENUM(BLOCK_64X8),
+                                     ENUM(BLOCK_4X64),
+                                     ENUM(BLOCK_64X4),
+#endif  // CONFIG_FLEX_PARTITION
                                      LAST_ENUM };
 
 #define TX_SKIP -1

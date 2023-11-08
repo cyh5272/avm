@@ -150,6 +150,7 @@ set_aom_config_var(
   CONFIG_EXT_RECUR_PARTITIONS 1 NUMBER
   "AV2 Fully recursive partitions including H partitions experiment flag")
 set_aom_config_var(CONFIG_BLOCK_256 1 NUMBER "AV2 BLOCK_256 experiment flag")
+set_aom_config_var(CONFIG_BLOCK_256_EXT 1 NUMBER "Flag that enblaes 256X64 and 64X256 partitions")
 set_aom_config_var(CONFIG_FLEX_PARTITION 1 NUMBER
                    "AV2 Flexible partition experiment flag")
 set_aom_config_var(CONFIG_ERP_TFLITE 0 NUMBER "Build ERP with TFLite")

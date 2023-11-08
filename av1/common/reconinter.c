@@ -328,6 +328,12 @@ DECLARE_ALIGNED(16, static uint8_t,
   { 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, },
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+#if CONFIG_BLOCK_256_EXT
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },  // not used
@@ -460,6 +466,12 @@ const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
   { MAX_WEDGE_TYPES, wedge_codebook_16, NULL, wedge_masks[BLOCK_32X8] },
   { MAX_WEDGE_TYPES, wedge_codebook_16, NULL, wedge_masks[BLOCK_16X64] },
   { MAX_WEDGE_TYPES, wedge_codebook_16, NULL, wedge_masks[BLOCK_64X16] },
+#if CONFIG_BLOCK_256_EXT
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
@@ -507,6 +519,12 @@ const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL] = {
     wedge_masks[BLOCK_32X8] },
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
+#if CONFIG_BLOCK_256_EXT
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+  { 0, NULL, NULL, NULL },
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
   { 0, NULL, NULL, NULL },
   { 0, NULL, NULL, NULL },
@@ -821,6 +839,9 @@ static uint8_t ii_size_scales[BLOCK_SIZES_ALL] = {
     0,  0,  0,  // unused
 #endif  // CONFIG_BLOCK_256
     8,  8,  4,  4,  2, 2,
+#if CONFIG_BLOCK_256_EXT
+    0,  0,  1,  1,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     4,  4,  2,  2,  2, 2,
 #endif  // CONFIG_FLEX_PARTITION
