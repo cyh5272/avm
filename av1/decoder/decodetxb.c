@@ -18,39 +18,8 @@
 #include "av1/common/scan.h"
 #include "av1/common/txb_common.h"
 #include "av1/common/reconintra.h"
+#include "av1/common/hr_coding.h"
 #include "av1/decoder/decodemv.h"
-
-static int read_golomb(MACROBLOCKD *xd, aom_reader *r) {
-  int x = 1;
-  int length = 0;
-
-#if CONFIG_BYPASS_IMPROVEMENT
-  length = aom_read_unary(r, 21, ACCT_INFO("length"));
-  if (length > 20) {
-    aom_internal_error(xd->error_info, AOM_CODEC_CORRUPT_FRAME,
-                       "Invalid length in read_golomb");
-  }
-  x = 1 << length;
-  x += aom_read_literal(r, length, ACCT_INFO());
-#else
-  int i = 0;
-  while (!i) {
-    i = aom_read_bit(r, ACCT_INFO());
-    ++length;
-    if (length > 20) {
-      aom_internal_error(xd->error_info, AOM_CODEC_CORRUPT_FRAME,
-                         "Invalid length in read_golomb");
-      break;
-    }
-  }
-  for (i = 0; i < length - 1; ++i) {
-    x <<= 1;
-    x += aom_read_bit(r, ACCT_INFO());
-  }
-#endif  // CONFIG_BYPASS_IMPROVEMENT
-
-  return x - 1;
-}
 
 static INLINE int rec_eob_pos(const int eob_token, const int extra) {
   int eob = av1_eob_group_start[eob_token];
@@ -431,6 +400,16 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
                       cm->features.reduced_tx_set_used);
   const qm_val_t *iqmatrix =
       av1_get_iqmatrix(&cm->quant_params, xd, plane, tx_size, tx_type);
+
+#if CONFIG_ADAPTIVE_HR
+  const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
+  adaptive_hr_info hr_info = { .tx_size = tx_size,
+                               .tx_type = tx_type,
+                               .qindex = xd->qindex[mbmi->segment_id],
+                               .is_inter =
+                                   is_inter_block(mbmi, xd->tree_type) };
+#endif  // CONFIG_ADAPTIVE_HR
+
 #if CONFIG_INSPECTION
   for (int c = 0; c < width * height; c++) {
     dequant_values[c] = get_dqv(dequant, c, iqmatrix);
@@ -480,7 +459,18 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
                              ACCT_INFO("sign"));
       signs[get_padded_idx(pos, bwl)] = sign > 0 ? -1 : 1;
       if (level >= MAX_BASE_BR_RANGE) {
-        level += read_golomb(xd, r);
+#if CONFIG_ADAPTIVE_HR
+        bool is_eob = c == (eob_data->eob - 1);
+        hr_info.is_dc = (c == 0);
+        hr_info.is_eob = is_eob;
+        hr_info.context = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
+        level += read_adaptive_hr(xd, r, &hr_info);
+
+        levels[get_padded_idx_left(pos, bwl)] =
+            (uint8_t)(AOMMIN(level, UINT8_MAX));
+#else
+        level += read_exp_golomb(xd, r, 0);
+#endif  // CONFIG_ADAPTIVE_HR
       }
       if (c == 0) dc_val = sign ? -level : level;
       // Bitmasking to clamp level to valid range:
@@ -589,6 +579,15 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
   const qm_val_t *iqmatrix =
       av1_get_iqmatrix(&cm->quant_params, xd, plane, tx_size, tx_type);
+
+#if CONFIG_ADAPTIVE_HR
+  adaptive_hr_info hr_info = { .tx_size = tx_size,
+                               .tx_type = tx_type,
+                               .qindex = xd->qindex[mbmi->segment_id],
+                               .is_inter =
+                                   is_inter_block(mbmi, xd->tree_type) };
+#endif  // CONFIG_ADAPTIVE_HR
+
 #if CONFIG_INSPECTION
   for (int c = 0; c < width * height; c++) {
     dequant_values[c] = get_dqv(dequant, c, iqmatrix);
@@ -762,7 +761,19 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       }
       if (is_hidden && c == 0) {
         if (level >= (MAX_BASE_BR_RANGE << 1)) {
-          level += (read_golomb(xd, r) << 1);
+#if CONFIG_ADAPTIVE_HR
+          bool is_eob = c == (*eob - 1);
+          hr_info.is_dc = (c == 0);
+          hr_info.is_eob = is_eob;
+          // Use context divided by 2 since the coefficient is also divided by 2
+          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class) >> 1;
+          level += (read_adaptive_hr(xd, r, &hr_info) << 1);
+
+          levels[get_padded_idx(pos, bwl)] =
+              (uint8_t)(AOMMIN(level, UINT8_MAX));
+#else
+          level += (read_exp_golomb(xd, r, 0) << 1);
+#endif  // CONFIG_ADAPTIVE_HR
         }
       } else {
         const int row = pos >> bwl;
@@ -770,11 +781,33 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         int limits = get_lf_limits(row, col, tx_class, plane);
         if (limits) {
           if (level >= LF_MAX_BASE_BR_RANGE) {
-            level += read_golomb(xd, r);
+#if CONFIG_ADAPTIVE_HR
+            bool is_eob = c == (*eob - 1);
+            hr_info.is_dc = (c == 0);
+            hr_info.is_eob = is_eob;
+            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            level += read_adaptive_hr(xd, r, &hr_info);
+
+            levels[get_padded_idx(pos, bwl)] =
+                (uint8_t)(AOMMIN(level, UINT8_MAX));
+#else
+            level += read_exp_golomb(xd, r, 0);
+#endif  // CONFIG_ADAPTIVE_HR
           }
         } else {
           if (level >= MAX_BASE_BR_RANGE) {
-            level += read_golomb(xd, r);
+#if CONFIG_ADAPTIVE_HR
+            bool is_eob = c == (*eob - 1);
+            hr_info.is_dc = (c == 0);
+            hr_info.is_eob = is_eob;
+            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            level += read_adaptive_hr(xd, r, &hr_info);
+
+            levels[get_padded_idx(pos, bwl)] =
+                (uint8_t)(AOMMIN(level, UINT8_MAX));
+#else
+            level += read_exp_golomb(xd, r, 0);
+#endif  // CONFIG_ADAPTIVE_HR
           }
         }
       }

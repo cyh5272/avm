@@ -269,6 +269,7 @@ static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
                                           const TX_CLASS tx_class) {
   int mag;
   // Note: AOMMIN(level, 5) is useless for decoder since level < 5.
+
   mag = clip_max5[levels[1]];                         // { 0, 1 }
   mag += clip_max5[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
   if (tx_class == TX_CLASS_2D) {
@@ -292,8 +293,8 @@ static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
 static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
                                        const int bwl, const TX_CLASS tx_class) {
   int mag;
-
   // Note: AOMMIN(level, 3) is useless for decoder since level < 3.
+
   mag = clip_max3[levels[1]];                         // { 0, 1 }
   mag += clip_max3[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
 
@@ -313,6 +314,27 @@ static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
 
   return mag;
 }
+
+#if CONFIG_ADAPTIVE_HR
+static AOM_FORCE_INLINE int get_nz_mag_noclip(const uint8_t *const levels,
+                                              const int bwl,
+                                              const TX_CLASS tx_class) {
+  int mag;
+
+  mag = levels[1];                         // { 0, 1 }
+  mag += levels[(1 << bwl) + TX_PAD_HOR];  // { 1, 0 }
+
+  if (tx_class == TX_CLASS_2D) {
+    mag += levels[(1 << bwl) + TX_PAD_HOR + 1];  // { 1, 1 }
+  } else if (tx_class == TX_CLASS_VERT) {
+    mag += levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)];  // { 2, 0 }
+  } else {
+    mag += levels[2];  // { 0, 2 }
+  }
+
+  return mag;
+}
+#endif  // CONFIG_ADAPTIVE_HR
 
 #define NZ_MAP_CTX_0 SIG_COEF_CONTEXTS_2D
 #define NZ_MAP_CTX_5 (NZ_MAP_CTX_0 + 5)
@@ -620,6 +642,23 @@ static INLINE int get_lower_levels_ctx_general(int is_last, int scan_idx,
     );
   }
 }
+
+#if CONFIG_ADAPTIVE_HR
+static AOM_FORCE_INLINE int get_hr_ctx(const uint8_t *levels, int coeff_idx,
+                                       int bwl, int is_eob, TX_CLASS tx_class) {
+  if (is_eob) return 0;
+  return get_nz_mag_noclip(levels + get_padded_idx(coeff_idx, bwl), bwl,
+                           tx_class);
+}
+
+static AOM_FORCE_INLINE int get_hr_ctx_skip(const uint8_t *levels,
+                                            int coeff_idx, int bwl, int is_eob,
+                                            TX_CLASS tx_class) {
+  if (is_eob) return 0;
+  return get_nz_mag_noclip(levels + get_padded_idx_left(coeff_idx, bwl), bwl,
+                           tx_class);
+}
+#endif  // CONFIG_ADAPTIVE_HR
 
 static INLINE void set_dc_sign(int *cul_level, int dc_val) {
   if (dc_val < 0)
