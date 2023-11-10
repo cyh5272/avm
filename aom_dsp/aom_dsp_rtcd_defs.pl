@@ -58,6 +58,13 @@ push @block_sizes, [32, 8];
 push @block_sizes, [16, 64];
 push @block_sizes, [64, 16];
 
+if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes"){
+  push @block_sizes, [64, 256];
+  push @block_sizes, [256, 64];
+  push @block_sizes, [32, 128];
+  push @block_sizes, [128, 32];
+}
+
 if (aom_config("CONFIG_FLEX_PARTITION") eq "yes") {
   push @block_sizes, [4, 32];
   push @block_sizes, [32, 4];
@@ -348,9 +355,11 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     }
     add_proto qw/unsigned int/, "aom_highbd_dist_wtd_sad${w}x${h}_avg", "const uint16_t *src_ptr, int src_stride, const uint16_t *ref_ptr, int ref_stride, const uint16_t *second_pred, const DIST_WTD_COMP_PARAMS* jcp_param";
   }
-  specialize qw/aom_highbd_sad256x256 avx2/;
-  specialize qw/aom_highbd_sad256x128 avx2/;
-  specialize qw/aom_highbd_sad128x256 avx2/;
+  if (aom_config("CONFIG_BLOCK_256") eq "yes") {
+    specialize qw/aom_highbd_sad256x256 avx2/;
+    specialize qw/aom_highbd_sad256x128 avx2/;
+    specialize qw/aom_highbd_sad128x256 avx2/;
+  }
   specialize qw/aom_highbd_sad128x128 avx2/;
   specialize qw/aom_highbd_sad128x64  avx2/;
   specialize qw/aom_highbd_sad64x128  avx2/;
@@ -386,9 +395,18 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_highbd_sad32x8    avx2 sse2/;
   specialize qw/aom_highbd_sad64x16   avx2 sse2/;
 
-  specialize qw/aom_highbd_sad_skip_256x256 avx2/;
-  specialize qw/aom_highbd_sad_skip_256x128 avx2/;
-  specialize qw/aom_highbd_sad_skip_128x256 avx2/;
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    specialize qw/aom_highbd_sad256x64 avx2/;
+    specialize qw/aom_highbd_sad64x256 avx2/;
+    specialize qw/aom_highbd_sad32x128 avx2/;
+    specialize qw/aom_highbd_sad128x32 avx2/;
+  }
+
+  if (aom_config("CONFIG_BLOCK_256") eq "yes") {
+    specialize qw/aom_highbd_sad_skip_256x256 avx2/;
+    specialize qw/aom_highbd_sad_skip_256x128 avx2/;
+    specialize qw/aom_highbd_sad_skip_128x256 avx2/;
+  }
   specialize qw/aom_highbd_sad_skip_128x128 avx2/;
   specialize qw/aom_highbd_sad_skip_128x64  avx2/;
   specialize qw/aom_highbd_sad_skip_64x128  avx2/;
@@ -423,9 +441,18 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   }
   specialize qw/aom_highbd_sad_skip_64x16   avx2 sse2/;
 
-  specialize qw/aom_highbd_sad256x256_avg avx2/;
-  specialize qw/aom_highbd_sad256x128_avg avx2/;
-  specialize qw/aom_highbd_sad128x256_avg avx2/;
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    specialize qw/aom_highbd_sad_skip_256x64 avx2/;
+    specialize qw/aom_highbd_sad_skip_64x256 avx2/;
+    specialize qw/aom_highbd_sad_skip_32x128 avx2/;
+    specialize qw/aom_highbd_sad_skip_128x32 avx2/;
+  }
+
+  if (aom_config("CONFIG_BLOCK_256") eq "yes") {
+    specialize qw/aom_highbd_sad256x256_avg avx2/;
+    specialize qw/aom_highbd_sad256x128_avg avx2/;
+    specialize qw/aom_highbd_sad128x256_avg avx2/;
+  }
   specialize qw/aom_highbd_sad128x128_avg avx2/;
   specialize qw/aom_highbd_sad128x64_avg  avx2/;
   specialize qw/aom_highbd_sad64x128_avg  avx2/;
@@ -456,6 +483,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_highbd_sad8x32_avg    sse2/;
   specialize qw/aom_highbd_sad32x8_avg    avx2 sse2/;
   specialize qw/aom_highbd_sad64x16_avg   avx2 sse2/;
+
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    specialize qw/aom_highbd_sad256x64_avg avx2/;
+    specialize qw/aom_highbd_sad64x256_avg avx2/;
+    specialize qw/aom_highbd_sad32x128_avg avx2/;
+    specialize qw/aom_highbd_sad128x32_avg avx2/;
+  }
 
   if (aom_config("CONFIG_FLEX_PARTITION") eq "yes") {
     specialize qw/aom_highbd_sad32x4       sse2/;
@@ -497,6 +531,9 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     } elsif (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128))) {
       specialize "aom_highbd_obmc_sad${w}x${h}", qw/sse4_1 avx2/;
     }
+    if (aom_config("CONFIG_BLOCK_256") eq "yes" && ($w == 128 && $h == 32) || ($w == 32 && $h == 128)) {
+      specialize "aom_highbd_obmc_sad${w}x${h}", qw/sse4_1 avx2/;
+    }
   }
 
   #
@@ -510,9 +547,11 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
       specialize "aom_highbd_sad${w}x${h}x4d", qw/sse2/;
     }
   }
-  specialize qw/aom_highbd_sad256x256x4d avx2/;
-  specialize qw/aom_highbd_sad256x128x4d avx2/;
-  specialize qw/aom_highbd_sad128x256x4d avx2/;
+  if (aom_config("CONFIG_BLOCK_256") eq "yes") {
+    specialize qw/aom_highbd_sad256x256x4d avx2/;
+    specialize qw/aom_highbd_sad256x128x4d avx2/;
+    specialize qw/aom_highbd_sad128x256x4d avx2/;
+  }
   specialize qw/aom_highbd_sad128x128x4d avx2/;
   specialize qw/aom_highbd_sad128x64x4d  avx2/;
   specialize qw/aom_highbd_sad64x128x4d  avx2/;
@@ -537,9 +576,18 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_highbd_sad16x64x4d   avx2 sse2/;
   specialize qw/aom_highbd_sad64x16x4d   avx2 sse2/;
 
-  specialize qw/aom_highbd_sad_skip_256x256x4d avx2/;
-  specialize qw/aom_highbd_sad_skip_256x128x4d avx2/;
-  specialize qw/aom_highbd_sad_skip_128x256x4d avx2/;
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    specialize qw/aom_highbd_sad256x64x4d avx2/;
+    specialize qw/aom_highbd_sad64x256x4d avx2/;
+    specialize qw/aom_highbd_sad32x128x4d avx2/;
+    specialize qw/aom_highbd_sad128x32x4d avx2/;
+  }
+
+  if (aom_config("CONFIG_BLOCK_256") eq "yes") {
+    specialize qw/aom_highbd_sad_skip_256x256x4d avx2/;
+    specialize qw/aom_highbd_sad_skip_256x128x4d avx2/;
+    specialize qw/aom_highbd_sad_skip_128x256x4d avx2/;
+  }
   specialize qw/aom_highbd_sad_skip_128x128x4d avx2/;
   specialize qw/aom_highbd_sad_skip_128x64x4d  avx2/;
   specialize qw/aom_highbd_sad_skip_64x128x4d  avx2/;
@@ -560,6 +608,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_highbd_sad_skip_32x8x4d    avx2 sse2/;
   specialize qw/aom_highbd_sad_skip_16x64x4d   avx2 sse2/;
   specialize qw/aom_highbd_sad_skip_64x16x4d   avx2 sse2/;
+
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    specialize qw/aom_highbd_sad_skip_256x64x4d avx2/;
+    specialize qw/aom_highbd_sad_skip_64x256x4d avx2/;
+    specialize qw/aom_highbd_sad_skip_32x128x4d avx2/;
+    specialize qw/aom_highbd_sad_skip_128x32x4d avx2/;
+  }
 
   if (aom_config("CONFIG_FLEX_PARTITION") eq "yes") {
     specialize qw/aom_highbd_sad4x32x4d  sse2/;
@@ -728,6 +783,19 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     add_proto qw/unsigned int aom_highbd_12_variance128x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
     specialize qw/aom_highbd_12_variance128x256 avx2/;
   }
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes"){
+    add_proto qw/unsigned int aom_highbd_12_variance256x64/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_12_variance256x64 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_12_variance64x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_12_variance64x256 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_12_variance32x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_12_variance32x128 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_12_variance128x32/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_12_variance128x32 avx2/;
+  }
 
   add_proto qw/unsigned int aom_highbd_12_variance128x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
   specialize qw/aom_highbd_12_variance128x128 sse2 avx2/;
@@ -798,6 +866,19 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
 
     add_proto qw/unsigned int aom_highbd_10_variance128x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
     specialize qw/aom_highbd_10_variance128x256 avx2/;
+  }
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes"){
+    add_proto qw/unsigned int aom_highbd_10_variance256x64/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_10_variance256x64 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_10_variance64x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_10_variance64x256 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_10_variance32x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_10_variance32x128 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_10_variance128x32/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_10_variance128x32 avx2/;
   }
 
   add_proto qw/unsigned int aom_highbd_10_variance128x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
@@ -882,6 +963,19 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
 
     add_proto qw/unsigned int aom_highbd_8_variance128x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
     specialize qw/aom_highbd_8_variance128x256 avx2/;
+  }
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes") {
+    add_proto qw/unsigned int aom_highbd_8_variance256x64/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_8_variance256x64 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_8_variance64x256/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_8_variance64x256 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_8_variance32x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_8_variance32x128 avx2/;
+
+    add_proto qw/unsigned int aom_highbd_8_variance128x32/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
+    specialize qw/aom_highbd_8_variance128x32 avx2/;
   }
 
   add_proto qw/unsigned int aom_highbd_8_variance128x128/, "const uint16_t *src_ptr, int source_stride, const uint16_t *ref_ptr, int ref_stride, unsigned int *sse";
@@ -1091,6 +1185,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     specialize qw/aom_highbd_10_sub_pixel_variance128x256 avx2/;
   }
 
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes"){
+    specialize qw/aom_highbd_10_sub_pixel_variance256x64 avx2/;
+    specialize qw/aom_highbd_10_sub_pixel_variance64x256 avx2/;
+    specialize qw/aom_highbd_10_sub_pixel_variance32x128 avx2/;
+    specialize qw/aom_highbd_10_sub_pixel_variance128x32 avx2/;
+  }
+
   add_proto qw/uint32_t aom_highbd_10_sub_pixel_variance128x128/, "const uint16_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse";
   specialize qw/aom_highbd_10_sub_pixel_variance128x128 sse2 avx2/;
 
@@ -1174,6 +1275,13 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     specialize qw/aom_highbd_8_sub_pixel_variance256x256 avx2/;
     specialize qw/aom_highbd_8_sub_pixel_variance256x128 avx2/;
     specialize qw/aom_highbd_8_sub_pixel_variance128x256 avx2/;
+  }
+
+  if (aom_config("CONFIG_BLOCK_256_EXT") eq "yes"){
+    specialize qw/aom_highbd_8_sub_pixel_variance256x64 avx2/;
+    specialize qw/aom_highbd_8_sub_pixel_variance64x256 avx2/;
+    specialize qw/aom_highbd_8_sub_pixel_variance32x128 avx2/;
+    specialize qw/aom_highbd_8_sub_pixel_variance128x32 avx2/;
   }
 
   add_proto qw/uint32_t aom_highbd_8_sub_pixel_variance128x128/, "const uint16_t *src_ptr, int source_stride, int xoffset, int  yoffset, const uint16_t *ref_ptr, int ref_stride, uint32_t *sse";
