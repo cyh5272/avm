@@ -138,7 +138,17 @@ static int reset(AVxWorker *const worker) {
       goto Error;
     }
     pthread_mutex_lock(&worker->impl_->mutex_);
+#ifdef __APPLE__
+    pthread_attr_t thread_attr;
+    pthread_attr_init(&thread_attr);
+    ok = !pthread_attr_setstacksize(&thread_attr, MIN_THREAD_STACK_SIZE);
+    if (ok) {
+      ok = !pthread_create(&worker->impl_->thread_, &thread_attr, thread_loop,
+                           worker);
+    }
+#else
     ok = !pthread_create(&worker->impl_->thread_, NULL, thread_loop, worker);
+#endif
     if (ok) worker->status_ = OK;
     pthread_mutex_unlock(&worker->impl_->mutex_);
     if (!ok) {
