@@ -439,6 +439,9 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
   .enable_intrabc = ARG_DEF(NULL, "enable-intrabc", 1,
                             "Enable intra block copy prediction mode "
                             "(0: false, 1: true (default))"),
+  .enable_intrabc_ext =
+      ARG_DEF(NULL, "enable-intrabc-ext", 1,
+              "Dummy argument to support CTCv6 command-line. Has no effect."),
   .enable_angle_delta =
       ARG_DEF(NULL, "enable-angle-delta", 1,
               "Enable intra angle delta (0: false, 1: true (default))"),

@@ -169,6 +169,7 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t enable_overlay;
   arg_def_t enable_palette;
   arg_def_t enable_intrabc;
+  arg_def_t enable_intrabc_ext;
   arg_def_t enable_angle_delta;
   arg_def_t enable_trellis_quant;
   arg_def_t enable_qm;
