@@ -1207,6 +1207,13 @@ void av1_opfl_build_inter_predictor(
   av1_init_inter_params(inter_pred_params, bw, bh, pre_y, pre_x,
                         pd->subsampling_x, pd->subsampling_y, xd->bd,
                         mi->use_intrabc[0], sf, pre_buf, mi->interp_fltr);
+#if CONFIG_OPFL_FILTER_4TAP
+  // For P0/P1 in optical flow derivations, use 4 tap interpolation filters
+  inter_pred_params->interp_filter_params[0] =
+      &av1_interp_4tap[EIGHTTAP_SMOOTH];
+  inter_pred_params->interp_filter_params[1] =
+      &av1_interp_4tap[EIGHTTAP_SMOOTH];
+#endif  // CONFIG_OPFL_FILTER_4TAP
 #if CONFIG_REFINEMV
   inter_pred_params->original_pu_width = pu_width;
   inter_pred_params->original_pu_height = pu_height;

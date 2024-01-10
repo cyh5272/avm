@@ -171,6 +171,8 @@ set_aom_config_var(CONFIG_CCSO_EDGE_CLF 1
                    "Enable adaptive edge classifier for CCSO.")
 set_aom_config_var(CONFIG_OPTFLOW_REFINEMENT 1
                    "AV2 experiment flag for optical flow MV refinement")
+set_aom_config_var(CONFIG_OPFL_FILTER_4TAP 1
+                   "Reduction of optical flow MV refinement computations")
 set_aom_config_var(
   CONFIG_IBP_DC 1
   "AV2 experiment flag to enable intra bi-prediction for DC mode.")
