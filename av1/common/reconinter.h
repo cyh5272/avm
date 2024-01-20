@@ -314,7 +314,7 @@ static const AffineModelParams default_affine_params = { 0, 0, 0, 0, 0 };
 // we are practically computing
 //   coeff * (v[delta] - v[0]) / (2 * delta).
 // Thus, coeff is doubled to get a better gradient quality.
-#if OPFL_BILINEAR_GRAD
+#if OPFL_BILINEAR_GRAD || CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 static const int bilinear_bits = 3;
 static const int32_t coeffs_bilinear[4][2] = {
   { 8, 16 },  // delta = 1 (SUBPEL_GRAD_DELTA_BITS = 0)
@@ -324,7 +324,7 @@ static const int32_t coeffs_bilinear[4][2] = {
 };
 #endif
 
-#if OPFL_BICUBIC_GRAD
+#if OPFL_BICUBIC_GRAD || CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 static const int bicubic_bits = 7;
 static const int32_t coeffs_bicubic[4][2][2] = {
   { { 128, 256 }, { 0, 0 } },    // delta = 1 (SUBPEL_GRAD_DELTA_BITS = 0)
