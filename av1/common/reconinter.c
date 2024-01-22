@@ -2344,6 +2344,7 @@ static INLINE unsigned int sad_generic(const uint16_t *a, int a_stride,
 #if OPFL_COMBINE_INTERP_GRAD_LS
 #if CONFIG_AFFINE_REFINEMENT
 #define COMBINE_WITH_BILINEAR 0
+#define DEBUG_AFFINE_COMBINE 0
 // Update predicted blocks (P0 & P1) and their gradients based on the affine
 // model derived from the first DAMR step
 #if CONFIG_COMBINE_AFFINE_WARP_GRADIENT && AFFINE_FAST_WARP_METHOD == 3
@@ -2608,6 +2609,29 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
   }
   av1_copy_pred_array_highbd(&dst_warped[0], &dst_warped[bw * bh], tmp0, tmp1,
                              bw, bh, d0, d1, 0);
+#if DEBUG_AFFINE_COMBINE
+  fprintf(stderr, "P0':\n");
+  for (int i = 0; i < bh; i++) {
+    for (int j = 0; j < bw; j++) {
+      fprintf(stderr, "%d,", dst_warped[i * bw + j]);
+    }
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "P1':\n");
+  for (int i = 0; i < bh; i++) {
+    for (int j = 0; j < bw; j++) {
+      fprintf(stderr, "%d,", dst_warped[bw * bh + i * bw + j]);
+    }
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "tmp0:\n");
+  for (int i = 0; i < bh; i++) {
+    for (int j = 0; j < bw; j++) {
+      fprintf(stderr, "%d,", tmp0[i * bw + j]);
+    }
+    fprintf(stderr, "\n");
+  }
+#endif
   // Buffers gx0 and gy0 are used to store the gradients of tmp0
   av1_compute_subpel_gradients_interp(tmp0, bw, bh, grad_prec_bits, gx0, gy0);
   aom_free(dst_warped);
@@ -2809,8 +2833,57 @@ void av1_get_optflow_based_mv_highbd(
 #endif  // CONFIG_REFINEMV
         &affine_params, grad_prec_bits, wms);
 
+#if DEBUG_AFFINE_COMBINE
+    struct macroblockd_plane *const pd = &xd->plane[plane];
+    fprintf(stderr,
+            "[update] f %d mi (%d,%d) bs %dx%d\n"
+            "  wm0 (%d,%d,%d,%d,%d,%d) wm1 (%d,%d,%d,%d,%d,%d)\n",
+            cm->cur_frame->order_hint, xd->mi_row, xd->mi_col, bw, bh,
+            wms[0].wmmat[0], wms[0].wmmat[1], wms[0].wmmat[2], wms[0].wmmat[3],
+            wms[0].wmmat[4], wms[0].wmmat[5], wms[1].wmmat[0], wms[1].wmmat[1],
+            wms[1].wmmat[2], wms[1].wmmat[3], wms[1].wmmat[4], wms[1].wmmat[5]);
+    fprintf(stderr, "P0:\n");
+    for (int i = 0; i < bh; i++) {
+      for (int j = 0; j < bw; j++) {
+        fprintf(stderr, "%d,", pd->pre[0].buf0[i * pd->pre[0].stride + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "P1:\n");
+    for (int i = 0; i < bh; i++) {
+      for (int j = 0; j < bw; j++) {
+        fprintf(stderr, "%d,", pd->pre[1].buf0[i * pd->pre[1].stride + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+#endif
+
     update_pred_grad_with_affine_model(xd, plane, bw, bh, wms, mi_x, mi_y, tmp0,
                                        tmp1, gx0, gy0, d0, d1, &grad_prec_bits);
+
+#if DEBUG_AFFINE_COMBINE
+    fprintf(stderr, "tmp1:\n");
+    for (int i = 0; i < bh; i++) {
+      for (int j = 0; j < bw; j++) {
+        fprintf(stderr, "%d,", tmp1[i * bw + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "gx:\n");
+    for (int i = 0; i < bh; i++) {
+      for (int j = 0; j < bw; j++) {
+        fprintf(stderr, "%d,", gx0[i * bw + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "gy:\n");
+    for (int i = 0; i < bh; i++) {
+      for (int j = 0; j < bw; j++) {
+        fprintf(stderr, "%d,", gy0[i * bw + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+#endif
 
     // Subblock wise translational refinement
     if (damr_refine_subblock(plane, bw, bh, mbmi->comp_refine_type, n)) {
