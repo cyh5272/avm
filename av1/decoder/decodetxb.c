@@ -715,7 +715,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
     }
   }
 
-  for (int c = 0; c < *eob; ++c) {
+  for (int c = *eob - 1; c >= 0; --c) {
     const int pos = scan[c];
     uint8_t sign;
     tran_low_t level = levels[get_padded_idx(pos, bwl)];

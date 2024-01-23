@@ -1003,8 +1003,8 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 #endif
 
   // Loop to code all signs in the transform block,
-  // starting with the sign of DC (if applicable)
-  for (int c = 0; c < eob; ++c) {
+  // starting with the sign of the EOB coefficient (if applicable)
+  for (int c = eob - 1; c >= 0; --c) {
     const tran_low_t v = tcoeff[scan[c]];
     const tran_low_t level = abs(v);
     const int sign = (v < 0) ? 1 : 0;
