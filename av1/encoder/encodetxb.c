@@ -278,32 +278,32 @@ static int get_eob_cost(int eob, const LV_MAP_EOB_COST *txb_eob_costs,
 
 #if CONFIG_ADAPTIVE_HR
 static INLINE int get_br_cost(tran_low_t level, const int *coeff_lps,
-                              adaptive_hr_info *info) {
+                              int hr_ctx) {
   const int base_range = AOMMIN(level - 1 - NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   int cost = coeff_lps[base_range];
 
   if (level >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE) {
     const int r = level - COEFF_BASE_RANGE - NUM_BASE_LEVELS - 1;
-    cost += av1_cost_literal(get_adaptive_hr_length(r, info));
+    cost += av1_cost_literal(get_adaptive_hr_length(r, hr_ctx));
   }
   return cost;
 }
 
 static INLINE int get_br_lf_cost(tran_low_t level, const int *coeff_lps,
-                                 adaptive_hr_info *info) {
+                                 int hr_ctx) {
   const int base_range =
       AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   int cost = coeff_lps[base_range];
 
   if (level >= 1 + LF_NUM_BASE_LEVELS + COEFF_BASE_RANGE) {
     const int r = level - COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS - 1;
-    cost += av1_cost_literal(get_adaptive_hr_length(r, info));
+    cost += av1_cost_literal(get_adaptive_hr_length(r, hr_ctx));
   }
   return cost;
 }
 
 static INLINE int get_br_cost_with_diff(tran_low_t level, const int *coeff_lps,
-                                        int *diff, adaptive_hr_info *info) {
+                                        int *diff, int hr_ctx) {
   const int base_range = AOMMIN(level - 1 - NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   int cost = coeff_lps[base_range];
 
@@ -313,7 +313,7 @@ static INLINE int get_br_cost_with_diff(tran_low_t level, const int *coeff_lps,
   if (level >= COEFF_BASE_RANGE + 1 + NUM_BASE_LEVELS) {
     const int r = level - COEFF_BASE_RANGE - NUM_BASE_LEVELS - 1;
     int bits, diff_bits;
-    bits = get_adaptive_hr_length_diff(r, info, &diff_bits);
+    bits = get_adaptive_hr_length_diff(r, hr_ctx, &diff_bits);
     *diff += av1_cost_literal(diff_bits);
     cost += av1_cost_literal(bits);
   }
@@ -323,7 +323,7 @@ static INLINE int get_br_cost_with_diff(tran_low_t level, const int *coeff_lps,
 
 static INLINE int get_br_lf_cost_with_diff(tran_low_t level,
                                            const int *coeff_lps, int *diff,
-                                           adaptive_hr_info *info) {
+                                           int hr_ctx) {
   const int base_range =
       AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   int cost = coeff_lps[base_range];
@@ -334,7 +334,7 @@ static INLINE int get_br_lf_cost_with_diff(tran_low_t level,
   if (level >= COEFF_BASE_RANGE + 1 + LF_NUM_BASE_LEVELS) {
     const int r = level - COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS - 1;
     int bits, diff_bits;
-    bits = get_adaptive_hr_length_diff(r, info, &diff_bits);
+    bits = get_adaptive_hr_length_diff(r, hr_ctx, &diff_bits);
     *diff += av1_cost_literal(diff_bits);
     cost += av1_cost_literal(bits);
   }
@@ -748,12 +748,6 @@ void av1_write_coeffs_txb_skip(const AV1_COMMON *const cm, MACROBLOCK *const x,
 
 #if CONFIG_ADAPTIVE_HR
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
-  const MB_MODE_INFO *mbmi = xd->mi[0];
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
 #endif  // CONFIG_ADAPTIVE_HR
 
   DECLARE_ALIGNED(16, int8_t, coeff_contexts[MAX_TX_SQUARE]);
@@ -801,11 +795,9 @@ void av1_write_coeffs_txb_skip(const AV1_COMMON *const cm, MACROBLOCK *const x,
       if (level > COEFF_BASE_RANGE + NUM_BASE_LEVELS) {
 #if CONFIG_ADAPTIVE_HR
         bool is_eob = c == (eob - 1);
-        hr_info.is_dc = (c == 0);
-        hr_info.is_eob = is_eob;
-        hr_info.context = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
+        int hr_ctx = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
         write_adaptive_hr(w, level - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS,
-                          &hr_info);
+                          hr_ctx);
 #else
         write_exp_golomb(w, level - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS, 0);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -903,15 +895,6 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
                           plane);
 
   const int bwl = get_txb_bwl(tx_size);
-
-#if CONFIG_ADAPTIVE_HR
-  const MB_MODE_INFO *mbmi = xd->mi[0];
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
-#endif  // CONFIG_ADAPTIVE_HR
 
   bool enable_parity_hiding = cm->features.allow_parity_hiding &&
                               !xd->lossless[xd->mi[0]->segment_id] &&
@@ -1112,13 +1095,10 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
         if (q_index > COEFF_BASE_RANGE + NUM_BASE_LEVELS) {
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
           // Use context divided by 2 since the coefficient is also divided by 2
-          hr_info.context =
-              get_hr_ctx(levels, scan[0], bwl, is_eob, tx_class) >> 1;
+          int hr_ctx = get_hr_ctx(levels, scan[0], bwl, is_eob, tx_class) >> 1;
           write_adaptive_hr(w, q_index - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS,
-                            &hr_info);
+                            hr_ctx);
 #else
           write_exp_golomb(w, q_index - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS,
                            0);
@@ -1133,11 +1113,9 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
           if (level > COEFF_BASE_RANGE + LF_NUM_BASE_LEVELS) {
 #if CONFIG_ADAPTIVE_HR
             bool is_eob = c == (eob - 1);
-            hr_info.is_dc = (c == 0);
-            hr_info.is_eob = is_eob;
-            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
             write_adaptive_hr(
-                w, level - COEFF_BASE_RANGE - 1 - LF_NUM_BASE_LEVELS, &hr_info);
+                w, level - COEFF_BASE_RANGE - 1 - LF_NUM_BASE_LEVELS, hr_ctx);
 #else
             write_exp_golomb(
                 w, level - COEFF_BASE_RANGE - 1 - LF_NUM_BASE_LEVELS, 0);
@@ -1147,11 +1125,9 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
           if (level > COEFF_BASE_RANGE + NUM_BASE_LEVELS) {
 #if CONFIG_ADAPTIVE_HR
             bool is_eob = c == (eob - 1);
-            hr_info.is_dc = (c == 0);
-            hr_info.is_eob = is_eob;
-            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
             write_adaptive_hr(w, level - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS,
-                              &hr_info);
+                              hr_ctx);
 #else
             write_exp_golomb(w, level - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS,
                              0);
@@ -1427,11 +1403,6 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
 
 #if CONFIG_ADAPTIVE_HR
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
 #endif  // CONFIG_ADAPTIVE_HR
 
   const int eob_multi_size = txsize_log2_minus4[tx_size];
@@ -1467,10 +1438,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_skip(
         const int ctx = get_br_ctx_skip(levels, pos, bwl);
 #if CONFIG_ADAPTIVE_HR
         bool is_eob = c == (eob - 1);
-        hr_info.is_dc = (c == 0);
-        hr_info.is_eob = is_eob;
-        hr_info.context = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
-        cost += get_br_cost(level, lps_cost[ctx], &hr_info);
+        int hr_ctx = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
+        cost += get_br_cost(level, lps_cost[ctx], hr_ctx);
 #else
         cost += get_br_cost(level, lps_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1538,15 +1507,6 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
   int cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
 #endif  // CONFIG_CONTEXT_DERIVATION
 
-#if CONFIG_ADAPTIVE_HR
-  const MB_MODE_INFO *mbmi = xd->mi[0];
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
-#endif  // CONFIG_ADAPTIVE_HR
-
   av1_txb_init_levels(qcoeff, width, height, levels);
 
   const int bob_code = p->bobs[block];
@@ -1597,10 +1557,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = get_br_ctx_lf_eob(pos, tx_class);
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_lf_cost(level, lps_lf_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_lf_cost(level, lps_lf_cost[ctx], hr_ctx);
 #else
           cost += get_br_lf_cost(level, lps_lf_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1610,10 +1568,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = 7; /* get_lf_ctx_eob */
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_cost(level, lps_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_cost(level, lps_cost[ctx], hr_ctx);
 #else
           cost += get_br_cost(level, lps_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1680,10 +1636,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_lf_cost(level, lps_lf_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_lf_cost(level, lps_lf_cost[ctx], hr_ctx);
 #else
           cost += get_br_lf_cost(level, lps_lf_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1693,10 +1647,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = get_br_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_cost(level, lps_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_cost(level, lps_cost[ctx], hr_ctx);
 #else
           cost += get_br_cost(level, lps_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1726,12 +1678,9 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
         const int ctx = get_par_br_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
         bool is_eob = c == (eob - 1);
-        hr_info.is_dc = (c == 0);
-        hr_info.is_eob = is_eob;
         // Use context divided by 2 since the coefficient is also divided by 2
-        hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class) >> 1;
-        cost +=
-            get_br_cost(q_index, coeff_costs_ph->lps_ph_cost[ctx], &hr_info);
+        int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class) >> 1;
+        cost += get_br_cost(q_index, coeff_costs_ph->lps_ph_cost[ctx], hr_ctx);
 #else
         cost += get_br_cost(q_index, coeff_costs_ph->lps_ph_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1773,10 +1722,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_lf_cost(level, lps_lf_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_lf_cost(level, lps_lf_cost[ctx], hr_ctx);
 #else
           cost += get_br_lf_cost(level, lps_lf_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -1786,10 +1733,8 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
           const int ctx = get_br_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-          cost += get_br_cost(level, lps_cost[ctx], &hr_info);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+          cost += get_br_cost(level, lps_cost[ctx], hr_ctx);
 #else
           cost += get_br_cost(level, lps_cost[ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2056,12 +2001,7 @@ int av1_cost_coeffs_txb_laplacian(const AV1_COMMON *cm, const MACROBLOCK *x,
 static AOM_FORCE_INLINE int get_two_coeff_cost_simple(
     int plane, int ci, tran_low_t abs_qc, int coeff_ctx,
     const LV_MAP_COEFF_COST *txb_costs, int bwl, TX_CLASS tx_class,
-    const uint8_t *levels, int *cost_low
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+    const uint8_t *levels, int *cost_low) {
   // this simple version assumes the coeff's scan_idx is not DC (scan_idx != 0)
   // and not the last (scan_idx != eob - 1)
   assert(ci > 0);
@@ -2121,11 +2061,9 @@ static AOM_FORCE_INLINE int get_two_coeff_cost_simple(
         const int br_ctx = get_br_lf_ctx(levels, ci, bwl, tx_class);
         int brcost_diff = 0;
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_dc = false;
-        hr_info->is_eob = false;
-        hr_info->context = get_hr_ctx(levels, ci, bwl, false, tx_class);
+        int hr_ctx = get_hr_ctx(levels, ci, bwl, false, tx_class);
         cost += get_br_lf_cost_with_diff(abs_qc, txb_costs->lps_lf_cost[br_ctx],
-                                         &brcost_diff, hr_info);
+                                         &brcost_diff, hr_ctx);
 #else
         cost += get_br_lf_cost_with_diff(abs_qc, txb_costs->lps_lf_cost[br_ctx],
                                          &brcost_diff);
@@ -2137,11 +2075,9 @@ static AOM_FORCE_INLINE int get_two_coeff_cost_simple(
         const int br_ctx = get_br_ctx(levels, ci, bwl, tx_class);
         int brcost_diff = 0;
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_dc = false;
-        hr_info->is_eob = false;
-        hr_info->context = get_hr_ctx(levels, ci, bwl, false, tx_class);
+        int hr_ctx = get_hr_ctx(levels, ci, bwl, false, tx_class);
         cost += get_br_cost_with_diff(abs_qc, txb_costs->lps_cost[br_ctx],
-                                      &brcost_diff, hr_info);
+                                      &brcost_diff, hr_ctx);
 #else
         cost += get_br_cost_with_diff(abs_qc, txb_costs->lps_cost[br_ctx],
                                       &brcost_diff);
@@ -2164,13 +2100,7 @@ static INLINE int get_coeff_cost_eob(int ci, tran_low_t abs_qc, int sign,
                                      int32_t *tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                      ,
-                                     int plane
-#if CONFIG_ADAPTIVE_HR
-                                     ,
-                                     const uint8_t *levels,
-                                     adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+                                     int plane) {
   int cost = 0;
   const int row = ci >> bwl;
   const int col = ci - (row << bwl);
@@ -2206,10 +2136,8 @@ static INLINE int get_coeff_cost_eob(int ci, tran_low_t abs_qc, int sign,
       if (abs_qc > LF_NUM_BASE_LEVELS) {
         int br_ctx = get_br_ctx_lf_eob(ci, tx_class);
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_eob = true;
-        hr_info->is_dc = (ci == 0);
-        hr_info->context = get_hr_ctx(levels, ci, bwl, true, tx_class);
-        cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx], hr_info);
+        int hr_ctx = 0; /* get_hr_ctx */
+        cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx], hr_ctx);
 #else
         cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2218,10 +2146,8 @@ static INLINE int get_coeff_cost_eob(int ci, tran_low_t abs_qc, int sign,
       if (abs_qc > NUM_BASE_LEVELS) {
         int br_ctx = 7; /* get_br_ctx_eob */
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_eob = true;
-        hr_info->is_dc = (ci == 0);
-        hr_info->context = get_hr_ctx(levels, ci, bwl, true, tx_class);
-        cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], hr_info);
+        int hr_ctx = 0; /* get_hr_ctx */
+        cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], hr_ctx);
 #else
         cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2242,12 +2168,7 @@ static INLINE int get_coeff_cost_general(int is_last, int ci, tran_low_t abs_qc,
                                          int32_t *tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                          ,
-                                         int plane
-#if CONFIG_ADAPTIVE_HR
-                                         ,
-                                         adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+                                         int plane) {
   int cost = 0;
   if (is_last) {
     const int row = ci >> bwl;
@@ -2304,10 +2225,8 @@ static INLINE int get_coeff_cost_general(int is_last, int ci, tran_low_t abs_qc,
           br_ctx = get_br_lf_ctx(levels, ci, bwl, tx_class);
 
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_dc = (ci == 0);
-        hr_info->is_eob = is_last;
-        hr_info->context = get_hr_ctx(levels, ci, bwl, is_last, tx_class);
-        cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx], hr_info);
+        int hr_ctx = get_hr_ctx(levels, ci, bwl, is_last, tx_class);
+        cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx], hr_ctx);
 #else
         cost += get_br_lf_cost(abs_qc, txb_costs->lps_lf_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2321,10 +2240,8 @@ static INLINE int get_coeff_cost_general(int is_last, int ci, tran_low_t abs_qc,
           br_ctx = get_br_ctx(levels, ci, bwl, tx_class);
 
 #if CONFIG_ADAPTIVE_HR
-        hr_info->is_dc = (ci == 0);
-        hr_info->is_eob = is_last;
-        hr_info->context = get_hr_ctx(levels, ci, bwl, is_last, tx_class);
-        cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], hr_info);
+        int hr_ctx = get_hr_ctx(levels, ci, bwl, is_last, tx_class);
+        cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], hr_ctx);
 #else
         cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2362,12 +2279,7 @@ static INLINE void update_coeff_general(
     int32_t *tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
     ,
-    int plane, coeff_info *coef_info, bool enable_parity_hiding
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+    int plane, coeff_info *coef_info, bool enable_parity_hiding) {
   const int dqv = get_dqv(dequant, scan[si], iqmatrix);
   const int ci = scan[si];
   const tran_low_t qc = qcoeff[ci];
@@ -2398,12 +2310,7 @@ static INLINE void update_coeff_general(
                                tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                ,
-                               plane
-#if CONFIG_ADAPTIVE_HR
-                               ,
-                               hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-        );
+                               plane);
     const int64_t rd = RDCOST(rdmult, rate, dist);
 
     tran_low_t qc_low, dqc_low;
@@ -2433,12 +2340,7 @@ static INLINE void update_coeff_general(
                                  tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                  ,
-                                 plane
-#if CONFIG_ADAPTIVE_HR
-                                 ,
-                                 hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-          );
+                                 plane);
     }
 
     rd_low = RDCOST(rdmult, rate_low, dist_low);
@@ -2467,12 +2369,7 @@ static AOM_FORCE_INLINE void update_coeff_simple(
     const LV_MAP_COEFF_COST *txb_costs, const tran_low_t *tcoeff,
     tran_low_t *qcoeff, tran_low_t *dqcoeff, uint8_t *levels,
     const qm_val_t *iqmatrix, coeff_info *coef_info, bool enable_parity_hiding,
-    int plane
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+    int plane) {
   const int dqv = get_dqv(dequant, scan[si], iqmatrix);
   (void)eob;
   // this simple version assumes the coeff's scan_idx is not DC (scan_idx != 0)
@@ -2509,12 +2406,7 @@ static AOM_FORCE_INLINE void update_coeff_simple(
     int rate_low = 0;
     const int rate =
         get_two_coeff_cost_simple(plane, ci, abs_qc, coeff_ctx, txb_costs, bwl,
-                                  tx_class, levels, &rate_low
-#if CONFIG_ADAPTIVE_HR
-                                  ,
-                                  hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-        );
+                                  tx_class, levels, &rate_low);
 
     if (abs_dqc < abs_tqc) {
       *accu_rate += rate;
@@ -2569,12 +2461,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
     int32_t *tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
     ,
-    int plane, coeff_info *coef_info, bool enable_parity_hiding
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+    int plane, coeff_info *coef_info, bool enable_parity_hiding) {
   const int bwl = get_txb_bwl(tx_size);
   const int height = get_txb_high(tx_size);
   const int dqv = get_dqv(dequant, scan[si], iqmatrix);
@@ -2619,12 +2506,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
                                tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                ,
-                               plane
-#if CONFIG_ADAPTIVE_HR
-                               ,
-                               hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-        );
+                               plane);
     int64_t rd = RDCOST(rdmult, *accu_rate + rate, *accu_dist + dist);
 
     tran_low_t qc_low, dqc_low;
@@ -2653,12 +2535,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
                                  tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                  ,
-                                 plane
-#if CONFIG_ADAPTIVE_HR
-                                 ,
-                                 hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-          );
+                                 plane);
       rd_low = RDCOST(rdmult, *accu_rate + rate_low, *accu_dist + dist_low);
     }
     int rate_up_backup = rate;
@@ -2680,12 +2557,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
                                           tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                           ,
-                                          plane
-#if CONFIG_ADAPTIVE_HR
-                                          ,
-                                          levels, hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-                       );
+                                          plane);
     int64_t dist_new_eob = dist;
     int64_t rd_new_eob = RDCOST(rdmult, rate_coeff_eob, dist_new_eob);
     int rateeobup = rate_coeff_eob;
@@ -2700,12 +2572,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
                                             tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                                             ,
-                                            plane
-#if CONFIG_ADAPTIVE_HR
-                                            ,
-                                            levels, hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-                         );
+                                            plane);
       const int64_t dist_new_eob_low = dist_low;
       const int64_t rd_new_eob_low =
           RDCOST(rdmult, rate_coeff_eob_low, dist_new_eob_low);
@@ -2793,10 +2660,6 @@ static AOM_FORCE_INLINE int rate_save(const LV_MAP_COEFF_COST *txb_costs,
                                       ,
                                       int plane
 #endif  // CONFIG_CHROMA_TX_COEFF_CODING
-#if CONFIG_ADAPTIVE_HR
-                                      ,
-                                      adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
 ) {
   tran_low_t abslevel = abs(level), q_index = abslevel >> 1;
   int sign = level < 0;
@@ -2821,22 +2684,15 @@ static AOM_FORCE_INLINE int rate_save(const LV_MAP_COEFF_COST *txb_costs,
                                  0
 #endif  // CONFIG_CONTEXT_DERIVATION
                                  ,
-                                 0
-#if CONFIG_ADAPTIVE_HR
-                                 ,
-                                 hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-  );
+                                 0);
 
   const int base_ctx_ph = get_base_ctx_ph(levels, pos, bwl, tx_class);
   int rate_ph = txb_costs_ph->base_ph_cost[base_ctx_ph][AOMMIN(q_index, 3)];
   if (q_index > NUM_BASE_LEVELS) {
     int br_ctx = get_par_br_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
-    hr_info->is_eob = false;
-    hr_info->is_dc = (pos == 0);
-    hr_info->context = get_hr_ctx(levels, pos, bwl, false, tx_class);
-    rate_ph += get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx], hr_info);
+    int hr_ctx = get_hr_ctx(levels, pos, bwl, false, tx_class);
+    rate_ph += get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx], hr_ctx);
 #else
     rate_ph += get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -2861,12 +2717,7 @@ static AOM_FORCE_INLINE void cost_hide_par(
     const LV_MAP_COEFF_COST *txb_costs_ph, int dc_sign_ctx, TX_CLASS tx_class,
     uint8_t *levels, const int bwl, const int64_t rdmult,
     const int32_t *dequant, const qm_val_t *iqmatrix, tune_cand *t_cand,
-    int rate_cur
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-) {
+    int rate_cur) {
   const int dqv = get_dqv(dequant, pos, iqmatrix);
   tran_low_t abslevel = abs(qcoeff), abstqc = abs(tcoeff);
   int64_t dist = get_coeff_dist(tcoeff, dqcoeff, shift);
@@ -2888,11 +2739,9 @@ static AOM_FORCE_INLINE void cost_hide_par(
     if (q_index > NUM_BASE_LEVELS) {
       int br_ctx = get_par_br_ctx(levels, pos, bwl, tx_class);
 #if CONFIG_ADAPTIVE_HR
-      hr_info->is_eob = false;
-      hr_info->is_dc = (pos == 0);
-      hr_info->context = get_hr_ctx(levels, pos, bwl, 0, tx_class);
+      int hr_ctx = get_hr_ctx(levels, pos, bwl, false, tx_class);
       rate_cand +=
-          get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx], hr_info);
+          get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx], hr_ctx);
 #else
       rate_cand += get_br_cost(q_index, txb_costs_ph->lps_ph_cost[br_ctx]);
 #endif  // CONFIG_ADAPTIVE_HR
@@ -3033,10 +2882,6 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
     ,
     int plane
 #endif  // CONFIG_CHROMA_TX_COEFF_CODING
-#if CONFIG_ADAPTIVE_HR
-    ,
-    adaptive_hr_info *hr_info
-#endif  // CONFIG_ADAPTIVE_HR
 ) {
   int nzsbb = 0, sum_abs1 = 0;
   for (int scan_idx = eob - 1; scan_idx > 0; --scan_idx) {
@@ -3061,10 +2906,6 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
                 ,
                 plane
 #endif  // CONFIG_CHROMA_TX_COEFF_CODING
-#if CONFIG_ADAPTIVE_HR
-                ,
-                hr_info
-#endif  // CONFIG_ADAPTIVE_HR
       );
 
   if (!needtune && nzsbb >= PHTHRESH) {
@@ -3079,12 +2920,7 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
   if (nzsbb >= PHTHRESH) {
     cost_hide_par(qcoeff[hidepos], dqcoeff[hidepos], tcoeff[hidepos], shift,
                   txb_costs, hidepos, txb_costs_ph, dc_sign_ctx, tx_class,
-                  levels, bwl, rdmult, dequant, iqmatrix, &t_cand_dc, rate_cur
-#if CONFIG_ADAPTIVE_HR
-                  ,
-                  hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-    );
+                  levels, bwl, rdmult, dequant, iqmatrix, &t_cand_dc, rate_cur);
   }
 
   // we change the level candidates to check the cost change.
@@ -3171,14 +3007,6 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     coef_info[scan_idx].upround = false;
   }
 
-#if CONFIG_ADAPTIVE_HR
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
-#endif  // CONFIG_ADAPTIVE_HR
-
   const int rshift =
       (sharpness +
        (cpi->oxcf.q_cfg.aq_mode == VARIANCE_AQ && mbmi->segment_id < 4
@@ -3250,12 +3078,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                          xd->tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                          ,
-                         plane, coef_info, enable_parity_hiding
-#if CONFIG_ADAPTIVE_HR
-                         ,
-                         &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-    );
+                         plane, coef_info, enable_parity_hiding);
     --si;
   } else {
     assert(abs_qc == 1);
@@ -3268,12 +3091,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                            xd->tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                            ,
-                           plane
-#if CONFIG_ADAPTIVE_HR
-                           ,
-                           levels, &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-        );
+                           plane);
     const tran_low_t tqc = tcoeff[ci];
     const tran_low_t dqc = dqcoeff[ci];
     const int64_t dist = get_coeff_dist(tqc, dqc, shift);
@@ -3294,12 +3112,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                      xd->tmp_sign
 #endif
                      ,
-                     plane, coef_info, enable_parity_hiding
-#if CONFIG_ADAPTIVE_HR
-                     ,
-                     &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-    );
+                     plane, coef_info, enable_parity_hiding);
   }
   if (si == -1 && nz_num <= max_nz_num) {
     update_skip(&accu_rate, accu_dist, &eob, nz_num, nz_ci, rdmult, skip_cost,
@@ -3309,12 +3122,8 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   for (; si >= 1; --si) {
     update_coeff_simple(&accu_rate, si, eob, tx_class, bwl, rdmult, shift,
                         dequant, scan, txb_costs, tcoeff, qcoeff, dqcoeff,
-                        levels, iqmatrix, coef_info, enable_parity_hiding, plane
-#if CONFIG_ADAPTIVE_HR
-                        ,
-                        &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-    );
+                        levels, iqmatrix, coef_info, enable_parity_hiding,
+                        plane);
   }
 
   // DC position
@@ -3330,12 +3139,7 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                          xd->tmp_sign
 #endif  // CONFIG_CONTEXT_DERIVATION
                          ,
-                         plane, coef_info, enable_parity_hiding
-#if CONFIG_ADAPTIVE_HR
-                         ,
-                         &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
-    );
+                         plane, coef_info, enable_parity_hiding);
   }
 
   if (enable_parity_hiding) {
@@ -3346,10 +3150,6 @@ int av1_optimize_txb_new(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                    ,
                    plane
 #endif  // CONFIG_CHROMA_TX_COEFF_CODING
-#if CONFIG_ADAPTIVE_HR
-                   ,
-                   &hr_info
-#endif  // CONFIG_ADAPTIVE_HR
     );
   }
 

@@ -403,11 +403,6 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
 
 #if CONFIG_ADAPTIVE_HR
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
 #endif  // CONFIG_ADAPTIVE_HR
 
 #if CONFIG_INSPECTION
@@ -461,10 +456,8 @@ uint8_t av1_read_coeffs_txb_skip(const AV1_COMMON *const cm,
       if (level >= MAX_BASE_BR_RANGE) {
 #if CONFIG_ADAPTIVE_HR
         bool is_eob = c == (eob_data->eob - 1);
-        hr_info.is_dc = (c == 0);
-        hr_info.is_eob = is_eob;
-        hr_info.context = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
-        level += read_adaptive_hr(xd, r, &hr_info);
+        int hr_ctx = get_hr_ctx_skip(levels, pos, bwl, is_eob, tx_class);
+        level += read_adaptive_hr(xd, r, hr_ctx);
 
         levels[get_padded_idx_left(pos, bwl)] =
             (uint8_t)(AOMMIN(level, UINT8_MAX));
@@ -579,14 +572,6 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
   const TX_CLASS tx_class = tx_type_to_class[get_primary_tx_type(tx_type)];
   const qm_val_t *iqmatrix =
       av1_get_iqmatrix(&cm->quant_params, xd, plane, tx_size, tx_type);
-
-#if CONFIG_ADAPTIVE_HR
-  adaptive_hr_info hr_info = { .tx_size = tx_size,
-                               .tx_type = tx_type,
-                               .qindex = xd->qindex[mbmi->segment_id],
-                               .is_inter =
-                                   is_inter_block(mbmi, xd->tree_type) };
-#endif  // CONFIG_ADAPTIVE_HR
 
 #if CONFIG_INSPECTION
   for (int c = 0; c < width * height; c++) {
@@ -763,11 +748,9 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         if (level >= (MAX_BASE_BR_RANGE << 1)) {
 #if CONFIG_ADAPTIVE_HR
           bool is_eob = c == (*eob - 1);
-          hr_info.is_dc = (c == 0);
-          hr_info.is_eob = is_eob;
           // Use context divided by 2 since the coefficient is also divided by 2
-          hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class) >> 1;
-          level += (read_adaptive_hr(xd, r, &hr_info) << 1);
+          int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class) >> 1;
+          level += (read_adaptive_hr(xd, r, hr_ctx) << 1);
 
           levels[get_padded_idx(pos, bwl)] =
               (uint8_t)(AOMMIN(level, UINT8_MAX));
@@ -783,10 +766,8 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
           if (level >= LF_MAX_BASE_BR_RANGE) {
 #if CONFIG_ADAPTIVE_HR
             bool is_eob = c == (*eob - 1);
-            hr_info.is_dc = (c == 0);
-            hr_info.is_eob = is_eob;
-            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-            level += read_adaptive_hr(xd, r, &hr_info);
+            int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            level += read_adaptive_hr(xd, r, hr_ctx);
 
             levels[get_padded_idx(pos, bwl)] =
                 (uint8_t)(AOMMIN(level, UINT8_MAX));
@@ -798,10 +779,8 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
           if (level >= MAX_BASE_BR_RANGE) {
 #if CONFIG_ADAPTIVE_HR
             bool is_eob = c == (*eob - 1);
-            hr_info.is_dc = (c == 0);
-            hr_info.is_eob = is_eob;
-            hr_info.context = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
-            level += read_adaptive_hr(xd, r, &hr_info);
+            int hr_ctx = get_hr_ctx(levels, pos, bwl, is_eob, tx_class);
+            level += read_adaptive_hr(xd, r, hr_ctx);
 
             levels[get_padded_idx(pos, bwl)] =
                 (uint8_t)(AOMMIN(level, UINT8_MAX));

@@ -64,46 +64,23 @@ int read_exp_golomb(MACROBLOCKD *xd, aom_reader *r, int k) {
 
 #if CONFIG_ADAPTIVE_HR
 
-typedef struct adaptive_table {
-  int *table;
-  int initial_param;
-  unsigned int table_size;
-} adaptive_table;
+static int adaptive_table[] = { 10, 20, 40, 75, 135 };
 
-int intra_table[] = { 10, 20, 40, 75, 135 };
-int inter_table[] = { 20, 35, 55, 95, 170 };
-int idtx_table[] = { 25, 50, 130 };
-
-adaptive_table tables[] = {
-  { .table = intra_table, .initial_param = 1, .table_size = 5 },  // Intra table
-  { .table = inter_table, .initial_param = 1, .table_size = 5 },  // Inter table
-  { .table = idtx_table,
-    .initial_param = 1,
-    .table_size = 3 },  // IDTX table (only for inter)
-};
-
-int get_adaptive_param(adaptive_hr_info *info) {
-  adaptive_table *adp_table;
-  adp_table = &tables[0];
-
-  int m = adp_table->initial_param;
-
-  for (unsigned int i = 0; i < adp_table->table_size; ++i) {
-    if (info->context < adp_table->table[i]) break;
-    ++m;
-  }
-
-  return m;
+static int get_adaptive_param(int ctx) {
+  const int table_size = sizeof(adaptive_table) / sizeof(int);
+  int m = 0;
+  while (m < table_size && ctx >= adaptive_table[m]) ++m;
+  return m + 1;
 }
 
 void write_truncated_rice(aom_writer *w, int level, int m, int k, int cmax) {
-  const int mask = (1 << m) - 1;
   int q = level >> m;
 
   if (q >= cmax) {
     aom_write_literal(w, 0, cmax);
     write_exp_golomb(w, level - (cmax << m), k);
   } else {
+    const int mask = (1 << m) - 1;
     aom_write_literal(w, 0, q);
     aom_write_literal(w, 1, 1);
     aom_write_literal(w, level & mask, m);
@@ -113,15 +90,13 @@ void write_truncated_rice(aom_writer *w, int level, int m, int k, int cmax) {
 int read_truncated_rice(MACROBLOCKD *xd, aom_reader *r, int m, int k,
                         int cmax) {
   int q = aom_read_unary(r, cmax, ACCT_INFO("hr"));
-  if (q == cmax) return read_exp_golomb(xd, r, k) + (cmax << m);
-
-  int rem = aom_read_literal(r, m, ACCT_INFO("hr"));
+  int rem = (q == cmax) ? read_exp_golomb(xd, r, k)
+                        : aom_read_literal(r, m, ACCT_INFO("hr"));
   return rem + (q << m);
 }
 
 int get_truncated_rice_length(int level, int m, int k, int cmax) {
   int q = level >> m;
-
   if (q >= cmax) return cmax + get_exp_golomb_length(level - (cmax << m), k);
 
   return q + 1 + m;
@@ -135,6 +110,7 @@ int get_truncated_rice_length_diff(int level, int m, int k, int cmax,
     int lshifted = level - (cmax << m);
     if (lshifted == 0) {
       int golomb_len0 = k + 1;
+      // diff = (cmax + golomb_len0) - (cmax - 1 + 1 + m)
       *diff = golomb_len0 - m;
       return cmax + golomb_len0;
     }
@@ -150,23 +126,23 @@ int get_truncated_rice_length_diff(int level, int m, int k, int cmax,
   return q + 1 + m;
 }
 
-void write_adaptive_hr(aom_writer *w, int level, adaptive_hr_info *info) {
-  int m = get_adaptive_param(info);
+void write_adaptive_hr(aom_writer *w, int level, int ctx) {
+  int m = get_adaptive_param(ctx);
   write_truncated_rice(w, level, m, m + 1, AOMMIN(m + 4, 6));
 }
 
-int read_adaptive_hr(MACROBLOCKD *xd, aom_reader *r, adaptive_hr_info *info) {
-  int m = get_adaptive_param(info);
+int read_adaptive_hr(MACROBLOCKD *xd, aom_reader *r, int ctx) {
+  int m = get_adaptive_param(ctx);
   return read_truncated_rice(xd, r, m, m + 1, AOMMIN(m + 4, 6));
 }
 
-int get_adaptive_hr_length(int level, adaptive_hr_info *info) {
-  int m = get_adaptive_param(info);
+int get_adaptive_hr_length(int level, int ctx) {
+  int m = get_adaptive_param(ctx);
   return get_truncated_rice_length(level, m, m + 1, AOMMIN(m + 4, 6));
 }
 
-int get_adaptive_hr_length_diff(int level, adaptive_hr_info *info, int *diff) {
-  int m = get_adaptive_param(info);
+int get_adaptive_hr_length_diff(int level, int ctx, int *diff) {
+  int m = get_adaptive_param(ctx);
   return get_truncated_rice_length_diff(level, m, m + 1, AOMMIN(m + 4, 6),
                                         diff);
 }

@@ -339,7 +339,7 @@ set_aom_config_var(CONFIG_REFINED_MVS_IN_TMVP 1
                    "Keep optical flow refined MVs in TMVP list.")
 set_aom_config_var(CONFIG_AFFINE_REFINEMENT 1
                    "Decoder side affine motion refinement.")
-set_aom_config_var(CONFIG_ADAPTIVE_HR 1 "AV2 new adaptive HR coefficient level coding.")
+set_aom_config_var(CONFIG_ADAPTIVE_HR 1 "Base range reduction and adaptive HR coefficient coding from CWG-E005.")
 #
 # Variables in this section control optional features of the build system.
 #

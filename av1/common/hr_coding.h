@@ -39,26 +39,16 @@ static INLINE int get_exp_golomb_length_diff(int level, int k, int *diff) {
 
 #if CONFIG_ADAPTIVE_HR
 
-typedef struct adaptive_hr_info {
-  int context;
-  TX_SIZE tx_size;
-  TX_TYPE tx_type;
-  int qindex;
-  bool is_inter;
-  bool is_dc;
-  bool is_eob;
-} adaptive_hr_info;
-
 void write_truncated_rice(aom_writer *w, int level, int m, int k, int cmax);
 int read_truncated_rice(MACROBLOCKD *xd, aom_reader *r, int m, int k, int cmax);
 int get_truncated_rice_length(int level, int m, int k, int cmax);
 int get_truncated_rice_length_diff(int level, int m, int k, int cmax,
                                    int *diff);
 
-void write_adaptive_hr(aom_writer *w, int level, adaptive_hr_info *info);
-int read_adaptive_hr(MACROBLOCKD *xd, aom_reader *r, adaptive_hr_info *info);
-int get_adaptive_hr_length(int level, adaptive_hr_info *info);
-int get_adaptive_hr_length_diff(int level, adaptive_hr_info *info, int *diff);
+void write_adaptive_hr(aom_writer *w, int level, int ctx);
+int read_adaptive_hr(MACROBLOCKD *xd, aom_reader *r, int ctx);
+int get_adaptive_hr_length(int level, int ctx);
+int get_adaptive_hr_length_diff(int level, int ctx, int *diff);
 
 #endif  // CONFIG_ADAPTIVE_HR
 
