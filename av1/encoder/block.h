@@ -1748,8 +1748,8 @@ static INLINE int is_rect_tx_allowed_bsize(BLOCK_SIZE bsize) {
     1,  // BLOCK_64X16
 #endif  // CONFIG_NEW_TX_PARTITION
 #if CONFIG_BLOCK_256_EXT
-    0,  // BLOCK_64X256
-    0,  // BLOCK_256X64
+    1,  // BLOCK_64X256
+    1,  // BLOCK_256X64
     1,  // BLOCK_32X128
     1,  // BLOCK_128X32
 #endif  // CONFIG_BLOCK_256_EXT
