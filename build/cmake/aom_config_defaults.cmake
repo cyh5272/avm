@@ -175,6 +175,8 @@ set_aom_config_var(CONFIG_OPFL_FILTER_4TAP 1
                    "Reduce optical flow and DAMR interpolation filter taps")
 set_aom_config_var(CONFIG_COMBINE_AFFINE_WARP_GRADIENT 0
                    "Combining warp and graident computations in DAMR")
+set_aom_config_var(CONFIG_GAUSSIAN_ELIMINATION_LS 0
+                   "Gaussian elimination solver for DAMR least squares problem")
 set_aom_config_var(
   CONFIG_IBP_DC 1
   "AV2 experiment flag to enable intra bi-prediction for DC mode.")

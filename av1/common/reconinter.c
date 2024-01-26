@@ -1047,6 +1047,208 @@ void av1_warp_plane_bilinear(WarpedMotionParams *wm, int bd,
 }
 #endif  // AFFINE_FAST_WARP_METHOD == 3
 
+#define DEBUG_GE 0
+#define DEBUG_GE_STAB 0
+#if DEBUG_GE
+void print_mat_sol(double *mat, double *sol, int dim) {
+  fprintf(stderr, "A:\n");
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      fprintf(stderr, "%f,", mat[i * dim + j]);
+    }
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "b:%f,%f,%f,%f\n", sol[0], sol[1], sol[2], sol[3]);
+}
+
+void print_mat_sol_int(int64_t *mat, int64_t *sol, int dim) {
+  fprintf(stderr, "A:\n");
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      fprintf(stderr, "%ld,", mat[i * dim + j]);
+    }
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "b:%ld,%ld,%ld,%ld\n", sol[0], sol[1], sol[2], sol[3]);
+}
+#endif
+
+#if CONFIG_GAUSSIAN_ELIMINATION_LS
+#define USE_DOUBLE 0
+#define MAX_LS_DIM 4
+#if USE_DOUBLE
+void swap_rows(double *mat, double *sol, const int i, const int j,
+               const int dim) {
+  double temp = sol[i];
+  sol[i] = sol[j];
+  sol[j] = temp;
+  for (int col = 0; col < dim; col++) {
+    temp = mat[i * dim + col];
+    mat[i * dim + col] = mat[j * dim + col];
+    mat[j * dim + col] = temp;
+  }
+}
+
+// function to reduce matrix to r.e.f.  Returns a value to
+// indicate whether matrix is singular or not
+int gaussian_elimination(double *mat, double *sol, int *precbits,
+                         const int dim) {
+  // Forward elimination
+  for (int i = 0; i < dim; i++) {
+    double pivot = mat[i * dim + i];
+    int idx_pivot = i;
+
+    for (int j = i + 1; j < dim; j++) {
+      double new_pivot = mat[j * dim + i];
+      if (fabs(new_pivot) > fabs(pivot)) {
+        idx_pivot = j;
+        pivot = new_pivot;
+      }
+    }
+
+    // Check singularity
+    if (pivot == 0) return 0;
+
+    // Put the row with the pivot first, and scale pivot to 1
+    if (i != idx_pivot) swap_rows(mat, sol, i, idx_pivot, dim);
+    mat[i * dim + i] = 1;
+    double inv_pivot = 1 / pivot;
+    for (int j = i + 1; j < dim; j++) mat[i * dim + j] *= inv_pivot;
+    sol[i] *= inv_pivot;
+
+    for (int k = i + 1; k < dim; k++) {
+      double f = mat[k * dim + i];
+      mat[k * dim + i] = 0;
+      for (int j = i + 1; j < dim; j++)
+        mat[k * dim + j] -= mat[i * dim + j] * f;
+      sol[k] -= sol[i] * f;
+    }
+  }
+#if DEBUG_GE
+  fprintf(stderr, "(after forward)\n");
+  print_mat_sol(mat, sol, 4);
+#endif
+
+  // Back substitution
+  for (int i = dim - 1; i >= 0; i--)
+    for (int j = i + 1; j < dim; j++) sol[i] -= mat[i * dim + j] * sol[j];
+  for (int i = 0; i < dim; i++) sol[i] *= (1 << precbits[i]);
+  return 1;
+}
+#else
+void swap_rows(int64_t *mat, int64_t *sol, const int i, const int j,
+               const int dim) {
+  int64_t temp = sol[i];
+  sol[i] = sol[j];
+  sol[j] = temp;
+  for (int col = 0; col < dim; col++) {
+    temp = mat[i * dim + col];
+    mat[i * dim + col] = mat[j * dim + col];
+    mat[j * dim + col] = temp;
+  }
+}
+
+int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
+                         const int dim) {
+  int16_t inv_pivot[MAX_LS_DIM] = { 0 };
+  int16_t inv_pivot_shift[MAX_LS_DIM] = { 0 };
+  int add_prec_bits = 0;
+  int lower_prec_bits[MAX_LS_DIM] = { 0 };
+  for (int i = 0; i < dim; i++)
+    add_prec_bits = AOMMAX(precbits[i], add_prec_bits);
+  for (int i = 0; i < dim; i++) {
+    sol[i] = sol[i] * (1 << add_prec_bits);
+    lower_prec_bits[i] = add_prec_bits - precbits[i];
+  }
+
+  // Elimination for the i-th column
+  for (int i = 0; i < dim; i++) {
+    int64_t pivot = mat[i * dim + i];
+    int idx_pivot = i;
+
+    for (int j = i + 1; j < dim; j++) {
+      int64_t new_pivot = mat[j * dim + i];
+      if (llabs(new_pivot) > llabs(pivot)) {
+        idx_pivot = j;
+        pivot = new_pivot;
+      }
+    }
+
+    // Check singularity
+    if (pivot == 0) return 0;
+
+    // Put the row with the pivot first, and get inverse of the pivot
+    if (i != idx_pivot) swap_rows(mat, sol, i, idx_pivot, dim);
+#if DEBUG_GE
+    if (i != idx_pivot) {
+      fprintf(stderr, "(swap row %d %d)\n", i, idx_pivot);
+      print_mat_sol_int(mat, sol, 4);
+    }
+#endif
+    inv_pivot[i] = (pivot > 0 ? 1 : -1) *
+                   resolve_divisor_64(llabs(pivot), inv_pivot_shift + i);
+
+    for (int k = i + 1; k < dim; k++) {
+      int64_t f = mat[k * dim + i] * inv_pivot[i];
+      mat[k * dim + i] = 0;
+      for (int j = i + 1; j < dim; j++) {
+#if DEBUG_GE_STAB
+        if (get_msb_signed_64(f) + get_msb_signed_64(mat[i * dim + j]) >
+            62 + inv_pivot_shift[i])
+          fprintf(stderr,
+                  "(bd of mat*mat*inv_pivot too large: %ld,%ld,%ld,shift %d)\n",
+                  mat[k * dim + i], mat[i * dim + j], inv_pivot[i],
+                  inv_pivot_shift[i]);
+#endif
+        if (get_msb_signed_64(f) + get_msb_signed_64(mat[i * dim + j]) > 62)
+          mat[k * dim + j] -= mat[i * dim + j] * ROUND_POWER_OF_TWO_SIGNED_64(
+                                                     f, inv_pivot_shift[i]);
+        else
+          mat[k * dim + j] -= ROUND_POWER_OF_TWO_SIGNED_64(mat[i * dim + j] * f,
+                                                           inv_pivot_shift[i]);
+      }
+      if (get_msb_signed_64(f) + get_msb_signed_64(sol[i]) > 62)
+        sol[k] -= sol[i] * ROUND_POWER_OF_TWO_SIGNED_64(f, inv_pivot_shift[i]);
+      else
+        sol[k] -= ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * f, inv_pivot_shift[i]);
+    }
+#if DEBUG_GE
+    fprintf(stderr, "(after forward %d) inv_pivot %d shift %d\n", i,
+            inv_pivot[i], inv_pivot_shift[i]);
+    print_mat_sol_int(mat, sol, 4);
+#endif
+  }
+
+  // Backward substitution
+  for (int i = dim - 1; i >= 0; i--) {
+    for (int j = i + 1; j < dim; j++) {
+#if DEBUG_GE_STAB
+      if (get_msb_signed_64(mat[i * dim + j]) + get_msb_signed_64(sol[j]) > 62)
+        fprintf(stderr, "(bd of mat*sol too large: %ld,%ld)\n",
+                mat[i * dim + j], sol[j]);
+#endif
+      sol[i] -= mat[i * dim + j] * sol[j];
+    }
+    if (get_msb_signed(inv_pivot[i]) + get_msb_signed_64(sol[i]) > 62)
+      sol[i] = inv_pivot[i] *
+               ROUND_POWER_OF_TWO_SIGNED_64(sol[i], inv_pivot_shift[i]);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_pivot[i],
+                                            inv_pivot_shift[i]);
+#if DEBUG_GE
+    fprintf(stderr, "(after backward %d)\nb:%ld,%ld,%ld,%ld\n", i, sol[0],
+            sol[1], sol[2], sol[3]);
+#endif
+  }
+
+  // Apply scaling
+  for (int i = 0; i < dim; i++)
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], lower_prec_bits[i]);
+
+  return 1;
+}
+#endif  // USE_DOUBLE
+#else
 // Compute intermediate results for 4D linear solver.
 void getsub_4d(int64_t *sub, int64_t *mat, int64_t *vec) {
   sub[0] = mat[0] * mat[5] - mat[1] * mat[4];
@@ -1063,7 +1265,8 @@ void getsub_4d(int64_t *sub, int64_t *mat, int64_t *vec) {
 
 // Solve a 4-dimensional matrix inverse using inverse determinant method:
 // x = A^(-1) * b, where A: mat, b: vec, x: sol
-int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
+int solver_4d_determinant(int64_t *mat, int64_t *vec, int *precbits,
+                          int64_t *sol) {
   int64_t a[10], b[10];  // values of 20 specific 2D subdeterminants
 
   getsub_4d(&a[0], mat, vec);
@@ -1117,6 +1320,36 @@ int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
   sol[2] = divide_and_round_signed(sol[2], det);
   sol[3] = divide_and_round_signed(sol[3], det);
   return 1;
+}
+#endif  // CONFIG_GAUSSIAN_ELIMINATION_LS
+
+int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
+#if DEBUG_GE
+  fprintf(stderr, "[solve 4d] precbits (%d,%d,%d,%d)\n", precbits[0],
+          precbits[1], precbits[2], precbits[3]);
+  print_mat_sol_int(mat, vec, 4);
+#endif
+#if CONFIG_GAUSSIAN_ELIMINATION_LS
+  memcpy(sol, vec, 4 * sizeof(int64_t));
+#if USE_DOUBLE
+  double fmat[MAX_LS_DIM * MAX_LS_DIM];
+  double fsol[MAX_LS_DIM];
+  for (int i = 0; i < 16; i++) fmat[i] = (double)mat[i];
+  for (int i = 0; i < 4; i++) fsol[i] = (double)sol[i];
+  int ret = gaussian_elimination(fmat, fsol, precbits, 4);
+  for (int i = 0; i < 16; i++) mat[i] = (int64_t)fmat[i];
+  for (int i = 0; i < 4; i++) sol[i] = (int64_t)fsol[i];
+#else
+  int ret = gaussian_elimination(mat, sol, precbits, 4);
+#endif
+#else
+  int ret = solver_4d_determinant(mat, vec, precbits, sol);
+#endif  // CONFIG_GAUSSIAN_ELIMINATION_LS
+#if DEBUG_GE
+  fprintf(stderr, "(final)\n");
+  print_mat_sol_int(mat, sol, 4);
+#endif
+  return ret;
 }
 #endif  // CONFIG_AFFINE_REFINEMENT
 
