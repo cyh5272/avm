@@ -396,12 +396,12 @@ static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
                                           const TX_CLASS tx_class) {
   int mag;
   // Note: AOMMIN(level, 5) is useless for decoder since level < 5.
-  mag = clip_max5[levels[1]];                         // { 0, 1 }
-  mag += clip_max5[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
+  mag = clip_max3[levels[1]];                         // { 0, 1 }
+  mag += clip_max3[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
   if (tx_class == TX_CLASS_2D) {
-    mag += clip_max5[levels[(1 << bwl) + TX_PAD_HOR + 1]];          // { 1, 1 }
-    mag += clip_max5[levels[2]];                                    // { 0, 2 }
-    mag += clip_max5[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
+    mag += clip_max3[levels[(1 << bwl) + TX_PAD_HOR + 1]];          // { 1, 1 }
+    mag += clip_max3[levels[2]];                                    // { 0, 2 }
+    mag += clip_max3[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
   } else if (tx_class == TX_CLASS_VERT) {
     mag += clip_max3[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
     mag += clip_max3[levels[(3 << bwl) + (3 << TX_PAD_HOR_LOG2)]];  // { 3, 0 }
@@ -706,11 +706,11 @@ static INLINE int get_lower_levels_ctx_lf_2d(const uint8_t *levels,
   int mag;
   // Note: AOMMIN(level, 3) is useless for decoder since level < 5.
   levels = levels + get_padded_idx(coeff_idx, bwl);
-  mag = AOMMIN(levels[1], 5);                                     // { 0, 1 }
-  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR], 5);              // { 1, 0 }
-  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR + 1], 5);          // { 1, 1 }
-  mag += AOMMIN(levels[2], 5);                                    // { 0, 2 }
-  mag += AOMMIN(levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)], 5);  // { 2, 0 }
+  mag = AOMMIN(levels[1], 3);                                     // { 0, 1 }
+  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR], 3);              // { 1, 0 }
+  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR + 1], 3);          // { 1, 1 }
+  mag += AOMMIN(levels[2], 3);                                    // { 0, 2 }
+  mag += AOMMIN(levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)], 3);  // { 2, 0 }
   int ctx = (mag + 1) >> 1;
   const int row = coeff_idx >> bwl;
   const int col = coeff_idx - (row << bwl);
