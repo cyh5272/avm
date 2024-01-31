@@ -226,9 +226,9 @@ static INLINE int get_br_lf_ctx_2d(const uint8_t *const levels,
   const int col = c - (row << bwl);
   const int stride = (1 << bwl) + TX_PAD_HOR;
   const int pos = row * stride + col;
-  int mag = AOMMIN(levels[pos + 1], MAX_BASE_BR_RANGE) +
-            AOMMIN(levels[pos + stride], MAX_BASE_BR_RANGE) +
-            AOMMIN(levels[pos + 1 + stride], MAX_BASE_BR_RANGE);
+  int mag = AOMMIN(levels[pos + 1], LF_MAX_BASE_BR_RANGE) +
+            AOMMIN(levels[pos + stride], LF_MAX_BASE_BR_RANGE) +
+            AOMMIN(levels[pos + 1 + stride], LF_MAX_BASE_BR_RANGE);
   mag = AOMMIN((mag + 1) >> 1, 6);
   return mag + 7;
 }
@@ -244,22 +244,22 @@ static AOM_FORCE_INLINE int get_br_lf_ctx(const uint8_t *const levels,
   const int col = c - (row << bwl);
   const int stride = (1 << bwl) + TX_PAD_HOR;
   const int pos = row * stride + col;
-  int mag = AOMMIN(levels[pos + 1], MAX_BASE_BR_RANGE);
-  mag += AOMMIN(levels[pos + stride], MAX_BASE_BR_RANGE);
+  int mag = AOMMIN(levels[pos + 1], LF_MAX_BASE_BR_RANGE);
+  mag += AOMMIN(levels[pos + stride], LF_MAX_BASE_BR_RANGE);
   switch (tx_class) {
     case TX_CLASS_2D:
-      mag += AOMMIN(levels[pos + stride + 1], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + stride + 1], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (c == 0) return mag;
       if ((row < 2) && (col < 2)) return mag + 7;
       break;
     case TX_CLASS_HORIZ:
-      mag += AOMMIN(levels[pos + 2], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + 2], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (col == 0) return mag + 7;
       break;
     case TX_CLASS_VERT:
-      mag += AOMMIN(levels[pos + (stride << 1)], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + (stride << 1)], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (row == 0) return mag + 7;
       break;
@@ -396,12 +396,13 @@ static AOM_FORCE_INLINE int get_nz_mag_lf(const uint8_t *const levels,
                                           const TX_CLASS tx_class) {
   int mag;
   // Note: AOMMIN(level, 5) is useless for decoder since level < 5.
-  mag = clip_max3[levels[1]];                         // { 0, 1 }
-  mag += clip_max3[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
+
+  mag = clip_max5[levels[1]];                         // { 0, 1 }
+  mag += clip_max5[levels[(1 << bwl) + TX_PAD_HOR]];  // { 1, 0 }
   if (tx_class == TX_CLASS_2D) {
-    mag += clip_max3[levels[(1 << bwl) + TX_PAD_HOR + 1]];          // { 1, 1 }
-    mag += clip_max3[levels[2]];                                    // { 0, 2 }
-    mag += clip_max3[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
+    mag += clip_max5[levels[(1 << bwl) + TX_PAD_HOR + 1]];          // { 1, 1 }
+    mag += clip_max5[levels[2]];                                    // { 0, 2 }
+    mag += clip_max5[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
   } else if (tx_class == TX_CLASS_VERT) {
     mag += clip_max3[levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)]];  // { 2, 0 }
     mag += clip_max3[levels[(3 << bwl) + (3 << TX_PAD_HOR_LOG2)]];  // { 3, 0 }
@@ -607,19 +608,19 @@ static AOM_FORCE_INLINE int get_par_br_ctx(const uint8_t *const levels,
   const int col = c - (row << bwl);
   const int stride = (1 << bwl) + TX_PAD_HOR;
   const int pos = row * stride + col;
-  int mag = AOMMIN(levels[pos + 1], MAX_BASE_BR_RANGE);
-  mag += AOMMIN(levels[pos + stride], MAX_BASE_BR_RANGE);
+  int mag = AOMMIN(levels[pos + 1], LF_MAX_BASE_BR_RANGE);
+  mag += AOMMIN(levels[pos + stride], LF_MAX_BASE_BR_RANGE);
   switch (tx_class) {
     case TX_CLASS_2D:
-      mag += AOMMIN(levels[pos + stride + 1], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + stride + 1], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, (COEFF_BR_PH_CONTEXTS - 1));
       break;
     case TX_CLASS_HORIZ:
-      mag += AOMMIN(levels[pos + 2], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + 2], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, (COEFF_BR_PH_CONTEXTS - 1));
       break;
     case TX_CLASS_VERT:
-      mag += AOMMIN(levels[pos + (stride << 1)], MAX_BASE_BR_RANGE);
+      mag += AOMMIN(levels[pos + (stride << 1)], LF_MAX_BASE_BR_RANGE);
       mag = AOMMIN((mag + 1) >> 1, (COEFF_BR_PH_CONTEXTS - 1));
       break;
     default: break;
@@ -706,11 +707,11 @@ static INLINE int get_lower_levels_ctx_lf_2d(const uint8_t *levels,
   int mag;
   // Note: AOMMIN(level, 3) is useless for decoder since level < 5.
   levels = levels + get_padded_idx(coeff_idx, bwl);
-  mag = AOMMIN(levels[1], 3);                                     // { 0, 1 }
-  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR], 3);              // { 1, 0 }
-  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR + 1], 3);          // { 1, 1 }
-  mag += AOMMIN(levels[2], 3);                                    // { 0, 2 }
-  mag += AOMMIN(levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)], 3);  // { 2, 0 }
+  mag = AOMMIN(levels[1], 5);                                     // { 0, 1 }
+  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR], 5);              // { 1, 0 }
+  mag += AOMMIN(levels[(1 << bwl) + TX_PAD_HOR + 1], 5);          // { 1, 1 }
+  mag += AOMMIN(levels[2], 5);                                    // { 0, 2 }
+  mag += AOMMIN(levels[(2 << bwl) + (2 << TX_PAD_HOR_LOG2)], 5);  // { 2, 0 }
   int ctx = (mag + 1) >> 1;
   const int row = coeff_idx >> bwl;
   const int col = coeff_idx - (row << bwl);

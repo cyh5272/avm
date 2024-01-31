@@ -80,7 +80,8 @@ extern "C" {
 // Number of symbols for base range coding in low-frequency region
 #define LF_BASE_SYMBOLS 6
 #define LF_NUM_BASE_LEVELS (LF_BASE_SYMBOLS - 2)
-#define LF_MAX_BASE_BR_RANGE (COEFF_BASE_RANGE + LF_NUM_BASE_LEVELS + 1)
+#define LF_COEFF_BASE_RANGE (0 * (BR_CDF_SIZE - 1))
+#define LF_MAX_BASE_BR_RANGE (LF_COEFF_BASE_RANGE + LF_NUM_BASE_LEVELS + 1)
 
 // Limits to determine the low-frequency region for coefficient coding.
 #define LF_2D_LIM 4     // row + column limit
@@ -97,8 +98,7 @@ extern "C" {
 #define NUM_BASE_LEVELS 2
 
 #define BR_CDF_SIZE (4)
-#define COEFF_BASE_RANGE (0 * (BR_CDF_SIZE - 1))
-
+#define COEFF_BASE_RANGE (1 * (BR_CDF_SIZE - 1))
 #define COEFF_CONTEXT_BITS 3
 #define COEFF_CONTEXT_MASK ((1 << COEFF_CONTEXT_BITS) - 1)
 #define MAX_BASE_BR_RANGE (COEFF_BASE_RANGE + NUM_BASE_LEVELS + 1)

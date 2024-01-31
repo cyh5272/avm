@@ -193,7 +193,7 @@ typedef struct {
   int base_lf_cost[LF_SIG_COEF_CONTEXTS][LF_BASE_SYMBOLS * 2];
   //! Cost for encoding an increment to the low-frequency coefficient
   int lps_lf_cost[LF_LEVEL_CONTEXTS]
-                 [COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
+                 [LF_COEFF_BASE_RANGE + 1 + LF_COEFF_BASE_RANGE + 1];
   //! Cost for encoding the base level of a parity-hidden coefficient
   int base_ph_cost[COEFF_BASE_PH_CONTEXTS][4];
   //! Cost for encoding an increment to the parity-hidden coefficient

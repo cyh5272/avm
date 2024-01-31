@@ -52,8 +52,8 @@ void set_coeff_info(tran_low_t qc_low, tran_low_t dqc_low, tran_low_t qc_up,
   }
 
   coef_info[scan_idx].tunable =
-      (abs(coef_info[scan_idx].qc) < MAX_BASE_BR_RANGE) ||
-      ((abs(qc_up) == MAX_BASE_BR_RANGE) && upround);
+      (abs(coef_info[scan_idx].qc) < LF_MAX_BASE_BR_RANGE) ||
+      ((abs(qc_up) == LF_MAX_BASE_BR_RANGE) && upround);
   if (coef_info[scan_idx].tunable) {
     if (upround) {
       coef_info[scan_idx].delta_cost = (cost_low - cost_up);
@@ -321,8 +321,8 @@ static INLINE int get_golomb_cost(int abs_qc) {
 // Golomb cost of coding bypass coded level values in the
 // low-frequency region.
 static INLINE int get_golomb_cost_lf(int abs_qc) {
-  if (abs_qc >= 1 + LF_NUM_BASE_LEVELS + COEFF_BASE_RANGE) {
-    const int r = abs_qc - COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS;
+  if (abs_qc >= 1 + LF_NUM_BASE_LEVELS + LF_COEFF_BASE_RANGE) {
+    const int r = abs_qc - LF_COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS;
     const int length = get_msb(r) + 1;
     return av1_cost_literal(2 * length - 1);
   }
@@ -333,7 +333,7 @@ static INLINE int get_golomb_cost_lf(int abs_qc) {
 // low-frequency region, includes the bypass cost.
 static INLINE int get_br_lf_cost(tran_low_t level, const int *coeff_lps) {
   const int base_range =
-      AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, COEFF_BASE_RANGE);
+      AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, LF_COEFF_BASE_RANGE);
   return coeff_lps[base_range] + get_golomb_cost_lf(level);
 }
 
@@ -342,12 +342,12 @@ static INLINE int get_br_lf_cost(tran_low_t level, const int *coeff_lps) {
 static INLINE int get_br_lf_cost_with_diff(tran_low_t level,
                                            const int *coeff_lps, int *diff) {
   const int base_range =
-      AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, COEFF_BASE_RANGE);
+      AOMMIN(level - 1 - LF_NUM_BASE_LEVELS, LF_COEFF_BASE_RANGE);
   int golomb_bits = 0;
-  if (level <= COEFF_BASE_RANGE + 1 + LF_NUM_BASE_LEVELS)
-    *diff += coeff_lps[base_range + COEFF_BASE_RANGE + 1];
-  if (level >= COEFF_BASE_RANGE + 1 + LF_NUM_BASE_LEVELS) {
-    int r = level - COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS;
+  if (level <= LF_COEFF_BASE_RANGE + 1 + LF_NUM_BASE_LEVELS)
+    *diff += coeff_lps[base_range + LF_COEFF_BASE_RANGE + 1];
+  if (level >= LF_COEFF_BASE_RANGE + 1 + LF_NUM_BASE_LEVELS) {
+    int r = level - LF_COEFF_BASE_RANGE - LF_NUM_BASE_LEVELS;
     if (r < 32) {
       golomb_bits = golomb_bits_cost[r];
       *diff += golomb_cost_diff[r];
@@ -1025,7 +1025,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
             level - 1 - LF_NUM_BASE_LEVELS;  // level is above 1.
         const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
         aom_cdf_prob *cdf = ec_ctx->coeff_br_lf_cdf[plane_type][br_ctx];
-        for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+        for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k = AOMMIN(base_range - idx, BR_CDF_SIZE - 1);
           aom_write_symbol(w, k, cdf, BR_CDF_SIZE);
           if (k < BR_CDF_SIZE - 1) break;
@@ -1059,6 +1059,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
     const int pos = scan[0];
     const tran_low_t v = tcoeff[pos];
     const tran_low_t level = abs(v);
+
     write_coeff_hidden(w, tx_class, scan, bwl, levels, level,
                        ec_ctx->coeff_base_ph_cdf, ec_ctx->coeff_br_ph_cdf);
   } else {
@@ -1216,7 +1217,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
             level - 1 - LF_NUM_BASE_LEVELS;  // level is above 1.
         const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
         aom_cdf_prob *cdf = ec_ctx->coeff_br_lf_cdf[plane_type][br_ctx];
-        for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+        for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k = AOMMIN(base_range - idx, BR_CDF_SIZE - 1);
           aom_write_symbol(w, k, cdf, BR_CDF_SIZE);
           if (k < BR_CDF_SIZE - 1) break;
@@ -1291,8 +1292,8 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
         const int col = pos - (row << bwl);
         int limits = get_lf_limits(row, col, tx_class, plane);
         if (limits) {
-          if (level > COEFF_BASE_RANGE + LF_NUM_BASE_LEVELS)
-            write_golomb(w, level - COEFF_BASE_RANGE - 1 - LF_NUM_BASE_LEVELS);
+          if (level > LF_COEFF_BASE_RANGE + LF_NUM_BASE_LEVELS)
+            write_golomb(w, level - LF_COEFF_BASE_RANGE - 1 - LF_NUM_BASE_LEVELS);
         } else {
           if (level > COEFF_BASE_RANGE + NUM_BASE_LEVELS)
             write_golomb(w, level - COEFF_BASE_RANGE - 1 - NUM_BASE_LEVELS);
@@ -1682,7 +1683,7 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
 
   const int(*lps_cost)[COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1] =
       coeff_costs->lps_cost;
-  const int(*lps_lf_cost)[COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1] =
+  const int(*lps_lf_cost)[LF_COEFF_BASE_RANGE + 1 + LF_COEFF_BASE_RANGE + 1] =
       coeff_costs->lps_lf_cost;
 #if CONFIG_LCCHROMA
   // cost
@@ -3501,7 +3502,7 @@ static AOM_FORCE_INLINE bool parity_hide_tb(
     const int blkpos = scan[scan_idx];
     if (qcoeff[blkpos]) {
       ++nzsbb;
-      sum_abs1 += AOMMIN(abs(qcoeff[blkpos]), MAX_BASE_BR_RANGE);
+      sum_abs1 += AOMMIN(abs(qcoeff[blkpos]), LF_MAX_BASE_BR_RANGE);
     }
   }
   int hidepos = scan[0], rate_cur = 0;
@@ -4590,7 +4591,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
         if (level > LF_NUM_BASE_LEVELS) {
           const int base_range = level - 1 - LF_NUM_BASE_LEVELS;
           const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
-          for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+          for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
             const int k = AOMMIN(base_range - idx, BR_CDF_SIZE - 1);
             if (allow_update_cdf) {
               update_cdf(ec_ctx->coeff_br_lf_cdf[plane_type][br_ctx], k,
@@ -4905,7 +4906,7 @@ void av1_update_and_record_txb_context(int plane, int block, int blk_row,
         if (level > LF_NUM_BASE_LEVELS) {
           const int base_range = level - 1 - LF_NUM_BASE_LEVELS;
           const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
-          for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+          for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
             const int k = AOMMIN(base_range - idx, BR_CDF_SIZE - 1);
             if (allow_update_cdf) {
               update_cdf(ec_ctx->coeff_br_lf_cdf[plane_type][br_ctx], k,
