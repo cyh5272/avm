@@ -138,7 +138,7 @@ void parity_hiding_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
   for (int si = eob - 1; si > 0; si--) {
     const int pos = scan[si];
     nz += !!(qcoeff[pos]);
-    sum_abs1 += AOMMIN(abs(qcoeff[pos]), MAX_BASE_BR_RANGE);
+    sum_abs1 += AOMMIN(abs(qcoeff[pos]), LF_MAX_BASE_BR_RANGE);
   }
   if (nz >= PHTHRESH && ((qcoeff[0] & 1) != (sum_abs1 & 1))) {
     int tune_pos = scan[0];
@@ -160,8 +160,8 @@ void parity_hiding_trellis_off(const struct AV1_COMP *cpi, MACROBLOCK *mb,
       absdqcoeff = abs(dqcoeff[pos]);
       absqcoeff = abs(qcoeff[pos]);
       bool tunable =
-          (absqcoeff < MAX_BASE_BR_RANGE) ||
-          ((absqcoeff == MAX_BASE_BR_RANGE) && (abstcoeff < absdqcoeff));
+          (absqcoeff < LF_MAX_BASE_BR_RANGE) ||
+          ((absqcoeff == LF_MAX_BASE_BR_RANGE) && (abstcoeff < absdqcoeff));
       absqcoeff += ((abstcoeff < absdqcoeff) ? -1 : 1);
       absdqcoeff = (tran_low_t)(ROUND_POWER_OF_TWO_64(
                                     (tran_high_t)absqcoeff *

@@ -86,7 +86,7 @@ static INLINE void read_coeffs_reverse_2d(
       if (level > LF_NUM_BASE_LEVELS) {
         const int br_ctx = get_br_lf_ctx_2d(levels, pos, bwl);
         aom_cdf_prob *cdf = br_lf_cdf[br_ctx];
-        for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+        for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k =
               aom_read_symbol(r, cdf, BR_CDF_SIZE, ACCT_INFO("k", "br_lf_cdf"));
           level += k;
@@ -134,7 +134,7 @@ static INLINE void read_coeffs_reverse(
       if (level > LF_NUM_BASE_LEVELS) {
         const int br_ctx = get_br_lf_ctx(levels, pos, bwl, tx_class);
         aom_cdf_prob *cdf = br_lf_cdf[br_ctx];
-        for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+        for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k =
               aom_read_symbol(r, cdf, BR_CDF_SIZE, ACCT_INFO("k", "br_lf_cdf"));
           level += k;
@@ -630,7 +630,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
       if (level > LF_NUM_BASE_LEVELS) {
         const int br_ctx = get_br_ctx_lf_eob(pos, tx_class);
         cdf = ec_ctx->coeff_br_lf_cdf[plane_type][br_ctx];
-        for (int idx = 0; idx < COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
+        for (int idx = 0; idx < LF_COEFF_BASE_RANGE; idx += BR_CDF_SIZE - 1) {
           const int k = aom_read_symbol(r, cdf, BR_CDF_SIZE,
                                         ACCT_INFO("k", "coeff_br_lf_cdf"));
           level += k;
@@ -675,7 +675,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
-              AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
+              AOMMIN(levels[get_padded_idx(pos, bwl)], LF_MAX_BASE_BR_RANGE);
           if (level) {
             ++num_nz;
             sum_abs1 += level;
@@ -697,7 +697,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, DecoderCodingBlock *dcb,
         for (int si = *eob - 1; si > 0; --si) {
           int pos = scan[si];
           int level =
-              AOMMIN(levels[get_padded_idx(pos, bwl)], MAX_BASE_BR_RANGE);
+              AOMMIN(levels[get_padded_idx(pos, bwl)], LF_MAX_BASE_BR_RANGE);
           if (level) {
             ++num_nz;
             sum_abs1 += level;
