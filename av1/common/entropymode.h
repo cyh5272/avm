@@ -199,9 +199,7 @@ typedef struct frame_contexts {
                              [CDF_SIZE(4)];
   aom_cdf_prob idtx_sign_cdf[IDTX_SIGN_CONTEXTS][CDF_SIZE(2)];
   aom_cdf_prob coeff_base_cdf_idtx[IDTX_SIG_COEF_CONTEXTS][CDF_SIZE(4)];
-#if !CONFIG_ADAPTIVE_HR
   aom_cdf_prob coeff_br_cdf_idtx[IDTX_LEVEL_CONTEXTS][CDF_SIZE(BR_CDF_SIZE)];
-#endif  // !CONFIG_ADAPTIVE_HR
   aom_cdf_prob coeff_base_lf_cdf[TX_SIZES][PLANE_TYPES][LF_SIG_COEF_CONTEXTS]
                                 [CDF_SIZE(LF_BASE_SYMBOLS)];
   aom_cdf_prob coeff_base_lf_eob_cdf[TX_SIZES][PLANE_TYPES]
@@ -210,13 +208,12 @@ typedef struct frame_contexts {
 #if !CONFIG_ADAPTIVE_HR
   aom_cdf_prob coeff_br_lf_cdf[PLANE_TYPES][LF_LEVEL_CONTEXTS]
                               [CDF_SIZE(BR_CDF_SIZE)];
-  aom_cdf_prob coeff_br_cdf[PLANE_TYPES][LEVEL_CONTEXTS][CDF_SIZE(BR_CDF_SIZE)];
 #endif // !CONFIG_ADAPTIVE_HR
+  aom_cdf_prob coeff_br_cdf[PLANE_TYPES][LEVEL_CONTEXTS][CDF_SIZE(BR_CDF_SIZE)];
+
   aom_cdf_prob coeff_base_ph_cdf[COEFF_BASE_PH_CONTEXTS]
                                 [CDF_SIZE(NUM_BASE_LEVELS + 2)];
-#if !CONFIG_ADAPTIVE_HR
   aom_cdf_prob coeff_br_ph_cdf[COEFF_BR_PH_CONTEXTS][CDF_SIZE(BR_CDF_SIZE)];
-#endif  // !CONFIG_ADAPTIVE_HR
 
   aom_cdf_prob inter_single_mode_cdf[INTER_SINGLE_MODE_CONTEXTS]
                                     [CDF_SIZE(INTER_SINGLE_MODES)];

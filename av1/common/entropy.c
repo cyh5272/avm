@@ -65,16 +65,14 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
            av1_default_coeff_base_lf_eob_multi_cdfs[index]);
 #if !CONFIG_ADAPTIVE_HR
   av1_copy(cm->fc->coeff_br_lf_cdf, av1_default_coeff_lps_lf_multi_cdfs[index]);
-  av1_copy(cm->fc->coeff_br_cdf, av1_default_coeff_lps_multi_cdfs[index]);
 #endif  // !CONFIG_ADAPTIVE_HR
+  av1_copy(cm->fc->coeff_br_cdf, av1_default_coeff_lps_multi_cdfs[index]);
   av1_copy(cm->fc->coeff_base_cdf, av1_default_coeff_base_multi_cdfs[index]);
   av1_copy(cm->fc->idtx_sign_cdf, av1_default_idtx_sign_cdfs[index]);
   av1_copy(cm->fc->coeff_base_cdf_idtx,
            av1_default_coeff_base_multi_cdfs_idtx[index]);
-#if !CONFIG_ADAPTIVE_HR
   av1_copy(cm->fc->coeff_br_cdf_idtx,
            av1_default_coeff_lps_multi_cdfs_idtx[index]);
-#endif  // !CONFIG_ADAPTIVE_HR
   av1_copy(cm->fc->coeff_base_eob_cdf,
            av1_default_coeff_base_eob_multi_cdfs[index]);
   av1_copy(cm->fc->eob_flag_cdf16, av1_default_eob_multi16_cdfs[index]);
@@ -85,9 +83,7 @@ void av1_default_coef_probs(AV1_COMMON *cm) {
   av1_copy(cm->fc->eob_flag_cdf512, av1_default_eob_multi512_cdfs[index]);
   av1_copy(cm->fc->eob_flag_cdf1024, av1_default_eob_multi1024_cdfs[index]);
   av1_copy(cm->fc->coeff_base_ph_cdf, av1_default_coeff_base_ph_cdfs[index]);
-#if !CONFIG_ADAPTIVE_HR
   av1_copy(cm->fc->coeff_br_ph_cdf, av1_default_coeff_br_ph_cdfs[index]);
-#endif  // !CONFIG_ADAPTIVE_HR
   av1_copy(cm->fc->coeff_base_bob_cdf,
            av1_default_coeff_base_bob_multi_cdfs[index]);
 }
@@ -161,10 +157,8 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   RESET_CDF_COUNTER(fc->coeff_base_cdf, 4);
   RESET_CDF_COUNTER(fc->idtx_sign_cdf, 2);
   RESET_CDF_COUNTER(fc->coeff_base_cdf_idtx, 4);
-#if !CONFIG_ADAPTIVE_HR
   RESET_CDF_COUNTER(fc->coeff_br_cdf_idtx, BR_CDF_SIZE);
   RESET_CDF_COUNTER(fc->coeff_br_cdf, BR_CDF_SIZE);
-#endif  // !CONFIG_ADAPTIVE_HR
   RESET_CDF_COUNTER(fc->inter_single_mode_cdf, INTER_SINGLE_MODES);
 #if CONFIG_EXTENDED_WARP_PREDICTION
   RESET_CDF_COUNTER(fc->inter_warp_mode_cdf, 2);
@@ -446,8 +440,6 @@ void av1_reset_cdf_symbol_counters(FRAME_CONTEXT *fc) {
   }
 
   RESET_CDF_COUNTER(fc->coeff_base_ph_cdf, NUM_BASE_LEVELS + 2);
-#if !CONFIG_ADAPTIVE_HR
   RESET_CDF_COUNTER(fc->coeff_br_ph_cdf, BR_CDF_SIZE);
-#endif  // !CONFIG_ADAPTIVE_HR
   RESET_CDF_COUNTER(fc->cctx_type_cdf, CCTX_TYPES);
 }
