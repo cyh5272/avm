@@ -3011,7 +3011,7 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
           const int32_t iyn = (yoff >> ss_y) >> WARPEDMODEL_PREC_BITS;
 
           // Mark as boundary and use one-sided difference for gradient if any
-          // of the bicubic steps is outside the block boundary
+          // of the sobel steps is outside the block boundary
           if ((point == 0 && ixn >= pre_buf->width - 1) ||
               (point == 1 && ixn + 1 <= 0))
             is_boundary_x = 1;
@@ -3034,13 +3034,13 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
           const int32_t syn =
               (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
-          // Bilinear coefficients for bicubic offset positions
+          // Bilinear coefficients for delta step position
           const int32_t coeff_xn = ROUND_POWER_OF_TWO(
               sxn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
           const int32_t coeff_yn = ROUND_POWER_OF_TWO(
               syn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
 
-          // Horizontal and vertical filter for bicubic offsets
+          // Horizontal and vertical filter for delta step
           int32_t vtmp_n0 =
               dst[iyn0 * stride + ixn0] * (unit_offset - coeff_xn) +
               dst[iyn0 * stride + ixn1] * coeff_xn;
@@ -3060,7 +3060,7 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
         if (i > 0) dst_delta[3] = prev_y_step[ref][j];
         if (j < bw - 1) prev_x_step[ref] = dst_delta[0];
         if (i < bh - 1) prev_y_step[ref][j] = dst_delta[2];
-#endif  // COMBINE_METHOD == 2
+#endif  // COMBINE_METHOD == 5
 
         warped_gx[ref] = (dst_delta[0] - dst_delta[1]) *
                          (1 << (subpel_bits + is_boundary_x - 1));
