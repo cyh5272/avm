@@ -1047,9 +1047,9 @@ void av1_warp_plane_bilinear(WarpedMotionParams *wm, int bd,
 }
 #endif  // AFFINE_FAST_WARP_METHOD == 3
 
-#define DEBUG_GE 0
-#define DEBUG_GE_STAB 0
-#if DEBUG_GE
+#define USE_DOUBLE 0
+#define DEBUG_SOLVER 0
+#if DEBUG_SOLVER
 void print_mat_sol(double *mat, double *sol, int dim) {
   fprintf(stderr, "A:\n");
   for (int i = 0; i < dim; i++) {
@@ -1074,8 +1074,9 @@ void print_mat_sol_int(int64_t *mat, int64_t *sol, int dim) {
 #endif
 
 #if CONFIG_GAUSSIAN_ELIMINATION_LS
-#define USE_DOUBLE 0
 #define MAX_LS_DIM 4
+#define DEBUG_GE 0
+#define DEBUG_GE_STAB 0
 #if USE_DOUBLE
 void swap_rows(double *mat, double *sol, const int i, const int j,
                const int dim) {
@@ -1249,6 +1250,49 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
 }
 #endif  // USE_DOUBLE
 #else
+#if USE_DOUBLE
+// Compute intermediate results for 4D linear solver.
+void getsub_4d(double *sub, double *mat, double *vec) {
+  sub[0] = mat[0] * mat[5] - mat[1] * mat[4];
+  sub[1] = mat[0] * mat[6] - mat[2] * mat[4];
+  sub[2] = mat[0] * mat[7] - mat[3] * mat[4];
+  sub[3] = mat[0] * vec[1] - vec[0] * mat[4];
+  sub[4] = mat[1] * mat[6] - mat[2] * mat[5];
+  sub[5] = mat[1] * mat[7] - mat[3] * mat[5];
+  sub[6] = mat[1] * vec[1] - vec[0] * mat[5];
+  sub[7] = mat[2] * mat[7] - mat[3] * mat[6];
+  sub[8] = mat[2] * vec[1] - vec[0] * mat[6];
+  sub[9] = mat[3] * vec[1] - vec[0] * mat[7];
+}
+
+// Solve a 4-dimensional matrix inverse using inverse determinant method:
+// x = A^(-1) * b, where A: mat, b: vec, x: sol
+int inverse_determinant_4d(double *mat, double *vec, int *precbits,
+                           double *sol) {
+  double a[10], b[10];  // values of 20 specific 2D subdeterminants
+  getsub_4d(&a[0], mat, vec);
+  getsub_4d(&b[0], mat + 8, vec + 2);
+
+  double det = a[0] * b[7] + a[7] * b[0] + a[2] * b[4] + a[4] * b[2] -
+               a[5] * b[1] - a[1] * b[5];
+  if (det <= 0) return 0;
+
+  sol[0] = a[5] * b[8] + a[8] * b[5] - a[6] * b[7] - a[7] * b[6] - a[4] * b[9] -
+           a[9] * b[4];
+  sol[1] = a[1] * b[9] + a[9] * b[1] + a[3] * b[7] + a[7] * b[3] - a[2] * b[8] -
+           a[8] * b[2];
+  sol[2] = a[2] * b[6] + a[6] * b[2] - a[0] * b[9] - a[9] * b[0] - a[3] * b[5] -
+           a[5] * b[3];
+  sol[3] = a[0] * b[8] + a[8] * b[0] + a[3] * b[4] + a[4] * b[3] - a[6] * b[1] -
+           a[1] * b[6];
+
+  for (int i = 0; i < 4; i++) {
+    sol[i] = sol[i] * (1 << precbits[i]);
+    sol[i] = fclamp(sol[i] / det, (double)INT64_MIN, (double)INT64_MAX);
+  }
+  return 1;
+}
+#else
 // Compute intermediate results for 4D linear solver.
 void getsub_4d(int64_t *sub, int64_t *mat, int64_t *vec) {
   sub[0] = mat[0] * mat[5] - mat[1] * mat[4];
@@ -1265,8 +1309,8 @@ void getsub_4d(int64_t *sub, int64_t *mat, int64_t *vec) {
 
 // Solve a 4-dimensional matrix inverse using inverse determinant method:
 // x = A^(-1) * b, where A: mat, b: vec, x: sol
-int solver_4d_determinant(int64_t *mat, int64_t *vec, int *precbits,
-                          int64_t *sol) {
+int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
+                           int64_t *sol) {
   int64_t a[10], b[10];  // values of 20 specific 2D subdeterminants
 
   getsub_4d(&a[0], mat, vec);
@@ -1321,10 +1365,11 @@ int solver_4d_determinant(int64_t *mat, int64_t *vec, int *precbits,
   sol[3] = divide_and_round_signed(sol[3], det);
   return 1;
 }
+#endif  // USE_DOUBLE
 #endif  // CONFIG_GAUSSIAN_ELIMINATION_LS
 
 int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
-#if DEBUG_GE
+#if DEBUG_SOLVER
   fprintf(stderr, "[solve 4d] precbits (%d,%d,%d,%d)\n", precbits[0],
           precbits[1], precbits[2], precbits[3]);
   print_mat_sol_int(mat, vec, 4);
@@ -1332,8 +1377,8 @@ int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
 #if CONFIG_GAUSSIAN_ELIMINATION_LS
   memcpy(sol, vec, 4 * sizeof(int64_t));
 #if USE_DOUBLE
-  double fmat[MAX_LS_DIM * MAX_LS_DIM];
-  double fsol[MAX_LS_DIM];
+  double fmat[4 * 4];
+  double fsol[4];
   for (int i = 0; i < 16; i++) fmat[i] = (double)mat[i];
   for (int i = 0; i < 4; i++) fsol[i] = (double)sol[i];
   int ret = gaussian_elimination(fmat, fsol, precbits, 4);
@@ -1343,9 +1388,20 @@ int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
   int ret = gaussian_elimination(mat, sol, precbits, 4);
 #endif
 #else
-  int ret = solver_4d_determinant(mat, vec, precbits, sol);
+#if USE_DOUBLE
+  double fmat[4 * 4];
+  double fvec[4];
+  double fsol[4];
+  for (int i = 0; i < 16; i++) fmat[i] = (double)mat[i];
+  for (int i = 0; i < 4; i++) fvec[i] = (double)vec[i];
+  int ret = inverse_determinant_4d(fmat, fvec, precbits, fsol);
+  for (int i = 0; i < 16; i++) mat[i] = (int64_t)fmat[i];
+  for (int i = 0; i < 4; i++) sol[i] = (int64_t)fsol[i];
+#else
+  int ret = inverse_determinant_4d(mat, vec, precbits, sol);
+#endif
 #endif  // CONFIG_GAUSSIAN_ELIMINATION_LS
-#if DEBUG_GE
+#if DEBUG_SOLVER
   fprintf(stderr, "(final)\n");
   print_mat_sol_int(mat, sol, 4);
 #endif
