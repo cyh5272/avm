@@ -550,11 +550,11 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 // Number of bits allowed for covariance matrix elements (su2, sv2, suv, suw
 // and svw) so that det, det_x, and det_y does not cause overflow issue in
 // int64_t. Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
-#define OPFL_COV_CLAMP_BITS 28
+#define MAX_OPFL_AUTOCORR_BITS 28
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#define OPFL_COV_CLAMP_VAL ((1 << OPFL_COV_CLAMP_BITS) - 1)
+#define OPFL_AUTOCORR_CLAMP_VAL ((1 << MAX_OPFL_AUTOCORR_BITS) - 1)
 #else
-#define OPFL_COV_CLAMP_VAL (1 << OPFL_COV_CLAMP_BITS)
+#define OPFL_AUTOCORR_CLAMP_VAL (1 << MAX_OPFL_AUTOCORR_BITS)
 #endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
 void av1_opfl_build_inter_predictor(
@@ -604,9 +604,9 @@ void av1_opfl_rebuild_inter_predictor(
 );
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-// We consider this tunable number K=MAX_LS_INTERNAL_BITS-1 (sign bit excluded)
-// as the target bit depth of all intermediate results
-#define MAX_LS_INTERNAL_BITS 30
+// We consider this tunable number K=MAX_LS_BITS-1 (sign bit excluded)
+// as the target maximum bit depth of all intermediate results for LS problem.
+#define MAX_LS_BITS 30
 // Divide all elements of a vector by a common factor, and apply shifts.
 // The integer division is based on lookup table.
 // sol: numerator (will be updated to the solution)
@@ -630,8 +630,8 @@ static INLINE void divide_and_round_array(int64_t *sol, int64_t den,
     if (sol[i] == 0) continue;
     int sign = sol[i] > 0;
     sol[i] = sign ? sol[i] : -sol[i];
-    int num_red_bits = AOMMAX(
-        0, get_msb_signed_64(sol[i]) + inv_den_msb + 1 - MAX_LS_INTERNAL_BITS);
+    int num_red_bits =
+        AOMMAX(0, get_msb_signed_64(sol[i]) + inv_den_msb + 1 - MAX_LS_BITS);
     sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], num_red_bits);
 
     int inc_bits = shifts[i] + num_red_bits - den_shift;
@@ -723,17 +723,22 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 #define AFFINE_AVERAGING_BITS 3
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-// TODO(kslu) write comments here
-#define AFFINE_CLAMP_VAL ((1 << 15) - 1)
-#define AFFINE_COV_CLAMP_VAL ((1 << 30) - 1)
+// We consider this tunable number H=MAX_AFFINE_AUTOCORR_BITS-1 (sign bit
+// excluded) as the maximum bit depth for autocorrelation matrix filling.
+// This value should not be set lower than 25, since gx*x+gy*y can reach 25
+// bits given the most extreme case (16+8+1 bits).
+#define MAX_AFFINE_AUTOCORR_BITS 31
+// Clamp range for autocorrelation matrix element, and for elements of a[]
+#define AFFINE_AUTOCORR_CLAMP_VAL ((1 << (MAX_AFFINE_AUTOCORR_BITS - 1)) - 1)
+#define AFFINE_SAMP_CLAMP_VAL ((1 << ((MAX_AFFINE_AUTOCORR_BITS - 1) >> 1)) - 1)
 #else
 // Number of bits allowed for covariance matrix elements so that determinants
 // do not overflow int64_t. For dim=3, input bit depth must be
 // <= (64 - mv_prec_bits - grad_prec_bits) / 3. For dim=4, input bit depth must
 // be <= (64-1)/2 for the first stage (getsub_4d), and <= 64-3-precbits for
 // the second stage (determinant and divide_and_round_signed).
-#define AFFINE_CLAMP_VAL (1 << 15)
-#define AFFINE_COV_CLAMP_VAL (1 << 30)
+#define AFFINE_SAMP_CLAMP_VAL (1 << 15)
+#define AFFINE_AUTOCORR_CLAMP_VAL (1 << 30)
 #endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
 // Internal bit depths for affine parameter derivation

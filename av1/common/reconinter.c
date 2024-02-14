@@ -1295,9 +1295,9 @@ int inverse_determinant_4d(double *mat, double *vec, int *precbits,
 }
 #else
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-void ls_range_check(const int64_t val) {
-  int64_t min_val = -(1ULL << (MAX_LS_INTERNAL_BITS - 1));
-  int64_t max_val = (1ULL << (MAX_LS_INTERNAL_BITS - 1)) - 1;
+void bit_depth_check(const int64_t val, const int maxbd) {
+  int64_t min_val = -(1ULL << (maxbd - 1));
+  int64_t max_val = (1ULL << (maxbd - 1)) - 1;
   (void)val;
   (void)min_val;
   (void)max_val;
@@ -1409,11 +1409,11 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
 #endif
 
-  // Bit range adjustment: say K=MAX_LS_INTERNAL_BITS-1, here we down shift
+  // Bit range adjustment: say K=MAX_LS_BITS-1, here we down shift
   // the matrix elements to be within L bits.
   // 2*L+1 <= K, meaning that L <= (K - 1) >> 1
   int shifts[4] = { 0 };
-  get_mat4d_shifts(mat, shifts, MAX_LS_INTERNAL_BITS);
+  get_mat4d_shifts(mat, shifts, MAX_LS_BITS);
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
       int shift_ij = shifts[i] + shifts[j];
@@ -1444,8 +1444,8 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   getsub_4d(&b[0], mat + 8, vec + 2);
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
   for (int i = 0; i < 10; i++) {
-    ls_range_check(a[i]);
-    ls_range_check(b[i]);
+    bit_depth_check(a[i], MAX_LS_BITS);
+    bit_depth_check(b[i], MAX_LS_BITS);
   }
 #endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
@@ -1465,8 +1465,8 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   int bbits_max = 0;
   get_vec_bit_ranges(a, &abits_max, 10);
   get_vec_bit_ranges(b, &bbits_max, 10);
-  int subdet_reduce_bits = AOMMAX(
-      0, AOMMAX(abits_max, bbits_max) - ((MAX_LS_INTERNAL_BITS - 4) >> 1));
+  int subdet_reduce_bits =
+      AOMMAX(0, AOMMAX(abits_max, bbits_max) - ((MAX_LS_BITS - 4) >> 1));
 #else
   // Flexibly adjust range to avoid overflow without losing precision. This
   // moves the bit depth of a[] and b[] within 29, so that det and sol will not
@@ -1494,7 +1494,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   int64_t det = a[0] * b[7] + a[7] * b[0] + a[2] * b[4] + a[4] * b[2] -
                 a[5] * b[1] - a[1] * b[5];
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-  ls_range_check(det);
+  bit_depth_check(det, MAX_LS_BITS);
 #endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
   if (det <= 0) return 0;
@@ -1517,7 +1517,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
 #endif
 
-  for (int i = 0; i < 4; i++) ls_range_check(sol[i]);
+  for (int i = 0; i < 4; i++) bit_depth_check(sol[i], MAX_LS_BITS);
   divide_and_round_array(sol, det, 4, precbits);
 
 #if DEBUG_BIT_DEPTH
@@ -2059,14 +2059,14 @@ void get_ref_affine_params(int bw, int bh, int mi_x, int mi_y,
 }
 
 // Find the maximum element of p/gx/gy in absolute value
-int64_t find_max_matrix_element(const uint16_t *p0, int pstride0,
-                                const uint16_t *p1, int pstride1,
-                                const int16_t *gx0, const int16_t *gy0,
-                                const int16_t *gx1, const int16_t *gy1,
-                                int gstride, int bw, int bh, int d0, int d1) {
+int find_max_matrix_element(const uint16_t *p0, int pstride0,
+                            const uint16_t *p1, int pstride1,
+                            const int16_t *gx0, const int16_t *gy0,
+                            const int16_t *gx1, const int16_t *gy1, int gstride,
+                            int bw, int bh, int d0, int d1) {
   // TODO(kslu) do it in a better way to remove repeated computations, or
   // handle this in gradient computation
-  int64_t max_el = 0;
+  int max_el = 0;
   for (int i = 0; i < bh; i++) {
     for (int j = 0; j < bw; j++) {
       max_el = AOMMAX(max_el, abs(d0 * (int)gx0[i * gstride + j] -
@@ -2087,17 +2087,17 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
                              const int16_t *gx1, const int16_t *gy1,
                              int gstride, int bw, int bh, int d0, int d1,
                              int grad_prec_bits, AffineModelParams *am_params) {
-  int bw_log2 = get_msb_signed(bw);
-  int bh_log2 = get_msb_signed(bh);
+  int bw_log2 = get_msb(bw);
+  int bh_log2 = get_msb(bh);
   // Check range of gradient and prediction differences. If maximum absolute
   // value is very large, matrix A is likely to be clamped. To improve
   // stability, we adaptively reduce the dynamic range here
-  int64_t max_el = find_max_matrix_element(p0, pstride0, p1, pstride1, gx0, gy0,
-                                           gx1, gy1, gstride, bw, bh, d0, d1);
-  int max_diff_bits = get_msb_signed_64(max_el);
+  int max_el = find_max_matrix_element(p0, pstride0, p1, pstride1, gx0, gy0,
+                                       gx1, gy1, gstride, bw, bh, d0, d1);
+  int max_el_msb = get_msb(max_el);
   const int grad_bits =
-      AOMMAX(0, max_diff_bits * 2 + bh_log2 + bw_log2 +
-                    AOMMAX(bh_log2, bw_log2) - AFFINE_GRAD_BITS_THR);
+      AOMMAX(0, max_el_msb * 2 + bh_log2 + bw_log2 + AOMMAX(bh_log2, bw_log2) -
+                    AFFINE_GRAD_BITS_THR);
   const int coords_bits =
       AOMMAX(0, ((bh_log2 + bw_log2) >> 1) - AFFINE_COORDS_OFFSET_BITS);
 
@@ -2122,8 +2122,8 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
       tmp[1] = d0 * (int)gy0[gidx] - d1 * (int)gy1[gidx];
       u = ROUND_POWER_OF_TWO_SIGNED_64(-tmp[0] * y + tmp[1] * x, coords_bits);
       v = ROUND_POWER_OF_TWO_SIGNED_64(tmp[0] * x + tmp[1] * y, coords_bits);
-      u = clamp64(u, -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
-      v = clamp64(v, -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
+      u = clamp64(u, -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
+      v = clamp64(v, -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
       w = (int64_t)p0[i * pstride0 + j] - (int64_t)p1[i * pstride1 + j];
       su2 += ROUND_POWER_OF_TWO_SIGNED_64(u * u, grad_bits);
       suv += ROUND_POWER_OF_TWO_SIGNED_64(u * v, grad_bits);
@@ -2139,11 +2139,11 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
 
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
-  su2 = clamp64(su2, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  sv2 = clamp64(sv2, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  suv = clamp64(suv, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  suw = clamp64(suw, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  svw = clamp64(svw, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
+  su2 = clamp64(su2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  sv2 = clamp64(sv2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  suv = clamp64(suv, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  suw = clamp64(suw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  svw = clamp64(svw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -2181,17 +2181,17 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
                                          int gstride, int bw, int bh, int d0,
                                          int d1, int grad_prec_bits,
                                          AffineModelParams *am_params) {
-  int bw_log2 = get_msb_signed(bw);
-  int bh_log2 = get_msb_signed(bh);
+  int bw_log2 = get_msb(bw);
+  int bh_log2 = get_msb(bh);
   // Check range of gradient and prediction differences. If maximum absolute
   // value is very large, matrix A is likely to be clamped. To improve
   // stability, we adaptively reduce the dynamic range here
-  int64_t max_el = find_max_matrix_element(p0, pstride0, p1, pstride1, gx0, gy0,
-                                           gx1, gy1, gstride, bw, bh, d0, d1);
-  int max_diff_bits = get_msb_signed_64(max_el);
+  int max_el = find_max_matrix_element(p0, pstride0, p1, pstride1, gx0, gy0,
+                                       gx1, gy1, gstride, bw, bh, d0, d1);
+  int max_el_msb = get_msb(max_el);
   const int grad_bits =
-      AOMMAX(0, max_diff_bits * 2 + bh_log2 + bw_log2 +
-                    AOMMAX(bh_log2, bw_log2) - AFFINE_GRAD_BITS_THR);
+      AOMMAX(0, max_el_msb * 2 + bh_log2 + bw_log2 + AOMMAX(bh_log2, bw_log2) -
+                    AFFINE_GRAD_BITS_THR);
   const int coords_bits =
       AOMMAX(0, ((bh_log2 + bw_log2) >> 1) - AFFINE_COORDS_OFFSET_BITS);
 
@@ -2215,7 +2215,7 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
       a[2] = tmp[0];
       a[3] = tmp[1];
       for (int s = 0; s < 4; ++s)
-        a[s] = clamp(a[s], -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
+        a[s] = clamp(a[s], -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
       const int d = (int)p0[i * pstride0 + j] - (int)p1[i * pstride1 + j];
       for (int s = 0; s < 4; ++s) {
         for (int t = 0; t <= s; ++t) {
@@ -2247,10 +2247,11 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
   // Note that all the clampings here typically take no effect.
   for (int s = 0; s < 4; ++s) {
     for (int t = 0; t < 4; ++t) {
-      mat_a[s * 4 + t] = clamp64(mat_a[s * 4 + t], -AFFINE_COV_CLAMP_VAL,
-                                 AFFINE_COV_CLAMP_VAL);
+      mat_a[s * 4 + t] = clamp64(mat_a[s * 4 + t], -AFFINE_AUTOCORR_CLAMP_VAL,
+                                 AFFINE_AUTOCORR_CLAMP_VAL);
     }
-    vec_b[s] = clamp64(vec_b[s], -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
+    vec_b[s] = clamp64(vec_b[s], -AFFINE_AUTOCORR_CLAMP_VAL,
+                       AFFINE_AUTOCORR_CLAMP_VAL);
   }
 
   int prec_bits[4] = {
@@ -2280,13 +2281,12 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
 #if OPFL_COMBINE_INTERP_GRAD_LS
 // Find the maximum element of pdiff/gx/gy in absolute value
 // TODO(kslu) add SIMD version
-int64_t find_max_matrix_element_interp_grad(const int16_t *pdiff, int pstride,
-                                            const int16_t *gx,
-                                            const int16_t *gy, int gstride,
-                                            int bw, int bh) {
+int find_max_matrix_element_interp_grad(const int16_t *pdiff, int pstride,
+                                        const int16_t *gx, const int16_t *gy,
+                                        int gstride, int bw, int bh) {
   // TODO(kslu) do it in a better way to remove repeated computations, or
   // handle this in gradient computation
-  int64_t max_el = 0;
+  int max_el = 0;
   for (int i = 0; i < bh; i++) {
     for (int j = 0; j < bw; j++) {
 #if OPFL_DOWNSAMP_QUINCUNX
@@ -2310,13 +2310,13 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
                                          int gstride, int bw, int bh,
                                          int grad_prec_bits,
                                          AffineModelParams *am_params) {
-  int x_range_log2 = get_msb_signed(bw);
-  int y_range_log2 = get_msb_signed(bh);
+  int x_range_log2 = get_msb(bw);
+  int y_range_log2 = get_msb(bh);
 #if AFFINE_AVERAGING_BITS > 0
   int step_h = AOMMAX(1, bh >> (7 - AFFINE_AVERAGING_BITS));
   int step_w = AOMMAX(1, bw >> (7 - AFFINE_AVERAGING_BITS));
-  int npel_log2 = AOMMIN(7 - AFFINE_AVERAGING_BITS, get_msb_signed(bw)) +
-                  AOMMIN(7 - AFFINE_AVERAGING_BITS, get_msb_signed(bh));
+  int npel_log2 = AOMMIN(7 - AFFINE_AVERAGING_BITS, x_range_log2) +
+                  AOMMIN(7 - AFFINE_AVERAGING_BITS, y_range_log2);
 #else
   int npel_log2 = x_range_log2 + y_range_log2;
 #endif
@@ -2326,11 +2326,11 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
   // Check range of gradient and prediction differences. If maximum absolute
   // value is very large, matrix A is likely to be clamped. To improve
   // stability, we adaptively reduce the dynamic range here
-  int64_t max_el = find_max_matrix_element_interp_grad(pdiff, pstride, gx, gy,
-                                                       gstride, bw, bh);
-  int max_diff_bits = get_msb_signed_64(max_el);
+  int max_el = find_max_matrix_element_interp_grad(pdiff, pstride, gx, gy,
+                                                   gstride, bw, bh);
+  int max_el_msb = get_msb(max_el);
   const int grad_bits =
-      AOMMAX(0, max_diff_bits * 2 + npel_log2 +
+      AOMMAX(0, max_el_msb * 2 + npel_log2 +
                     AOMMAX(x_range_log2, y_range_log2) - AFFINE_GRAD_BITS_THR);
   const int coords_bits = AOMMAX(
       0, ((x_range_log2 + y_range_log2) >> 1) - AFFINE_COORDS_OFFSET_BITS);
@@ -2361,8 +2361,8 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
                                        coords_bits);
       v = ROUND_POWER_OF_TWO_SIGNED_64(gx[gidx] * x + gy[gidx] * y,
                                        coords_bits);
-      u = clamp64(u, -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
-      v = clamp64(v, -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
+      u = clamp64(u, -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
+      v = clamp64(v, -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
       w = (int64_t)pdiff[i * pstride + j];
       su2 += ROUND_POWER_OF_TWO_SIGNED_64(u * u, grad_bits);
       suv += ROUND_POWER_OF_TWO_SIGNED_64(u * v, grad_bits);
@@ -2378,11 +2378,11 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
 
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
-  su2 = clamp64(su2, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  sv2 = clamp64(sv2, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  suv = clamp64(suv, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  suw = clamp64(suw, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
-  svw = clamp64(svw, -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
+  su2 = clamp64(su2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  sv2 = clamp64(sv2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  suv = clamp64(suv, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  suw = clamp64(suw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+  svw = clamp64(svw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -2418,13 +2418,13 @@ int derive_rotation_scale_translation_4p_interp_grad(
     const int16_t *pdiff, int pstride, const int16_t *gx, const int16_t *gy,
     int gstride, int bw, int bh, int grad_prec_bits,
     AffineModelParams *am_params) {
-  int x_range_log2 = get_msb_signed(bw);
-  int y_range_log2 = get_msb_signed(bh);
+  int x_range_log2 = get_msb(bw);
+  int y_range_log2 = get_msb(bh);
 #if AFFINE_AVERAGING_BITS > 0
   int step_h = AOMMAX(1, bh >> (7 - AFFINE_AVERAGING_BITS));
   int step_w = AOMMAX(1, bw >> (7 - AFFINE_AVERAGING_BITS));
-  int npel_log2 = AOMMIN(7 - AFFINE_AVERAGING_BITS, get_msb_signed(bw)) +
-                  AOMMIN(7 - AFFINE_AVERAGING_BITS, get_msb_signed(bh));
+  int npel_log2 = AOMMIN(7 - AFFINE_AVERAGING_BITS, x_range_log2) +
+                  AOMMIN(7 - AFFINE_AVERAGING_BITS, y_range_log2);
 #else
   int npel_log2 = x_range_log2 + y_range_log2;
 #endif
@@ -2434,11 +2434,11 @@ int derive_rotation_scale_translation_4p_interp_grad(
   // Check range of gradient and prediction differences. If maximum absolute
   // value is very large, matrix A is likely to be clamped. To improve
   // stability, we adaptively reduce the dynamic range here
-  int64_t max_el = find_max_matrix_element_interp_grad(pdiff, pstride, gx, gy,
-                                                       gstride, bw, bh);
-  int max_diff_bits = get_msb_signed_64(max_el);
+  int max_el = find_max_matrix_element_interp_grad(pdiff, pstride, gx, gy,
+                                                   gstride, bw, bh);
+  int max_el_msb = get_msb(max_el);
   const int grad_bits =
-      AOMMAX(0, max_diff_bits * 2 + npel_log2 +
+      AOMMAX(0, max_el_msb * 2 + npel_log2 +
                     AOMMAX(x_range_log2, y_range_log2) - AFFINE_GRAD_BITS_THR);
   const int coords_bits = AOMMAX(
       0, ((x_range_log2 + y_range_log2) >> 1) - AFFINE_COORDS_OFFSET_BITS);
@@ -2468,7 +2468,7 @@ int derive_rotation_scale_translation_4p_interp_grad(
       a[2] = gx[gidx];
       a[3] = gy[gidx];
       for (int s = 0; s < 4; ++s)
-        a[s] = clamp(a[s], -AFFINE_CLAMP_VAL, AFFINE_CLAMP_VAL);
+        a[s] = clamp(a[s], -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
       const int d = pdiff[i * pstride + j];
       for (int s = 0; s < 4; ++s) {
         for (int t = 0; t <= s; ++t) {
@@ -2491,10 +2491,11 @@ int derive_rotation_scale_translation_4p_interp_grad(
 
   for (int s = 0; s < 4; ++s) {
     for (int t = 0; t < 4; ++t) {
-      mat_a[s * 4 + t] = clamp64(mat_a[s * 4 + t], -AFFINE_COV_CLAMP_VAL,
-                                 AFFINE_COV_CLAMP_VAL);
+      mat_a[s * 4 + t] = clamp64(mat_a[s * 4 + t], -AFFINE_AUTOCORR_CLAMP_VAL,
+                                 AFFINE_AUTOCORR_CLAMP_VAL);
     }
-    vec_b[s] = clamp64(vec_b[s], -AFFINE_COV_CLAMP_VAL, AFFINE_COV_CLAMP_VAL);
+    vec_b[s] = clamp64(vec_b[s], -AFFINE_AUTOCORR_CLAMP_VAL,
+                       AFFINE_AUTOCORR_CLAMP_VAL);
   }
 
   int prec_bits[4] = {
@@ -2575,11 +2576,11 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
 
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
-  su2 = clamp64(su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  sv2 = clamp64(sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suv = clamp64(suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suw = clamp64(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  svw = clamp64(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  su2 = clamp64(su2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  sv2 = clamp64(sv2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  suv = clamp64(suv, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  suw = clamp64(suw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  svw = clamp64(svw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -2644,11 +2645,11 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
 
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
-  su2 = clamp64(su2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  sv2 = clamp64(sv2, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suv = clamp64(suv, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  suw = clamp64(suw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
-  svw = clamp64(svw, -OPFL_COV_CLAMP_VAL, OPFL_COV_CLAMP_VAL);
+  su2 = clamp64(su2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  sv2 = clamp64(sv2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  suv = clamp64(suv, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  suw = clamp64(suw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+  svw = clamp64(svw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
