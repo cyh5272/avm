@@ -551,7 +551,11 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 // and svw) so that det, det_x, and det_y does not cause overflow issue in
 // int64_t. Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
 #define OPFL_COV_CLAMP_BITS 28
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#define OPFL_COV_CLAMP_VAL ((1 << OPFL_COV_CLAMP_BITS) - 1)
+#else
 #define OPFL_COV_CLAMP_VAL (1 << OPFL_COV_CLAMP_BITS)
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
 void av1_opfl_build_inter_predictor(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, const MB_MODE_INFO *mi,
@@ -682,8 +686,13 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // <= (64 - mv_prec_bits - grad_prec_bits) / 3. For dim=4, input bit depth must
 // be <= (64-1)/2 for the first stage (getsub_4d), and <= 64-3-precbits for
 // the second stage (determinant and divide_and_round_signed).
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#define AFFINE_CLAMP_VAL ((1 << 15) - 1)
+#define AFFINE_COV_CLAMP_VAL ((1 << 30) - 1)
+#else
 #define AFFINE_CLAMP_VAL (1 << 15)
 #define AFFINE_COV_CLAMP_VAL (1 << 30)
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
 // Internal bit depths for affine parameter derivation
 #define AFFINE_GRAD_BITS_THR 32
