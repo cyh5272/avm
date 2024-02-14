@@ -603,7 +603,46 @@ void av1_opfl_rebuild_inter_predictor(
 #endif  // CONFIG_OPTFLOW_ON_TIP
 );
 
-#if !CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+// We consider this tunable number K=MAX_LS_INTERNAL_BITS-1 (sign bit excluded)
+// as the target bit depth of all intermediate results
+#define MAX_LS_INTERNAL_BITS 30
+// Divide all elements of a vector by a common factor, and apply shifts.
+// The integer division is based on lookup table.
+// sol: numerator (will be updated to the solution)
+// den: denominator
+// out: output result (sol / den)
+// TODO(kslu) reduce input bit depth to int32_t
+static INLINE void divide_and_round_array(int64_t *sol, int64_t den,
+                                          const int dim, int *shifts) {
+  assert(den != 0);
+  if (den < 0) {
+    for (int i = 0; i < dim; i++) sol[i] = -sol[i];
+    return divide_and_round_array(sol, -den, dim, shifts);
+  }
+  // TODO(kslu) use resolve_divisor_32
+  int16_t den_shift = 0;
+  int16_t inv_den = (den == 1) ? 1 : resolve_divisor_64(den, &den_shift);
+  int inv_den_msb = get_msb_signed(inv_den);
+
+  // Apply shifts to sol[i] and den to keep both bit depths within K.
+  for (int i = 0; i < dim; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int num_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_den_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], num_red_bits);
+
+    int inc_bits = shifts[i] + num_red_bits - den_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_den * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_den, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+}
+#else
 // Integer division based on lookup table.
 // num: numerator
 // den: denominator
@@ -684,9 +723,6 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 #define AFFINE_AVERAGING_BITS 3
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-// We consider this tunable number K=MAX_LS_INTERNAL_BITS-1 (sign bit excluded)
-// as the target bit depth of all intermediate results
-#define MAX_LS_INTERNAL_BITS 30
 // TODO(kslu) write comments here
 #define AFFINE_CLAMP_VAL ((1 << 15) - 1)
 #define AFFINE_COV_CLAMP_VAL ((1 << 30) - 1)
