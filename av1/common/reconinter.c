@@ -1295,9 +1295,6 @@ int inverse_determinant_4d(double *mat, double *vec, int *precbits,
 }
 #else
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-// We consider this tunable number K=MAX_LS_INTERNAL_BITS-1 (sign bit excluded)
-// as the target bit depth of all intermediate results
-#define MAX_LS_INTERNAL_BITS 30
 #define DIVISION_BIT_GAP_THR 8
 void ls_range_check(const int64_t val) {
   int64_t min_val = -(1ULL << (MAX_LS_INTERNAL_BITS - 1));
@@ -1413,7 +1410,8 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
 #endif
 
-  // Bit range adjustment: down shift the matrix elements to be within L bits.
+  // Bit range adjustment: say K=MAX_LS_INTERNAL_BITS-1, here we down shift
+  // the matrix elements to be within L bits.
   // 2*L+1 <= K, meaning that L <= (K - 1) >> 1
   int shifts[4] = { 0 };
   get_mat4d_shifts(mat, shifts, MAX_LS_INTERNAL_BITS);
@@ -1522,6 +1520,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
 
   for (int i = 0; i < 4; i++) ls_range_check(sol[i]);
 
+  // TODO(kslu) use resolve_divisor_32
   int16_t det_shift = 0;
   int16_t inv_det = resolve_divisor_64(det, &det_shift);
   int inv_det_msb = get_msb_signed(inv_det);
@@ -2173,11 +2172,36 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return 1;
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+  // TODO(kslu) handle the bit range of correlation matrix filling
+  int16_t det_shift = 0;
+  int16_t inv_det = resolve_divisor_64(det, &det_shift);
+  int inv_det_msb = get_msb_signed(inv_det);
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+  for (int i = 0; i < 2; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int detj_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_det_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], detj_red_bits);
+
+    int inc_bits = bits + detj_red_bits - det_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_det * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_det, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+  const int angle = (int)sol[0];
+  const int alpha = (int)sol[1];
+#else
   const int64_t det_x = (sv2 * suw - suv * svw) * (1 << bits);
   const int64_t det_y = (su2 * svw - suv * suw) * (1 << bits);
 
   const int angle = (int)divide_and_round_signed(det_x, det);
   const int alpha = (int)divide_and_round_signed(det_y, det);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = angle;
@@ -2403,11 +2427,36 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return 1;
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+  // TODO(kslu) handle the bit range of correlation matrix filling
+  int16_t det_shift = 0;
+  int16_t inv_det = resolve_divisor_64(det, &det_shift);
+  int inv_det_msb = get_msb_signed(inv_det);
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+  for (int i = 0; i < 2; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int detj_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_det_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], detj_red_bits);
+
+    int inc_bits = bits + detj_red_bits - det_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_det * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_det, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+  const int angle = (int)sol[0];
+  const int alpha = (int)sol[1];
+#else
   const int64_t det_x = (sv2 * suw - suv * svw) * (1 << bits);
   const int64_t det_y = (su2 * svw - suv * suw) * (1 << bits);
 
   int angle = (int)divide_and_round_signed(det_x, det);
   int alpha = (int)divide_and_round_signed(det_y, det);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = angle;
@@ -2591,11 +2640,36 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+  // TODO(kslu) handle the bit range of correlation matrix filling
+  int16_t det_shift = 0;
+  int16_t inv_det = resolve_divisor_64(det, &det_shift);
+  int inv_det_msb = get_msb_signed(inv_det);
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+  for (int i = 0; i < 2; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int detj_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_det_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], detj_red_bits);
+
+    int inc_bits = bits + detj_red_bits - det_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_det * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_det, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+  *vx0 = (int)-sol[0];
+  *vy0 = (int)-sol[1];
+#else
   const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
   const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;
@@ -2651,11 +2725,36 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+  // TODO(kslu) handle the bit range of correlation matrix filling
+  int16_t det_shift = 0;
+  int16_t inv_det = resolve_divisor_64(det, &det_shift);
+  int inv_det_msb = get_msb_signed(inv_det);
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+  for (int i = 0; i < 2; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int detj_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_det_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], detj_red_bits);
+
+    int inc_bits = bits + detj_red_bits - det_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_det * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_det, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+  *vx0 = (int)-sol[0];
+  *vy0 = (int)-sol[1];
+#else
   const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
   const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;

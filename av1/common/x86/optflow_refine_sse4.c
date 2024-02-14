@@ -511,10 +511,35 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+  // TODO(kslu) handle the bit range of correlation matrix filling
+  int16_t det_shift = 0;
+  int16_t inv_det = resolve_divisor_64(det, &det_shift);
+  int inv_det_msb = get_msb_signed(inv_det);
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+  for (int i = 0; i < 2; i++) {
+    if (sol[i] == 0) continue;
+    int sign = sol[i] > 0;
+    sol[i] = sign ? sol[i] : -sol[i];
+    int detj_red_bits = AOMMAX(
+        0, get_msb_signed_64(sol[i]) + inv_det_msb + 1 - MAX_LS_INTERNAL_BITS);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], detj_red_bits);
+
+    int inc_bits = bits + detj_red_bits - det_shift;
+    if (inc_bits >= 0)
+      sol[i] = sol[i] * inv_det * (1 << inc_bits);
+    else
+      sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_det, -inc_bits);
+    sol[i] = sign ? sol[i] : -sol[i];
+  }
+  *vx0 = (int)-sol[0];
+  *vy0 = (int)-sol[1];
+#else
   const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
   const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;

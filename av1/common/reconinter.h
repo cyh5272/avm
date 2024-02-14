@@ -603,6 +603,7 @@ void av1_opfl_rebuild_inter_predictor(
 #endif  // CONFIG_OPTFLOW_ON_TIP
 );
 
+#if !CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 // Integer division based on lookup table.
 // num: numerator
 // den: denominator
@@ -647,6 +648,7 @@ static INLINE int32_t divide_and_round_signed(int64_t num, int64_t den) {
 #endif  // NDEBUG
   return out;
 }
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
 #if CONFIG_AFFINE_REFINEMENT || CONFIG_OPFL_MV_SEARCH
@@ -681,15 +683,19 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // 4: {128, 64, 32, 16}->8
 #define AFFINE_AVERAGING_BITS 3
 
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+// We consider this tunable number K=MAX_LS_INTERNAL_BITS-1 (sign bit excluded)
+// as the target bit depth of all intermediate results
+#define MAX_LS_INTERNAL_BITS 30
+// TODO(kslu) write comments here
+#define AFFINE_CLAMP_VAL ((1 << 15) - 1)
+#define AFFINE_COV_CLAMP_VAL ((1 << 30) - 1)
+#else
 // Number of bits allowed for covariance matrix elements so that determinants
 // do not overflow int64_t. For dim=3, input bit depth must be
 // <= (64 - mv_prec_bits - grad_prec_bits) / 3. For dim=4, input bit depth must
 // be <= (64-1)/2 for the first stage (getsub_4d), and <= 64-3-precbits for
 // the second stage (determinant and divide_and_round_signed).
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#define AFFINE_CLAMP_VAL ((1 << 15) - 1)
-#define AFFINE_COV_CLAMP_VAL ((1 << 30) - 1)
-#else
 #define AFFINE_CLAMP_VAL (1 << 15)
 #define AFFINE_COV_CLAMP_VAL (1 << 30)
 #endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
