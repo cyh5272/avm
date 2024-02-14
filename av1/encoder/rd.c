@@ -1105,8 +1105,11 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
         int br_lf_rate[BR_CDF_SIZE];
         int prev_cost_lf = 0;
         int i, j;
+
+#if !CONFIG_ADAPTIVE_HR
         av1_cost_tokens_from_cdf(br_lf_rate, fc->coeff_br_lf_cdf[plane][ctx],
                                  NULL);
+#endif  // !CONFIG_ADAPTIVE_HR
         for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
           for (j = 0; j < BR_CDF_SIZE - 1; j++) {
             pcost->lps_lf_cost[ctx][i + j] = prev_cost_lf + br_lf_rate[j];
@@ -1127,7 +1130,9 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
         int br_rate[BR_CDF_SIZE];
         int prev_cost = 0;
         int i, j;
+#if !CONFIG_ADAPTIVE_HR
         av1_cost_tokens_from_cdf(br_rate, fc->coeff_br_cdf[plane][ctx], NULL);
+#endif  // !CONFIG_ADAPTIVE_HR
         // printf("br_rate: ");
         // for(j = 0; j < BR_CDF_SIZE; j++)
         //  printf("%4d ", br_rate[j]);
@@ -1178,7 +1183,9 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
       int br_rate_skip[BR_CDF_SIZE];
       int prev_cost_skip = 0;
       int i, j;
+#if !CONFIG_ADAPTIVE_HR
       av1_cost_tokens_from_cdf(br_rate_skip, fc->coeff_br_cdf_idtx[ctx], NULL);
+#endif  // !CONFIG_ADAPTIVE_HR
       for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
         for (j = 0; j < BR_CDF_SIZE - 1; j++) {
           pcost->lps_cost_skip[ctx][i + j] = prev_cost_skip + br_rate_skip[j];
@@ -1209,7 +1216,9 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
     int br_ph_rate[BR_CDF_SIZE];
     int prev_cost = 0;
     int i, j;
+#if !CONFIG_ADAPTIVE_HR
     av1_cost_tokens_from_cdf(br_ph_rate, fc->coeff_br_ph_cdf[ctx], NULL);
+#endif  // !CONFIG_ADAPTIVE_HR
     for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
       for (j = 0; j < BR_CDF_SIZE - 1; j++) {
         pcost->lps_ph_cost[ctx][i + j] = prev_cost + br_ph_rate[j];

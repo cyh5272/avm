@@ -1901,6 +1901,7 @@ int main(int argc, const char **argv) {
                      "BASE_PH_CONTEXTS][CDF_SIZE(NUM_BASE_LEVELS + 2)]",
                      1, &total_count, 0, mem_wanted, "Coefficients");
 
+#if !CONFIG_ADAPTIVE_HR
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = COEFF_BR_PH_CONTEXTS;
   cts_each_dim[2] = BR_CDF_SIZE;
@@ -1910,6 +1911,7 @@ int main(int argc, const char **argv) {
                      "av1_default_coeff_br_ph_cdfs[TOKEN_CDF_Q_CTXS][COEFF_BR_"
                      "PH_CONTEXTS][CDF_SIZE(BR_CDF_SIZE)]",
                      1, &total_count, 0, mem_wanted, "Coefficients");
+#endif  // !CONFIG_ADAPTIVE_HR
 
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = TX_SIZES;
@@ -1936,6 +1938,7 @@ int main(int argc, const char **argv) {
       "[CDF_SIZE(LF_BASE_SYMBOLS - 1)]",
       1, &total_count, 0, mem_wanted, "Coefficients");
 
+#if !CONFIG_ADAPTIVE_HR
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = PLANE_TYPES;
   cts_each_dim[2] = LF_LEVEL_CONTEXTS;
@@ -1959,6 +1962,7 @@ int main(int argc, const char **argv) {
                      "[PLANE_TYPES][LEVEL_CONTEXTS]"
                      "[CDF_SIZE(BR_CDF_SIZE)]",
                      1, &total_count, 0, mem_wanted, "Coefficients");
+#endif  // !CONFIG_ADAPTIVE_HR
 
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = TX_SIZES;
@@ -1972,6 +1976,7 @@ int main(int argc, const char **argv) {
       "[CDF_SIZE(NUM_BASE_LEVELS + 2)]",
       1, &total_count, 0, mem_wanted, "Coefficients");
 
+#if !CONFIG_ADAPTIVE_HR
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = IDTX_LEVEL_CONTEXTS;
   cts_each_dim[2] = BR_CDF_SIZE;
@@ -1982,6 +1987,8 @@ int main(int argc, const char **argv) {
                      "[TOKEN_CDF_Q_CTXS][IDTX_LEVEL_CONTEXTS]"
                      "[CDF_SIZE(BR_CDF_SIZE)]",
                      1, &total_count, 0, mem_wanted, "Coefficients");
+#endif  // !CONFIG_ADAPTIVE_HR
+
   cts_each_dim[0] = TOKEN_CDF_Q_CTXS;
   cts_each_dim[1] = IDTX_SIG_COEF_CONTEXTS;
   cts_each_dim[2] = NUM_BASE_LEVELS + 2;

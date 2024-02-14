@@ -64,13 +64,13 @@ int read_exp_golomb(MACROBLOCKD *xd, aom_reader *r, int k) {
 
 #if CONFIG_ADAPTIVE_HR
 
-static int adaptive_table[] = { 10, 20, 40, 75, 135 };
+static const int adaptive_table[] = { 5, 10, 15, 35, 70, 135 };
+static const int table_size = sizeof(adaptive_table) / sizeof(int);
 
 static int get_adaptive_param(int ctx) {
-  const int table_size = sizeof(adaptive_table) / sizeof(int);
   int m = 0;
-  while (m < table_size && ctx >= adaptive_table[m]) ++m;
-  return m + 1;
+  while (m < table_size && ctx > adaptive_table[m]) ++m;
+  return m;
 }
 
 void write_truncated_rice(aom_writer *w, int level, int m, int k, int cmax) {
@@ -81,8 +81,7 @@ void write_truncated_rice(aom_writer *w, int level, int m, int k, int cmax) {
     write_exp_golomb(w, level - (cmax << m), k);
   } else {
     const int mask = (1 << m) - 1;
-    aom_write_literal(w, 0, q);
-    aom_write_literal(w, 1, 1);
+    aom_write_literal(w, 1, q + 1);
     aom_write_literal(w, level & mask, m);
   }
 }

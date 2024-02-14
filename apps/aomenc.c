@@ -1645,6 +1645,9 @@ static void show_stream_config(struct stream_state *stream,
   fprintf(stdout,
           "Tool setting (Others)          : Palette (%d), "
           "ParityHiding (%d), "
+#if CONFIG_ADAPTIVE_HR
+          "AdaptiveHighRange (%d), "
+#endif  // CONFIG_ADAPTIVE_HR
 #if CONFIG_IBC_SR_EXT
           "IntraBCExt (%d), "
 #endif  // CONFIG_IBC_SR_EXT

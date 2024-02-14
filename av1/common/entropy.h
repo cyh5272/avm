@@ -83,7 +83,7 @@ extern "C" {
 #define NUM_BASE_LEVELS 2
 
 #if CONFIG_ADAPTIVE_HR
-#define BR_NUM_ITERATIONS 1
+#define BR_NUM_ITERATIONS 0
 #else
 #define BR_NUM_ITERATIONS 4
 #endif  // CONFIG_ADAPTIVE_HR
