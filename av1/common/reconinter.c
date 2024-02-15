@@ -1072,12 +1072,85 @@ void print_mat_sol_int(int64_t *mat, int64_t *sol, int dim) {
   }
   fprintf(stderr, "b:%ld,%ld,%ld,%ld\n", sol[0], sol[1], sol[2], sol[3]);
 }
+
+void print_els_int32(const int *arr, const int len, char *arr_name) {
+  fprintf(stderr, "%s:\n", arr_name);
+  for (int i = 0; i < len; i++) {
+    fprintf(stderr, "%d,", arr[i]);
+  }
+  fprintf(stderr, "\n");
+  return;
+}
+
+void print_els_int64(const int64_t *arr, const int len, char *arr_name) {
+  fprintf(stderr, "%s:\n", arr_name);
+  for (int i = 0; i < len; i++) {
+    fprintf(stderr, "%ld,", arr[i]);
+  }
+  fprintf(stderr, "\n");
+  return;
+}
 #endif
+
+#if DEBUG_BIT_DEPTH
+void bit_depth_check(const int64_t val, const int maxbd) {
+  int64_t min_val = -(1ULL << (maxbd - 1));
+  int64_t max_val = (1ULL << (maxbd - 1)) - 1;
+  assert(val <= max_val);
+  assert(val >= min_val);
+  if (val > max_val || val < min_val)
+    fprintf(stderr, "[BIT DEPTH ERROR] val %ld maxbd %d\n", val, maxbd);
+  return;
+}
+#endif
+
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+// Obtain the bit depth ranges for each row and column of a square matrix
+void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
+  int bits = 0;
+  int max_sum = 0;
+  int bits_sum[4] = { 0 };
+  int bits_diag[4] = { 0 };
+  for (int i = 0; i < 4; i++) {
+    for (int j = i; j < 4; j++) {
+      bits = 1 + get_msb_signed_64(mat[i * 4 + j]);
+      bits_sum[i] += bits;
+      if (i == j) bits_diag[i] = bits;
+      if (i != j) bits_sum[j] += bits;
+    }
+    // For the i-th row/col, if bit depth exceeds the threshold, apply a
+    // downshift.
+    shifts[i] = -AOMMAX(0, (bits_diag[i] - max_mat_bits + 1) >> 1);
+  }
+  // Subtract these downshifts from aggregated sum and diagonal.
+  for (int i = 0; i < 4; i++) {
+    bits_diag[i] += shifts[i] * 2;
+    bits_sum[i] +=
+        shifts[0] + shifts[1] + shifts[2] + shifts[3] + 4 * shifts[i];
+    max_sum = AOMMAX(max_sum, bits_sum[i]);
+  }
+
+  // For the i-th row/col, if bit depth does not exceeds the threshold,
+  // compute the gap of bit depth to that of the largest diagonal element,
+  // and apply an upshift based on this gap.
+  for (int i = 0; i < 4; i++) {
+    shifts[i] +=
+        AOMMIN(max_mat_bits - bits_diag[i], (max_sum - bits_sum[i]) >> 2);
+  }
+}
+
+// Obtain the bit depth range of a vector
+void get_vec_bit_ranges(const int64_t *vec, int *bits_max, const int dim) {
+  int bits = 0;
+  for (int i = 0; i < dim; i++) {
+    bits = 1 + get_msb_signed_64(vec[i]);
+    *bits_max = AOMMAX(*bits_max, bits);
+  }
+}
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 
 #if CONFIG_GAUSSIAN_ELIMINATION_LS
 #define MAX_LS_DIM 4
-#define DEBUG_GE 0
-#define DEBUG_GE_STAB 0
 #if USE_DOUBLE
 void swap_rows(double *mat, double *sol, const int i, const int j,
                const int dim) {
@@ -1126,7 +1199,7 @@ int gaussian_elimination(double *mat, double *sol, int *precbits,
       sol[k] -= sol[i] * f;
     }
   }
-#if DEBUG_GE
+#if DEBUG_SOLVER
   fprintf(stderr, "(after forward)\n");
   print_mat_sol(mat, sol, 4);
 #endif
@@ -1150,6 +1223,264 @@ void swap_rows(int64_t *mat, int64_t *sol, const int i, const int j,
   }
 }
 
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+// For better precision, set this number as minimal bits for intermediate
+// result of Gaussian elimination.
+#define GE_MULT_PREC_BITS 12
+#define DEBUG_STAB_MULT 0
+// This function is a stable version of ROUND_POWER_OF_TWO_SIGNED(a*b, shift),
+// where shifts are partially applied before multiplcation operations to avoid
+// overflow issues, i.e., (a>>s1)*(b>>s2)>>s3, where s1+s2+s3=shift
+int64_t stable_mult_shift(const int64_t a, const int64_t b, const int shift,
+                          const int msb_a, const int msb_b, const int max_bd,
+                          int *rem_shift) {
+  assert(shift >= 0);
+
+#if DEBUG_STAB_MULT
+  fprintf(stderr, "a %ld b %ld msba %d msbb %d shift %d maxbd %d", a, b, msb_a,
+          msb_b, shift, max_bd);
+  if (msb_a + msb_b + 1 <= max_bd) fprintf(stderr, "\n");
+#endif
+
+  // Remaining bit shifts (may be used in the next stage of multiplcation)
+  int rem = AOMMAX(0, msb_a + msb_b - shift + 1 - max_bd);
+  if (rem_shift) *rem_shift += rem;
+  if (msb_a + msb_b + 1 <= max_bd)
+    return ROUND_POWER_OF_TWO_SIGNED_64(a * b, shift);
+
+#if DEBUG_BIT_DEPTH
+  if (!rem_shift && msb_a + msb_b - shift + 1 > max_bd) {
+    fprintf(stderr, "[bit depth too small for mult] %d+%d-%d+1>%d\n", msb_a,
+            msb_b, shift, max_bd);
+    assert(0);
+  }
+#endif
+
+  // To determine s1/s2/s3 in ((a>>s1)*(b>>s2))>>s3, consider the equation
+  //   (1+msb_a-s1)+(1+msb_b-s2)+1 <= max_bd+rem,
+  // where better numerical stability is obtained when
+  //   msb_a-s1 ~= msb_b-s2.
+  // This leads to the following solution
+  int msb_diff = abs(msb_a - msb_b);
+  // Total required shifts (s1 + s2)
+  int s = msb_a + msb_b - max_bd - rem + 3;
+  int diff = AOMMIN(s, msb_diff);
+  int s1 = (s - diff) >> 1;
+  int s2 = s1;
+  if (msb_a >= msb_b)
+    s1 += diff;
+  else
+    s2 += diff;
+
+  assert(s1 >= 0);
+  assert(s2 >= 0);
+  assert(shift - s1 - s2 >= 0);
+#if DEBUG_STAB_MULT
+  int64_t res = ROUND_POWER_OF_TWO_SIGNED_64(
+      ROUND_POWER_OF_TWO_SIGNED_64(a, s1) * ROUND_POWER_OF_TWO_SIGNED_64(b, s2),
+      shift - s1 - s2);
+  fprintf(stderr, " s1 %d s2 %d rem %d res %ld\n", s1, s2, rem, res);
+#endif
+
+  return ROUND_POWER_OF_TWO_SIGNED_64(
+      ROUND_POWER_OF_TWO_SIGNED_64(a, s1) * ROUND_POWER_OF_TWO_SIGNED_64(b, s2),
+      shift - s1 - s2);
+}
+
+int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
+                         const int dim) {
+#if DEBUG_SOLVER
+  int print = 1;
+  if (print) {
+    fprintf(stderr, "[Start GE]\n");
+    print_els_int64(mat, 16, "mat");
+    print_els_int64(sol, 4, "sol");
+    print_els_int32(precbits, 4, "precbits");
+  }
+#endif
+
+  int shifts[MAX_LS_DIM] = { 0 };
+  int16_t inv_pivot[MAX_LS_DIM] = { 0 };
+  int16_t inv_pivot_shift[MAX_LS_DIM] = { 0 };
+
+  // Bit range adjustment: add shifts such that the bit depths of shifted mat
+  // and sol elements are capped by K-dim+1. This is because each element of
+  // mat and sol during forward elimination is updated at most dim-1 times.
+  // Each update is a subtraction that can increase the bit depth by 1 at the
+  // extreme case.
+  // Goal: shift Aij by si+sj+e bits, and shift bi by si+e+f bits. These shifts
+  // will satisfy
+  //     1+MSB(Aij)+si+sj+e <= (K-dim+1)-1 unsigned bits
+  //     1+MSB(bi)+si+e+f <= (K-dim+1)-1 unsigned bits
+  //     precbits[i]-f+si <= 0
+  // The last constraint is preferred but not strictly required, since
+  // precbits[i]-f+si shifts will be applied to b at the end. Making all these
+  // shifts negative means there is no loss of precision during the Gaussian
+  // elimination procedure. One quick solution is given as follows:
+  //     si=floor(min(K-dim+1-MSB(Aii), min(MSB(Aii))-MSB(Aii))/2)
+  //     f=max_i(precbits[i]+si)
+  //     e=min(K-dim+1-MSB(bi)-si) - max(precbits[i]+si)
+  int bd_cap = MAX_LS_BITS - dim;
+  int a_extra_shift = 64;
+  int b_extra_shift = -64;
+  int min_diag_msb = 64;
+  int mat_diag_bits[MAX_LS_DIM] = { 0 };
+  int sol_bits[MAX_LS_DIM] = { 0 };
+  for (int i = 0; i < dim; i++) {
+    mat_diag_bits[i] = 1 + get_msb_signed_64(mat[i * dim + i]);
+    min_diag_msb = AOMMIN(min_diag_msb, mat_diag_bits[i]);
+    sol_bits[i] = 1 + get_msb_signed_64(sol[i]);
+  }
+  for (int i = 0; i < dim; i++) {
+    shifts[i] =
+        -(AOMMAX(mat_diag_bits[i] - bd_cap, mat_diag_bits[i] - min_diag_msb) >>
+          1);
+    a_extra_shift = AOMMIN(a_extra_shift, bd_cap - sol_bits[i] - shifts[i]);
+    b_extra_shift = AOMMAX(b_extra_shift, precbits[i] + shifts[i]);
+  }
+  a_extra_shift -= b_extra_shift;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      int abits = a_extra_shift + shifts[i] + shifts[j];
+      mat[i * dim + j] =
+          abits >= 0 ? (mat[i * dim + j] * (1 << abits))
+                     : ROUND_POWER_OF_TWO_SIGNED_64(mat[i * dim + j], -abits);
+#if DEBUG_BIT_DEPTH
+      bit_depth_check(mat[i * dim + j], MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+    }
+    int bbits = shifts[i] + a_extra_shift + b_extra_shift;
+    sol[i] = bbits >= 0 ? (sol[i] * (1 << bbits))
+                        : ROUND_POWER_OF_TWO_SIGNED_64(sol[i], -bbits);
+    precbits[i] = precbits[i] - b_extra_shift + shifts[i];
+#if DEBUG_BIT_DEPTH
+    bit_depth_check(sol[i], MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+  }
+
+#if DEBUG_SOLVER
+  if (print) {
+    fprintf(stderr, "After 1st shift\n");
+    print_els_int64(mat, 16, "mat");
+    print_els_int64(sol, 4, "sol");
+    print_els_int32(shifts, 4, "shifts");
+    print_els_int32(precbits, 4, "precbits");
+  }
+#endif
+
+  // Elimination for the i-th column
+  int64_t diff = 0;
+  for (int i = 0; i < dim; i++) {
+    int64_t pivot = mat[i * dim + i];
+    int idx_pivot = i;
+
+    for (int j = i + 1; j < dim; j++) {
+      int64_t new_pivot = mat[j * dim + i];
+      if (llabs(new_pivot) > llabs(pivot)) {
+        idx_pivot = j;
+        pivot = new_pivot;
+      }
+    }
+
+    // Check singularity
+    if (pivot == 0) return 0;
+
+    // Put the row with the pivot first, and get inverse of the pivot
+    if (i != idx_pivot) swap_rows(mat, sol, i, idx_pivot, dim);
+    inv_pivot[i] = (pivot > 0 ? 1 : -1) *
+                   resolve_divisor_64(llabs(pivot), inv_pivot_shift + i);
+
+    for (int k = i + 1; k < dim; k++) {
+      // Compute Akj = Akj - Aki * Aij / Aii, while keeping all intermediate
+      // result within K bits
+      int msb_ki = get_msb_signed_64(mat[k * dim + i]);
+      int msb_invpiv = get_msb_signed(inv_pivot[i]);
+      // Apply an upshift first if intermediate results will be close to zero.
+      int inc_bits = AOMMAX(
+          0, GE_MULT_PREC_BITS - msb_ki - msb_invpiv + inv_pivot_shift[i]);
+      int fshift = inc_bits;
+      int64_t f = stable_mult_shift(mat[k * dim + i], (int64_t)inv_pivot[i],
+                                    inv_pivot_shift[i] - inc_bits, msb_ki,
+                                    msb_invpiv, MAX_LS_BITS, &fshift);
+      int msb_f = get_msb_signed_64(f);
+      mat[k * dim + i] = 0;
+
+      for (int j = i + 1; j < dim; j++) {
+        int msb_ij = get_msb_signed_64(mat[i * dim + j]);
+        diff = stable_mult_shift(mat[i * dim + j], f, fshift, msb_ij, msb_f,
+                                 MAX_LS_BITS, NULL);
+        mat[k * dim + j] -= diff;
+#if DEBUG_BIT_DEPTH
+        bit_depth_check(diff, MAX_LS_BITS);
+        bit_depth_check(mat[k * dim + j], MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+      }
+      int msb_sol = get_msb_signed_64(sol[i]);
+      diff = stable_mult_shift(sol[i], f, fshift, msb_sol, msb_f, MAX_LS_BITS,
+                               NULL);
+      sol[k] -= diff;
+#if DEBUG_BIT_DEPTH
+      bit_depth_check(diff, MAX_LS_BITS);
+      bit_depth_check(sol[k], MAX_LS_BITS);
+#endif
+#if DEBUG_SOLVER
+      if (print) {
+        fprintf(stderr,
+                "After FE %d-th row (pivot %ld inv_pivot %d shift %d)\n", i,
+                pivot, inv_pivot[i], inv_pivot_shift[i]);
+        print_els_int64(mat, 16, "mat");
+        print_els_int64(sol, 4, "sol");
+      }
+#endif
+    }
+  }
+
+  // Backward substitution
+  for (int i = dim - 1; i >= 0; i--) {
+    // To reduce bit depth requirement, do a MSB check and downshift the entire
+    // matrix row.
+    int max_mult_bits = 0;
+    for (int j = i + 1; j < dim; j++)
+      max_mult_bits = AOMMAX(
+          max_mult_bits,
+          2 + get_msb_signed_64(mat[i * dim + j]) + get_msb_signed_64(sol[j]));
+    int redbit = AOMMAX(0, max_mult_bits - MAX_LS_BITS + 2);
+    sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], redbit);
+    for (int j = i + 1; j < dim; j++) {
+      diff = ROUND_POWER_OF_TWO_SIGNED_64(mat[i * dim + j], redbit) * sol[j];
+      sol[i] = sol[i] - diff;
+#if DEBUG_BIT_DEPTH
+      bit_depth_check(diff, MAX_LS_BITS);
+      bit_depth_check(sol[i], MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+    }
+    sol[i] = stable_mult_shift(sol[i], (int64_t)inv_pivot[i],
+                               inv_pivot_shift[i] - redbit, get_msb_signed_64(sol[i]),
+                               get_msb_signed(inv_pivot[i]), MAX_LS_BITS, NULL);
+#if DEBUG_SOLVER
+    if (print) {
+      fprintf(stderr, "After BS %d-th row\n", i);
+      print_els_int64(sol, 4, "sol");
+    }
+#endif
+  }
+
+  // Apply remaining downscaling
+  for (int i = 0; i < dim; i++)
+    sol[i] = precbits[i] >= 0
+                 ? (sol[i] * (1 << precbits[i]))
+                 : ROUND_POWER_OF_TWO_SIGNED_64(sol[i], -precbits[i]);
+
+#if DEBUG_SOLVER
+  if (print) {
+    fprintf(stderr, "[final]\n");
+    print_els_int64(sol, 4, "sol");
+  }
+#endif
+
+  return 1;
+}
+#else
 int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
                          const int dim) {
   int16_t inv_pivot[MAX_LS_DIM] = { 0 };
@@ -1181,7 +1512,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
 
     // Put the row with the pivot first, and get inverse of the pivot
     if (i != idx_pivot) swap_rows(mat, sol, i, idx_pivot, dim);
-#if DEBUG_GE
+#if DEBUG_SOLVER
     if (i != idx_pivot) {
       fprintf(stderr, "(swap row %d %d)\n", i, idx_pivot);
       print_mat_sol_int(mat, sol, 4);
@@ -1194,7 +1525,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
       int64_t f = mat[k * dim + i] * inv_pivot[i];
       mat[k * dim + i] = 0;
       for (int j = i + 1; j < dim; j++) {
-#if DEBUG_GE_STAB
+#if DEBUG_BIT_DEPTH
         if (get_msb_signed_64(f) + get_msb_signed_64(mat[i * dim + j]) >
             62 + inv_pivot_shift[i])
           fprintf(stderr,
@@ -1214,7 +1545,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
       else
         sol[k] -= ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * f, inv_pivot_shift[i]);
     }
-#if DEBUG_GE
+#if DEBUG_SOLVER
     fprintf(stderr, "(after forward %d) inv_pivot %d shift %d\n", i,
             inv_pivot[i], inv_pivot_shift[i]);
     print_mat_sol_int(mat, sol, 4);
@@ -1224,7 +1555,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
   // Backward substitution
   for (int i = dim - 1; i >= 0; i--) {
     for (int j = i + 1; j < dim; j++) {
-#if DEBUG_GE_STAB
+#if DEBUG_BIT_DEPTH
       if (get_msb_signed_64(mat[i * dim + j]) + get_msb_signed_64(sol[j]) > 62)
         fprintf(stderr, "(bd of mat*sol too large: %ld,%ld)\n",
                 mat[i * dim + j], sol[j]);
@@ -1237,7 +1568,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
     else
       sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i] * inv_pivot[i],
                                             inv_pivot_shift[i]);
-#if DEBUG_GE
+#if DEBUG_SOLVER
     fprintf(stderr, "(after backward %d)\nb:%ld,%ld,%ld,%ld\n", i, sol[0],
             sol[1], sol[2], sol[3]);
 #endif
@@ -1249,6 +1580,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
 
   return 1;
 }
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 #endif  // USE_DOUBLE
 #else
 #if USE_DOUBLE
@@ -1294,89 +1626,6 @@ int inverse_determinant_4d(double *mat, double *vec, int *precbits,
   return 1;
 }
 #else
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#if CONFIG_DEBUG
-void bit_depth_check(const int64_t val, const int maxbd) {
-  int64_t min_val = -(1ULL << (maxbd - 1));
-  int64_t max_val = (1ULL << (maxbd - 1)) - 1;
-  assert(val <= max_val);
-  assert(val >= min_val);
-  return;
-}
-#endif  // CONFIG_DEBUG
-
-#if DEBUG_BIT_DEPTH
-void print_els_int32(const int *arr, const int len, char *arr_name) {
-  fprintf(stderr, "%s:\n", arr_name);
-  for (int i = 0; i < len; i++) {
-    fprintf(stderr, "%d,", arr[i]);
-  }
-  fprintf(stderr, "\n");
-  return;
-}
-
-void print_els_int64(const int64_t *arr, const int len, char *arr_name) {
-  fprintf(stderr, "%s:\n", arr_name);
-  for (int i = 0; i < len; i++) {
-    fprintf(stderr, "%ld,", arr[i]);
-  }
-  fprintf(stderr, "\n");
-  return;
-}
-#endif
-
-// Obtain the bit depth ranges for each row and column of a square matrix
-void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
-  int bits = 0;
-  int max_sum = 0;
-  int bits_sum[4] = { 0 };
-  int bits_diag[4] = { 0 };
-  for (int i = 0; i < 4; i++) {
-    for (int j = i; j < 4; j++) {
-      bits = 1 + get_msb_signed_64(mat[i * 4 + j]);
-      bits_sum[i] += bits;
-      if (i == j) bits_diag[i] = bits;
-      if (i != j) bits_sum[j] += bits;
-    }
-    // For the i-th row/col, if bit depth exceeds the threshold, apply a
-    // downshift.
-    shifts[i] = -AOMMAX(0, (bits_diag[i] - max_mat_bits + 1) >> 1);
-  }
-  // Subtract these downshifts from aggregated sum and diagonal.
-  for (int i = 0; i < 4; i++) {
-    bits_diag[i] += shifts[i] * 2;
-    bits_sum[i] +=
-        shifts[0] + shifts[1] + shifts[2] + shifts[3] + 4 * shifts[i];
-    max_sum = AOMMAX(max_sum, bits_sum[i]);
-  }
-
-  // For the i-th row/col, if bit depth does not exceeds the threshold,
-  // compute the gap of bit depth to that of the largest diagonal element,
-  // and apply an upshift based on this gap.
-  for (int i = 0; i < 4; i++) {
-    shifts[i] +=
-        AOMMIN(max_mat_bits - bits_diag[i], (max_sum - bits_sum[i]) >> 2);
-  }
-#if DEBUG_BIT_DEPTH
-  int print = mat[0] > (1L << 24);
-  if (print) {
-    fprintf(stderr, "max_mat_bits %d max_sum %d\n", max_mat_bits, max_sum);
-    print_els_int32(bits_diag, 4, "bits_diag");
-    print_els_int32(bits_sum, 4, "bits_sum");
-  }
-#endif
-}
-
-// Obtain the bit depth range of a vector
-void get_vec_bit_ranges(const int64_t *vec, int *bits_max, const int dim) {
-  int bits = 0;
-  for (int i = 0; i < dim; i++) {
-    bits = 1 + get_msb_signed_64(vec[i]);
-    *bits_max = AOMMAX(*bits_max, bits);
-  }
-}
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-
 // Compute intermediate results for 4D linear solver.
 void getsub_4d(int64_t *sub, const int64_t *mat, const int64_t *vec) {
   sub[0] = mat[0] * mat[5] - mat[1] * mat[4];
@@ -1396,8 +1645,8 @@ void getsub_4d(int64_t *sub, const int64_t *mat, const int64_t *vec) {
 int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
                            int64_t *sol) {
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#if DEBUG_BIT_DEPTH
-  int print = mat[0] > (1L << 24);
+#if DEBUG_SOLVER
+  int print = 1;
   if (print) {
     fprintf(stderr, "Before 1st shift\n");
     print_els_int64(mat, 16, "mat");
@@ -1428,7 +1677,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
     precbits[i] += shifts[i];
   }
 
-#if DEBUG_BIT_DEPTH
+#if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "After 1st shift\n");
     print_els_int64(mat, 16, "mat");
@@ -1440,15 +1689,15 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   int64_t a[10], b[10];  // values of 20 2D subdeterminants
   getsub_4d(&a[0], mat, vec);
   getsub_4d(&b[0], mat + 8, vec + 2);
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
   for (int i = 0; i < 10; i++) {
     bit_depth_check(a[i], MAX_LS_BITS);
     bit_depth_check(b[i], MAX_LS_BITS);
   }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#if DEBUG_BIT_DEPTH
+#if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "Before 2nd shift\n");
     print_els_int64(a, 10, "a");
@@ -1481,19 +1730,19 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
     a[i] = ROUND_POWER_OF_TWO_SIGNED_64(a[i], subdet_reduce_bits);
     b[i] = ROUND_POWER_OF_TWO_SIGNED_64(b[i], subdet_reduce_bits);
   }
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
+#if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "After 2nd shift\n");
     print_els_int64(a, 10, "a");
     print_els_int64(b, 10, "b");
   }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif
 
   int64_t det = a[0] * b[7] + a[7] * b[0] + a[2] * b[4] + a[4] * b[2] -
                 a[5] * b[1] - a[1] * b[5];
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
   bit_depth_check(det, MAX_LS_BITS);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
 
   if (det <= 0) return 0;
   sol[0] = a[5] * b[8] + a[8] * b[5] - a[6] * b[7] - a[7] * b[6] - a[4] * b[9] -
@@ -1506,7 +1755,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
            a[1] * b[6];
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
-#if DEBUG_BIT_DEPTH
+#if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "Before 3rd shift\n");
     print_els_int64(sol, 4, "sol");
@@ -1515,12 +1764,12 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
 #endif
 
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#if DEBUG_BIT_DEPTH
   for (int i = 0; i < 4; i++) bit_depth_check(sol[i], MAX_LS_BITS);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
+#endif  // DEBUG_BIT_DEPTH
   divide_and_round_array(sol, det, 4, precbits);
 
-#if DEBUG_BIT_DEPTH
+#if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "After 3rd shift\n");
     print_els_int64(sol, 4, "sol");
