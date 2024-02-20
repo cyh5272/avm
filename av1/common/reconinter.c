@@ -1326,8 +1326,7 @@ void print_els_int64(const int64_t *arr, const int len, char *arr_name) {
 #endif
 
 // Obtain the bit depth ranges for each row and column of a square matrix
-void get_mat4d_shifts(const int64_t *mat, int *shifts, const int maxbd) {
-  const int max_mat_bit = (maxbd - 2) >> 1;
+void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
   int bits = 0;
   int max_sum = 0;
   int bits_sum[4] = { 0 };
@@ -1341,7 +1340,7 @@ void get_mat4d_shifts(const int64_t *mat, int *shifts, const int maxbd) {
     }
     // For the i-th row/col, if bit depth exceeds the threshold, apply a
     // downshift.
-    shifts[i] = -AOMMAX(0, (bits_diag[i] - max_mat_bit + 1) >> 1);
+    shifts[i] = -AOMMAX(0, (bits_diag[i] - max_mat_bits + 1) >> 1);
   }
   // Subtract these downshifts from aggregated sum and diagonal.
   for (int i = 0; i < 4; i++) {
@@ -1356,13 +1355,12 @@ void get_mat4d_shifts(const int64_t *mat, int *shifts, const int maxbd) {
   // and apply an upshift based on this gap.
   for (int i = 0; i < 4; i++) {
     shifts[i] +=
-        AOMMIN(max_mat_bit - bits_diag[i], (max_sum - bits_sum[i]) >> 2);
+        AOMMIN(max_mat_bits - bits_diag[i], (max_sum - bits_sum[i]) >> 2);
   }
 #if DEBUG_BIT_DEPTH
   int print = mat[0] > (1L << 24);
   if (print) {
-    fprintf(stderr, "maxbd %d max_mat_bit %d max_sum %d\n", maxbd, max_mat_bit,
-            max_sum);
+    fprintf(stderr, "max_mat_bits %d max_sum %d\n", max_mat_bits, max_sum);
     print_els_int32(bits_diag, 4, "bits_diag");
     print_els_int32(bits_sum, 4, "bits_sum");
   }
@@ -1412,7 +1410,8 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   // the matrix elements to be within L bits.
   // 2*L+1 <= K, meaning that L <= (K - 1) >> 1
   int shifts[4] = { 0 };
-  get_mat4d_shifts(mat, shifts, MAX_LS_BITS);
+  const int max_mat_bits = (MAX_LS_BITS - 2) >> 1;
+  get_mat4d_shifts(mat, shifts, max_mat_bits);
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
       int shift_ij = shifts[i] + shifts[j];
