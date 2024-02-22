@@ -1049,6 +1049,7 @@ void av1_warp_plane_bilinear(WarpedMotionParams *wm, int bd,
 
 #define USE_DOUBLE 0
 #define DEBUG_SOLVER 0
+#define DEBUG_SOLVER_THR 60  // Set lower to show more LS solver data
 #define DEBUG_BIT_DEPTH 0
 #if DEBUG_SOLVER
 void print_mat_sol(double *mat, double *sol, int dim) {
@@ -1199,10 +1200,6 @@ int gaussian_elimination(double *mat, double *sol, int *precbits,
       sol[k] -= sol[i] * f;
     }
   }
-#if DEBUG_SOLVER
-  fprintf(stderr, "(after forward)\n");
-  print_mat_sol(mat, sol, 4);
-#endif
 
   // Back substitution
   for (int i = dim - 1; i >= 0; i--)
@@ -1290,7 +1287,7 @@ int64_t stable_mult_shift(const int64_t a, const int64_t b, const int shift,
 int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
                          const int dim) {
 #if DEBUG_SOLVER
-  int print = 1;
+  int print = llabs(mat[0]) > (1L << DEBUG_SOLVER_THR);
   if (print) {
     fprintf(stderr, "[Start GE]\n");
     print_els_int64(mat, 16, "mat");
@@ -1646,7 +1643,8 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
                            int64_t *sol) {
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 #if DEBUG_SOLVER
-  int print = 1;
+  int print = llabs(mat[0]) > (1L << DEBUG_SOLVER_THR);
+  ;
   if (print) {
     fprintf(stderr, "Before 1st shift\n");
     print_els_int64(mat, 16, "mat");
@@ -1806,6 +1804,10 @@ int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
   fprintf(stderr, "[solve 4d] precbits (%d,%d,%d,%d)\n", precbits[0],
           precbits[1], precbits[2], precbits[3]);
   print_mat_sol_int(mat, vec, 4);
+  int64_t mat0[16];
+  int pb[4];
+  memcpy(mat0, mat, 16 * sizeof(int64_t));
+  memcpy(pb, precbits, 4 * sizeof(int));
 #endif
 #if CONFIG_GAUSSIAN_ELIMINATION_LS
   memcpy(sol, vec, 4 * sizeof(int64_t));
@@ -1837,6 +1839,20 @@ int solver_4d(int64_t *mat, int64_t *vec, int *precbits, int64_t *sol) {
 #if DEBUG_SOLVER
   fprintf(stderr, "(final)\n");
   print_mat_sol_int(mat, sol, 4);
+  // Check |A*x-b|
+  int64_t sqerr = 0;
+  int64_t sq_vec_norm = 0;
+  for (int i = 0; i < 4; i++) {
+    int64_t v = 0;
+    for (int j = 0; j < 4; j++)
+      v += ROUND_POWER_OF_TWO_SIGNED_64(mat0[i * 4 + j] * sol[j], pb[j]);
+    sqerr += (v - vec[i]) * (v - vec[i]);
+    sq_vec_norm += vec[i] * vec[i];
+  }
+  if (sqerr * 50 > sq_vec_norm) {
+    fprintf(stderr, "[large square err] sqerr %ld sq_vec_norm %ld\n", sqerr,
+            sq_vec_norm);
+  }
 #endif
   return ret;
 }
