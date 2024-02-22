@@ -2527,9 +2527,6 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
   };
   if (!solver_4d(mat_a, vec_b, prec_bits, vec_x)) return 1;
 
-  for (int i = 0; i < 4; i++)
-    vec_x[i] = clamp64(vec_x[i], -AFFINE_PARAMS_MAX, AFFINE_PARAMS_MAX);
-
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = (int)vec_x[0];
   am_params->scale_alpha =
@@ -2770,9 +2767,6 @@ int derive_rotation_scale_translation_4p_interp_grad(
     grad_prec_bits + AFFINE_PREC_BITS,
   };
   if (!solver_4d(mat_a, vec_b, prec_bits, vec_x)) return 1;
-
-  for (int i = 0; i < 4; i++)
-    vec_x[i] = clamp64(vec_x[i], -AFFINE_PARAMS_MAX, AFFINE_PARAMS_MAX);
 
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = (int)vec_x[0];

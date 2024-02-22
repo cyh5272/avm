@@ -744,8 +744,7 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // Internal bit depths for affine parameter derivation
 #define AFFINE_GRAD_BITS_THR 32
 #define AFFINE_COORDS_OFFSET_BITS 3
-#define AFFINE_PREC_BITS 12
-#define AFFINE_PARAMS_MAX (1 << (AFFINE_PREC_BITS + 3))
+#define AFFINE_PREC_BITS 16
 #define AFFINE_RLS_PARAM 2
 
 static INLINE int is_translational_refinement_allowed(const AV1_COMMON *cm,
