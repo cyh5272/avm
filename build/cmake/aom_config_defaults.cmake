@@ -177,9 +177,11 @@ set_aom_config_var(CONFIG_COMBINE_AFFINE_WARP_GRADIENT 0
                    "Combining warp and graident computations in DAMR")
 set_aom_config_var(CONFIG_GAUSSIAN_ELIMINATION_LS 0
                    "Gaussian elimination solver for DAMR least squares problem")
+set_aom_config_var(CONFIG_REDUCE_LS_BIT_DEPTH 0
+                   "Reduce bit depth for least square solvers in OPFL and DAMR")
 set_aom_config_var(
-  CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH 0
-  "Reduce bit depth for optical flow and DAMR least squares problem")
+  CONFIG_REDUCE_AUTOCORR_BIT_DEPTH 0
+  "Reduce bit depth for autocorrelation matrix in OPFL and DAMR")
 set_aom_config_var(
   CONFIG_IBP_DC 1
   "AV2 experiment flag to enable intra bi-prediction for DC mode.")

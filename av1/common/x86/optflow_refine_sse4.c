@@ -511,7 +511,7 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
   // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
@@ -523,7 +523,7 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
   const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;

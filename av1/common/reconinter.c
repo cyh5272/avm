@@ -1105,7 +1105,7 @@ void bit_depth_check(const int64_t val, const int maxbd) {
 }
 #endif
 
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
 // Obtain the bit depth ranges for each row and column of a square matrix
 void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
   int bits = 0;
@@ -1148,7 +1148,7 @@ void get_vec_bit_ranges(const int64_t *vec, int *bits_max, const int dim) {
     *bits_max = AOMMAX(*bits_max, bits);
   }
 }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
 #if CONFIG_GAUSSIAN_ELIMINATION_LS
 #define MAX_LS_DIM 4
@@ -1220,7 +1220,7 @@ void swap_rows(int64_t *mat, int64_t *sol, const int i, const int j,
   }
 }
 
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
 // For better precision, set this number as minimal bits for intermediate
 // result of Gaussian elimination.
 #define GE_MULT_PREC_BITS 12
@@ -1438,9 +1438,9 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
     // matrix row.
     int max_mult_bits = 0;
     for (int j = i + 1; j < dim; j++)
-      max_mult_bits = AOMMAX(
-          max_mult_bits,
-          2 + get_msb_signed_64(mat[i * dim + j]) + get_msb_signed_64(sol[j]));
+      max_mult_bits =
+          AOMMAX(max_mult_bits, 2 + get_msb_signed_64(mat[i * dim + j]) +
+                                    get_msb_signed_64(sol[j]));
     int redbit = AOMMAX(0, max_mult_bits - MAX_LS_BITS + 2);
     sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], redbit);
     for (int j = i + 1; j < dim; j++) {
@@ -1452,7 +1452,8 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
 #endif  // DEBUG_BIT_DEPTH
     }
     sol[i] = stable_mult_shift(sol[i], (int64_t)inv_pivot[i],
-                               inv_pivot_shift[i] - redbit, get_msb_signed_64(sol[i]),
+                               inv_pivot_shift[i] - redbit,
+                               get_msb_signed_64(sol[i]),
                                get_msb_signed(inv_pivot[i]), MAX_LS_BITS, NULL);
 #if DEBUG_SOLVER
     if (print) {
@@ -1577,7 +1578,7 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
 
   return 1;
 }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 #endif  // USE_DOUBLE
 #else
 #if USE_DOUBLE
@@ -1641,7 +1642,7 @@ void getsub_4d(int64_t *sub, const int64_t *mat, const int64_t *vec) {
 // x = A^(-1) * b, where A: mat, b: vec, x: sol
 int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
                            int64_t *sol) {
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
 #if DEBUG_SOLVER
   int print = llabs(mat[0]) > (1L << DEBUG_SOLVER_THR);
   ;
@@ -1683,18 +1684,18 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
     print_els_int32(precbits, 4, "precbits");
   }
 #endif
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
   int64_t a[10], b[10];  // values of 20 2D subdeterminants
   getsub_4d(&a[0], mat, vec);
   getsub_4d(&b[0], mat + 8, vec + 2);
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH && DEBUG_BIT_DEPTH
   for (int i = 0; i < 10; i++) {
     bit_depth_check(a[i], MAX_LS_BITS);
     bit_depth_check(b[i], MAX_LS_BITS);
   }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH && DEBUG_BIT_DEPTH
 
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
 #if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "Before 2nd shift\n");
@@ -1723,7 +1724,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
   int max_bits = get_msb_signed_64(max_el);
   int subdet_reduce_bits = AOMMAX(0, max_bits - 28);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
   for (int i = 0; i < 10; i++) {
     a[i] = ROUND_POWER_OF_TWO_SIGNED_64(a[i], subdet_reduce_bits);
     b[i] = ROUND_POWER_OF_TWO_SIGNED_64(b[i], subdet_reduce_bits);
@@ -1738,9 +1739,9 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
 
   int64_t det = a[0] * b[7] + a[7] * b[0] + a[2] * b[4] + a[4] * b[2] -
                 a[5] * b[1] - a[1] * b[5];
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH && DEBUG_BIT_DEPTH
   bit_depth_check(det, MAX_LS_BITS);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && DEBUG_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH && DEBUG_BIT_DEPTH
 
   if (det <= 0) return 0;
   sol[0] = a[5] * b[8] + a[8] * b[5] - a[6] * b[7] - a[7] * b[6] - a[4] * b[9] -
@@ -1752,7 +1753,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   sol[3] = a[0] * b[8] + a[8] * b[0] + a[3] * b[4] + a[4] * b[3] - a[6] * b[1] -
            a[1] * b[6];
 
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
 #if DEBUG_SOLVER
   if (print) {
     fprintf(stderr, "Before 3rd shift\n");
@@ -1792,7 +1793,7 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   sol[1] = divide_and_round_signed(sol[1], det);
   sol[2] = divide_and_round_signed(sol[2], det);
   sol[3] = divide_and_round_signed(sol[3], det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
   return 1;
 }
@@ -2414,7 +2415,7 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return 1;
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
   // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
@@ -2427,7 +2428,7 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
 
   const int angle = (int)divide_and_round_signed(det_x, det);
   const int alpha = (int)divide_and_round_signed(det_y, det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = angle;
@@ -2650,7 +2651,7 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return 1;
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
   // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
@@ -2663,7 +2664,7 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
 
   int angle = (int)divide_and_round_signed(det_x, det);
   int alpha = (int)divide_and_round_signed(det_y, det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
   assert(WARPEDMODEL_PREC_BITS - AFFINE_PREC_BITS >= 0);
   am_params->rot_angle = angle;
@@ -2845,7 +2846,7 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
   // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
@@ -2858,7 +2859,7 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;
@@ -2914,7 +2915,7 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_LS_BIT_DEPTH
   // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
@@ -2927,7 +2928,7 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
 
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_LS_BIT_DEPTH
   *vx1 = (*vx0) * d1;
   *vy1 = (*vy0) * d1;
   *vx0 = (*vx0) * d0;
