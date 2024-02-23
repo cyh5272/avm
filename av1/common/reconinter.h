@@ -553,6 +553,10 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 #define MAX_OPFL_AUTOCORR_BITS 28
 #if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 #define OPFL_AUTOCORR_CLAMP_VAL ((1 << MAX_OPFL_AUTOCORR_BITS) - 1)
+// Clamp range for u/v/w. If it uses h unsigned bits, then u2/v2 uses 2h
+// unsigned bits. Every sum of 8 u2/v2 use at most 2h+3 unsigned bits, and
+// must not exceed half of the max bit depth of su2/sv2. Thus, 2h+3 <= H-2
+#define OPFL_SAMP_CLAMP_VAL ((1 << ((MAX_OPFL_AUTOCORR_BITS - 5) >> 1)) - 1)
 #else
 #define OPFL_AUTOCORR_CLAMP_VAL (1 << MAX_OPFL_AUTOCORR_BITS)
 #endif  // CONFIG_REDUCE_LS_BIT_DEPTH

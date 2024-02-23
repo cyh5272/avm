@@ -2700,7 +2700,7 @@ int derive_rotation_scale_translation_4p_interp_grad(
   int max_el = find_max_matrix_element_interp_grad(pdiff, pstride, gx, gy,
                                                    gstride, bw, bh);
   int max_el_msb = get_msb(max_el);
-  const int grad_bits =
+  int grad_bits =
       AOMMAX(0, max_el_msb * 2 + npel_log2 +
                     AOMMAX(x_range_log2, y_range_log2) - AFFINE_GRAD_BITS_THR);
   const int coords_bits = AOMMAX(
@@ -2732,7 +2732,12 @@ int derive_rotation_scale_translation_4p_interp_grad(
       a[3] = gy[gidx];
       for (int s = 0; s < 4; ++s)
         a[s] = clamp(a[s], -AFFINE_SAMP_CLAMP_VAL, AFFINE_SAMP_CLAMP_VAL);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+      const int d = clamp(pdiff[i * pstride + j], -AFFINE_SAMP_CLAMP_VAL,
+                          AFFINE_SAMP_CLAMP_VAL);
+#else
       const int d = pdiff[i * pstride + j];
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
       for (int s = 0; s < 4; ++s) {
         for (int t = 0; t <= s; ++t) {
           mat_a[s * 4 + t] += ROUND_POWER_OF_TWO_SIGNED_64(
@@ -2742,6 +2747,31 @@ int derive_rotation_scale_translation_4p_interp_grad(
             ROUND_POWER_OF_TWO_SIGNED_64((int64_t)a[s] * (int64_t)d, grad_bits);
       }
     }
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+#if DEBUG_BIT_DEPTH
+    for (int s = 0; s < 4; s++) {
+      for (int t = 0; t <= s; t++)
+        bit_depth_check(mat_a[s * 4 + t], MAX_AFFINE_AUTOCORR_BITS);
+      bit_depth_check(vec_b[s], MAX_AFFINE_AUTOCORR_BITS);
+    }
+#endif  // CONFIG_DEBUG
+    // Do a range check and add a downshift if range is getting close to the bit
+    // depth cap. This check is done for every 16 pixels so it can be easily
+    // replicated in the SIMD version.
+    if (bw >= 16 || i % 2 == 1) {
+      int64_t max_diag =
+          AOMMAX(AOMMAX(mat_a[0], mat_a[5]), AOMMAX(mat_a[10], mat_a[15]));
+      if (get_msb_signed_64(max_diag) >= MAX_AFFINE_AUTOCORR_BITS - 2) {
+        for (int s = 0; s < 4; ++s) {
+          for (int t = 0; t < 4; ++t)
+            mat_a[s * 4 + t] =
+                ROUND_POWER_OF_TWO_SIGNED_64(mat_a[s * 4 + t], 1);
+          vec_b[s] = ROUND_POWER_OF_TWO_SIGNED_64(vec_b[s], 1);
+        }
+        grad_bits++;
+      }
+    }
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   }
   for (int s = 0; s < 4; ++s) {
     for (int t = s + 1; t < 4; ++t) mat_a[s * 4 + t] = mat_a[t * 4 + s];
@@ -2812,6 +2842,7 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
   int64_t sv2 = 0;
   int64_t suw = 0;
   int64_t svw = 0;
+  int grad_bits = 0;
   for (int i = 0; i < bh; ++i) {
     for (int j = 0; j < bw; ++j) {
 #if OPFL_DOWNSAMP_QUINCUNX
@@ -2820,11 +2851,11 @@ void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
       const int64_t u = d0 * gx0[i * gstride + j] - d1 * gx1[i * gstride + j];
       const int64_t v = d0 * gy0[i * gstride + j] - d1 * gy1[i * gstride + j];
       const int64_t w = p0[i * pstride0 + j] - p1[i * pstride1 + j];
-      su2 += (u * u);
-      suv += (u * v);
-      sv2 += (v * v);
-      suw += (u * w);
-      svw += (v * w);
+      su2 += ROUND_POWER_OF_TWO_SIGNED_64(u * u, grad_bits);
+      suv += ROUND_POWER_OF_TWO_SIGNED_64(u * v, grad_bits);
+      sv2 += ROUND_POWER_OF_TWO_SIGNED_64(v * v, grad_bits);
+      suw += ROUND_POWER_OF_TWO_SIGNED_64(u * w, grad_bits);
+      svw += ROUND_POWER_OF_TWO_SIGNED_64(v * w, grad_bits);
     }
   }
   const int bits = mv_prec_bits + grad_prec_bits;
@@ -2881,20 +2912,57 @@ void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
   int64_t sv2 = 0;
   int64_t suw = 0;
   int64_t svw = 0;
+  int grad_bits = 0;
   for (int i = 0; i < bh; ++i) {
     for (int j = 0; j < bw; ++j) {
 #if OPFL_DOWNSAMP_QUINCUNX
       if ((i + j) % 2 == 1) continue;
 #endif
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+      // TODO(kslu) do clamping in SIMD
+      const int u =
+          clamp(gx[i * gstride + j], -OPFL_SAMP_CLAMP_VAL, OPFL_SAMP_CLAMP_VAL);
+      const int v =
+          clamp(gy[i * gstride + j], -OPFL_SAMP_CLAMP_VAL, OPFL_SAMP_CLAMP_VAL);
+      const int w = clamp(pdiff[i * pstride0 + j], -OPFL_SAMP_CLAMP_VAL,
+                          OPFL_SAMP_CLAMP_VAL);
+#else
       const int u = gx[i * gstride + j];
       const int v = gy[i * gstride + j];
       const int w = pdiff[i * pstride0 + j];
-      su2 += (u * u);
-      suv += (u * v);
-      sv2 += (v * v);
-      suw += (u * w);
-      svw += (v * w);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+      su2 += ROUND_POWER_OF_TWO_SIGNED_64(u * u, grad_bits);
+      suv += ROUND_POWER_OF_TWO_SIGNED_64(u * v, grad_bits);
+      sv2 += ROUND_POWER_OF_TWO_SIGNED_64(v * v, grad_bits);
+      suw += ROUND_POWER_OF_TWO_SIGNED_64(u * w, grad_bits);
+      svw += ROUND_POWER_OF_TWO_SIGNED_64(v * w, grad_bits);
     }
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+#if DEBUG_BIT_DEPTH
+    bit_depth_check(su2, MAX_OPFL_AUTOCORR_BITS);
+    bit_depth_check(suv, MAX_OPFL_AUTOCORR_BITS);
+    bit_depth_check(sv2, MAX_OPFL_AUTOCORR_BITS);
+    bit_depth_check(suw, MAX_OPFL_AUTOCORR_BITS);
+    bit_depth_check(svw, MAX_OPFL_AUTOCORR_BITS);
+#endif  // CONFIG_DEBUG
+    // Do a range check and add a downshift if range is getting close to the bit
+    // depth cap. This check is done for every 8 pixels so it can be easily
+    // replicated in the SIMD version.
+    // TODO(kslu) do this check in SIMD
+    if (bw >= 8 || i % 2 == 1) {
+      // Do a range check and add a downshift if range is getting close to the
+      // bit depth cap
+      int64_t max_diag = AOMMAX(su2, sv2);
+      if (get_msb_signed_64(max_diag) >= MAX_OPFL_AUTOCORR_BITS - 2) {
+        su2 = ROUND_POWER_OF_TWO_SIGNED_64(su2, 1);
+        suv = ROUND_POWER_OF_TWO_SIGNED_64(suv, 1);
+        sv2 = ROUND_POWER_OF_TWO_SIGNED_64(sv2, 1);
+        suw = ROUND_POWER_OF_TWO_SIGNED_64(suw, 1);
+        svw = ROUND_POWER_OF_TWO_SIGNED_64(svw, 1);
+        grad_bits++;
+      }
+    }
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   }
   const int bits = mv_prec_bits + grad_prec_bits;
 #if OPFL_REGULARIZED_LS

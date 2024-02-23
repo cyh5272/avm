@@ -532,7 +532,7 @@ INSTANTIATE_TEST_SUITE_P(
     C, AV1OptFlowRefineHighbdTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_highbd_c));
 
-#if HAVE_SSE4_1
+#if HAVE_SSE4_1 && !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 INSTANTIATE_TEST_SUITE_P(
     SSE4_1, AV1OptFlowRefineHighbdTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_highbd_sse4_1));
@@ -873,7 +873,7 @@ INSTANTIATE_TEST_SUITE_P(
     C, AV1OptFlowRefineInterpGradTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_interp_grad_c));
 
-#if HAVE_SSE4_1
+#if HAVE_SSE4_1 && !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 INSTANTIATE_TEST_SUITE_P(
     SSE4_1, AV1OptFlowRefineInterpGradTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_interp_grad_sse4_1));
