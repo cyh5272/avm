@@ -20,11 +20,27 @@
 #include "aom_dsp/x86/synonyms.h"
 
 #if CONFIG_OPTFLOW_REFINEMENT
-static INLINE __m128i round_power_of_two_signed_epi32(__m128i temp1,
-                                                      __m128i temp2,
-                                                      const __m128i v_bias_d,
-                                                      const __m128i ones,
-                                                      const int bits) {
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+static INLINE __m128i round_power_of_two_signed_epi64(__m128i in, int n) {
+  __m128i sign_mask = _mm_srai_epi32(in, 31);
+  sign_mask = _mm_or_si128(sign_mask, _mm_srli_epi64(sign_mask, 4));
+  __m128i abs_vec = _mm_xor_si128(in, sign_mask);
+  abs_vec = _mm_sub_epi64(abs_vec, sign_mask);
+
+  __m128i rounding_offset = _mm_set_epi32(0, (1 << n) >> 1, 0, (1 << n) >> 1);
+  __m128i add_vec = _mm_add_epi64(abs_vec, rounding_offset);
+  __m128i rounded_vec = _mm_srli_epi64(add_vec, n);
+
+  // Restore the sign
+  rounded_vec = _mm_xor_si128(rounded_vec, sign_mask);
+  rounded_vec = _mm_sub_epi64(rounded_vec, sign_mask);
+  return rounded_vec;
+}
+#endif  // CONFIG_REDUCD_AUTOCORR_BIT_DEPTH
+
+static INLINE __m128i pack_and_round_epi32(__m128i temp1, __m128i temp2,
+                                           const __m128i v_bias_d,
+                                           const __m128i ones, const int bits) {
   __m128i v_sign_d = _mm_sign_epi32(ones, temp1);
   __m128i reg = _mm_mullo_epi32(temp1, v_sign_d);
   reg = _mm_srli_epi32(_mm_add_epi32(reg, v_bias_d), bits);
@@ -113,8 +129,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp1 = _mm_mullo_epi32(temp1, mask);
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
 
         const int idx = col * bw + row;
         xx_storeu_128(x_grad + idx, temp1);
@@ -147,8 +163,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp1 = _mm_mullo_epi32(temp1, mask);
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
         xx_storeu_128(y_grad + idx, temp1);
       }
     }
@@ -220,8 +236,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp1 = _mm_mullo_epi32(temp1, mask);
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
 
         const int idx = col * bw + row;
         xx_storeu_128(x_grad + idx, temp1);
@@ -247,8 +263,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp1 = _mm_mullo_epi32(temp1, mask);
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
         xx_storeu_128(x_grad + idx + 8, temp1);
 
         src = pred_src + row;
@@ -284,8 +300,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
 
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
         xx_storeu_128(y_grad + idx, temp1);
 
         sub1 = _mm_sub_epi32(_mm_cvtepi16_epi32(vpred_next1_2),
@@ -308,8 +324,8 @@ void av1_bicubic_grad_interpolation_highbd_sse4_1(const int16_t *pred_src,
         temp1 = _mm_mullo_epi32(temp1, mask);
         temp2 = _mm_mullo_epi32(temp2, mask);
 #endif
-        temp1 = round_power_of_two_signed_epi32(temp1, temp2, v_bias_d, ones,
-                                                bicubic_bits);
+        temp1 =
+            pack_and_round_epi32(temp1, temp2, v_bias_d, ones, bicubic_bits);
         xx_storeu_128(y_grad + idx + 8, temp1);
       }
     }
@@ -374,6 +390,8 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
 #else
   (void)rls_alpha;
 #endif
+
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
   su2 = clamp64(su2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
@@ -381,6 +399,7 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
   suv = clamp64(suv, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
   suw = clamp64(suw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
   svw = clamp64(svw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -466,6 +485,12 @@ static void opfl_mv_refinement_8x4_sse4_1(const int16_t *pdiff, int pstride,
   __m128i vw_hi = _mm_setzero_si128();
   const int bits = mv_prec_bits + grad_prec_bits;
   const int rls_alpha = OPFL_RLS_PARAM;
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+  int grad_bits_lo = 0;
+  int grad_bits_hi = 0;
+  __m128i opfl_samp_min = _mm_set1_epi16(-OPFL_SAMP_CLAMP_VAL);
+  __m128i opfl_samp_max = _mm_set1_epi16(OPFL_SAMP_CLAMP_VAL);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 #if OPFL_DOWNSAMP_QUINCUNX
   const __m128i even_row =
       _mm_set_epi16(0, 0xFFFF, 0, 0xFFFF, 0, 0xFFFF, 0, 0xFFFF);
@@ -491,6 +516,11 @@ static void opfl_mv_refinement_8x4_sse4_1(const int16_t *pdiff, int pstride,
     // 16bit and there are cases where these buffers can be filled with extreme
     // values. Hence, the accumulation here needs to be done at 64-bit precision
     // to avoid overflow issues.
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    gradX = _mm_max_epi16(_mm_min_epi16(gradX, opfl_samp_max), opfl_samp_min);
+    gradY = _mm_max_epi16(_mm_min_epi16(gradY, opfl_samp_max), opfl_samp_min);
+    pred = _mm_max_epi16(_mm_min_epi16(pred, opfl_samp_max), opfl_samp_min);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     const __m128i gradX_lo_0 = _mm_cvtepi16_epi32(gradX);
     const __m128i gradY_lo_0 = _mm_cvtepi16_epi32(gradY);
     const __m128i pred_lo_0 = _mm_cvtepi16_epi32(pred);
@@ -508,28 +538,63 @@ static void opfl_mv_refinement_8x4_sse4_1(const int16_t *pdiff, int pstride,
 
     multiply_and_accum(gradX_lo_0, gradX_lo_0, gradX_hi_0, gradX_hi_0,
                        gradX_lo1, gradX_lo1, gradX_hi1, gradX_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    u2_lo =
+        _mm_add_epi64(u2_lo, round_power_of_two_signed_epi64(t1, grad_bits_lo));
+    u2_hi =
+        _mm_add_epi64(u2_hi, round_power_of_two_signed_epi64(t2, grad_bits_hi));
+#else
     u2_lo = _mm_add_epi64(u2_lo, t1);
     u2_hi = _mm_add_epi64(u2_hi, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
     multiply_and_accum(gradY_lo_0, gradY_lo_0, gradY_hi_0, gradY_hi_0,
                        gradY_lo1, gradY_lo1, gradY_hi1, gradY_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    v2_lo =
+        _mm_add_epi64(v2_lo, round_power_of_two_signed_epi64(t1, grad_bits_lo));
+    v2_hi =
+        _mm_add_epi64(v2_hi, round_power_of_two_signed_epi64(t2, grad_bits_hi));
+#else
     v2_lo = _mm_add_epi64(v2_lo, t1);
     v2_hi = _mm_add_epi64(v2_hi, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
     multiply_and_accum(gradX_lo_0, gradY_lo_0, gradX_hi_0, gradY_hi_0,
                        gradX_lo1, gradY_lo1, gradX_hi1, gradY_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    uv_lo =
+        _mm_add_epi64(uv_lo, round_power_of_two_signed_epi64(t1, grad_bits_lo));
+    uv_hi =
+        _mm_add_epi64(uv_hi, round_power_of_two_signed_epi64(t2, grad_bits_hi));
+#else
     uv_lo = _mm_add_epi64(uv_lo, t1);
     uv_hi = _mm_add_epi64(uv_hi, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
     multiply_and_accum(gradX_lo_0, pred_lo_0, gradX_hi_0, pred_hi_0, gradX_lo1,
                        pred_lo1, gradX_hi1, pred_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    uw_lo =
+        _mm_add_epi64(uw_lo, round_power_of_two_signed_epi64(t1, grad_bits_lo));
+    uw_hi =
+        _mm_add_epi64(uw_hi, round_power_of_two_signed_epi64(t2, grad_bits_hi));
+#else
     uw_lo = _mm_add_epi64(uw_lo, t1);
     uw_hi = _mm_add_epi64(uw_hi, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
     multiply_and_accum(gradY_lo_0, pred_lo_0, gradY_hi_0, pred_hi_0, gradY_lo1,
                        pred_lo1, gradY_hi1, pred_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    vw_lo =
+        _mm_add_epi64(vw_lo, round_power_of_two_signed_epi64(t1, grad_bits_lo));
+    vw_hi =
+        _mm_add_epi64(vw_hi, round_power_of_two_signed_epi64(t2, grad_bits_hi));
+#else
     vw_lo = _mm_add_epi64(vw_lo, t1);
     vw_hi = _mm_add_epi64(vw_hi, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
 #if OPFL_DOWNSAMP_QUINCUNX
     gx += gstride << 1;
@@ -542,6 +607,42 @@ static void opfl_mv_refinement_8x4_sse4_1(const int16_t *pdiff, int pstride,
     pdiff += pstride;
     bHeight -= 1;
 #endif
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    // Do a range check and add a downshift if range is getting close to the bit
+    // depth cap.
+    if (bHeight % 2 == 0) {
+      int64_t su2c_lo, sv2c_lo, su2c_hi, sv2c_hi;
+      int64_t suwc_lo, svwc_lo, suwc_hi, svwc_hi;
+      xx_storel_64(&su2c_lo, _mm_add_epi64(u2_lo, _mm_srli_si128(u2_lo, 8)));
+      xx_storel_64(&sv2c_lo, _mm_add_epi64(v2_lo, _mm_srli_si128(v2_lo, 8)));
+      xx_storel_64(&su2c_hi, _mm_add_epi64(u2_hi, _mm_srli_si128(u2_hi, 8)));
+      xx_storel_64(&sv2c_hi, _mm_add_epi64(v2_hi, _mm_srli_si128(v2_hi, 8)));
+      xx_storel_64(&suwc_lo, _mm_add_epi64(uw_lo, _mm_srli_si128(uw_lo, 8)));
+      xx_storel_64(&svwc_lo, _mm_add_epi64(vw_lo, _mm_srli_si128(vw_lo, 8)));
+      xx_storel_64(&suwc_hi, _mm_add_epi64(uw_hi, _mm_srli_si128(uw_hi, 8)));
+      xx_storel_64(&svwc_hi, _mm_add_epi64(vw_hi, _mm_srli_si128(vw_hi, 8)));
+      if (get_msb_signed_64(AOMMAX(AOMMAX(su2c_lo, sv2c_lo),
+                                   AOMMAX(llabs(suwc_lo), llabs(svwc_lo)))) >=
+          MAX_OPFL_AUTOCORR_BITS - 2) {
+        u2_lo = round_power_of_two_signed_epi64(u2_lo, 1);
+        v2_lo = round_power_of_two_signed_epi64(v2_lo, 1);
+        uv_lo = round_power_of_two_signed_epi64(uv_lo, 1);
+        uw_lo = round_power_of_two_signed_epi64(uw_lo, 1);
+        vw_lo = round_power_of_two_signed_epi64(vw_lo, 1);
+        grad_bits_lo++;
+      }
+      if (get_msb_signed_64(AOMMAX(AOMMAX(su2c_hi, sv2c_hi),
+                                   AOMMAX(llabs(suwc_hi), llabs(svwc_hi)))) >=
+          MAX_OPFL_AUTOCORR_BITS - 2) {
+        u2_hi = round_power_of_two_signed_epi64(u2_hi, 1);
+        v2_hi = round_power_of_two_signed_epi64(v2_hi, 1);
+        uv_hi = round_power_of_two_signed_epi64(uv_hi, 1);
+        uw_hi = round_power_of_two_signed_epi64(uw_hi, 1);
+        vw_hi = round_power_of_two_signed_epi64(vw_hi, 1);
+        grad_bits_hi++;
+      }
+    }
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   } while (bHeight != 0);
   u2_lo = _mm_add_epi64(u2_lo, _mm_srli_si128(u2_lo, 8));
   u2_hi = _mm_add_epi64(u2_hi, _mm_srli_si128(u2_hi, 8));
@@ -588,6 +689,11 @@ static void opfl_mv_refinement_8x8_sse4_1(const int16_t *pdiff, int pstride,
   __m128i v2 = _mm_setzero_si128();
   __m128i uw = _mm_setzero_si128();
   __m128i vw = _mm_setzero_si128();
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+  int grad_bits = 0;
+  __m128i opfl_samp_min = _mm_set1_epi16(-OPFL_SAMP_CLAMP_VAL);
+  __m128i opfl_samp_max = _mm_set1_epi16(OPFL_SAMP_CLAMP_VAL);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 #if OPFL_DOWNSAMP_QUINCUNX
   const __m128i even_row =
       _mm_set_epi16(0, 0xFFFF, 0, 0xFFFF, 0, 0xFFFF, 0, 0xFFFF);
@@ -613,6 +719,11 @@ static void opfl_mv_refinement_8x8_sse4_1(const int16_t *pdiff, int pstride,
     // 16bit and there are cases where these buffers can be filled with extreme
     // values. Hence, the accumulation here needs to be done at 64bit to avoid
     // overflow issues.
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    gradX = _mm_max_epi16(_mm_min_epi16(gradX, opfl_samp_max), opfl_samp_min);
+    gradY = _mm_max_epi16(_mm_min_epi16(gradY, opfl_samp_max), opfl_samp_min);
+    pred = _mm_max_epi16(_mm_min_epi16(pred, opfl_samp_max), opfl_samp_min);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     const __m128i gradX_lo_0 = _mm_cvtepi16_epi32(gradX);
     const __m128i gradY_lo_0 = _mm_cvtepi16_epi32(gradY);
     const __m128i pred_lo_0 = _mm_cvtepi16_epi32(pred);
@@ -630,27 +741,47 @@ static void opfl_mv_refinement_8x8_sse4_1(const int16_t *pdiff, int pstride,
 
     multiply_and_accum(gradX_lo_0, gradX_lo_0, gradX_hi_0, gradX_hi_0,
                        gradX_lo1, gradX_lo1, gradX_hi1, gradX_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    t2 = round_power_of_two_signed_epi64(_mm_add_epi64(t1, t2), grad_bits);
+#else
     t2 = _mm_add_epi64(t1, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     u2 = _mm_add_epi64(u2, t2);
 
     multiply_and_accum(gradY_lo_0, gradY_lo_0, gradY_hi_0, gradY_hi_0,
                        gradY_lo1, gradY_lo1, gradY_hi1, gradY_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    t2 = round_power_of_two_signed_epi64(_mm_add_epi64(t1, t2), grad_bits);
+#else
     t2 = _mm_add_epi64(t1, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     v2 = _mm_add_epi64(v2, t2);
 
     multiply_and_accum(gradX_lo_0, gradY_lo_0, gradX_hi_0, gradY_hi_0,
                        gradX_lo1, gradY_lo1, gradX_hi1, gradY_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    t2 = round_power_of_two_signed_epi64(_mm_add_epi64(t1, t2), grad_bits);
+#else
     t2 = _mm_add_epi64(t1, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     uv = _mm_add_epi64(uv, t2);
 
     multiply_and_accum(gradX_lo_0, pred_lo_0, gradX_hi_0, pred_hi_0, gradX_lo1,
                        pred_lo1, gradX_hi1, pred_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    t2 = round_power_of_two_signed_epi64(_mm_add_epi64(t1, t2), grad_bits);
+#else
     t2 = _mm_add_epi64(t1, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     uw = _mm_add_epi64(uw, t2);
 
     multiply_and_accum(gradY_lo_0, pred_lo_0, gradY_hi_0, pred_hi_0, gradY_lo1,
                        pred_lo1, gradY_hi1, pred_hi1, &t1, &t2);
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    t2 = round_power_of_two_signed_epi64(_mm_add_epi64(t1, t2), grad_bits);
+#else
     t2 = _mm_add_epi64(t1, t2);
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
     vw = _mm_add_epi64(vw, t2);
 #if OPFL_DOWNSAMP_QUINCUNX
     gx += gstride << 1;
@@ -663,6 +794,31 @@ static void opfl_mv_refinement_8x8_sse4_1(const int16_t *pdiff, int pstride,
     pdiff += pstride;
     bHeight -= 1;
 #endif
+#if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+    // Do a range check and add a downshift if range is getting close to the
+    // bit depth cap
+    int64_t su2c, sv2c, suwc, svwc;
+    xx_storel_64(&su2c, _mm_add_epi64(u2, _mm_srli_si128(u2, 8)));
+    xx_storel_64(&sv2c, _mm_add_epi64(v2, _mm_srli_si128(v2, 8)));
+    xx_storel_64(&suwc, _mm_add_epi64(uw, _mm_srli_si128(uw, 8)));
+    xx_storel_64(&svwc, _mm_add_epi64(vw, _mm_srli_si128(vw, 8)));
+    if (get_msb_signed_64(
+            AOMMAX(AOMMAX(su2c, sv2c), AOMMAX(llabs(suwc), llabs(svwc)))) >=
+        MAX_OPFL_AUTOCORR_BITS - 2) {
+      u2 = round_power_of_two_signed_epi64(u2, 1);
+      v2 = round_power_of_two_signed_epi64(v2, 1);
+      uv = round_power_of_two_signed_epi64(uv, 1);
+      uw = round_power_of_two_signed_epi64(uw, 1);
+      vw = round_power_of_two_signed_epi64(vw, 1);
+      grad_bits++;
+      int64_t suvc;
+      xx_storel_64(&su2c, _mm_add_epi64(u2, _mm_srli_si128(u2, 8)));
+      xx_storel_64(&sv2c, _mm_add_epi64(v2, _mm_srli_si128(v2, 8)));
+      xx_storel_64(&suvc, _mm_add_epi64(uv, _mm_srli_si128(uv, 8)));
+      xx_storel_64(&suwc, _mm_add_epi64(uw, _mm_srli_si128(uw, 8)));
+      xx_storel_64(&svwc, _mm_add_epi64(vw, _mm_srli_si128(vw, 8)));
+    }
+#endif  // CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   } while (bHeight != 0);
 
   int64_t su2, sv2, suv, suw, svw;

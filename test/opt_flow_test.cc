@@ -648,7 +648,7 @@ INSTANTIATE_TEST_SUITE_P(
     C, AV1OptFlowRefineTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_c));
 
-#if HAVE_SSE4_1 && !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+#if HAVE_SSE4_1
 INSTANTIATE_TEST_SUITE_P(
     SSE4_1, AV1OptFlowRefineTest,
     BuildOptFlowHighbdParams(av1_opfl_mv_refinement_nxn_sse4_1));

@@ -2358,8 +2358,8 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
           AOMMAX(AOMMAX(mat_a[0], mat_a[5]), AOMMAX(mat_a[10], mat_a[15]));
       int64_t max_xcorr = AOMMAX(AOMMAX(llabs(vec_b[0]), llabs(vec_b[1])),
                                  AOMMAX(llabs(vec_b[2]), llabs(vec_b[3])));
-      if (get_msb_signed_64(max_autocorr) >= MAX_AFFINE_AUTOCORR_BITS - 2 ||
-          get_msb_signed_64(max_xcorr) >= MAX_AFFINE_AUTOCORR_BITS - 2) {
+      if (get_msb_signed_64(AOMMAX(max_autocorr, max_xcorr)) >=
+          MAX_AFFINE_AUTOCORR_BITS - 2) {
         for (int s = 0; s < 4; ++s) {
           for (int t = 0; t < 4; ++t)
             mat_a[s * 4 + t] =
@@ -2467,8 +2467,8 @@ void av1_opfl_mv_refinement(const int16_t *pdiff, int pstride,
       // bit depth cap
       int64_t max_autocorr = AOMMAX(su2, sv2);
       int64_t max_xcorr = AOMMAX(llabs(suw), llabs(svw));
-      if (get_msb_signed_64(max_autocorr) >= MAX_OPFL_AUTOCORR_BITS - 2 ||
-          get_msb_signed_64(max_xcorr) >= MAX_OPFL_AUTOCORR_BIS - 2) {
+      if (get_msb_signed_64(AOMMAX(max_autocorr, max_xcorr)) >=
+          MAX_OPFL_AUTOCORR_BITS - 2) {
         su2 = ROUND_POWER_OF_TWO_SIGNED_64(su2, 1);
         suv = ROUND_POWER_OF_TWO_SIGNED_64(suv, 1);
         sv2 = ROUND_POWER_OF_TWO_SIGNED_64(sv2, 1);
