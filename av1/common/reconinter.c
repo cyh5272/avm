@@ -1295,16 +1295,15 @@ int inverse_determinant_4d(double *mat, double *vec, int *precbits,
 }
 #else
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_DEBUG
 void bit_depth_check(const int64_t val, const int maxbd) {
   int64_t min_val = -(1ULL << (maxbd - 1));
   int64_t max_val = (1ULL << (maxbd - 1)) - 1;
-  (void)val;
-  (void)min_val;
-  (void)max_val;
   assert(val <= max_val);
   assert(val >= min_val);
   return;
 }
+#endif  // CONFIG_DEBUG
 
 #if DEBUG_BIT_DEPTH
 void print_els_int32(const int *arr, const int len, char *arr_name) {
@@ -1442,12 +1441,12 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   int64_t a[10], b[10];  // values of 20 2D subdeterminants
   getsub_4d(&a[0], mat, vec);
   getsub_4d(&b[0], mat + 8, vec + 2);
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
   for (int i = 0; i < 10; i++) {
     bit_depth_check(a[i], MAX_LS_BITS);
     bit_depth_check(b[i], MAX_LS_BITS);
   }
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
 
 #if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
 #if DEBUG_BIT_DEPTH
@@ -1493,9 +1492,9 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
 
   int64_t det = a[0] * b[7] + a[7] * b[0] + a[2] * b[4] + a[4] * b[2] -
                 a[5] * b[1] - a[1] * b[5];
-#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
   bit_depth_check(det, MAX_LS_BITS);
-#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
 
   if (det <= 0) return 0;
   sol[0] = a[5] * b[8] + a[8] * b[5] - a[6] * b[7] - a[7] * b[6] - a[4] * b[9] -
@@ -1517,7 +1516,9 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   }
 #endif
 
+#if CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
   for (int i = 0; i < 4; i++) bit_depth_check(sol[i], MAX_LS_BITS);
+#endif  // CONFIG_REDUCE_OPFL_DAMR_BIT_DEPTH && CONFIG_DEBUG
   divide_and_round_array(sol, det, 4, precbits);
 
 #if DEBUG_BIT_DEPTH
