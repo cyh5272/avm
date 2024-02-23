@@ -3776,10 +3776,10 @@ static AOM_INLINE void write_modes_sb(
   if (!is_sb_root && !frame_is_intra_only(cm) && parent && partition &&
       parent->region_type != INTRA_REGION && ptree->inter_sdp_allowed_flag &&
       is_bsize_allowed_for_inter_sdp(bsize, ptree->partition)) {
-    const int plane = xd->tree_type == CHROMA_PART;
-    const int ctx = get_intra_region_context(xd, mi_row, mi_col, bsize);
-    aom_write_symbol(w, ptree->region_type,
-                     xd->tile_ctx->region_type_cdf[plane][ctx], REGION_TYPES);
+    const int ctx = get_intra_region_context(bsize);
+    assert(xd->tree_type != CHROMA_PART);
+    aom_write_symbol(w, ptree->region_type, xd->tile_ctx->region_type_cdf[ctx],
+                     REGION_TYPES);
     if (ptree->region_type == INTRA_REGION) {
       xd->tree_type = LUMA_PART;
     }
@@ -4010,11 +4010,6 @@ static AOM_INLINE void write_modes_sb(
 
   // update partition context
   update_ext_partition_context(xd, mi_row, mi_col, subsize, bsize, partition);
-#if CONFIG_INTER_SDP
-  if (partition == PARTITION_NONE && !frame_is_intra_only(cm)) {
-    update_intra_region_context(xd, mi_row, mi_col, bsize, ptree->region_type);
-  }
-#endif  // CONFIG_INTER_SDP
 }
 
 static AOM_INLINE void write_modes(AV1_COMP *const cpi,

@@ -2423,7 +2423,7 @@ static void loopfilter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
 
 #if CONFIG_INTER_SDP_DEBUG
   is_decoding_process = 0;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
   if (lf->filter_level[0] || lf->filter_level[1]) {
     if (num_workers > 1
@@ -2449,7 +2449,7 @@ static void loopfilter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
 #endif
 #if CONFIG_INTER_SDP_DEBUG
   is_decoding_process = -1;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
   cdef_restoration_frame(cpi, cm, xd, use_restoration, use_cdef);
 }

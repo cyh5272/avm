@@ -2445,16 +2445,6 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
         x->cb_offset[plane] +=
             block_size_wide[bsize_base] * block_size_high[bsize_base];
       }
-      //#if CONFIG_INTER_SDP
-      //      if (xd->tree_type == 2 && xd->is_chroma_ref &&
-      //      !frame_is_intra_only(cm))
-      //        assert(mbmi->chroma_ref_info.bsize_base == bsize);
-      //      if (plane > 0 && !frame_is_intra_only(cm) && xd->tree_type != 1) {
-      //        if (x->cb_offset[plane] != x->cb_offset[0]) {
-      //          printf("Error, mismatch cb offset!\n");
-      //        }
-      //      }
-      //#endif
     }
     if (bsize == cpi->common.sb_size &&
         mbmi->skip_txfm[xd->tree_type == CHROMA_PART] == 1 &&
@@ -2844,10 +2834,6 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 
   if (mi_row >= mi_params->mi_rows || mi_col >= mi_params->mi_cols) return;
 
-#if CONFIG_INTER_SDP
-  REGION_TYPE cur_region_type = pc_tree->region_type;
-#endif
-
   MACROBLOCK *const x = &td->mb;
   MACROBLOCKD *const xd = &x->e_mbd;
   assert(bsize < BLOCK_SIZES_ALL);
@@ -2918,9 +2904,9 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
         parent->region_type != INTRA_REGION && xd->tree_type != CHROMA_PART &&
         ptree->inter_sdp_allowed_flag &&
         is_bsize_allowed_for_inter_sdp(bsize, partition)) {
-      const int plane_index = xd->tree_type == CHROMA_PART;
-      const int ctx = get_intra_region_context(xd, mi_row, mi_col, bsize);
-      update_cdf(xd->tile_ctx->region_type_cdf[plane_index][ctx],
+      assert(xd->tree_type != CHROMA_PART);
+      const int intra_region_ctx = get_intra_region_context(bsize);
+      update_cdf(xd->tile_ctx->region_type_cdf[intra_region_ctx],
                  ptree->region_type, REGION_TYPES);
     }
 #endif
@@ -3361,7 +3347,6 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
   // encode the chroma blocks under one intra region in inter frame
   if (encode_sdp_intra_region_yuv) {
     xd->tree_type = CHROMA_PART;
-    MB_MODE_INFO *mbmi = xd->mi[0];
     encode_b(cpi, tile_data, td, tp, mi_row, mi_col, dry_run, bsize,
              PARTITION_NONE, pc_tree->none_chroma, rate);
     xd->tree_type = SHARED_PART;
@@ -3370,12 +3355,6 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 
   if (ptree) ptree->is_settled = 1;
   update_ext_partition_context(xd, mi_row, mi_col, subsize, bsize, partition);
-#if CONFIG_INTER_SDP
-  if (partition == PARTITION_NONE && !frame_is_intra_only(cm)) {
-    update_intra_region_context(xd, mi_row, mi_col, bsize,
-                                pc_tree->region_type);
-  }
-#endif  // CONFIG_INTER_SDP
 }
 
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -4422,9 +4401,8 @@ static void init_partition_search_state_params(
 
 #if CONFIG_INTER_SDP
   if (xd->tree_type != CHROMA_PART) {
-    const int ctx = get_intra_region_context(xd, mi_row, mi_col, bsize);
-    part_search_state->region_type_cost =
-        mode_costs->region_type_cost[xd->tree_type == CHROMA_PART][ctx];
+    const int ctx = get_intra_region_context(bsize);
+    part_search_state->region_type_cost = mode_costs->region_type_cost[ctx];
   }
 #endif
 
@@ -4873,9 +4851,6 @@ static void rectangular_partition_search(
   const bool try_prune_with_ml =
       cpi->sf.part_sf.prune_rect_with_ml && !frame_is_intra_only(cm) &&
       part_search_state->forced_partition == PARTITION_INVALID &&
-      //#if CONFIG_INTER_SDP
-      //      pc_tree->region_type != INTRA_REGION &&
-      //#endif  // CONFIG_INTER_SDP
       is_whole_block_inside && part_none_rd < INT64_MAX &&
       (is_rect_part_allowed(cpi, part_search_state, active_edge_type, HORZ,
                             mi_pos_rect[HORZ][0][HORZ]) ||
@@ -4901,9 +4876,6 @@ static void rectangular_partition_search(
   }
   if (cpi->sf.part_sf.prune_rect_with_none_rd &&
       part_search_state->forced_partition == PARTITION_INVALID &&
-      //#if CONFIG_INTER_SDP
-      //      pc_tree->region_type != INTRA_REGION &&
-      //#endif  // CONFIG_INTER_SDP
       !frame_is_intra_only(cm) && part_none_rd < INT64_MAX) {
     prune_rect_with_none_rd(part_search_state, bsize, x->qindex, x->rdmult,
                             part_none_rd, is_not_edge_block);
@@ -5931,7 +5903,8 @@ static void none_partition_search(
   part_search_state->none_rd = this_rdc->rdcost;
 #if CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_INTER_SDP
-  if (pc_tree->region_type == MIXED_INTER_INTRA_REGION)
+  if (pc_tree->region_type == MIXED_INTER_INTRA_REGION ||
+      frame_is_intra_only(cm))
 #endif  // CONFIG_INTER_SDP
     pc_tree->none_rd = *this_rdc;
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
@@ -6926,6 +6899,96 @@ static AOM_INLINE void prune_ext_partitions_3way(
 }
 
 #if CONFIG_INTER_SDP
+// Early termination about inter-sdp
+static INLINE void early_termination_inter_sdp(PC_TREE *pc_tree,
+                                               float *total_count,
+                                               float *inter_mode_count) {
+  REGION_TYPE cur_region_type = pc_tree->region_type;
+  if (pc_tree->partitioning == PARTITION_NONE) {
+    if (pc_tree->none[cur_region_type] == NULL) return;
+    const MB_MODE_INFO *const mi = &(pc_tree->none[cur_region_type])->mic;
+    if (mi == NULL) return;
+    *total_count += 1;
+    if (mi->mode >= NEARMV && mi->mode < MB_MODE_COUNT) *inter_mode_count += 1;
+    return;
+  }
+  switch (pc_tree->partitioning) {
+    case PARTITION_HORZ:
+      early_termination_inter_sdp(pc_tree->horizontal[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_VERT:
+      early_termination_inter_sdp(pc_tree->vertical[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_HORZ_4A:
+      early_termination_inter_sdp(pc_tree->horizontal4a[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4a[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4a[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4a[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_HORZ_4B:
+      early_termination_inter_sdp(pc_tree->horizontal4b[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4b[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4b[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal4b[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_VERT_4A:
+      early_termination_inter_sdp(pc_tree->vertical4a[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4a[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4a[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4a[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_VERT_4B:
+      early_termination_inter_sdp(pc_tree->vertical4b[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4b[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4b[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical4b[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_HORZ_3:
+      early_termination_inter_sdp(pc_tree->horizontal3[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal3[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal3[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->horizontal3[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    case PARTITION_VERT_3:
+      early_termination_inter_sdp(pc_tree->vertical3[cur_region_type][0],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical3[cur_region_type][1],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical3[cur_region_type][2],
+                                  total_count, inter_mode_count);
+      early_termination_inter_sdp(pc_tree->vertical3[cur_region_type][3],
+                                  total_count, inter_mode_count);
+      break;
+    default: break;
+  }
+}
+
 static INLINE void search_intra_region_partitioning(
     PartitionSearchState *search_state, AV1_COMP *const cpi, ThreadData *td,
     TileDataEnc *tile_data, TokenExtra **tp, RD_STATS *best_rdc,
@@ -6941,6 +7004,15 @@ static INLINE void search_intra_region_partitioning(
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
   MACROBLOCKD *const xd = &x->e_mbd;
+
+  // add one encoder fast method for early terminating inter-sdp
+  float total_count = 0;
+  float inter_mode_count = 0;
+  early_termination_inter_sdp(pc_tree, &total_count, &inter_mode_count);
+  // if over 60% of the coded blocks under this region are inter coded blocks,
+  // skip the rdo for inter-sdp
+  if (total_count * 0.7 < inter_mode_count) return;
+
   pc_tree->region_type = INTRA_REGION;
   // store the current best partitioning
   PARTITION_TYPE cur_best_partitioning = pc_tree->partitioning;
@@ -8962,7 +9034,8 @@ BEGIN_PARTITION_SEARCH:
       pc_tree->parent->region_type == MIXED_INTER_INTRA_REGION &&
       xd->tree_type != CHROMA_PART)
     partition_none_allowed = 0;
-  search_none_after_rect &= (xd->tree_type != CHROMA_PART);
+  if (!frame_is_intra_only(cm) && pc_tree->region_type == INTRA_REGION)
+    search_none_after_rect &= (xd->tree_type != CHROMA_PART);
   if (!search_none_after_rect && !search_none_after_split &&
       partition_none_allowed) {
 #else
@@ -9348,45 +9421,6 @@ BEGIN_PARTITION_SEARCH:
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS && !defined(NDEBUG)
 
-#if CONFIG_INTER_SDP_DEBUG
-  // record the partitioning tree
-  int tracked_partition_path = 0;
-  if (mi_row == 80 && mi_col == 30 && cm->current_frame.order_hint == 16 &&
-      bsize == BLOCK_8X16 && pc_tree->parent) {
-    PC_TREE *pc_tree_1_parent = pc_tree->parent;
-    if (pc_tree_1_parent &&
-        pc_tree_1_parent->region_type == MIXED_INTER_INTRA_REGION &&
-        pc_tree_1_parent->block_size == BLOCK_32X16) {
-      PC_TREE *pc_tree_2_parent = pc_tree_1_parent->parent;
-      if (pc_tree_2_parent &&
-          pc_tree_2_parent->region_type == MIXED_INTER_INTRA_REGION &&
-          pc_tree_2_parent->block_size == BLOCK_32X32) {
-        // 3rd parent
-        PC_TREE *pc_tree_3_parent = pc_tree_2_parent->parent;
-        if (pc_tree_3_parent &&
-            pc_tree_3_parent->region_type == MIXED_INTER_INTRA_REGION &&
-            pc_tree_3_parent->block_size == BLOCK_64X32) {
-          PC_TREE *pc_tree_4_parent = pc_tree_3_parent->parent;
-          if (pc_tree_4_parent &&
-              pc_tree_4_parent->region_type == MIXED_INTER_INTRA_REGION &&
-              pc_tree_4_parent->block_size == BLOCK_64X64) {
-            PC_TREE *pc_tree_5_parent = pc_tree_4_parent->parent;
-            if (pc_tree_5_parent &&
-                pc_tree_5_parent->region_type == MIXED_INTER_INTRA_REGION &&
-                pc_tree_5_parent->block_size == BLOCK_128X64) {
-              PC_TREE *pc_tree_6_parent = pc_tree_5_parent->parent;
-              if (pc_tree_6_parent &&
-                  pc_tree_6_parent->region_type == MIXED_INTER_INTRA_REGION &&
-                  pc_tree_6_parent->block_size == BLOCK_128X128) {
-                tracked_partition_path = 1;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-#endif  // CONFIG_INTER_SDP
 #if CONFIG_INTER_SDP
   if (frame_is_intra_only(cm)) pc_tree->inter_sdp_allowed_flag = 0;
   if (!frame_is_intra_only(cm) &&
@@ -9480,19 +9514,10 @@ BEGIN_PARTITION_SEARCH:
   // Reset the PC_TREE deallocation flag.
   int pc_tree_dealloc = 0;
 
-  //#if CONFIG_INTER_SDP
-  //  const int finished_sb_encoding =
-  //      (bsize == cm->seq_params.sb_size) &&
-  //      (frame_is_intra_only(cm) ||
-  //       (!frame_is_intra_only(cm) &&
-  //        pc_tree->region_type == MIXED_INTER_INTRA_REGION));
-  //#endif
-
   // If a valid partition is found and reconstruction is required for future
   // sub-blocks in the same group.
   if (part_search_state.found_best_partition && pc_tree->index != 3) {
     if (bsize == cm->sb_size) {
-      //#endif
       // Encode the superblock.
       const int emit_output = multi_pass_mode != SB_DRY_PASS;
       const RUN_TYPE run_type = emit_output ? OUTPUT_ENABLED : DRY_RUN_NORMAL;

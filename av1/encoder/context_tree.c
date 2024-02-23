@@ -1178,7 +1178,7 @@ PC_TREE *counterpart_from_different_partition(PC_TREE *pc_tree,
   result = look_for_counterpart_helper(pc_tree->vertical3[cur_region_type][0],
                                        target);
   if (result) return result;
-#else  // CONFIG_INTER_SDP
+#else
   result = look_for_counterpart_helper(pc_tree->split[0], target);
   if (result) return result;
   result = look_for_counterpart_helper(pc_tree->horizontal[0], target);

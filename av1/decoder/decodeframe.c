@@ -2848,10 +2848,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
           parent->region_type != INTRA_REGION &&
           ptree->inter_sdp_allowed_flag &&
           is_bsize_allowed_for_inter_sdp(bsize, ptree->partition)) {
-        const int plane = xd->tree_type == CHROMA_PART;
-        const int ctx = get_intra_region_context(xd, mi_row, mi_col, bsize);
+        const int ctx = get_intra_region_context(bsize);
         ptree->region_type =
-            aom_read_symbol(reader, xd->tile_ctx->region_type_cdf[plane][ctx],
+            aom_read_symbol(reader, xd->tile_ctx->region_type_cdf[ctx],
                             REGION_TYPES, ACCT_INFO("region_type"));
         if (ptree->region_type == INTRA_REGION) xd->tree_type = LUMA_PART;
       } else if (!frame_is_intra_only(cm)) {
@@ -3151,12 +3150,6 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 
   if (parse_decode_flag & 1)
     update_ext_partition_context(xd, mi_row, mi_col, subsize, bsize, partition);
-#if CONFIG_INTER_SDP
-  if ((parse_decode_flag & 1) && partition == PARTITION_NONE &&
-      !frame_is_intra_only(cm)) {
-    update_intra_region_context(xd, mi_row, mi_col, bsize, ptree->region_type);
-  }
-#endif  // CONFIG_INTER_SDP
 }
 
 static AOM_INLINE void setup_bool_decoder(

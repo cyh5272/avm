@@ -65,7 +65,7 @@ enum {
 extern FILE *file_enc;
 extern FILE *file_dec;
 extern int is_decoding_process;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
 static INLINE int is_comp_ref_allowed(BLOCK_SIZE bsize) {
   return AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >= 8;
@@ -385,10 +385,6 @@ typedef struct CHROMA_REF_INFO {
   /*! \brief Stores the size of that the current chroma block needs to be coded
    * at. */
   BLOCK_SIZE bsize_base;
-  //#if CONFIG_INTER_SDP
-  //  /*! \brief The region type used for the current block. */
-  //  PARTITION_TYPE region_type;
-  //#endif
 } CHROMA_REF_INFO;
 
 #define MAX_TX_PARTITIONS 4
@@ -2394,10 +2390,6 @@ typedef struct macroblockd {
    * Note: These contain actual data, NOT pointers.
    */
   PARTITION_CONTEXT left_partition_context[MAX_MB_PLANE][MAX_MIB_SIZE];
-#if CONFIG_INTER_SDP
-  INTRA_REGION_CONTEXT *above_intra_region_context;
-  INTRA_REGION_CONTEXT left_intra_region_context[MAX_MIB_SIZE];
-#endif  // CONFIG_INTER_SDP
 #if !CONFIG_TX_PARTITION_CTX
   /*!
    * Transform contexts for the above blocks.

@@ -456,31 +456,18 @@ static const aom_cdf_prob
 #endif  // CONFIG_AIMC
 
 #if CONFIG_INTER_SDP
-static aom_cdf_prob default_region_type_cdf[PARTITION_STRUCTURE_NUM]
-                                           [INTER_SDP_BSIZE_GROUP]
+static aom_cdf_prob default_region_type_cdf[INTER_SDP_BSIZE_GROUP]
                                            [CDF_SIZE(REGION_TYPES)] = {
-                                             // Luma
-                                             { // w * h <= 64
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 128
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 256
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 512
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 1024
-                                               { AOM_CDF2(16384), 0 } },
-                                             // Chroma
-                                             { // w * h <= 64
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 128
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 256
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 512
-                                               { AOM_CDF2(16384), 0 },
-                                               // w * h <= 1024
-                                               { AOM_CDF2(16384), 0 } }
+                                             // w * h <= 64
+                                             { AOM_CDF2(16384), 0 },
+                                             // w * h <= 128
+                                             { AOM_CDF2(16384), 0 },
+                                             // w * h <= 256
+                                             { AOM_CDF2(16384), 0 },
+                                             // w * h <= 512
+                                             { AOM_CDF2(16384), 0 },
+                                             // w * h <= 1024
+                                             { AOM_CDF2(16384), 0 }
                                            };
 #endif  // CONFIG_INTER_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS

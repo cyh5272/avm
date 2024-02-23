@@ -100,12 +100,9 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, const MACROBLOCKD *xd,
                          ModeCosts *mode_costs, FRAME_CONTEXT *fc) {
   int i, j;
 #if CONFIG_INTER_SDP
-  for (int plane_index = (xd->tree_type == CHROMA_PART);
-       plane_index < PARTITION_STRUCTURE_NUM; plane_index++) {
-    for (i = 0; i < INTER_SDP_BSIZE_GROUP; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->region_type_cost[plane_index][i],
-                               fc->region_type_cdf[plane_index][i], NULL);
-    }
+  for (i = 0; i < INTER_SDP_BSIZE_GROUP; ++i) {
+    av1_cost_tokens_from_cdf(mode_costs->region_type_cost[i],
+                             fc->region_type_cdf[i], NULL);
   }
 #endif
 #if CONFIG_EXT_RECUR_PARTITIONS

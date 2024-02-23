@@ -837,8 +837,7 @@ typedef struct {
   /**@{*/
 #if CONFIG_INTER_SDP
   //! Cost for coding the region type.
-  int region_type_cost[PARTITION_STRUCTURE_NUM][INTER_SDP_BSIZE_GROUP]
-                      [REGION_TYPES];
+  int region_type_cost[INTER_SDP_BSIZE_GROUP][REGION_TYPES];
 #endif  // CONFIG_INTER_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
   /*! Cost for sending split token. */

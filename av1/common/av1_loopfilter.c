@@ -652,7 +652,7 @@ static TX_SIZE set_lpf_parameters(
                 plane, mi_row, mi_col, pv_ts, edge_dir, pv_row, pv_col,
                 tree_type, mode_step, prev_bsize_base, mi_prev->region_type);
           }*/
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
           const uint32_t pv_q =
               av1_get_filter_q(&cm->lf_info, edge_dir, plane, mi_prev);
@@ -790,7 +790,7 @@ static TX_SIZE set_lpf_parameters(
                       "\n",
                       plane, mi_row, mi_col, ts, clipped_ts, pv_ts);
             }*/
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
             if (TX_4X4 >= min_ts) {
               params->filter_length = 4;
             } else if (TX_8X8 == min_ts) {
@@ -881,7 +881,7 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
     file_temp = file_dec;
   else
     file_temp = NULL;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
   for (int y = 0; y < y_range; y++) {
     uint16_t *p = dst_ptr + y * MI_SIZE * dst_stride;
     for (int x = 0; x < x_range;) {
@@ -912,7 +912,7 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
                 plane, mi_row, mi_col, curr_y, curr_x, tx_size,
                 params.filter_length);
       }*/
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
       const aom_bit_depth_t bit_depth = cm->seq_params.bit_depth;
       if (params.filter_length) {
@@ -944,7 +944,7 @@ void av1_filter_block_plane_vert(const AV1_COMMON *const cm,
       p += dst_stride;
     }
   }*/
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 }
 
 void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
@@ -967,7 +967,7 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
     file_temp = file_dec;
   else
     file_temp = NULL;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
   for (int x = 0; x < x_range; x++) {
     uint16_t *p = dst_ptr + x * MI_SIZE;
     for (int y = 0; y < y_range;) {
@@ -1000,7 +1000,7 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
       //          plane, mi_row, mi_col, curr_y, curr_x, tx_size,
       //          params.filter_length);
       //}
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
       if (params.filter_length) {
         aom_highbd_lpf_horizontal_generic_c(p, dst_stride, params.filter_length,
@@ -1033,7 +1033,7 @@ void av1_filter_block_plane_horz(const AV1_COMMON *const cm,
       p += dst_stride;
     }
   }*/
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 }
 
 void av1_filter_block_plane_vert_test(const AV1_COMMON *const cm,

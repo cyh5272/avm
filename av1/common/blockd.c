@@ -22,7 +22,7 @@
 FILE *file_enc = NULL;
 FILE *file_dec = NULL;
 int is_decoding_process = -1;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP_DEBUG
 
 #if CONFIG_AIMC
 PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi) {
