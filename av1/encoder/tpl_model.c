@@ -170,7 +170,11 @@ static uint32_t motion_estimation(AV1_COMP *cpi, MACROBLOCK *x,
 #endif
 #endif
                                      search_site_cfg,
-                                     /*fine_search_interval=*/0);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	  /*fine_search_interval=*/0, 0);
+#else
+	  /*fine_search_interval=*/0);
+#endif
   SEARCH_METHODS search_method = tpl_sf->search_method;
 #if CONFIG_FLEX_MVRES
   // MV search of flex MV precision is supported only for NSTEP or DIAMOND
@@ -191,7 +195,11 @@ static uint32_t motion_estimation(AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_FLEX_MVRES
                                     pb_mv_precision,
 #endif
-                                    cost_list);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	  cost_list, 0);
+#else
+	  cost_list);
+#endif
   ms_params.forced_stop = tpl_sf->subpel_force_stop;
   ms_params.var_params.subpel_search_type = USE_2_TAPS;
   ms_params.mv_cost_params.mv_cost_type = MV_COST_NONE;
@@ -233,6 +241,7 @@ static int is_alike_mv(int_mv candidate_mv, center_mv_t *center_mvs,
 
   return 0;
 }
+
 
 static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
                                        int mi_col, BLOCK_SIZE bsize,
@@ -437,6 +446,9 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
     av1_init_inter_params(&inter_pred_params, bw, bh, mi_row * MI_SIZE,
                           mi_col * MI_SIZE, 0, 0, xd->bd, 0, &tpl_data->sf,
                           &ref_buf, kernel);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
     inter_pred_params.conv_params = get_conv_params(0, 0, xd->bd);
 
     av1_enc_build_one_inter_predictor(predictor, bw, &best_rfidx_mv.as_mv,
@@ -488,6 +500,9 @@ static AOM_INLINE void mode_estimation(AV1_COMP *cpi, MACROBLOCK *x, int mi_row,
     av1_init_inter_params(&inter_pred_params, bw, bh, mi_row * MI_SIZE,
                           mi_col * MI_SIZE, 0, 0, xd->bd, 0, &tpl_data->sf,
                           &ref_buf, kernel);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
     inter_pred_params.conv_params = get_conv_params(0, 0, xd->bd);
 
     av1_enc_build_one_inter_predictor(dst_buffer, dst_buffer_stride,
@@ -889,6 +904,7 @@ static AOM_INLINE void mc_flow_dispenser(AV1_COMP *cpi) {
   const BLOCK_SIZE bsize = convert_length_to_bsize(cpi->tpl_data.tpl_bsize_1d);
   const TX_SIZE tx_size = max_txsize_lookup[bsize];
   const int mi_height = mi_size_high[bsize];
+
   for (int mi_row = 0; mi_row < mi_params->mi_rows; mi_row += mi_height) {
     // Motion estimation row boundary
     av1_set_mv_row_limits(mi_params, &x->mv_limits, mi_row, mi_height,
@@ -991,6 +1007,7 @@ static AOM_INLINE void init_gop_frames_for_tpl(
       if (buf == NULL) break;
       tpl_frame->gf_picture = &buf->img;
     }
+
     // 'cm->current_frame.frame_number' is the display number
     // of the current frame.
     // 'anc_frame_offset' is the number of frames displayed so

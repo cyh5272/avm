@@ -26,6 +26,25 @@ static void extend_plane_high(uint16_t *const src, int src_stride, int width,
   int i;
   const int linesize = extend_left + extend_right + width;
 
+#if 0
+  {
+    printf("\textend_plane_high: %d\n", height);
+    if (height == 360) {
+      int dbg;
+      dbg = 1;
+
+      long long int sum = 0;
+      for (int r = 0; r < height; r++) {
+        for (int c = 0; c < width; c++) {
+          sum += src[r * src_stride + c];
+        }
+      }
+
+      printf("src: %lld ", sum);
+    }
+  }
+#endif
+
   /* copy the left and right most columns out */
   uint16_t *src_ptr1 = src;
   uint16_t *src_ptr2 = src + width - 1;
@@ -58,6 +77,25 @@ static void extend_plane_high(uint16_t *const src, int src_stride, int width,
     memcpy(dst_ptr2, src_ptr2, linesize * sizeof(uint16_t));
     dst_ptr2 += src_stride;
   }
+
+#if 0
+  {
+    if (height == 360) {
+      int dbg;
+      dbg = 1;
+
+      long long int sum = 0;
+      for (int r = -extend_top; r < (height + extend_bottom); r++) {
+        for (int c = -extend_left; c < (width + extend_right); c++) {
+          sum += src[r * src_stride + c];
+        }
+      }
+
+      printf("dst: %lld ", sum);
+      printf("\n");
+    }
+  }
+#endif
 }
 
 void aom_yv12_extend_frame_borders_c(YV12_BUFFER_CONFIG *ybf,

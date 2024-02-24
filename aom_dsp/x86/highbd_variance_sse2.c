@@ -649,6 +649,9 @@ void aom_highbd_upsampled_pred_sse2(MACROBLOCKD *xd,
           &inter_pred_params, width, height, mi_y >> pd->subsampling_y,
           mi_x >> pd->subsampling_x, pd->subsampling_x, pd->subsampling_y,
           xd->bd, is_intrabc, sf, pre_buf, filters);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+      av1_init_phase_offset(&inter_pred_params, cm);
+#endif
       av1_enc_build_one_inter_predictor(comp_pred, width, mv,
                                         &inter_pred_params);
       return;
@@ -722,10 +725,18 @@ void aom_highbd_comp_avg_upsampled_pred_sse2(
     MACROBLOCKD *xd, const struct AV1Common *const cm, int mi_row, int mi_col,
     const MV *const mv, uint16_t *comp_pred16, const uint16_t *pred, int width,
     int height, int subpel_x_q3, int subpel_y_q3, const uint16_t *ref,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+    int ref_stride, int bd, int subpel_search, int is_scaled_ref) {
+#else
     int ref_stride, int bd, int subpel_search) {
+#endif
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, mv, comp_pred16, width,
                             height, subpel_x_q3, subpel_y_q3, ref, ref_stride,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+                            bd, subpel_search, is_scaled_ref);
+#else
                             bd, subpel_search, 0);
+#endif
   /*The total number of pixels must be a multiple of 8 (e.g., 4x4).*/
   assert(!(width * height & 7));
   int n = width * height >> 3;
@@ -806,12 +817,20 @@ void aom_highbd_dist_wtd_comp_avg_upsampled_pred_sse2(
     const MV *const mv, uint16_t *comp_pred16, const uint16_t *pred, int width,
     int height, int subpel_x_q3, int subpel_y_q3, const uint16_t *ref,
     int ref_stride, int bd, const DIST_WTD_COMP_PARAMS *jcp_param,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+    int subpel_search, int is_scaled_ref) {
+#else
     int subpel_search) {
+#endif    
   int n;
   int i;
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, mv, comp_pred16, width,
                             height, subpel_x_q3, subpel_y_q3, ref, ref_stride,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+                            bd, subpel_search, is_scaled_ref);
+#else
                             bd, subpel_search, 0);
+#endif                            
   assert(!(width * height & 7));
   n = width * height >> 3;
 

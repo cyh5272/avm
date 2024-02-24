@@ -2748,6 +2748,7 @@ static void search_tx_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
         if (txfm_param.sec_tx_type > 0) continue;
       }
 #endif  // CONFIG_ATC_DCTX_ALIGNED
+
       // If rd cost based on coeff rate alone is already more than best_rd,
       // terminate early.
       if (RDCOST(x->rdmult, rate_cost, 0) > best_rd) continue;

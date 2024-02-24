@@ -333,6 +333,7 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
     const MV mv = mbmi->mv[ref].as_mv;
     int skip_hor_plane = 0;
     int skip_ver_plane = 0;
+
     for (int plane_idx = 0; plane_idx < AOMMAX(1, (num_planes - 1));
          ++plane_idx) {
       struct macroblockd_plane *const pd = &xd->plane[plane_idx];
@@ -344,6 +345,7 @@ static INLINE void calc_interp_skip_pred_flag(MACROBLOCK *const x,
                                     0,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                                     pd->subsampling_x, pd->subsampling_y);
+
       const int sub_x = (mv_q4.col & SUBPEL_MASK) << SCALE_EXTRA_BITS;
       const int sub_y = (mv_q4.row & SUBPEL_MASK) << SCALE_EXTRA_BITS;
       skip_hor_plane |= ((sub_x == 0) << plane_idx);

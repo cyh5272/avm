@@ -105,6 +105,7 @@ double av1_estimate_noise_from_single_plane(const YV12_BUFFER_CONFIG *frame,
  *
  * \return Whether temporal filtering is successfully done.
  */
+
 int av1_temporal_filter(AV1_COMP *cpi, const int filter_frame_lookahead_idx,
                         int *show_existing_arf);
 

@@ -51,6 +51,8 @@ static AOM_INLINE void suppress_active_map(AV1_COMP *cpi) {
 
 static AOM_INLINE void set_mb_mi(CommonModeInfoParams *mi_params, int width,
                                  int height) {
+
+
   // Ensure that the decoded width and height are both multiples of
   // 8 luma pixels (note: this may only be a multiple of 4 chroma pixels if
   // subsampling is used).
@@ -62,7 +64,6 @@ static AOM_INLINE void set_mb_mi(CommonModeInfoParams *mi_params, int width,
   mi_params->mi_cols = aligned_width >> MI_SIZE_LOG2;
   mi_params->mi_rows = aligned_height >> MI_SIZE_LOG2;
   mi_params->mi_stride = calc_mi_size(mi_params->mi_cols);
-
   mi_params->mb_cols = (mi_params->mi_cols + 2) >> 2;
   mi_params->mb_rows = (mi_params->mi_rows + 2) >> 2;
   mi_params->MBs = mi_params->mb_rows * mi_params->mb_cols;
@@ -105,7 +106,9 @@ static AOM_INLINE void enc_free_mi(CommonModeInfoParams *mi_params) {
 
 static AOM_INLINE void enc_set_mb_mi(CommonModeInfoParams *mi_params, int width,
                                      int height) {
+
   const int is_4k_or_larger = AOMMIN(width, height) >= 2160;
+
   mi_params->mi_alloc_bsize = is_4k_or_larger ? BLOCK_8X8 : BLOCK_4X4;
 
   set_mb_mi(mi_params, width, height);
@@ -902,7 +905,11 @@ static AOM_INLINE void set_size_independent_vars(AV1_COMP *cpi) {
 
 static AOM_INLINE void release_scaled_references(AV1_COMP *cpi) {
   // TODO(isbs): only refresh the necessary frames, rather than all of them
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+  for (int i = 0; i < INTER_REFS_PER_FRAME * (SUPERRES_SCALES + 1); ++i) {
+#else
   for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
+#endif
     RefCntBuffer *const buf = cpi->scaled_ref_buf[i];
     if (buf != NULL) {
       --buf->ref_count;

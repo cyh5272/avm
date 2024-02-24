@@ -457,7 +457,7 @@ if (aom_config("CONFIG_PEF") eq "yes") {
 
 # WARPED_MOTION / GLOBAL_MOTION functions
 
-add_proto qw/void av1_highbd_warp_affine/, "const int32_t *mat, const uint16_t *ref, int width, int height, int stride, uint16_t *pred, int p_col, int p_row, int p_width, int p_height, int p_stride, int subsampling_x, int subsampling_y, int bd, ConvolveParams *conv_params, int16_t alpha, int16_t beta, int16_t gamma, int16_t delta";
+add_proto qw/void av1_highbd_warp_affine/, "const int32_t *mat, const uint16_t *ref, int width, int height, int stride, uint16_t *pred, int p_col, int p_row, int p_width, int p_height, int p_stride, int subsampling_x, int subsampling_y, int bd, ConvolveParams *conv_params, int16_t alpha, int16_t beta, int16_t gamma, int16_t delta, const int x_step_qn, const int y_step_qn";
 specialize qw/av1_highbd_warp_affine sse4_1 avx2/;
 
 if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
@@ -485,6 +485,7 @@ add_proto qw/void av1_highbd_dist_wtd_convolve_x/, "const uint16_t *src, int src
 add_proto qw/void av1_highbd_dist_wtd_convolve_y/, "const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w, int h, const InterpFilterParams *filter_params_y, const int subpel_y_qn, ConvolveParams *conv_params, int bd";
 add_proto qw/void av1_highbd_dist_wtd_convolve_2d_copy/, "const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w, int h, ConvolveParams *conv_params, int bd";
 add_proto qw/void av1_highbd_convolve_2d_scale/, "const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w, int h, const InterpFilterParams *filter_params_x, const InterpFilterParams *filter_params_y, const int subpel_x_qn, const int x_step_qn, const int subpel_y_qn, const int y_step_qn, ConvolveParams *conv_params, int bd";
+add_proto qw/void av1_highbd_convolve_2d_scale_strided/, "const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w, int h, const InterpFilterParams *filter_params_x, const InterpFilterParams *filter_params_y, const int subpel_x_qn, const int x_step_qn, const int subpel_y_qn, const int y_step_qn, ConvolveParams *conv_params, int bd";
 
 specialize qw/av1_highbd_dist_wtd_convolve_2d sse4_1 avx2/;
 specialize qw/av1_highbd_dist_wtd_convolve_x sse4_1 avx2/;
@@ -494,6 +495,7 @@ specialize qw/av1_highbd_convolve_2d_sr ssse3 avx2/;
 specialize qw/av1_highbd_convolve_x_sr ssse3 avx2/;
 specialize qw/av1_highbd_convolve_y_sr ssse3 avx2/;
 specialize qw/av1_highbd_convolve_2d_scale sse4_1/;
+specialize qw/av1_highbd_convolve_2d_scale_strided sse4_1/;
 
 # INTRA_EDGE functions
 add_proto qw/void av1_filter_intra_edge_high/, "uint16_t *p, int sz, int strength";

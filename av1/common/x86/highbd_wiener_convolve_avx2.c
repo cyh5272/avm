@@ -2551,6 +2551,9 @@ void av1_fill_tskip_feature_accumulator_avx2(
   int col_base = col_offset + tskip_lead;
   const int tskip_length = tskip_lead + tskip_lag + 1;
   assert(col_base >= 0);
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  assert(tskip_sum_buf[col_base] >= 0);   
+#endif
   tskip_feature_accum[0] += tskip_sum_buf[col_base];
   col_base++;
   int cl = col_base - tskip_length;

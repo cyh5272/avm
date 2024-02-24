@@ -201,6 +201,92 @@ set_aom_config_var(
   CONFIG_FLEXIBLE_RU_SIZE 1
   "AV2 experiment flag to choose RU size between 128x128, 256x256 and 512x512")
 
+set_aom_config_var(CONFIG_2D_SR 1 NUMBER
+                   "AV2 2D super resolution experiment flag.")
+set_aom_config_var(CONFIG_2D_SR_SCALE_EXT 1 NUMBER
+                   "AV2 2D super resolution scaling range extension flag.")
+set_aom_config_var(CONFIG_2D_SR_FRAME_WISE_SWITCHING 1 NUMBER
+                   "QP offset adjustment for framewise scaling factor select")
+set_aom_config_var(CONFIG_2D_SR_FRAME_WISE_SWITCHING_SSE_MATCHING 1 NUMBER
+                   "Fix on SSE value matching")                   
+set_aom_config_var(CONFIG_2D_SR_RESAMPLER_FIX 1 NUMBER
+                   "Co-sited Chroma position for Lanczos resampler")       
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_FIX 1 NUMBER
+                   "Fix on restoration with SR")
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_BUG_FIX 1 NUMBER
+                   "BUG Fix on restoration with SR")
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_BUG_FIX_ON_STRIDE 1 NUMBER
+                   "BUG Fix on stride of restoration with SR")
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB 1 NUMBER
+                   "BUG Fix on mismatch of restoration with SR")
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE 1 NUMBER
+                   "Flexible RU Size adaptation for SR")                  
+set_aom_config_var(CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE 1 NUMBER
+                   "Scaling Bit Estimation for SR")
+set_aom_config_var(CONFIG_2D_SR_SET_TX_SKIP_ZERO 1 NUMBER
+                   "Improvement of pc wiener with SR")
+set_aom_config_var(CONFIG_2D_SR_PC_WIENER_ENABLE_FOR_SR 1 NUMBER
+                   "Enable PC Wiener when SR is used")
+set_aom_config_var(CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR 1 NUMBER
+                   "Save boundaries for restoration after SR")
+set_aom_config_var(CONFIG_2D_SR_FIX_COMPOUND_ME 1 NUMBER
+                   "Fix on Motion Esitmation for compound prediction with SR")
+set_aom_config_var(CONFIG_2D_SR_SECOND_PRED_FIX 1 NUMBER
+                   "Fix on second prediction for compound mode")        
+set_aom_config_var(CONFIG_2D_SR_REF_IDX_FIX 1 NUMBER
+                   "Fix on ref idx")
+set_aom_config_var(CONFIG_2D_SR_RESTORE_SCALED_BUF 1 NUMBER
+                   "Restore scaled buffers")            
+set_aom_config_var(CONFIG_2D_SR_RESTORE_UNSCALED_BUF 1 NUMBER
+                   "Restore unscaled buffers")            
+set_aom_config_var(CONFIG_2D_SR_TILE_CONFIG 1 NUMBER
+                   "Tile off when SR is used")
+set_aom_config_var(CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES_FIX 1 NUMBER
+                   "Fix on Allow TIP direct with SR")              
+set_aom_config_var(CONFIG_2D_SR_BAWP_FIX 1 NUMBER
+                   "Fix on BAWP for SR")
+set_aom_config_var(CONFIG_2D_SR_REF_MVS_INTER_FIX 1 NUMBER
+                   "Fix on ref mvs inter for SR")
+set_aom_config_var(CONFIG_2D_SR_ZERO_MV_EXACT_MATCH 1 NUMBER
+                   "Force zero MV exact match for IL and OOL")                   
+set_aom_config_var(CONFIG_2D_SR_MC_PHASE_FIX 1 NUMBER
+                   "Fix MC phase with SR")
+set_aom_config_var(CONFIG_2D_SR_SUBSAMPLE_FOR_WARP 1 NUMBER
+                   "Enable subsampling for warp modes with SR.")
+set_aom_config_var(CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP 1 NUMBER
+                    "Enable scaled reference support for 1.5x warp modes with SR.")
+set_aom_config_var(CONFIG_2D_SR_ZERO_PHASE 1 NUMBER
+                   "Use zero phase with downsampler, upsampler and MC in SR")
+set_aom_config_var(CONFIG_2D_SR_PHASE_ADJUSTMENT 1 NUMBER
+                   "Match OOL phase in IL 2x, 3x, 4x, 6x")
+set_aom_config_var(CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT 1 NUMBER
+                   "Enable scaled ref support in superres AUTO mode")
+set_aom_config_var(CONFIG_2D_SR_AUTO_DISABLE_SPEEDUP 1 NUMBER 
+                   "Disable q threshold based speedup for AUTO mode")
+set_aom_config_var(CONFIG_2D_SR_LIMIT_SCALE_FACTORS 1 NUMBER
+                   "Limit scale factors")
+set_aom_config_var(CONFIG_2D_SR_CLAMP_MV_FOR_TIP 1 NUMBER
+                   "Clamp MV instead of Sample position for 2x, 3x, 4x, 6x")
+set_aom_config_var(CONFIG_2D_SR_LANCZOS_RESAMPLER_Y4M_CONVERT_8BIT_TO_10BIT 1 NUMBER
+                   "Convert 8-bit content to 10-bit before resampling")
+set_aom_config_var(CONFIG_2D_SR_LANCZOS_RESAMPLER_Y4M_ALIGN_8 1 NUMBER
+                   "Use picture sizes derived in in-loop processing")
+set_aom_config_var(CONFIG_2D_SR_AUTO_DISABLE_SCREEN_CONTENT_TOOLS_FOR_NON_1x 1 NUMBER "Disable screen content for non 1x in AUTO MODE")
+set_aom_config_var(CONFIG_REFINEMV 1 NUMBER "Enable refinemv modes")
+set_aom_config_var(CONFIG_2D_SR_STRIDED_CONV_SPEED 1 NUMBER
+                    "Speedup strided convolution")
+set_aom_config_var(CONFIG_2D_SR_ADJUST_DELTA_QP 1 NUMBER
+                    "Adjust delta QP for SR")
+set_aom_config_var(CONFIG_2D_SR_USE_GOOD_INDICES 1 NUMBER
+                    "Use good_indices for SR")
+
+set_aom_config_var(
+  CONFIG_ACROSS_SCALE_TPL_MVS 1 NUMBER
+  "AV2 experiment flag to enable across scale temporal mv projection.")
+set_aom_config_var(
+  CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES 1 NUMBER
+  "AV2 experiment flag to enable TIP direct mode across scale.")
+
 # Source of throughput analysis : CWG-B065
 set_aom_config_var(CONFIG_THROUGHPUT_ANALYSIS 0
                    "AV2 experiment flag to measure throughput.")
@@ -219,7 +305,7 @@ set_aom_config_var(CONFIG_IMPROVED_JMVD 1
                    "Enable joint MVD coding with multiple scaling factors")
 set_aom_config_var(
   CONFIG_PALETTE_IMPROVEMENTS
-  1
+  0
   "AV2 experiment flag for palette parsing independency and improved palette color map coding."
 )
 set_aom_config_var(CONFIG_SKIP_MODE_SSE_BUG_FIX 1
@@ -249,7 +335,6 @@ set_aom_config_var(CONFIG_D071_IMP_MSK_BLD 1
 set_aom_config_var(CONFIG_SKIP_TXFM_OPT 1
                    "Enable to optimize the signaling of skip_txfm")
 set_aom_config_var(CONFIG_CWP 1 "Enables compound weighted prediction.")
-set_aom_config_var(CONFIG_REFINEMV 1 "Enable refinemv modes")
 
 set_aom_config_var(CONFIG_EXPLICIT_TEMPORAL_DIST_CALC 1
                    "Enable to explicit temporal distance calculation")

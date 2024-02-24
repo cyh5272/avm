@@ -263,11 +263,31 @@ int64_t av1_calc_highbd_frame_error(const uint16_t *const ref, int stride,
                                     const uint16_t *const dst, int p_width,
                                     int p_height, int p_stride, int bd);
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+typedef struct SubpelParams {
+  int xs;
+  int ys;
+  int subpel_x;
+  int subpel_y;
+
+#if CONFIG_D071_IMP_MSK_BLD
+  int x0;  // top left sample horizontal cood.
+  int y0;  // top left sample vertical cood.
+  int x1;  // x0 + bw
+  int y1;  // y0 + bh
+#endif     // CONFIG_D071_IMP_MSK_BLD
+} SubpelParams;
+#endif
+
 void highbd_warp_plane(WarpedMotionParams *wm, const uint16_t *const ref,
                        int width, int height, int stride, uint16_t *const pred,
                        int p_col, int p_row, int p_width, int p_height,
                        int p_stride, int subsampling_x, int subsampling_y,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                       int bd, ConvolveParams *conv_params, const SubpelParams *subpel_params);
+#else
                        int bd, ConvolveParams *conv_params);
+#endif
 
 void warp_plane(WarpedMotionParams *wm, const uint8_t *const ref, int width,
                 int height, int stride, uint8_t *pred, int p_col, int p_row,
@@ -278,7 +298,11 @@ void av1_warp_plane(WarpedMotionParams *wm, int bd, const uint16_t *ref,
                     int width, int height, int stride, uint16_t *pred,
                     int p_col, int p_row, int p_width, int p_height,
                     int p_stride, int subsampling_x, int subsampling_y,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                    ConvolveParams *conv_params, const SubpelParams *subpel_params);
+#else
                     ConvolveParams *conv_params);
+#endif   
 
 int av1_find_projection(int np, const int *pts1, const int *pts2,
                         BLOCK_SIZE bsize, MV mv, WarpedMotionParams *wm_params,

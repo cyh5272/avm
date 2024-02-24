@@ -35,7 +35,6 @@ void av1_lookahead_destroy(struct lookahead_ctx *ctx) {
   if (ctx) {
     if (ctx->buf) {
       int i;
-
       for (i = 0; i < ctx->max_sz; i++) aom_free_frame_buffer(&ctx->buf[i].img);
       free(ctx->buf);
     }

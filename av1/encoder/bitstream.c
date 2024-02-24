@@ -2904,7 +2904,7 @@ static AOM_INLINE void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
   if (!mbmi->skip_txfm[xd->tree_type == CHROMA_PART]) {
     write_tokens_b(cpi, w, tok, tok_end);
   }
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER && !CONFIG_2D_SR_SET_TX_SKIP_ZERO
   else if (!is_global_intrabc_allowed(cm) && !cm->features.coded_lossless) {
     // Assert only when LR is enabled.
     assert(1 == av1_get_txk_skip(cm, xd->mi_row, xd->mi_col, 0, 0, 0));
@@ -3032,6 +3032,41 @@ static AOM_INLINE void write_partition(const AV1_COMMON *const cm,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 }
 
+
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+static AOM_INLINE void write_modes_sb_loop_restoration(
+	AV1_COMP *const cpi, aom_writer *const w,
+	int mi_row, int mi_col, BLOCK_SIZE bsize) {
+	const AV1_COMMON *const cm = &cpi->common;
+	const int num_planes = av1_num_planes(cm);
+	MACROBLOCKD *const xd = &cpi->td.mb.e_mbd;
+	assert(bsize == cm->seq_params.sb_size);
+
+	for (int plane = 0; plane < num_planes; plane++) {
+		int rcol0, rcol1, rrow0, rrow1;
+#if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
+                if ((cm->rst_info[plane].frame_restoration_type != RESTORE_NONE ||
+                     cm->rst_info[plane].frame_cross_restoration_type != RESTORE_NONE) &&
+#else
+		if (cm->rst_info[plane].frame_restoration_type != RESTORE_NONE &&
+#endif
+			av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
+				&rcol0, &rcol1, &rrow0, &rrow1)) {
+			const int rstride = cm->rst_info[plane].horz_units_per_tile;
+			for (int rrow = rrow0; rrow < rrow1; ++rrow) {
+				for (int rcol = rcol0; rcol < rcol1; ++rcol) {
+					const int runit_idx = rcol + rrow * rstride;
+					const RestorationUnitInfo *rui =
+						&cm->rst_info[plane].unit_info[runit_idx];
+					loop_restoration_write_sb_coeffs(cm, xd, rui, w, plane,
+						cpi->td.counts);
+				}
+			}
+		}
+	}
+}
+#endif
+
 static AOM_INLINE void write_modes_sb(
     AV1_COMP *const cpi, const TileInfo *const tile, aom_writer *const w,
     const TokenExtra **tok, const TokenExtra *const tok_end,
@@ -3064,6 +3099,9 @@ static AOM_INLINE void write_modes_sb(
   const int plane_start = get_partition_plane_start(xd->tree_type);
   const int plane_end =
       get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+  if (!av1_superres_scaled(cm)) {
+#endif
   for (int plane = plane_start; plane < plane_end; ++plane) {
     int rcol0, rcol1, rrow0, rrow1;
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
@@ -3086,6 +3124,9 @@ static AOM_INLINE void write_modes_sb(
       }
     }
   }
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+  }
+#endif
 
 #if CONFIG_EXT_RECUR_PARTITIONS
   write_partition(cm, xd, mi_row, mi_col, partition, bsize, ptree, ptree_luma,
@@ -3320,7 +3361,21 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
       av1_reset_loop_filter_delta(xd, num_planes);
     }
   }
-
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+  if (av1_superres_scaled(cm)) {
+	  int scaled_mi_row_end = mi_row_end * cm->superres_scale_denominator / SCALE_NUMERATOR;
+	  int scaled_mi_col_end = mi_col_end * cm->superres_scale_denominator / SCALE_NUMERATOR;
+	  for (int mi_row = mi_row_start; mi_row < scaled_mi_row_end;
+		  mi_row += cm->seq_params.mib_size) {
+//		  av1_zero_left_context(xd);
+		  for (int mi_col = mi_col_start; mi_col < scaled_mi_col_end;
+			  mi_col += cm->seq_params.mib_size) {
+//			  av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
+			  write_modes_sb_loop_restoration(cpi, w, mi_row, mi_col, cm->seq_params.sb_size);
+		  }
+	  }
+  }
+#endif
   for (int mi_row = mi_row_start; mi_row < mi_row_end;
        mi_row += cm->seq_params.mib_size) {
     const int sb_row_in_tile =
@@ -3532,7 +3587,7 @@ static AOM_INLINE void encode_restoration_mode(
     RestorationInfo *rsi = &cm->rst_info[0];
 
     assert(rsi->restoration_unit_size >= sb_size);
-    assert(RESTORATION_UNITSIZE_MAX == 256);
+	assert(RESTORATION_UNITSIZE_MAX == 256);
     if (sb_size == 64) {
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 64);
     }
@@ -3540,7 +3595,6 @@ static AOM_INLINE void encode_restoration_mode(
       aom_wb_write_bit(wb, rsi->restoration_unit_size > 128);
     }
   }
-
   if (num_planes > 1) {
     int s = AOMMIN(cm->seq_params.subsampling_x, cm->seq_params.subsampling_y);
     if (s && !chroma_none) {
@@ -4396,21 +4450,47 @@ static AOM_INLINE void write_superres_scale(const AV1_COMMON *const cm,
                                             struct aom_write_bit_buffer *wb) {
   const SequenceHeader *const seq_params = &cm->seq_params;
   if (!seq_params->enable_superres) {
+#if CONFIG_2D_SR
+    assert(cm->superres_scale_denominator == cm->superres_scale_numerator);
+#else   // CONFIG_2D_SR
     assert(cm->superres_scale_denominator == SCALE_NUMERATOR);
+#endif  // CONFIG_2D_SR
     return;
   }
 
   // First bit is whether to to scale or not
+#if CONFIG_2D_SR
+  if (cm->superres_scale_denominator == cm->superres_scale_numerator) {
+#else                         // CONFIG_2D_SR
   if (cm->superres_scale_denominator == SCALE_NUMERATOR) {
+#endif                        // CONFIG_2D_SR
     aom_wb_write_bit(wb, 0);  // no scaling
   } else {
     aom_wb_write_bit(wb, 1);  // scaling, write scale factor
+#if CONFIG_2D_SR
+    assert(cm->superres_scale_denominator > cm->superres_scale_numerator);
+#if CONFIG_2D_SR_SCALE_EXT
+    // Current across-scale prediction can handle downsampling factor <= 6
+    assert(cm->superres_scale_denominator <= 6 * cm->superres_scale_numerator);
+#else  // CONFIG_2D_SR_SCALE_EXT
+    // Current across-scale prediction can handle downsampling factor <= 2
+    assert(cm->superres_scale_denominator <= 2 * cm->superres_scale_numerator);
+#endif  // CONFIG_2D_SR_SCALE_EXT
+    assert(cm->superres_scale_index >= 0);
+    assert(cm->superres_scale_index < SUPERRES_SCALES);
+    assert(cm->superres_scale_denominator ==
+           superres_scales[cm->superres_scale_index].scale_denom);
+    assert(cm->superres_scale_numerator ==
+           superres_scales[cm->superres_scale_index].scale_num);
+    aom_wb_write_literal(wb, cm->superres_scale_index, SUPERRES_SCALE_BITS);
+#else   // CONFIG_2D_SR
     assert(cm->superres_scale_denominator >= SUPERRES_SCALE_DENOMINATOR_MIN);
     assert(cm->superres_scale_denominator <
            SUPERRES_SCALE_DENOMINATOR_MIN + (1 << SUPERRES_SCALE_BITS));
     aom_wb_write_literal(
         wb, cm->superres_scale_denominator - SUPERRES_SCALE_DENOMINATOR_MIN,
         SUPERRES_SCALE_BITS);
+#endif  // CONFIG_2D_SR
   }
 }
 
@@ -5362,8 +5442,10 @@ static AOM_INLINE void write_uncompressed_header_obu(
 #endif  // CONFIG_PEF
 #if CONFIG_TIP
       if (cm->seq_params.enable_tip) {
+#if !CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
         assert(IMPLIES(av1_superres_scaled(cm),
                        features->tip_frame_mode != TIP_FRAME_AS_OUTPUT));
+#endif  // !CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
         aom_wb_write_literal(wb, features->tip_frame_mode, 2);
         if (features->tip_frame_mode && cm->seq_params.enable_tip_hole_fill) {
           aom_wb_write_bit(wb, features->allow_tip_hole_fill);

@@ -162,6 +162,7 @@ typedef struct {
 
 extern const wedge_params_type av1_wedge_params_lookup[BLOCK_SIZES_ALL];
 
+#if !CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
 typedef struct SubpelParams {
   int xs;
   int ys;
@@ -175,6 +176,7 @@ typedef struct SubpelParams {
 #endif     // CONFIG_D071_IMP_MSK_BLD
 
 } SubpelParams;
+#endif
 
 struct build_prediction_ctxt {
   const AV1_COMMON *cm;
@@ -259,6 +261,15 @@ typedef struct InterPredParams {
 #if CONFIG_D071_IMP_MSK_BLD
   INTERINTER_COMPOUND_BORDER_DATA border_data;
 #endif  // CONFIG_D071_IMP_MSK_BLD
+
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  int posx_offset[2];
+  int posy_offset[2];
+#endif
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+  int mi_rows;
+  int mi_cols;
+#endif
 } InterPredParams;
 
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -330,6 +341,10 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
                            int is_intrabc, const struct scale_factors *sf,
                            const struct buf_2d *ref_buf,
                            InterpFilter interp_filter);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_init_phase_offset(InterPredParams *inter_pred_params,
+                           const AV1_COMMON *const cm);
+#endif
 
 #if CONFIG_WARP_REF_LIST
 // Check if the signaling of the warp delta parameters are allowed

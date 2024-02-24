@@ -88,6 +88,22 @@ static void enc_calc_subpel_params(const MV *const src_mv,
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
 
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif
+
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
     const int bottom = (pre_buf->height + AOM_INTERP_EXTEND)
@@ -96,11 +112,116 @@ static void enc_calc_subpel_params(const MV *const src_mv,
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const int bw = use_optflow_refinement
+                         ? inter_pred_params->orig_block_width
+                         : inter_pred_params->block_width;
+      const int bh = use_optflow_refinement ? inter_pred_params->orig_block_height : inter_pred_params->block_height;
+
+      MV mv_q4;
+      if (use_optflow_refinement) {
+        // optflow refinement always returns MVs with 1/16 precision so it is
+        // not necessary to shift the MV before clamping
+        mv_q4.row = (int16_t)ROUND_POWER_OF_TWO_SIGNED(src_mv->row * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + inter_pred_params->subsampling_y);
+        mv_q4.col = (int16_t)ROUND_POWER_OF_TWO_SIGNED(src_mv->col * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + inter_pred_params->subsampling_x);
+      } else {
+        mv_q4.row = (int16_t)(src_mv->row * (1 << (1 - inter_pred_params->subsampling_y)));
+        mv_q4.col = (int16_t)(src_mv->col * (1 << (1 - inter_pred_params->subsampling_x)));
+      }
+
+      int mi_row = inter_pred_params->pix_row / (MI_SIZE >> inter_pred_params->subsampling_y);
+      int mi_col = inter_pred_params->pix_col / (MI_SIZE >> inter_pred_params->subsampling_x);
+      int mb_to_top_edge = -GET_MV_SUBPEL(mi_row * MI_SIZE);
+      int mb_to_bottom_edge = GET_MV_SUBPEL((inter_pred_params->mi_rows - mi_row) * MI_SIZE - bh);
+      int mb_to_left_edge = -GET_MV_SUBPEL((mi_col * MI_SIZE));
+      int mb_to_right_edge = GET_MV_SUBPEL((inter_pred_params->mi_cols - mi_col) * MI_SIZE - bw);
+
+      const int spel_left = (AOM_INTERP_EXTEND + bw) << SUBPEL_BITS;
+      const int spel_right = spel_left - SUBPEL_SHIFTS;
+      const int spel_top = (AOM_INTERP_EXTEND + bh) << SUBPEL_BITS;
+      const int spel_bottom = spel_top - SUBPEL_SHIFTS;
+
+      const SubpelMvLimits mv_limits = {
+        mb_to_left_edge * (1 << (1 - inter_pred_params->subsampling_x)) - spel_left,
+        mb_to_right_edge * (1 << (1 - inter_pred_params->subsampling_x)) + spel_right,
+        mb_to_top_edge * (1 << (1 - inter_pred_params->subsampling_y)) - spel_top,
+        mb_to_bottom_edge * (1 << (1 - inter_pred_params->subsampling_y)) + spel_bottom
+      };
+
+      clamp_mv(&mv_q4, &mv_limits);
+
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
+
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_NO_SCALE) scale = 1;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+      inter_pred_params->conv_params.stride_scale = scale;
 
+      orig_pos_y = clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         top, bottom);
+      orig_pos_x = clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         left, right);
+#if CONFIG_D071_IMP_MSK_BLD
+      if (inter_pred_params->border_data.enable_bacp) {
+        // Get reference block top left coordinate.
+        subpel_params->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+        subpel_params->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+        // Get reference block bottom right coordinate.
+        subpel_params->x1 =
+          ((orig_pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+            SCALE_SUBPEL_BITS) +
+          scale;
+        subpel_params->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+          subpel_params->ys) >>
+          SCALE_SUBPEL_BITS) +
+          scale;
+    }
+#endif  // CONFIG_D071_IMP_MSK_BLD
+      *pre = pre_buf->buf0 +
+             (orig_pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
+             (orig_pos_x >> SCALE_SUBPEL_BITS);
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+#if CONFIG_D071_IMP_MSK_BLD
+      if (inter_pred_params->border_data.enable_bacp) {
+        // Get reference block top left coordinate.
+        subpel_params->x0 = pos_x >> SCALE_SUBPEL_BITS;
+        subpel_params->y0 = pos_y >> SCALE_SUBPEL_BITS;
+        // Get reference block bottom right coordinate.
+        subpel_params->x1 =
+          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+            SCALE_SUBPEL_BITS) +
+          1;
+        subpel_params->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
+          subpel_params->ys) >>
+          SCALE_SUBPEL_BITS) +
+          1;
+      }
+#endif  // CONFIG_D071_IMP_MSK_BLD
+      *pre = pre_buf->buf0 + (pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
+             (pos_x >> SCALE_SUBPEL_BITS);
+    }
+#else
 #if CONFIG_D071_IMP_MSK_BLD
     if (inter_pred_params->border_data.enable_bacp) {
       // Get reference block top left coordinate.
@@ -108,18 +229,18 @@ static void enc_calc_subpel_params(const MV *const src_mv,
       subpel_params->y0 = pos_y >> SCALE_SUBPEL_BITS;
       // Get reference block bottom right coordinate.
       subpel_params->x1 =
-          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
-           SCALE_SUBPEL_BITS) +
-          1;
+        ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+          SCALE_SUBPEL_BITS) +
+        1;
       subpel_params->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
-                                        subpel_params->ys) >>
-                           SCALE_SUBPEL_BITS) +
-                          1;
+        subpel_params->ys) >>
+        SCALE_SUBPEL_BITS) +
+        1;
     }
 #endif  // CONFIG_D071_IMP_MSK_BLD
-
     *pre = pre_buf->buf0 + (pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
            (pos_x >> SCALE_SUBPEL_BITS);
+#endif
 #if CONFIG_OPTFLOW_REFINEMENT || CONFIG_EXT_RECUR_PARTITIONS
   } else {
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
@@ -212,7 +333,12 @@ void enc_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
                              enc_calc_subpel_params);
 }
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_enc_build_inter_predictor_y(MACROBLOCKD *xd, int mi_row, int mi_col,
+                                     const struct AV1Common *const cm) {
+#else
 void av1_enc_build_inter_predictor_y(MACROBLOCKD *xd, int mi_row, int mi_col) {
+#endif
   const int mi_x = mi_col * MI_SIZE;
   const int mi_y = mi_row * MI_SIZE;
   struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
@@ -226,6 +352,9 @@ void av1_enc_build_inter_predictor_y(MACROBLOCKD *xd, int mi_row, int mi_col) {
   av1_init_inter_params(&inter_pred_params, pd->width, pd->height, mi_y, mi_x,
                         pd->subsampling_x, pd->subsampling_y, xd->bd, false, sf,
                         pd->pre, xd->mi[0]->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  av1_init_phase_offset(&inter_pred_params, cm);
+#endif
 
   inter_pred_params.conv_params = get_conv_params_no_round(
       0, AOM_PLANE_Y, xd->tmp_conv_dst, MAX_SB_SIZE, false, xd->bd);
@@ -379,6 +508,9 @@ static INLINE void build_obmc_prediction(MACROBLOCKD *xd, int rel_mi_row,
         &inter_pred_params, bw, bh, mi_y >> pd->subsampling_y,
         mi_x >> pd->subsampling_x, pd->subsampling_x, pd->subsampling_y, xd->bd,
         0, xd->block_ref_scale_factors[0], pre_buf, above_mbmi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, ctxt->cm);
+#endif
     inter_pred_params.conv_params = get_conv_params(0, j, xd->bd);
 
     av1_enc_build_one_inter_predictor(pd->dst.buf, pd->dst.stride, &mv,
@@ -440,9 +572,16 @@ void av1_build_obmc_inter_predictors_sb(const AV1_COMMON *cm, MACROBLOCKD *xd) {
                                   dst_stride2);
 }
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
+                                            int ref, uint16_t *dst,
+                                            int ext_dst_stride,
+                                            const struct AV1Common *const cm) {
+#else
 void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
                                             int ref, uint16_t *dst,
                                             int ext_dst_stride) {
+#endif
   assert(bsize < BLOCK_SIZES_ALL);
   const MB_MODE_INFO *mi = xd->mi[0];
   const int mi_row = xd->mi_row;
@@ -470,6 +609,10 @@ void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
       &inter_pred_params, bw, bh, mi_y >> pd->subsampling_y,
       mi_x >> pd->subsampling_x, pd->subsampling_x, pd->subsampling_y, xd->bd,
       0, xd->block_ref_scale_factors[ref], &pd->pre[ref], mi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  av1_init_phase_offset(&inter_pred_params, cm);
+#endif
+
   inter_pred_params.conv_params = get_conv_params(0, plane, xd->bd);
   av1_init_warp_params(&inter_pred_params, &warp_types, ref, xd, mi);
 

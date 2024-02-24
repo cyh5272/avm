@@ -55,6 +55,9 @@ typedef struct {
   int resize_width;
   int resize_height;
   uint8_t superres_denom;
+#if CONFIG_2D_SR
+  uint8_t superres_num;
+#endif  // CONFIG_2D_SR
 } size_params_type;
 
 enum {

@@ -1192,6 +1192,7 @@ static int tpl_worker_hook(void *arg1, void *unused) {
   TX_SIZE tx_size = max_txsize_lookup[bsize];
   int mi_height = mi_size_high[bsize];
   int num_active_workers = cpi->tpl_data.tpl_mt_sync.num_threads_working;
+
   for (int mi_row = thread_data->start * mi_height; mi_row < mi_params->mi_rows;
        mi_row += num_active_workers * mi_height) {
     // Motion estimation row boundary

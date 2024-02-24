@@ -234,6 +234,7 @@ static AOM_INLINE void model_rd_for_sb_with_curvfit(
                        &bw, &bh);
 
     sse = calculate_sse(xd, p, pd, bw, bh);
+
     model_rd_with_curvfit(cpi, x, plane_bsize, plane, sse, bw * bh, &rate,
                           &dist);
 

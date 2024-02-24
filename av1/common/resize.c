@@ -24,6 +24,9 @@
 #include "aom_scale/aom_scale.h"
 #include "av1/common/common.h"
 #include "av1/common/resize.h"
+#if CONFIG_2D_SR
+#include "av1/common/lanczos_resample.h"
+#endif  // CONFIG_2D_SR
 
 #include "config/aom_dsp_rtcd.h"
 #include "config/aom_scale_rtcd.h"
@@ -985,6 +988,112 @@ Error:
   aom_free(arrbuf2);
 }
 
+#if CONFIG_2D_SR
+#define LANCZOS_A_NORMATIVE_HOR_Y 5  // Normative hor Lanczos a Luma
+#define LANCZOS_A_NORMATIVE_HOR_C 5  // Normative hor Lanczos a Chroma
+#define LANCZOS_A_NORMATIVE_VER_Y 5  // Normative ver Lanczos a Luma
+#define LANCZOS_A_NORMATIVE_VER_C 5  // Normative ver Lanczos a Chroma
+
+#define LANCZOS_A_NONNORMATIVE_HOR_Y 5  // Non-normative hor Lanczos a Luma
+#define LANCZOS_A_NONNORMATIVE_HOR_C 5  // Non-normative hor Lanczos a Chroma
+#define LANCZOS_A_NONNORMATIVE_VER_Y 5  // Non-normative ver Lanczos a Luma
+#define LANCZOS_A_NONNORMATIVE_VER_C \
+  5  // Non-normative ver Lanczos a Chroma
+     // Chroma
+void av1_resample_plane_2d_lanczos(const uint16_t *const input, int height,
+                                   int width, int in_stride, uint16_t *output,
+                                   int height2, int width2, int out_stride,
+                                   int subx, int suby, int bd, int denom,
+                                   int num, int lanczos_a_hor,
+                                   int lanczos_a_ver) {
+  int coeff_prec_bits = 14;
+  int extra_prec_bits = 2;
+  WIN_TYPE win = WIN_LANCZOS;
+  EXT_TYPE ext = EXT_REPEAT;
+  ClipProfile clip = { bd, 0 };
+  int horz_a = lanczos_a_hor;
+  int vert_a = lanczos_a_ver;
+#if CONFIG_2D_SR_ZERO_PHASE
+  double horz_x0 = (double)('z');
+  double vert_x0 = (double)('z');
+#else
+  double horz_x0 = subx ? (double)('d') : (double)('c');
+  double vert_x0 = suby ? (double)('d') : (double)('c');
+#endif
+
+  RationalResampleFilter horz_rf;
+  RationalResampleFilter vert_rf;
+
+  if (!get_resample_filter(num, denom, horz_a, horz_x0, ext, win, subx,
+                           coeff_prec_bits, &horz_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+#if CONFIG_2D_SR_RESAMPLER_FIX && !CONFIG_2D_SR_ZERO_PHASE
+  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, 0,
+#else
+  if (!get_resample_filter(num, denom, vert_a, vert_x0, ext, win, suby,
+#endif
+                           coeff_prec_bits, &vert_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+
+  av1_resample_2d((const int16_t *)input, width, height, in_stride, &horz_rf,
+                  &vert_rf, extra_prec_bits, &clip, (int16_t *)output, width2,
+                  height2, out_stride);
+}
+
+void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
+                                         YV12_BUFFER_CONFIG *dst, int bd,
+                                         const int num_planes, const int subx,
+                                         const int suby, const int denom,
+                                         const int num) {
+  for (int i = 0; i < AOMMIN(num_planes, MAX_MB_PLANE); ++i) {
+    const int is_uv = i > 0;
+    const int lanczos_a_hor =
+        is_uv ? LANCZOS_A_NONNORMATIVE_HOR_C : LANCZOS_A_NONNORMATIVE_HOR_Y;
+    const int lanczos_a_ver =
+        is_uv ? LANCZOS_A_NONNORMATIVE_VER_C : LANCZOS_A_NONNORMATIVE_VER_Y;
+    av1_resample_plane_2d_lanczos(
+        src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
+        src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
+        dst->crop_widths[is_uv], dst->strides[is_uv], is_uv ? subx : 0,
+        is_uv ? suby : 0, bd, denom, num, lanczos_a_hor, lanczos_a_ver);
+  }
+  aom_extend_frame_borders(dst, num_planes);
+
+}
+
+int64_t av1_downup_lanczos_sse(const YV12_BUFFER_CONFIG *src, int bd, int denom,
+                               int num) {
+  const int width = src->crop_widths[0];
+  const int height = src->crop_heights[0];
+
+  int width2 = width, height2 = height;
+  av1_calculate_scaled_superres_size(&width2, &height2, denom, num);
+  uint16_t *down = (uint16_t *)aom_malloc(sizeof(*down) * width2 * height2);
+  int down_stride = width2;
+
+  YV12_BUFFER_CONFIG outbuf;
+  memset(&outbuf, 0, sizeof(outbuf));
+  aom_alloc_frame_buffer(&outbuf, width, height, src->subsampling_x,
+                         src->subsampling_y, 0, 32);
+  av1_resample_plane_2d_lanczos(
+      src->y_buffer, height, width, src->y_stride, down, height2, width2,
+      down_stride, src->subsampling_x, src->subsampling_y, bd, denom, num,
+      LANCZOS_A_NONNORMATIVE_HOR_Y, LANCZOS_A_NONNORMATIVE_VER_Y);
+  av1_resample_plane_2d_lanczos(
+      down, height2, width2, down_stride, outbuf.y_buffer, height, width,
+      outbuf.y_stride, src->subsampling_x, src->subsampling_y, bd, num, denom,
+      LANCZOS_A_NORMATIVE_HOR_Y, LANCZOS_A_NORMATIVE_VER_Y);
+  int64_t sse = aom_highbd_get_y_sse(src, &outbuf);
+  aom_free(down);
+  aom_free_frame_buffer(&outbuf);
+  return sse;
+}
+#endif  // CONFIG_2D_SR
+
 static void highbd_upscale_normative_rect(const uint16_t *const input,
                                           int height, int width, int in_stride,
                                           uint16_t *output, int height2,
@@ -1184,6 +1293,65 @@ void av1_resize_and_extend_frame_nonnormative(const YV12_BUFFER_CONFIG *src,
   aom_extend_frame_borders(dst, num_planes);
 }
 
+#if CONFIG_2D_SR
+void av1_upscale_normative_2d(const AV1_COMMON *cm, const uint16_t *src, int height,
+                              int width, int src_stride, uint16_t *dst,
+                              int height2, int width2, int dst_stride,
+                              int plane ) {
+
+  int denom = -1;
+  const int denom_h = cm->superres_scale_denominator;
+  const int denom_v = cm->superres_scale_denominator;
+
+  const int is_uv = (plane > 0);
+  const int ss_x = is_uv && cm->seq_params.subsampling_x;
+  const int ss_y = is_uv && cm->seq_params.subsampling_y;
+
+  int coeff_prec_bits = 14;
+  int extra_prec_bits = 2;
+  WIN_TYPE win = WIN_LANCZOS;
+  EXT_TYPE ext = EXT_REPEAT;
+  ClipProfile clip = { (int) cm->seq_params.bit_depth, 0 };
+  int horz_a = 5;
+  int vert_a = 5;
+#if CONFIG_2D_SR_ZERO_PHASE
+  double horz_x0 = (double)('z');
+  double vert_x0 = (double)('z');
+#else
+  double horz_x0 = ss_x ? (double)('d') : (double)('c');
+  double vert_x0 = ss_y ? (double)('d') : (double)('c');
+#endif
+
+  RationalResampleFilter horz_rf;
+  RationalResampleFilter vert_rf;
+
+  denom = denom_h;
+
+  if (!get_resample_filter(denom, SCALE_NUMERATOR, horz_a, horz_x0,
+                           ext, win, ss_x,
+                           coeff_prec_bits, &horz_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+
+  denom = denom_v;
+
+  if (!get_resample_filter(denom, SCALE_NUMERATOR, vert_a, vert_x0,
+#if CONFIG_2D_SR_RESAMPLER_FIX && !CONFIG_2D_SR_ZERO_PHASE
+                           ext, win, 0,
+#else
+                           ext, win, ss_y,
+#endif
+                           coeff_prec_bits, &vert_rf)) {
+    fprintf(stderr, "Cannot generate filter, exiting!\n");
+    exit(1);
+  }
+
+  av1_resample_2d((const int16_t *)src, width, height, src_stride, &horz_rf, &vert_rf,
+                  extra_prec_bits, &clip, (const int16_t *)dst, width2, height2,
+                  dst_stride);
+}
+#endif  // CONFIG_2D_SR
 void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint16_t *src,
                                 int src_stride, uint16_t *dst, int dst_stride,
                                 int plane, int rows) {
@@ -1239,6 +1407,22 @@ void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint16_t *src,
   }
 }
 
+#if CONFIG_2D_SR
+void av1_upscale_normative_2d_and_extend_frame(const AV1_COMMON *cm,
+                                             const YV12_BUFFER_CONFIG *src,
+                                             YV12_BUFFER_CONFIG *dst ) {
+	const int num_planes = av1_num_planes(cm);
+	for (int i = 0; i < num_planes; ++i) {
+		const int is_uv = (i > 0);
+        av1_upscale_normative_2d(
+                        cm, src->buffers[i], src->crop_heights[is_uv], src->crop_widths[is_uv],
+		src->strides[is_uv], dst->buffers[i], dst->crop_heights[is_uv],
+			dst->crop_widths[is_uv], dst->strides[is_uv], i);
+	}
+
+	aom_extend_frame_borders(dst, num_planes);
+}
+#else   // CONFIG_2D_SR
 void av1_upscale_normative_and_extend_frame(const AV1_COMMON *cm,
                                             const YV12_BUFFER_CONFIG *src,
                                             YV12_BUFFER_CONFIG *dst) {
@@ -1252,6 +1436,7 @@ void av1_upscale_normative_and_extend_frame(const AV1_COMMON *cm,
 
   aom_extend_frame_borders(dst, num_planes);
 }
+#endif  // CONFIG_2D_SR
 
 YV12_BUFFER_CONFIG *av1_scale_if_required(
     AV1_COMMON *cm, YV12_BUFFER_CONFIG *unscaled, YV12_BUFFER_CONFIG *scaled,
@@ -1268,18 +1453,61 @@ YV12_BUFFER_CONFIG *av1_scale_if_required(
 
   if (scaling_required) {
     const int num_planes = av1_num_planes(cm);
+#if CONFIG_2D_SR
+    if (cm->superres_scale_denominator > cm->superres_scale_numerator) {
+      av1_resize_lanczos_and_extend_frame(
+          unscaled, scaled, (int)cm->seq_params.bit_depth, num_planes,
+          unscaled->subsampling_x, unscaled->subsampling_y,
+          cm->superres_scale_denominator, cm->superres_scale_numerator);
+    } else {
+#endif  // CONFIG_2D_SR
     if (use_optimized_scaler && cm->seq_params.bit_depth == AOM_BITS_8) {
       av1_resize_and_extend_frame(unscaled, scaled, filter, phase, num_planes);
     } else {
       av1_resize_and_extend_frame_nonnormative(
           unscaled, scaled, (int)cm->seq_params.bit_depth, num_planes);
+	}
+#if CONFIG_2D_SR
     }
+#endif  // CONFIG_2D_SR
     return scaled;
   } else {
     return unscaled;
   }
 }
 
+#if CONFIG_2D_SR
+// Calculates the scaled dimension given the original dimension and the scale
+// denominator.
+static void calculate_scaled_size_helper(int *dim, int denom, int num) {
+  if (denom != num) {
+    // We need to ensure the constraint in "Appendix A" of the spec:
+    // * FrameWidth is greater than or equal to 16
+    // * FrameHeight is greater than or equal to 16
+    // For this, we clamp the downscaled dimension to at least 16. One
+    // exception: if original dimension itself was < 16, then we keep the
+    // downscaled dimension to be same as the original, to ensure that resizing
+    // is valid.
+    const int min_dim = AOMMIN(16, *dim);
+    // Use this version if we need *dim to be even
+    // *width = (*width * SCALE_NUMERATOR + denom) / (2 * denom);
+    // *width <<= 1;
+    *dim = (*dim * num + denom / 2) / (denom);
+    *dim = AOMMAX(*dim, min_dim);
+  }
+}
+
+void av1_calculate_scaled_size(int *width, int *height, int resize_denom) {
+  calculate_scaled_size_helper(width, resize_denom, SCALE_NUMERATOR);
+  calculate_scaled_size_helper(height, resize_denom, SCALE_NUMERATOR);
+}
+
+void av1_calculate_scaled_superres_size(int *width, int *height,
+                                        int superres_denom, int superres_num) {
+  calculate_scaled_size_helper(width, superres_denom, superres_num);
+  calculate_scaled_size_helper(height, superres_denom, superres_num);
+}
+#else   // CONFIG_2D_SR
 // Calculates the scaled dimension given the original dimension and the scale
 // denominator.
 static void calculate_scaled_size_helper(int *dim, int denom) {
@@ -1310,6 +1538,7 @@ void av1_calculate_scaled_superres_size(int *width, int *height,
   (void)height;
   calculate_scaled_size_helper(width, superres_denom);
 }
+#endif  // CONFIG_2D_SR
 
 void av1_calculate_unscaled_superres_size(int *width, int *height, int denom) {
   if (denom != SCALE_NUMERATOR) {
@@ -1346,18 +1575,30 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 
   YV12_BUFFER_CONFIG *const frame_to_show = &cm->cur_frame->buf;
 
+#if CONFIG_2D_SR
+  if (aom_alloc_frame_buffer(
+          &copy_buffer, cm->width, cm->height, seq_params->subsampling_x,
+          seq_params->subsampling_y, AOM_BORDER_IN_PIXELS, byte_alignment))
+    aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                       "Failed to alloc copy buffer for 2D-superres upscaling");
+#else   // CONFIG_2D_SR
   const int aligned_width = ALIGN_POWER_OF_TWO(cm->width, 3);
   if (aom_alloc_frame_buffer(
           &copy_buffer, aligned_width, cm->height, seq_params->subsampling_x,
           seq_params->subsampling_y, AOM_BORDER_IN_PIXELS, byte_alignment))
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate copy buffer for superres upscaling");
+#endif  // CONFIG_2D_SR
 
   // Copy function assumes the frames are the same size.
   // Note that it does not copy YV12_BUFFER_CONFIG config data.
   aom_yv12_copy_frame(frame_to_show, &copy_buffer, num_planes);
 
+#if CONFIG_2D_SR
+  assert(copy_buffer.y_crop_width == cm->width);
+#else   // CONFIG_2D_SR
   assert(copy_buffer.y_crop_width == aligned_width);
+#endif  // CONFIG_2D_SR
   assert(copy_buffer.y_crop_height == cm->height);
 
   // Realloc the current frame buffer at a higher resolution in place.
@@ -1414,7 +1655,11 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 
   // Scale up and back into frame_to_show.
   assert(frame_to_show->y_crop_width != cm->width);
+#if CONFIG_2D_SR
+  av1_upscale_normative_2d_and_extend_frame(cm, &copy_buffer, frame_to_show);
+#else   // CONFIG_2D_SR
   av1_upscale_normative_and_extend_frame(cm, &copy_buffer, frame_to_show);
+#endif  // CONFIG_2D_SR
 
   // Free the copy buffer
   aom_free_frame_buffer(&copy_buffer);

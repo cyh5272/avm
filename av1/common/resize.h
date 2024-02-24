@@ -21,6 +21,37 @@
 extern "C" {
 #endif
 
+
+#if CONFIG_2D_SR
+typedef struct {
+  uint8_t scale_num;
+  uint8_t scale_denom;
+} ScaleFactor;
+#if CONFIG_2D_SR_SCALE_EXT 
+static const ScaleFactor superres_scales[SUPERRES_SCALES] = {
+#if CONFIG_2D_SR_FRAME_WISE_SWITCHING  
+	{ 4, 6 },{ 4, 8 },{ 4, 12 },{ 4, 16 },{ 4, 24 },{ 4, 5 },{ 4, 7 },{ 4, 10 } // Currently 1.5X, 2X, 3X, 4X, 6X used
+#else
+	{ 4, 5 },{ 4, 6 },{ 4, 7 },{ 4, 8 },{ 4, 10 },{ 4, 12 },{ 4, 16 },{ 4, 24 }
+#endif
+};
+#else
+static const ScaleFactor superres_scales[SUPERRES_SCALES] = {
+	{ 8, 10 },{ 8, 12 },{ 8, 14 },{ 8, 16 }
+};
+#endif
+
+void av1_resize_lanczos_and_extend_frame(const YV12_BUFFER_CONFIG *src,
+                                         YV12_BUFFER_CONFIG *dst, int bd,
+                                         const int num_planes, const int subx,
+                                         const int suby, const int denom,
+                                         const int num);
+void av1_upscale_2d_normative_and_extend_frame(const AV1_COMMON *cm,
+                                               const YV12_BUFFER_CONFIG *src,
+                                               YV12_BUFFER_CONFIG *dst);
+int64_t av1_downup_lanczos_sse(const YV12_BUFFER_CONFIG *src, int bd, int denom,
+                               int num);
+#endif  // CONFIG_2D_SR
 void av1_resize_plane(const uint8_t *const input, int height, int width,
                       int in_stride, uint8_t *output, int height2, int width2,
                       int out_stride);
@@ -88,10 +119,17 @@ void av1_resize_and_extend_frame_nonnormative(const YV12_BUFFER_CONFIG *src,
 // resize scale denominator.
 void av1_calculate_scaled_size(int *width, int *height, int resize_denom);
 
+#if CONFIG_2D_SR
+// Similar to above, but calculates scaled dimensions after superres from the
+// given original dimensions and superres scale denominator.
+void av1_calculate_scaled_superres_size(int *width, int *height,
+                                        int superres_denom, int superres_num);
+#else   // CONFIG_2D_SR
 // Similar to above, but calculates scaled dimensions after superres from the
 // given original dimensions and superres scale denominator.
 void av1_calculate_scaled_superres_size(int *width, int *height,
                                         int superres_denom);
+#endif  // CONFIG_2D_SR
 
 // Inverse of av1_calculate_scaled_superres_size() above: calculates the
 // original dimensions from the given scaled dimensions and the scale

@@ -731,10 +731,17 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   RANGE_CHECK(cfg, rc_resize_kf_denominator, SCALE_NUMERATOR,
               SCALE_NUMERATOR << 1);
   RANGE_CHECK_HI(cfg, rc_superres_mode, AOM_SUPERRES_AUTO);
+  #if CONFIG_2D_SR_SCALE_EXT
+  RANGE_CHECK(cfg, rc_superres_denominator, SCALE_NUMERATOR,
+              SCALE_NUMERATOR * 6);
+  RANGE_CHECK(cfg, rc_superres_kf_denominator, SCALE_NUMERATOR,
+              SCALE_NUMERATOR * 6);
+  #else  // CONFIG_2D_SR_SCALE_EXT 
   RANGE_CHECK(cfg, rc_superres_denominator, SCALE_NUMERATOR,
               SCALE_NUMERATOR << 1);
   RANGE_CHECK(cfg, rc_superres_kf_denominator, SCALE_NUMERATOR,
               SCALE_NUMERATOR << 1);
+  #endif  // CONFIG_2D_SR_SCALE_EXT
   RANGE_CHECK(cfg, rc_superres_qthresh, 1, 255);
   RANGE_CHECK(cfg, rc_superres_kf_qthresh, 1, 255);
   RANGE_CHECK_HI(extra_cfg, cdf_update_mode, 2);
@@ -1802,7 +1809,7 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
         superres_cfg->superres_scale_denominator == SCALE_NUMERATOR &&
         superres_cfg->superres_kf_scale_denominator == SCALE_NUMERATOR) {
       disable_superres(superres_cfg);
-    }
+    }   
     if (superres_cfg->superres_mode == AOM_SUPERRES_QTHRESH &&
         superres_cfg->superres_qthresh == 255 &&
         superres_cfg->superres_kf_qthresh == 255) {
@@ -1816,6 +1823,15 @@ static aom_codec_err_t set_encoder_config(AV1EncoderConfig *oxcf,
   if (!superres_cfg->enable_superres) {
     disable_superres(superres_cfg);
   }
+
+#if CONFIG_2D_SR_TILE_CONFIG
+  if (superres_cfg->enable_superres && (superres_cfg->superres_mode == AOM_SUPERRES_FIXED &&
+        (superres_cfg->superres_scale_denominator != SCALE_NUMERATOR ||
+        superres_cfg->superres_kf_scale_denominator != SCALE_NUMERATOR))){
+    tile_cfg->tile_columns = 0;
+    tile_cfg->tile_rows = 0;
+  }
+#endif  // CONFIG_2D_SR_TILE_CONFIG
 
   if (input_cfg->limit == 1) {
     // still picture mode, display model and timing is meaningless
@@ -3137,6 +3153,7 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
                                 src_time_stamp, src_end_time_stamp)) {
         res = update_error_state(ctx, &cpi->common.error);
       }
+
       aom_img_free(hbd_img);
       ctx->next_frame_flags = 0;
     }

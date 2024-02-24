@@ -293,8 +293,10 @@ static AOM_INLINE int keep_one_comp_stat(MV_STATS *mv_stats, int comp_val,
   int use_fractional_mv = !cpi->common.features.cur_frame_force_integer_mv;
 
 #if CONFIG_ADAPTIVE_MVD
+#if !CONFIG_ADAPTIVE_MVD_TEST1
   if (is_adaptive_mvd && (mv_class != MV_CLASS_0 || int_part > 0))
     use_fractional_mv = 0;
+#endif
 #endif  // CONFIG_ADAPTIVE_MVD
 #if CONFIG_FLEX_MVRES
   int frac_part_rate = 0, frac_part_rate_qpel = 0;

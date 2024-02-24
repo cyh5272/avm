@@ -14,6 +14,9 @@
 #include "config/av1_rtcd.h"
 
 #include "av1/common/warped_motion.h"
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+#include "av1/encoder/rd.h"
+#endif 
 
 void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
                                  int width, int height, int stride,
@@ -21,7 +24,17 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
                                  int p_width, int p_height, int p_stride,
                                  int subsampling_x, int subsampling_y, int bd,
                                  ConvolveParams *conv_params, int16_t alpha,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                                 int16_t beta, int16_t gamma, int16_t delta,
+                                 const int x_step_qn, const int y_step_qn) {
+#else
                                  int16_t beta, int16_t gamma, int16_t delta) {
+#endif 
+
+//#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+//fprintf(g_log, "", );
+//#endif 
+
   __m256i tmp[15];
   const int reduce_bits_horiz =
       conv_params->round_0 +
@@ -63,6 +76,12 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
   (void)mhoriz;
   int sx;
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+  // Determine our stride
+  assert(x_step_qn == y_step_qn);
+  const int x_conv_stride = x_step_qn >> SCALE_SUBPEL_BITS;
+#endif
+
   for (int i = 0; i < p_height; i += 8) {
     for (int j = 0; j < p_width; j += 8) {
       // Calculate the center of this 8x8 block,
@@ -76,7 +95,11 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
       const int32_t x4 = dst_x >> subsampling_x;
       const int32_t y4 = dst_y >> subsampling_y;
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+      int16_t ix4 = x4 >> WARPEDMODEL_PREC_BITS;
+#else
       const int16_t ix4 = x4 >> WARPEDMODEL_PREC_BITS;
+#endif
       int32_t sx4 = x4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
       const int16_t iy4 = y4 >> WARPEDMODEL_PREC_BITS;
       int32_t sy4 = y4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
@@ -92,7 +115,11 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
       // Horizontal filter
       if (ix4 <= -7) {
         for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          int iy = x_conv_stride * (iy4 + k);
+#else
           int iy = iy4 + k;
+#endif          
           if (iy < 0)
             iy = 0;
           else if (iy > height - 1)
@@ -103,7 +130,11 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
         }
       } else if (ix4 >= width + 6) {
         for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          int iy = x_conv_stride * (iy4 + k);
+#else
           int iy = iy4 + k;
+#endif          
           if (iy < 0)
             iy = 0;
           else if (iy > height - 1)
@@ -116,8 +147,11 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
       } else if (((ix4 - 7) < 0) || ((ix4 + 9) > width)) {
         int32_t tmp1[8];
         for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          const int iy = clamp(x_conv_stride * (iy4 + k), 0, height - 1);
+#else
           const int iy = clamp(iy4 + k, 0, height - 1);
-
+#endif
           sx = sx4 + beta * (k + 4);
           for (int l = -4; l < 4; ++l) {
             int ix = ix4 + l - 3;
@@ -126,7 +160,11 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
 
             int32_t sum = 1 << offset_bits_horiz;
             for (int m = 0; m < 8; ++m) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP            
+              const int sample_x = clamp(x_conv_stride * (ix + m), 0, width - 1);
+#else
               const int sample_x = clamp(ix + m, 0, width - 1);
+#endif                
               sum += ref[iy * stride + sample_x] * coeffs[m];
             }
             sum = ROUND_POWER_OF_TWO(sum, reduce_bits_horiz);
@@ -150,7 +188,12 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
           __m256i v_c67 = _mm256_broadcastd_epi32(
               _mm_shuffle_epi32(v_01, 3));  // A7A6A7A6A7A6A7A6
           for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+            int iy = x_conv_stride * (iy4 + k);
+            ix4 = x_conv_stride * ix4;
+#else
             int iy = iy4 + k;
+#endif
             if (iy < 0)
               iy = 0;
             else if (iy > height - 1)
@@ -197,7 +240,12 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
           }
         } else if (alpha == 0) {
           for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+            int iy = x_conv_stride * (iy4 + k);
+            ix4 = x_conv_stride * ix4;
+#else
             int iy = iy4 + k;
+#endif            
             if (iy < 0)
               iy = 0;
             else if (iy > height - 1)
@@ -325,7 +373,12 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
               _mm256_unpackhi_epi64(v_c0123u, v_c4567u);  // H7H6 ... A7A6
 
           for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+            int iy = x_conv_stride * (iy4 + k);
+            ix4 = x_conv_stride * ix4;
+#else
             int iy = iy4 + k;
+#endif            
             if (iy < 0)
               iy = 0;
             else if (iy > height - 1)
@@ -374,7 +427,12 @@ void av1_highbd_warp_affine_avx2(const int32_t *mat, const uint16_t *ref,
 
         } else {
           for (int k = -7; k < AOMMIN(8, p_height - i); ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+            int iy = x_conv_stride * (iy4 + k);
+            ix4 = x_conv_stride * ix4;
+#else
             int iy = iy4 + k;
+#endif           
             if (iy < 0)
               iy = 0;
             else if (iy > height - 1)

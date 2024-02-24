@@ -20,10 +20,18 @@
 extern "C" {
 #endif
 
-#define SCALE_NUMERATOR 8
+#if CONFIG_2D_SR_SCALE_EXT 
+#define SCALE_NUMERATOR 4
+#else  // CONFIG_2D_SR_SCALE_EXT
+#define SCALE_NUMERATOR 8   
+#endif  // CONFIG_2D_SR_SCALE_EXT 
 
 #define REF_SCALE_SHIFT 14
 #define REF_NO_SCALE (1 << REF_SCALE_SHIFT)
+#define REF_2x_SCALE (1 << (REF_SCALE_SHIFT + 1))
+#define REF_3x_SCALE (3 * (1 << REF_SCALE_SHIFT))
+#define REF_4x_SCALE (1 << (REF_SCALE_SHIFT + 2))
+#define REF_6x_SCALE (6 * (1 << REF_SCALE_SHIFT))
 #define REF_INVALID_SCALE -1
 
 struct scale_factors {
@@ -34,6 +42,11 @@ struct scale_factors {
 
   int (*scale_value_x)(int val, const struct scale_factors *sf);
   int (*scale_value_y)(int val, const struct scale_factors *sf);
+
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+  int (*scale_value_x_gen)(int val, const struct scale_factors *sf);
+  int (*scale_value_y_gen)(int val, const struct scale_factors *sf);
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
 };
 
 MV32 av1_scale_mv(const MV *mv, int x, int y, const struct scale_factors *sf);
@@ -55,7 +68,11 @@ static INLINE int av1_is_scaled(const struct scale_factors *sf) {
 
 static INLINE int valid_ref_frame_size(int ref_width, int ref_height,
                                        int this_width, int this_height) {
-  return 2 * this_width >= ref_width && 2 * this_height >= ref_height &&
+#if CONFIG_2D_SR_SCALE_EXT 
+	return 7 * this_width > ref_width && 7 * this_height > ref_height &&
+#else  // CONFIG_2D_SR_SCALE_EXT
+	return 2 * this_width >= ref_width && 2 * this_height >= ref_height &&
+#endif  // CONFIG_2D_SR_SCALE_EXT 
          this_width <= 16 * ref_width && this_height <= 16 * ref_height;
 }
 

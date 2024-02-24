@@ -448,15 +448,27 @@ static int64_t pick_interintra_wedge(const AV1_COMP *const cpi,
   return rd;
 }
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+static AOM_INLINE void get_inter_predictor_masked_compound_y(
+    MACROBLOCK *x, const BLOCK_SIZE bsize, uint16_t *pred0, uint16_t *pred1,
+    int16_t *residual1, int16_t *diff10, int stride,
+    const struct AV1Common *const cm) {
+#else
 static AOM_INLINE void get_inter_predictor_masked_compound_y(
     MACROBLOCK *x, const BLOCK_SIZE bsize, uint16_t *pred0, uint16_t *pred1,
     int16_t *residual1, int16_t *diff10, int stride) {
+#endif
   MACROBLOCKD *xd = &x->e_mbd;
   const int bw = block_size_wide[bsize];
   const int bh = block_size_high[bsize];
   // get inter predictors to use for masked compound modes
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  av1_build_inter_predictor_single_buf_y(xd, bsize, 0, pred0, stride, cm);
+  av1_build_inter_predictor_single_buf_y(xd, bsize, 1, pred1, stride, cm);
+#else
   av1_build_inter_predictor_single_buf_y(xd, bsize, 0, pred0, stride);
   av1_build_inter_predictor_single_buf_y(xd, bsize, 1, pred1, stride);
+#endif
   const struct buf_2d *const src = &x->plane[0].src;
 
   aom_highbd_subtract_block(bh, bw, residual1, bw, src->buf, src->stride, pred1,
@@ -746,8 +758,8 @@ static int handle_wedge_inter_intra_mode(
     int rate_sum, skip_txfm_sb;
     int64_t dist_sum, skip_sse_sb;
     // get negative of mask
-    const uint8_t *mask =
-        av1_get_contiguous_soft_mask(mbmi->interintra_wedge_index, 1, bsize);
+	const uint8_t *mask =
+		av1_get_contiguous_soft_mask(mbmi->interintra_wedge_index, 1, bsize);
     av1_compound_single_motion_search(cpi, x, bsize, &tmp_mv->as_mv,
 #if CONFIG_JOINT_MVD
                                       &tmp_mv->as_mv,
@@ -1155,8 +1167,13 @@ static int64_t masked_compound_type_rd(
   // this may increase memory requirements as compound segment mask needs to be
   // stored in each record.
   if (*calc_pred_masked_compound) {
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    get_inter_predictor_masked_compound_y(x, bsize, pred0, pred1, residual1,
+                                          diff10, stride, cm);
+#else
     get_inter_predictor_masked_compound_y(x, bsize, pred0, pred1, residual1,
                                           diff10, stride);
+#endif
     *calc_pred_masked_compound = 0;
   }
   if (cpi->sf.inter_sf.prune_wedge_pred_diff_based &&
@@ -1239,9 +1256,15 @@ static int64_t masked_compound_type_rd(
       CompoundTypeRdBuffers tmp_buf;
       int64_t tmp_rd = INT64_MAX;
       alloc_compound_type_rd_buffers_no_check(&tmp_buf);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+      get_inter_predictor_masked_compound_y(x, bsize, tmp_buf.pred0,
+                                            tmp_buf.pred1, tmp_buf.residual1,
+                                            tmp_buf.diff10, stride, cm);
+#else
       get_inter_predictor_masked_compound_y(x, bsize, tmp_buf.pred0,
                                             tmp_buf.pred1, tmp_buf.residual1,
                                             tmp_buf.diff10, stride);
+#endif
 
       tmp_rd = pick_interinter_mask[compound_type - COMPOUND_WEDGE](
           cpi, x, bsize, tmp_buf.pred0, tmp_buf.pred1, tmp_buf.residual1,

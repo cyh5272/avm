@@ -82,6 +82,21 @@ void av1_alloc_restoration_buffers(AV1_COMMON *cm) {
     const int tile_stripes = (ext_h + 63) / 64;
     num_stripes += tile_stripes;
   }
+#if CONFIG_2D_SR
+  // TODO(yuec, debargha): This is a temporary fix to handle mismatch between
+  // stripes in the coded domain vs. stripes in the upscaled domain. In AV1
+  // they were the same and there was no issue. However in
+  // CONFIG_2D_SR, the actual number of stripes in the upscaled domain
+  // can be twice as many as stripes in the coded domain. Hence this change.
+  // Going forward, wee need to rethink striped loop-restoration in the
+  // context of 2D superres, and implement a different strategy or remove
+  // striping altogether, based on consultation with hardware teams.
+#if CONFIG_2D_SR_SCALE_EXT
+  num_stripes *= 6;
+#else  // CONFIG_2D_SR_SCALE_EXT
+  num_stripes <<= 1;
+#endif  // CONFIG_2D_SR_SCALE_EXT  
+#endif  // CONFIG_2D_SR
 
   // Now we need to allocate enough space to store the line buffers for the
   // stripes
@@ -314,13 +329,16 @@ static int alloc_sbi(CommonSBInfoParams *sbi_params) {
 int av1_alloc_context_buffers(AV1_COMMON *cm, int width, int height) {
   CommonModeInfoParams *const mi_params = &cm->mi_params;
   mi_params->set_mb_mi(mi_params, width, height);
+
 #if CONFIG_PC_WIENER
   if (alloc_mi(mi_params, cm)) goto fail;
 #else
   if (alloc_mi(mi_params)) goto fail;
 #endif  // CONFIG_PC_WIENER
+
   CommonSBInfoParams *const sbi_params = &cm->sbi_params;
   set_sb_si(cm);
+
   if (alloc_sbi(sbi_params)) goto fail;
 
   return 0;

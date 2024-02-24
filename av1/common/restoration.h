@@ -83,9 +83,17 @@ extern "C" {
     RESTORATION_PADDING))
 
 #if CONFIG_FLEXIBLE_RU_SIZE
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+#define RESTORATION_UNITSIZE_MAX 512 * 6
+#else
 #define RESTORATION_UNITSIZE_MAX 512
+#endif
+#else  // CONFIG_FLEXIBLE_RU_SIZE
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+#define RESTORATION_UNITSIZE_MAX 256 * 6
 #else
 #define RESTORATION_UNITSIZE_MAX 256
+#endif
 #endif  // CONFIG_FLEXIBLE_RU_SIZE
 #define RESTORATION_UNITPELS_HORZ_MAX \
   (RESTORATION_UNITSIZE_MAX * 3 / 2 + 2 * RESTORATION_BORDER_HORZ + 16)
@@ -351,6 +359,12 @@ typedef struct {
    * Pointer to buffers for pcwiener computations.
    */
   PcwienerBuffers *pcwiener_buffers;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  /*!
+   * flag to skip accumulating txskip values
+   */
+  bool skip_acc_txskip_flag;
+#endif  
 #endif  // CONFIG_PC_WIENER
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
   /*!
@@ -490,6 +504,12 @@ typedef struct {
    */
   int num_filter_classes;
 #endif  // CONFIG_WIENER_NONSEP
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  /*!
+   * flag to skip accumulating txskip values
+   */
+  bool skip_acc_txskip_flag;
+#endif
 } RestorationInfo;
 
 /*!\cond */
@@ -578,7 +598,11 @@ typedef void (*rest_unit_visitor_t)(const RestorationTileLimits *limits,
                                     RestorationLineBuffers *rlbs);
 
 typedef struct FilterFrameCtxt {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  RestorationInfo *rsi;
+#else
   const RestorationInfo *rsi;
+#endif  
   int tile_stripe0;
   int ss_x, ss_y;
   int bit_depth;
@@ -599,6 +623,9 @@ typedef struct FilterFrameCtxt {
   int qindex_offset;
   uint8_t *wiener_class_id;
   int wiener_class_id_stride;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  bool skip_acc_txskip_flag;
+#endif  
 #endif  // CONFIG_PC_WIENER
 } FilterFrameCtxt;
 
@@ -783,7 +810,11 @@ void copy_tile(int width, int height, const uint16_t *src, int src_stride,
 
 #if CONFIG_FLEXIBLE_RU_SIZE
 void set_restoration_unit_size(int width, int height, int sx, int sy,
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+                               RestorationInfo *rst, uint8_t superres_scale_denominator);
+#else
                                RestorationInfo *rst);
+#endif                               
 #endif  // CONFIG_FLEXIBLE_RU_SIZE
 /*!\endcond */
 

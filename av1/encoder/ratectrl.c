@@ -989,9 +989,18 @@ static int get_active_qp(const RATE_CONTROL *rc,
   if (rc_cfg->mode == AOM_CQ || rc_cfg->mode == AOM_Q) {
     // printf("Superres %d %d %d = %d\n", superres_denom, intra_only,
     //        rc->frames_to_key, !(intra_only && rc->frames_to_key <= 1));
+
     if ((superres_mode == AOM_SUPERRES_QTHRESH ||
          superres_mode == AOM_SUPERRES_AUTO) &&
         superres_denom != SCALE_NUMERATOR) {
+#if CONFIG_2D_SR
+#if CONFIG_2D_SR_FRAME_WISE_SWITCHING
+      active_qp = rc_cfg->qp;
+#else
+      active_qp =
+          AOMMAX(active_qp - ((superres_denom - SCALE_NUMERATOR) * 3), 0);
+#endif          
+#else   // CONFIG_2D_SR
       int mult = SUPERRES_QADJ_PER_DENOM_KEYFRAME_SOLO;
       if (intra_only && rc->frames_to_key <= 1) {
         mult = 0;
@@ -1002,7 +1011,9 @@ static int get_active_qp(const RATE_CONTROL *rc,
       }
       active_qp =
           AOMMAX(active_qp - ((superres_denom - SCALE_NUMERATOR) * mult), 0);
+#endif  // CONFIG_2D_SR
     }
+
   }
   if (rc_cfg->mode == AOM_CQ && rc->total_target_bits > 0) {
     const double x = (double)rc->total_actual_bits / rc->total_target_bits;
@@ -1687,6 +1698,14 @@ int av1_rc_pick_q_and_bounds(const AV1_COMP *cpi, RATE_CONTROL *rc, int width,
     q = rc_pick_q_and_bounds(cpi, width, height, gf_index, bottom_index,
                              top_index, &rc->level1_qp);
   }
+
+#if CONFIG_2D_SR_FRAME_WISE_SWITCHING
+    if (cpi->superres_mode == AOM_SUPERRES_AUTO &&
+        cpi->common.superres_scale_denominator != SCALE_NUMERATOR) {
+      q = AOMMAX(q - ((int)(log2(((double)cpi->common.superres_scale_denominator) / 4) * 23)), 0);
+    }
+#endif
+
   if (gf_group->update_type[gf_index] == ARF_UPDATE ||
       gf_group->update_type[gf_index] == KFFLT_UPDATE)
     rc->level1_qp = q;

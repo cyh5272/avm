@@ -497,15 +497,23 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
   const int num_planes = av1_num_planes(cm);
   MV_REFERENCE_FRAME ref_frame;
 
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+  const uint8_t denom = cpi->oxcf.superres_cfg.superres_scale_denominator;
+  const int scale_index = (denom == SCALE_NUMERATOR) ? SUPERRES_SCALES : to_scale_index(cpi, denom);
+#endif
+
   for (ref_frame = 0; ref_frame < INTER_REFS_PER_FRAME; ++ref_frame) {
     // Need to convert from AOM_REFFRAME to index into ref_mask (subtract 1).
     if (cm->ref_frame_flags & (1 << ref_frame)) {
       BufferPool *const pool = cm->buffer_pool;
       const YV12_BUFFER_CONFIG *const ref =
           get_ref_frame_yv12_buf(cm, ref_frame);
-
       if (ref == NULL) {
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+        cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index] = NULL;
+#else
         cpi->scaled_ref_buf[ref_frame] = NULL;
+#endif
         continue;
       }
 
@@ -525,7 +533,11 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
           }
         }
         int force_scaling = 0;
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+        RefCntBuffer *new_fb = cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index];
+#else
         RefCntBuffer *new_fb = cpi->scaled_ref_buf[ref_frame];
+#endif
         if (new_fb == NULL) {
           const int new_fb_idx = get_free_fb(cm);
           if (new_fb_idx == INVALID_IDX) {
@@ -550,24 +562,100 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
             aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                                "Failed to allocate frame buffer");
           }
+#if CONFIG_2D_SR
+          if (cm->superres_scale_denominator > cm->superres_scale_numerator) {
+#if CONFIG_2D_SR_ZERO_PHASE
+            if ((cm->superres_scale_denominator != 6 ) &&  // 1.5x
+                (cm->superres_scale_denominator != 8 ) &&  // 2x
+                (cm->superres_scale_denominator != 12) &&  // 3x
+                (cm->superres_scale_denominator != 16) &&  // 4x
+                (cm->superres_scale_denominator != 24)) {  // 6x
+              printf("av1_scale_references(): Unsupported scaling factor\n");
+              exit(0);
+            }
+
+            if ((cm->superres_scale_denominator == 8 ) || // 2x
+                (cm->superres_scale_denominator == 12) || // 3x
+                (cm->superres_scale_denominator == 16) || // 4x
+                (cm->superres_scale_denominator == 24)) { // 6x
+              int scale = 0;
+              if (cm->superres_scale_denominator == 8 ) scale = 2;  // 2x
+              if (cm->superres_scale_denominator == 12) scale = 3; // 3x
+              if (cm->superres_scale_denominator == 16) scale = 4; // 4x
+              if (cm->superres_scale_denominator == 24) scale = 6; // 6x
+              assert(scale != 0);
+
+              const int num_planes = av1_num_planes(cm);
+              YV12_BUFFER_CONFIG *fb = &(new_fb->buf);
+              for (int i = 0; i < num_planes; ++i) {
+                const int is_uv = (i > 0) ? 1 : 0;
+
+                uint16_t *src = ref->buffers[i];
+                int src_stride = ref->strides[is_uv];
+                uint16_t *dst = fb->buffers[i];
+                int dst_stride = fb->strides[is_uv];
+                
+
+                for (int r = 0; r < fb->crop_heights[is_uv]; r++) {
+                  uint16_t *dst0 = dst;
+                  uint16_t *src0 = src;
+                  for (int c = 0; c < fb->crop_widths[is_uv]; c++) {
+                    (*dst) = (*src);
+                    dst++;
+                    src += scale;
+                  }
+                  dst = dst0 + dst_stride;
+                  src = src0 + scale * src_stride;
+                }
+              }
+              aom_extend_frame_borders(fb, num_planes);
+            } else {  // 1.5x
+              av1_resize_lanczos_and_extend_frame(
+                  ref, &new_fb->buf, (int)cm->seq_params.bit_depth, num_planes,
+                  cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
+                  cm->superres_scale_denominator, cm->superres_scale_numerator);
+            }
+#else
+            av1_resize_lanczos_and_extend_frame(
+                ref, &new_fb->buf, (int)cm->seq_params.bit_depth, num_planes,
+                cm->seq_params.subsampling_x, cm->seq_params.subsampling_y,
+                cm->superres_scale_denominator, cm->superres_scale_numerator);
+#endif
+          } else {
+#endif  // CONFIG_2D_SR
           if (use_optimized_scaler && cm->seq_params.bit_depth == AOM_BITS_8)
             av1_resize_and_extend_frame(ref, &new_fb->buf, filter, phase,
                                         num_planes);
           else
             av1_resize_and_extend_frame_nonnormative(
                 ref, &new_fb->buf, (int)cm->seq_params.bit_depth, num_planes);
+#if CONFIG_2D_SR
+          }
+#endif  // CONFIG_2D_SR
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+          cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index] = new_fb;
+#else
           cpi->scaled_ref_buf[ref_frame] = new_fb;
+#endif
           alloc_frame_mvs(cm, new_fb);
         }
       } else {
         RefCntBuffer *buf = get_ref_frame_buf(cm, ref_frame);
         buf->buf.y_crop_width = ref->y_crop_width;
         buf->buf.y_crop_height = ref->y_crop_height;
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+        cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index] = buf;
+#else
         cpi->scaled_ref_buf[ref_frame] = buf;
+#endif
         ++buf->ref_count;
       }
     } else {
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+      if (!has_no_stats_stage(cpi)) cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index] = NULL;
+#else
       if (!has_no_stats_stage(cpi)) cpi->scaled_ref_buf[ref_frame] = NULL;
+#endif
     }
   }
 }

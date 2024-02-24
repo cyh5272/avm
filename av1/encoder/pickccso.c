@@ -583,6 +583,7 @@ void derive_ccso_filter(AV1_COMMON *cm, const int plane, MACROBLOCKD *xd,
       ((mi_params->mi_cols >> xd->plane[plane].subsampling_x) +
        (1 << log2_filter_unit_size >> 2) - 1) /
       (1 << log2_filter_unit_size >> 2);
+
   const int sb_count = ccso_nvfb * ccso_nhfb;
   const int pic_height_c = xd->plane[plane].dst.height;
   const int pic_width_c = xd->plane[plane].dst.width;

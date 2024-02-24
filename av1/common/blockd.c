@@ -462,8 +462,15 @@ void av1_setup_block_planes(MACROBLOCKD *xd, int ss_x, int ss_y,
 void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
   // Allocate based on the MIN_TX_SIZE, which is a 4x4 block.
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
-    int w = mi_params->mi_cols << MI_SIZE_LOG2;
-    int h = mi_params->mi_rows << MI_SIZE_LOG2;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    int w = AOMMAX(mi_params->frm_width, cm->seq_params.max_frame_width);
+    int h = AOMMAX(mi_params->frm_height, cm->seq_params.max_frame_height);
+    assert((mi_params->frm_width == 0 && cm->seq_params.max_frame_width > 0) || (mi_params->frm_width > 0 && cm->seq_params.max_frame_width == 0) || (mi_params->frm_width == cm->seq_params.max_frame_width));
+    assert((mi_params->frm_height == 0 && cm->seq_params.max_frame_height > 0) || (mi_params->frm_height > 0 && cm->seq_params.max_frame_height == 0) || (mi_params->frm_height == cm->seq_params.max_frame_height));
+#else
+	int w = mi_params->mi_cols << MI_SIZE_LOG2;
+	int h = mi_params->mi_rows << MI_SIZE_LOG2;
+#endif     
     w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
@@ -477,6 +484,20 @@ void av1_alloc_txk_skip_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
 #ifndef NDEBUG
   av1_reset_txk_skip_array(cm);
 #endif  // NDEBUG
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+	  int w = mi_params->mi_cols << MI_SIZE_LOG2;
+	  int h = mi_params->mi_rows << MI_SIZE_LOG2;
+	  w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+	  h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+	  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+	  h >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_y);
+	  int stride = (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+	  int rows = (h + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+	  mi_params->tx_skip_buf_size[plane] = rows * stride;
+	  mi_params->tx_skip_stride[plane] = stride;
+  }
+#endif
 }
 
 void av1_dealloc_txk_skip_array(CommonModeInfoParams *mi_params) {
@@ -487,6 +508,10 @@ void av1_dealloc_txk_skip_array(CommonModeInfoParams *mi_params) {
 }
 
 void av1_reset_txk_skip_array(AV1_COMMON *cm) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(cm->superres_scale_denominator != SCALE_NUMERATOR)
+    return;
+#endif  
   // Allocate based on the MIN_TX_SIZE, which is a 4x4 block.
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
     int w = cm->mi_params.mi_cols << MI_SIZE_LOG2;
@@ -501,7 +526,12 @@ void av1_reset_txk_skip_array(AV1_COMMON *cm) {
   }
 }
 
+
 void av1_reset_txk_skip_array_using_mi_params(CommonModeInfoParams *mi_params) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(mi_params->superres_scale_denominator != SCALE_NUMERATOR)
+    return;
+#endif  
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
     memset(mi_params->tx_skip[plane], ILLEGAL_TXK_SKIP_VALUE,
            mi_params->tx_skip_buf_size[plane]);
@@ -513,6 +543,10 @@ void av1_init_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
                              TREE_TYPE tree_type,
                              const CHROMA_REF_INFO *chroma_ref_info,
                              int plane_start, int plane_end) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(cm->superres_scale_denominator != SCALE_NUMERATOR)
+    return;
+#endif                             
   const bool is_chroma_ref = chroma_ref_info->is_chroma_ref;
   for (int plane = plane_start; plane < plane_end; plane++) {
     if (plane && !is_chroma_ref) {
@@ -562,6 +596,10 @@ void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
                                const CHROMA_REF_INFO *chroma_ref_info,
                                int plane, int blk_row, int blk_col,
                                TX_SIZE tx_size) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(cm->superres_scale_denominator != SCALE_NUMERATOR)
+    return;
+#endif                                
   blk_row *= 4;
   blk_col *= 4;
   mi_row = (tree_type == SHARED_PART && plane)
@@ -595,6 +633,10 @@ void av1_update_txk_skip_array(const AV1_COMMON *cm, int mi_row, int mi_col,
 
 uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
                          int plane, int blk_row, int blk_col) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(cm->superres_scale_denominator != SCALE_NUMERATOR)
+    return 0;
+#endif                             
   blk_row *= 4;
   blk_col *= 4;
   int w = ((cm->width + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2)
@@ -615,8 +657,15 @@ uint8_t av1_get_txk_skip(const AV1_COMMON *cm, int mi_row, int mi_col,
 
 void av1_alloc_class_id_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
   for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
-    int w = mi_params->mi_cols << MI_SIZE_LOG2;
-    int h = mi_params->mi_rows << MI_SIZE_LOG2;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    int w = AOMMAX(mi_params->frm_width, cm->seq_params.max_frame_width);
+    int h = AOMMAX(mi_params->frm_height, cm->seq_params.max_frame_height);
+    assert((mi_params->frm_width == 0 && cm->seq_params.max_frame_width > 0) || (mi_params->frm_width > 0 && cm->seq_params.max_frame_width == 0) || (mi_params->frm_width == cm->seq_params.max_frame_width));
+    assert((mi_params->frm_height == 0 && cm->seq_params.max_frame_height > 0) || (mi_params->frm_height > 0 && cm->seq_params.max_frame_height == 0) || (mi_params->frm_height == cm->seq_params.max_frame_height));
+#else
+	  int w = mi_params->mi_cols << MI_SIZE_LOG2;
+	  int h = mi_params->mi_rows << MI_SIZE_LOG2;
+#endif
     w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
     w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
@@ -627,6 +676,19 @@ void av1_alloc_class_id_array(CommonModeInfoParams *mi_params, AV1_COMMON *cm) {
         aom_calloc(rows * stride, sizeof(uint8_t));
     mi_params->wiener_class_id_stride[plane] = stride;
   }
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  for (int plane = 0; plane < MAX_MB_PLANE; plane++) {
+	  int w = mi_params->mi_cols << MI_SIZE_LOG2;
+	  int h = mi_params->mi_rows << MI_SIZE_LOG2;
+	  w = ((w + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+	  h = ((h + MAX_SB_SIZE - 1) >> MAX_SB_SIZE_LOG2) << MAX_SB_SIZE_LOG2;
+	  w >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_x);
+	  h >>= ((plane == 0) ? 0 : cm->seq_params.subsampling_y);
+	  int stride = (w + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+	  int rows = (h + MIN_TX_SIZE - 1) >> MIN_TX_SIZE_LOG2;
+	  mi_params->wiener_class_id_stride[plane] = stride;
+  }
+#endif  
 }
 
 void av1_dealloc_class_id_array(CommonModeInfoParams *mi_params) {

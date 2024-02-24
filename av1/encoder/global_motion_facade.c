@@ -417,7 +417,11 @@ static AOM_INLINE void update_valid_ref_frames_for_gm(
     cm->global_motion[frame] = default_warp_params;
     RefCntBuffer *buf = get_ref_frame_buf(cm, frame);
     // Skip global motion estimation for invalid ref frames
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+    if (buf == NULL || av1_is_scaled(get_ref_scale_factors(cm, frame)) ||
+#else
     if (buf == NULL ||
+#endif
         (ref_disabled && cpi->sf.hl_sf.recode_loop != DISALLOW_RECODE)) {
       continue;
     } else {

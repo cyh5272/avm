@@ -42,11 +42,19 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
   // Note: As per the spec, we must test the fixed point scales here, which are
   // at a higher precision (1 << 14) than the xs and ys in subpel_params (that
   // have 1 << 10 precision).
-  if (av1_is_scaled(sf)) return 0;
+#if !CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+  if (av1_is_scaled(sf)) {
+//    printf("\nav1_is_scaled(sf):");
+    return 0;
+  } 
+#endif
 
   if (final_warp_params != NULL) *final_warp_params = default_warp_params;
 
-  if (build_for_obmc) return 0;
+  if (build_for_obmc) {
+//    printf("\nbuild_for_obmc:");
+    return 0;
+  }
 
 #if CONFIG_EXTENDED_WARP_PREDICTION
   if (warp_types->local_warp_allowed && !mbmi->wm_params[ref].invalid) {
@@ -66,6 +74,9 @@ int av1_allow_warp(const MB_MODE_INFO *const mbmi,
     return 1;
   }
 
+//  printf("warp_types->local_warp_allowed? %d",  warp_types->local_warp_allowed);
+//  printf("mbmi->wm_params[%d].invalid? %d",  ref, mbmi->wm_params[ref].invalid);
+//  printf("\nav1_allow_warp:");
   return 0;
 }
 
@@ -121,6 +132,79 @@ void av1_init_inter_params(InterPredParams *inter_pred_params, int block_width,
   }
 }
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_init_phase_offset(InterPredParams *inter_pred_params,
+                           const struct AV1Common *const cm) {
+  for (int plane_type = 0; plane_type < 2; plane_type++) {
+    inter_pred_params->posx_offset[plane_type] = 0;
+    inter_pred_params->posy_offset[plane_type] = 0;
+  }
+#if CONFIG_2D_SR_ZERO_PHASE
+  // phase offset for chroma horizontal filter when using 6x upsampling
+  if (cm->superres_scale_denominator == 24) {
+    inter_pred_params->posx_offset[0] = -512;
+    inter_pred_params->posy_offset[0] = -512;
+    inter_pred_params->posx_offset[1] = -512;
+    inter_pred_params->posy_offset[1] = -512;
+  }
+  // phase offset for chroma horizontal filter when using 4x upsampling
+  if (cm->superres_scale_denominator == 16) {
+    inter_pred_params->posx_offset[0] = -512;
+    inter_pred_params->posy_offset[0] = -512;
+    inter_pred_params->posx_offset[1] = -512;
+    inter_pred_params->posy_offset[1] = -512;
+  }
+  // phase offset for chroma horizontal filter when using 3x upsampling
+  if (cm->superres_scale_denominator == 12) {
+    inter_pred_params->posx_offset[0] = 0;
+    inter_pred_params->posy_offset[0] = 0;
+    inter_pred_params->posx_offset[1] = 0;
+    inter_pred_params->posy_offset[1] = 0;
+  }
+  // phase offset for chroma horizontal filter when using 2x upsampling
+  if (cm->superres_scale_denominator == 8) {
+    inter_pred_params->posx_offset[0] = -512;
+    inter_pred_params->posy_offset[0] = -512;
+    inter_pred_params->posx_offset[1] = -512;
+    inter_pred_params->posy_offset[1] = -512;
+  }
+  // phase offset for chroma horizontal filter when using 1.5x upsampling
+  if (cm->superres_scale_denominator == 6) {
+    inter_pred_params->posx_offset[0] = -256;
+    inter_pred_params->posy_offset[0] = -256;
+    inter_pred_params->posx_offset[1] = -256;
+    inter_pred_params->posy_offset[1] = -256;
+  }
+#else
+  // phase offset for chroma horizontal filter when using 6x upsampling
+  if (cm->superres_scale_denominator == 24) {
+    inter_pred_params->posx_offset[1] = -213;
+  }
+  // phase offset for chroma horizontal filter when using 4x upsampling
+  if (cm->superres_scale_denominator == 16) {
+    inter_pred_params->posx_offset[1] = -192;
+  }
+  // phase offset for chroma horizontal filter when using 3x upsampling
+  if (cm->superres_scale_denominator == 12) {
+    inter_pred_params->posx_offset[1] = -171;
+  }
+  // phase offset for chroma horizontal filter when using 2x upsampling
+  if (cm->superres_scale_denominator == 8) {
+    inter_pred_params->posx_offset[1] = -128;
+  }
+  // phase offset for chroma horizontal filter when using 1.5x upsampling
+  if (cm->superres_scale_denominator == 6) {
+    inter_pred_params->posx_offset[1] = -85;
+  }
+#endif
+
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+  inter_pred_params->mi_rows = cm->mi_params.mi_rows;
+  inter_pred_params->mi_cols = cm->mi_params.mi_cols;
+#endif
+}
+#endif
+
 void av1_init_comp_mode(InterPredParams *inter_pred_params) {
   inter_pred_params->comp_mode = UNIFORM_COMP;
 }
@@ -148,8 +232,13 @@ void av1_init_warp_params(InterPredParams *inter_pred_params,
                      ref,
 #endif  // CONFIG_EXTENDED_WARP_PREDICTION
                      0, inter_pred_params->scale_factors,
-                     &inter_pred_params->warp_params))
+                     &inter_pred_params->warp_params)) {
     inter_pred_params->mode = WARP_PRED;
+//    printf("\nav1_allow_warp : allowed\n");
+  } 
+//  else {
+//        printf("\nav1_allow_warp : disallowed\n");
+//  }
 }
 
 void av1_make_inter_predictor(const uint16_t *src, int src_stride,
@@ -170,7 +259,12 @@ void av1_make_inter_predictor(const uint16_t *src, int src_stride,
         inter_pred_params->pix_col, inter_pred_params->pix_row,
         inter_pred_params->block_width, inter_pred_params->block_height,
         dst_stride, inter_pred_params->subsampling_x,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+        inter_pred_params->subsampling_y, &inter_pred_params->conv_params,
+        subpel_params);
+#else
         inter_pred_params->subsampling_y, &inter_pred_params->conv_params);
+#endif        
   } else if (inter_pred_params->mode == TRANSLATION_PRED) {
     highbd_inter_predictor(
         src, src_stride, dst, dst_stride, subpel_params,
@@ -927,6 +1021,9 @@ void av1_opfl_build_inter_predictor(
   av1_init_inter_params(inter_pred_params, bw, bh, pre_y, pre_x,
                         pd->subsampling_x, pd->subsampling_y, xd->bd,
                         mi->use_intrabc[0], sf, pre_buf, mi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  av1_init_phase_offset(inter_pred_params, cm);
+#endif
 #if CONFIG_REFINEMV
   inter_pred_params->original_pu_width = pu_width;
   inter_pred_params->original_pu_height = pu_height;
@@ -1658,6 +1755,7 @@ static AOM_INLINE void build_masked_compound_no_round(
                                 &inter_pred_params->conv_params,
                                 inter_pred_params->bit_depth);
 }
+
 #if !CONFIG_D071_IMP_MSK_BLD
 static
 #endif
@@ -1713,17 +1811,39 @@ static
     BacpBlockData *b_data_1 =
         &inter_pred_params->border_data.bacp_block_data[2 * sub_block_id + 1];
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    const struct scale_factors *sf = inter_pred_params->scale_factors;
+
+    int scale_mult = 1, scale_offset = 0, scale_rshift = 0;
+    if (sf->x_scale_fp == REF_NO_SCALE)               {scale_mult = 1; scale_offset = 0; scale_rshift = 0;} // 1.0
+    //if (sf->x_scale_fp == 1.5*(1 << REF_SCALE_SHIFT)) {scale_mult = 3; scale_offset = 1; scale_rshift = 1;} // 1.5
+    if (sf->x_scale_fp == REF_2x_SCALE)               {scale_mult = 2; scale_offset = 0; scale_rshift = 0;} // 2.0
+    if (sf->x_scale_fp == REF_3x_SCALE)               {scale_mult = 3; scale_offset = 0; scale_rshift = 0;} // 3.0;
+    if (sf->x_scale_fp == REF_4x_SCALE)               {scale_mult = 4; scale_offset = 0; scale_rshift = 0;} // 4.0;
+    if (sf->x_scale_fp == REF_6x_SCALE)               {scale_mult = 6; scale_offset = 0; scale_rshift = 0;} // 6.0;
+#endif
+
     for (int i = 0; i < inter_pred_params->block_height; ++i) {
       for (int j = 0; j < inter_pred_params->block_width; ++j) {
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+        int x = b_data_0->x0 + ((scale_mult * j + scale_offset) >> scale_rshift);
+        int y = b_data_0->y0 + ((scale_mult * i + scale_offset) >> scale_rshift);
+#else
         int x = b_data_0->x0 + j;
         int y = b_data_0->y0 + i;
+#endif
 
         int p0_available =
             (x >= 0 && x < inter_pred_params->ref_frame_buf.width && y >= 0 &&
              y < inter_pred_params->ref_frame_buf.height);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+        x = b_data_1->x0 + ((scale_mult * j + scale_offset) >> scale_rshift);
+        y = b_data_1->y0 + ((scale_mult * i + scale_offset) >> scale_rshift);
+#else
         x = b_data_1->x0 + j;
         y = b_data_1->y0 + i;
+#endif
         int p1_available =
             (x >= 0 && x < inter_pred_params->ref_frame_buf.width && y >= 0 &&
              y < inter_pred_params->ref_frame_buf.height);
@@ -1739,6 +1859,7 @@ static
       mask += mask_stride;
     }
   }
+
 #endif  // CONFIG_D071_IMP_MSK_BLD
 
   build_masked_compound_no_round(
@@ -1946,7 +2067,11 @@ void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
                             uint16_t *recon_left, int rec_stride,
                             uint16_t *ref_top, uint16_t *ref_left,
                             int ref_stride, int ref, int plane, int bw,
-                            int bh) {
+#if CONFIG_2D_SR_BAWP_FIX
+	                        int bh, const struct scale_factors *sf) {
+#else
+	                        int bh) {
+#endif
   MB_MODE_INFO *mbmi = xd->mi[0];
   assert(mbmi->bawp_flag == 1);
   // only integer position of reference, may need to consider
@@ -1955,26 +2080,69 @@ void derive_bawp_parameters(MACROBLOCKD *xd, uint16_t *recon_top,
   int sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
 
   if (xd->up_available) {
-    for (int i = 0; i < bw; ++i) {
-      sum_x += ref_top[i];
-      sum_y += recon_top[i];
-      sum_xy += ref_top[i] * recon_top[i];
-      sum_xx += ref_top[i] * ref_top[i];
-    }
+#if CONFIG_2D_SR_BAWP_FIX
+	  if (sf->x_scale_fp != REF_NO_SCALE) {
+		  for (int i = 0; i < bw; i++) {
+			  int idx = sf->scale_value_x_gen(i, sf);
+			  sum_x += ref_top[idx];
+			  sum_y += recon_top[i];
+			  sum_xy += ref_top[idx] * recon_top[i];
+			  sum_xx += ref_top[idx] * ref_top[idx];
+		  }
+	  }
+	  else {
+		  for (int i = 0; i < bw; ++i) {
+			  sum_x += ref_top[i];
+			  sum_y += recon_top[i];
+			  sum_xy += ref_top[i] * recon_top[i];
+			  sum_xx += ref_top[i] * ref_top[i];
+		  }
+	  }
+#else
+	  for (int i = 0; i < bw; ++i) {
+		  sum_x += ref_top[i];
+		  sum_y += recon_top[i];
+		  sum_xy += ref_top[i] * recon_top[i];
+		  sum_xx += ref_top[i] * ref_top[i];
+	  }
+#endif
     count += bw;
   }
 
   if (xd->left_available) {
-    for (int i = 0; i < bh; ++i) {
-      sum_x += ref_left[0];
-      sum_y += recon_left[0];
-      sum_xy += ref_left[0] * recon_left[0];
-      sum_xx += ref_left[0] * ref_left[0];
+#if CONFIG_2D_SR_BAWP_FIX
+	  if (sf->y_scale_fp != REF_NO_SCALE) {
+		  for (int i = 0; i < bh; i++) {
+			  int ref_left_tmp_idx = sf->scale_value_y_gen(i, sf) * ref_stride;
+			  sum_x += ref_left[ref_left_tmp_idx];
+			  sum_y += recon_left[0];
+			  sum_xy += ref_left[ref_left_tmp_idx] * recon_left[0];
+			  sum_xx += ref_left[ref_left_tmp_idx] * ref_left[ref_left_tmp_idx];
+			  recon_left += rec_stride;
+		  }
+	  }
+	  else {
+		  for (int i = 0; i < bh; ++i) {
+			  sum_x += ref_left[0];
+			  sum_y += recon_left[0];
+			  sum_xy += ref_left[0] * recon_left[0];
+			  sum_xx += ref_left[0] * ref_left[0];
+			  recon_left += rec_stride;
+			  ref_left += ref_stride;
+		  }
+	  }
+#else
+	  for (int i = 0; i < bh; ++i) {
+		  sum_x += ref_left[0];
+		  sum_y += recon_left[0];
+		  sum_xy += ref_left[0] * recon_left[0];
+		  sum_xx += ref_left[0] * ref_left[0];
 
-      recon_left += rec_stride;
-      ref_left += ref_stride;
-    }
-    count += bh;
+		  recon_left += rec_stride;
+		  ref_left += ref_stride;
+	  }
+#endif
+      count += bh;
   }
 
   const int16_t shift = 8;  // maybe a smaller value can be used
@@ -2058,12 +2226,41 @@ void av1_build_one_bawp_inter_predictor(
     // the picture boundary limitation to be checked.
     struct macroblockd_plane *const pd = &xd->plane[plane];
     const int ref_stride = pd->pre[ref].stride;
-    uint16_t *ref_buf = pd->pre[ref].buf + y_off * ref_stride + x_off;
+
+#if CONFIG_2D_SR_BAWP_FIX
+	uint16_t *ref_buf = pd->pre[ref].buf + y_off * ref_stride + x_off;
+	  const struct scale_factors *sf = inter_pred_params->scale_factors;
+	  if (sf->x_scale_fp != REF_NO_SCALE || sf->y_scale_fp != REF_NO_SCALE) {
+      //      ref_buf = pd->pre[ref].buf + (y_off * sf->y_scale_fp / REF_NO_SCALE) * ref_stride
+      //          + (x_off * sf->x_scale_fp / REF_NO_SCALE);
+      calc_subpel_params_func(&mbmi->mv[ref].as_mv, inter_pred_params, xd, mi_x,
+                              mi_y, ref,
+#if CONFIG_OPTFLOW_REFINEMENT
+			  0, /* use_optflow_refinement */
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+			  mc_buf, &ref_buf, &subpel_params, &ref_stride);
+	  }
+#else
+	  uint16_t *ref_buf = pd->pre[ref].buf + y_off * ref_stride + x_off;
+#endif
+
     uint16_t *ref_top = ref_buf - BAWP_REF_LINES * ref_stride;
     uint16_t *ref_left = ref_buf - BAWP_REF_LINES;
 
+#if CONFIG_2D_SR_BAWP_FIX
+    if (sf->x_scale_fp != REF_NO_SCALE || sf->y_scale_fp != REF_NO_SCALE) {
+      ref_top = ref_buf -
+                BAWP_REF_LINES * ref_stride * (sf->y_scale_fp / REF_NO_SCALE);
+      ref_left = ref_buf - BAWP_REF_LINES * (sf->x_scale_fp / REF_NO_SCALE);
+    }
+#endif
+
     derive_bawp_parameters(xd, recon_top, recon_left, recon_stride, ref_top,
-                           ref_left, ref_stride, ref, plane, ref_w, ref_h);
+#if CONFIG_2D_SR_BAWP_FIX
+                           ref_left, ref_stride, ref, plane, ref_w, ref_h, sf);
+#else
+						  ref_left, ref_stride, ref, plane, ref_w, ref_h);
+#endif
   }
 
   int16_t alpha = mbmi->bawp_alpha[plane][ref];
@@ -2173,6 +2370,9 @@ static void build_inter_predictors_sub8x8(
                             pre_x + x, pd->subsampling_x, pd->subsampling_y,
                             xd->bd, mi->use_intrabc[0], sf, &pre_buf,
                             this_mbmi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+      av1_init_phase_offset(&inter_pred_params, cm);
+#endif
       inter_pred_params.conv_params =
           get_conv_params_no_round(ref, plane, NULL, 0, is_compound, xd->bd);
 
@@ -2228,6 +2428,7 @@ static void refinemv_highbd_pad_mc_border(const uint16_t *src, int src_stride,
 
     if (y0 > ref_area->pad_block.y0 && y0 < ref_area->pad_block.y1)
       ref_row += src_stride;
+
   } while (--b_h);
 }
 // check if padding is required during motion compensation
@@ -2289,12 +2490,21 @@ int update_extend_mc_border_params(const struct scale_factors *const sf,
 // perform padding of the motion compensated block if requires.
 // Padding is performed if the motion compensated block is partially out of the
 // reference area.
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+static void refinemv_extend_mc_border(
+    const struct scale_factors *const sf, struct buf_2d *const pre_buf,
+    MV32 scaled_mv, PadBlock block, int subpel_x_mv, int subpel_y_mv,
+    int do_warp, int is_intrabc, uint16_t *paded_ref_buf,
+    int paded_ref_buf_stride, uint16_t **pre, int *src_stride,
+    const ReferenceArea *ref_area, InterPredParams *const inter_pred_params) {
+#else
 static void refinemv_extend_mc_border(
     const struct scale_factors *const sf, struct buf_2d *const pre_buf,
     MV32 scaled_mv, PadBlock block, int subpel_x_mv, int subpel_y_mv,
     int do_warp, int is_intrabc, uint16_t *paded_ref_buf,
     int paded_ref_buf_stride, uint16_t **pre, int *src_stride,
     const ReferenceArea *ref_area) {
+#endif
   int x_pad = 0, y_pad = 0;
   if (update_extend_mc_border_params(sf, pre_buf, scaled_mv, &block,
                                      subpel_x_mv, subpel_y_mv, do_warp,
@@ -2331,6 +2541,7 @@ void tip_dec_calc_subpel_params(const MV *const src_mv,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                                 MV32 *scaled_mv, int *subpel_x_mv,
                                 int *subpel_y_mv) {
+                                	
   const struct scale_factors *sf = inter_pred_params->scale_factors;
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
 
@@ -2374,6 +2585,22 @@ void tip_dec_calc_subpel_params(const MV *const src_mv,
     int pos_x = sf->scale_value_x(orig_pos_x, sf);
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
+    
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif    
 
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
@@ -2382,12 +2609,130 @@ void tip_dec_calc_subpel_params(const MV *const src_mv,
     const int right = (pre_buf->width + AOM_INTERP_EXTEND) << SCALE_SUBPEL_BITS;
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
-
+    
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const MV mv_q4 = tip_clamp_mv_to_umv_border_sb(inter_pred_params, src_mv, bw, bh, use_optflow_refinement, inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else    
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
+    
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+      inter_pred_params->conv_params.stride_scale = scale;
+
+      int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
+      int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+
+    const MV orig_mv_q4 = tip_clamp_mv_to_umv_border_sb(
+          inter_pred_params, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+          use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+          inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+
+      orig_pos_x += orig_mv_q4.col;
+      orig_pos_y += orig_mv_q4.row;
+
+      orig_pos_y =
+          clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale, top,
+                bottom);
+      orig_pos_x =
+          clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale, left,
+                right);
+
+
+      // Get reference block top left coordinate.
+      block->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+
+      //// Get reference block bottom right coordinate.
+      //block->x1 = ((orig_pos_x +
+      //              (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+      //     SCALE_SUBPEL_BITS) +
+      //    scale;
+      //block->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+      //                          subpel_params->ys) >>
+      //             SCALE_SUBPEL_BITS) +
+      //            scale;
+
+#if CONFIG_D071_IMP_MSK_BLD
+      //block->x1 = orig_pos_x + (inter_pred_params->block_width) * scale;
+      //block->y1 = orig_pos_y + (inter_pred_params->block_height) * scale;
+      block->x1 =
+          ((orig_pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          scale;
+      block->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+#else
+      //block->x1 = orig_pos_x + bw * scale;
+      //block->y1 = orig_pos_y + bh * scale;
+      block->x1 =
+          ((orig_pos_x + (bw - 1) * subpel_params->xs) >> SCALE_SUBPEL_BITS) + 1;
+      block->y1 =
+          ((orig_pos_y + (bh - 1) * subpel_params->ys) >> SCALE_SUBPEL_BITS) + 1;
+#endif  // CONFIG_D071_IMP_MSK_BLD
+
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+
+      // Get reference block top left coordinate.
+      block->x0 = pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = pos_y >> SCALE_SUBPEL_BITS;
+
+#if CONFIG_D071_IMP_MSK_BLD
+      block->x1 =
+          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          1;
+      block->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  1;
+#else
+      // Get reference block bottom right coordinate.
+      block->x1 =
+          ((pos_x + (bw - 1) * subpel_params->xs) >> SCALE_SUBPEL_BITS) + 1;
+      block->y1 =
+          ((pos_y + (bh - 1) * subpel_params->ys) >> SCALE_SUBPEL_BITS) + 1;
+#endif  // CONFIG_D071_IMP_MSK_BLD
+    }
+    MV temp_mv;
+    temp_mv = tip_clamp_mv_to_umv_border_sb(inter_pred_params, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                            use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                            inter_pred_params->subsampling_x,
+                                            inter_pred_params->subsampling_y);
+
+      *scaled_mv = av1_scale_mv(&temp_mv, mi_x, mi_y, sf);
+      scaled_mv->row += SCALE_EXTRA_OFF;
+      scaled_mv->col += SCALE_EXTRA_OFF;
+
+      *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
+      *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#else
     // Get reference block top left coordinate.
     block->x0 = pos_x >> SCALE_SUBPEL_BITS;
     block->y0 = pos_y >> SCALE_SUBPEL_BITS;
@@ -2422,6 +2767,7 @@ void tip_dec_calc_subpel_params(const MV *const src_mv,
 
     *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
     *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#endif    
   } else {
     // Get block position in current frame.
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
@@ -2497,12 +2843,21 @@ void tip_common_calc_subpel_params_and_extend(
 
   const int paded_ref_buf_stride =
       inter_pred_params->ref_area->paded_ref_buf_stride;
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+  refinemv_extend_mc_border(
+      inter_pred_params->scale_factors, &inter_pred_params->ref_frame_buf,
+      scaled_mv, block, subpel_x_mv, subpel_y_mv,
+      inter_pred_params->mode == WARP_PRED, inter_pred_params->is_intrabc,
+      &inter_pred_params->ref_area->paded_ref_buf[0], paded_ref_buf_stride, pre,
+      src_stride, inter_pred_params->ref_area, inter_pred_params);
+#else      
   refinemv_extend_mc_border(
       inter_pred_params->scale_factors, &inter_pred_params->ref_frame_buf,
       scaled_mv, block, subpel_x_mv, subpel_y_mv,
       inter_pred_params->mode == WARP_PRED, inter_pred_params->is_intrabc,
       &inter_pred_params->ref_area->paded_ref_buf[0], paded_ref_buf_stride, pre,
       src_stride, inter_pred_params->ref_area);
+#endif      
 }
 #endif
 
@@ -2516,6 +2871,7 @@ void dec_calc_subpel_params(const MV *const src_mv,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
                             MV32 *scaled_mv, int *subpel_x_mv,
                             int *subpel_y_mv) {
+                          	
   const struct scale_factors *sf = inter_pred_params->scale_factors;
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
 
@@ -2560,6 +2916,22 @@ void dec_calc_subpel_params(const MV *const src_mv,
     int pos_x = sf->scale_value_x(orig_pos_x, sf);
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
+    
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif    
 
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
@@ -2569,11 +2941,96 @@ void dec_calc_subpel_params(const MV *const src_mv,
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const MV mv_q4 = clamp_mv_to_umv_border_sb(xd, src_mv, bw, bh, use_optflow_refinement, inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
+    
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+
+      inter_pred_params->conv_params.stride_scale = scale;
+
+      int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
+      int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+
+      const MV orig_mv_q4 = clamp_mv_to_umv_border_sb(
+          xd, src_mv, bw, bh, use_optflow_refinement,
+          inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+
+      orig_pos_x += orig_mv_q4.col;
+      orig_pos_y += orig_mv_q4.row;
+
+      orig_pos_y = clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         top, bottom);
+      orig_pos_x = clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         left, right);
+
+      // Get reference block top left coordinate.
+      block->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 = ((orig_pos_x +
+                    (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+      block->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+                                     subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+
+      // Get reference block top left coordinate.
+      block->x0 = pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 =
+          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          1;
+      block->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  1;
+    }
+
+    MV temp_mv;
+    temp_mv = clamp_mv_to_umv_border_sb(xd, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                        use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                        inter_pred_params->subsampling_x,
+                                        inter_pred_params->subsampling_y);
+    *scaled_mv = av1_scale_mv(&temp_mv, mi_x, mi_y, sf);
+    scaled_mv->row += SCALE_EXTRA_OFF;
+    scaled_mv->col += SCALE_EXTRA_OFF;
+
+    *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
+    *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#else
     // Get reference block top left coordinate.
     block->x0 = pos_x >> SCALE_SUBPEL_BITS;
     block->y0 = pos_y >> SCALE_SUBPEL_BITS;
@@ -2601,6 +3058,7 @@ void dec_calc_subpel_params(const MV *const src_mv,
 
     *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
     *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#endif    
   } else {
     // Get block position in current frame.
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
@@ -2671,12 +3129,21 @@ void common_calc_subpel_params_and_extend(
   // printf(" Use ref padding \n");
   const int paded_ref_buf_stride =
       inter_pred_params->ref_area->paded_ref_buf_stride;
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT      
+  refinemv_extend_mc_border(
+      inter_pred_params->scale_factors, &inter_pred_params->ref_frame_buf,
+      scaled_mv, block, subpel_x_mv, subpel_y_mv,
+      inter_pred_params->mode == WARP_PRED, inter_pred_params->is_intrabc,
+      &inter_pred_params->ref_area->paded_ref_buf[0], paded_ref_buf_stride, pre,
+      src_stride, inter_pred_params->ref_area, inter_pred_params);
+#else
   refinemv_extend_mc_border(
       inter_pred_params->scale_factors, &inter_pred_params->ref_frame_buf,
       scaled_mv, block, subpel_x_mv, subpel_y_mv,
       inter_pred_params->mode == WARP_PRED, inter_pred_params->is_intrabc,
       &inter_pred_params->ref_area->paded_ref_buf[0], paded_ref_buf_stride, pre,
       src_stride, inter_pred_params->ref_area);
+#endif      
 }
 
 static void get_ref_area_info(const MV *const src_mv,
@@ -2767,6 +3234,9 @@ void av1_get_reference_area_with_padding(const AV1_COMMON *cm, MACROBLOCKD *xd,
                           pd->subsampling_x, pd->subsampling_y, xd->bd,
                           mi->use_intrabc[0], sf, pre_buf,
                           is_tip ? MULTITAP_SHARP : mi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
 
     inter_pred_params.original_pu_width = bw;
     inter_pred_params.original_pu_height = bh;
@@ -2858,6 +3328,9 @@ void apply_mv_refinement(const AV1_COMMON *cm, MACROBLOCKD *xd, int plane,
     av1_init_inter_params(&inter_pred_params[ref], bw, bh, pre_y, pre_x,
                           pd->subsampling_x, pd->subsampling_y, xd->bd,
                           mi->use_intrabc[0], sf, pre_buf, BILINEAR);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params[ref], cm);
+#endif
 
 #if CONFIG_REFINEMV
     inter_pred_params[ref].original_pu_width = pu_width;
@@ -3178,6 +3651,9 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
     av1_init_inter_params(&inter_pred_params, bw, bh, pre_y, pre_x,
                           pd->subsampling_x, pd->subsampling_y, xd->bd,
                           mi->use_intrabc[0], sf, pre_buf, mi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
 
 #if CONFIG_REFINEMV
     inter_pred_params.use_ref_padding = 1;
@@ -3446,10 +3922,17 @@ static void build_inter_predictors_8x8_and_bigger(
 
   if (use_optflow_refinement && plane == 0) {
     // Allocate gradient and dst buffers
-    gx0 = aom_memalign(32, 2 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx0));
-    gx1 = aom_memalign(32, 2 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx1));
-    gy0 = gx0 + (MAX_SB_SIZE * MAX_SB_SIZE);
-    gy1 = gx1 + (MAX_SB_SIZE * MAX_SB_SIZE);
+#if CONFIG_2D_SR_SCALE_EXT
+	  gx0 = aom_memalign(32, 36 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx0));
+	  gx1 = aom_memalign(32, 36 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx1));
+	  gy0 = gx0 + (MAX_SB_SIZE * MAX_SB_SIZE);
+	  gy1 = gx1 + (MAX_SB_SIZE * MAX_SB_SIZE);
+#else  // CONFIG_2D_SR_SCALE_EXT
+	  gx0 = aom_memalign(32, 2 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx0));
+	  gx1 = aom_memalign(32, 2 * MAX_SB_SIZE * MAX_SB_SIZE * sizeof(*gx1));
+	  gy0 = gx0 + (MAX_SB_SIZE * MAX_SB_SIZE);
+	  gy1 = gx1 + (MAX_SB_SIZE * MAX_SB_SIZE);
+#endif  // CONFIG_2D_SR_SCALE_EXT 
 
     // Initialize refined mv
 #if CONFIG_REFINEMV
@@ -3465,8 +3948,13 @@ static void build_inter_predictors_8x8_and_bigger(
     }
     // Refine MV using optical flow. The final output MV will be in 1/16
     // precision.
-    dst0 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
-    dst1 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
+#if CONFIG_2D_SR_SCALE_EXT
+	dst0 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
+	dst1 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
+#else  // CONFIG_2D_SR_SCALE_EXT
+	dst0 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
+	dst1 = aom_calloc(1, MAX_SB_SIZE * MAX_SB_SIZE * sizeof(uint16_t));
+#endif  // CONFIG_2D_SR_SCALE_EXT
     av1_get_optflow_based_mv_highbd(cm, xd, plane, mi, mv_refined, bw, bh, mi_x,
                                     mi_y, mc_buf, calc_subpel_params_func, gx0,
                                     gy0, gx1, gy1, vx0, vy0, vx1, vy1, dst0,
@@ -3506,6 +3994,9 @@ static void build_inter_predictors_8x8_and_bigger(
     av1_init_inter_params(&inter_pred_params, bw, bh, pre_y, pre_x,
                           pd->subsampling_x, pd->subsampling_y, xd->bd,
                           mi->use_intrabc[0], sf, pre_buf, mi->interp_fltr);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
     if (is_compound) av1_init_comp_mode(&inter_pred_params);
 #if CONFIG_D071_IMP_MSK_BLD
     inter_pred_params.border_data.enable_bacp = use_bacp;

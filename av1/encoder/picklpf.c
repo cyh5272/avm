@@ -29,6 +29,7 @@
 #include "av1/encoder/picklpf.h"
 
 #include <float.h>
+
 #define CHROMA_LAMBDA_MULT 6
 
 static void yv12_copy_plane(const YV12_BUFFER_CONFIG *src_bc,
@@ -290,21 +291,20 @@ static int search_filter_offsets(const YV12_BUFFER_CONFIG *sd, AV1_COMP *cpi,
         vert_bits + (offsets[off_ind] == vert_offset ? 0 : DF_PAR_BITS);
     best_bits = vert_bits + (offset_best == vert_offset ? 0 : DF_PAR_BITS);
   }
-
   double best_cost =
       RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult * chroma_lambda_mult, best_bits,
                                      best_err, cm->seq_params.bit_depth);
   double start_cost =
-      RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult * chroma_lambda_mult, start_bits,
-                                     start_err, cm->seq_params.bit_depth);
+	  RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult * chroma_lambda_mult, start_bits,
+		  start_err, cm->seq_params.bit_depth);
 
 #else
   double best_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
       x->rdmult * chroma_lambda_mult, offset_best ? DF_PAR_BITS : 0, best_err,
       cm->seq_params.bit_depth);
   double start_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult * chroma_lambda_mult, offsets[off_ind] ? DF_PAR_BITS : 0,
-      start_err, cm->seq_params.bit_depth);
+	  x->rdmult * chroma_lambda_mult, offsets[off_ind] ? DF_PAR_BITS : 0,
+	  start_err, cm->seq_params.bit_depth);
 #endif  // DF_DUAL
 
   if (best_cost_ret) *best_cost_ret = AOMMIN(best_cost, start_cost);

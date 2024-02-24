@@ -1788,9 +1788,22 @@ YV12_BUFFER_CONFIG *av1_get_scaled_ref_frame(const AV1_COMP *cpi,
     return NULL;
   }
 #endif  // CONFIG_TIP
-
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+  if (ref_frame >= cpi->common.ref_frames_info.num_total_refs) {
+	  return NULL;
+  }
+#else
   assert(ref_frame < cpi->common.ref_frames_info.num_total_refs);
+#endif
+
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+  const uint8_t denom = cpi->oxcf.superres_cfg.superres_scale_denominator;
+  const int scale_index = (denom == SCALE_NUMERATOR) ? SUPERRES_SCALES : to_scale_index(cpi, denom);
+
+  RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame * (SUPERRES_SCALES + 1) + scale_index];
+#else
   RefCntBuffer *const scaled_buf = cpi->scaled_ref_buf[ref_frame];
+#endif
   const RefCntBuffer *const ref_buf =
       get_ref_frame_buf(&cpi->common, ref_frame);
   return (scaled_buf != ref_buf && scaled_buf != NULL) ? &scaled_buf->buf

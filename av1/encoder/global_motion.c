@@ -192,7 +192,11 @@ static int64_t highbd_warp_error(
       const int warp_h = AOMMIN(error_bsize_h, p_row + p_height - i);
       highbd_warp_plane(wm, ref, width, height, stride, tmp, j, i, warp_w,
                         warp_h, WARP_ERROR_BLOCK, subsampling_x, subsampling_y,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                        bd, &conv_params, NULL);
+#else
                         bd, &conv_params);
+#endif 
       gm_sumerr += av1_calc_highbd_frame_error(tmp, WARP_ERROR_BLOCK,
                                                dst + j + i * p_stride, warp_w,
                                                warp_h, p_stride, bd);

@@ -233,7 +233,11 @@ static AOM_INLINE void first_pass_motion_search(AV1_COMP *cpi, MACROBLOCK *x,
 #if CONFIG_IBC_BV_IMPROVEMENT
       is_ibc_cost,
 #endif
-      first_pass_search_sites, fine_search_interval);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	  first_pass_search_sites, fine_search_interval, 0);
+#else
+	  first_pass_search_sites, fine_search_interval);
+#endif
 #else
   av1_make_default_fullpel_ms_params(&ms_params, cpi, x, bsize, ref_mv,
                                      first_pass_search_sites,
@@ -909,6 +913,7 @@ int av1_get_mb_cols_in_tile(TileInfo tile) {
 static void first_pass_tile(AV1_COMP *cpi, ThreadData *td,
                             TileDataEnc *tile_data) {
   TileInfo *tile = &tile_data->tile_info;
+
   for (int mi_row = tile->mi_row_start; mi_row < tile->mi_row_end;
        mi_row += FP_MIB_SIZE) {
     av1_first_pass_row(cpi, td, tile_data, mi_row >> FP_MIB_SIZE_LOG2);
@@ -958,6 +963,7 @@ void av1_first_pass_row(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   AV1EncRowMultiThreadSync *const row_mt_sync = &tile_data->row_mt_sync;
 
   xd->tile = *tile;
+
   const YV12_BUFFER_CONFIG *const last_frame =
       get_ref_frame_yv12_buf(cm, LAST_FRAME_PROXY);
   const YV12_BUFFER_CONFIG *golden_frame =
@@ -1050,6 +1056,7 @@ void av1_first_pass_row(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
           recon_yoffset, recon_uvoffset, src_yoffset, alt_ref_frame_yoffset,
           fp_block_size, this_intra_error, raw_motion_err_counts,
           raw_motion_err_list, &best_ref_mv, &last_mv, mb_stats);
+
       if (mb_col_in_tile == 0) {
         *first_top_mv = last_mv;
       }
@@ -1122,6 +1129,7 @@ void av1_first_pass(AV1_COMP *cpi, const int64_t ts_duration) {
   const YV12_BUFFER_CONFIG *golden_frame =
       get_ref_frame_yv12_buf(cm, GOLDEN_FRAME_PROXY);
   YV12_BUFFER_CONFIG *const this_frame = &cm->cur_frame->buf;
+
   // First pass code requires valid last and new frame buffers.
   assert(this_frame != NULL);
   assert(frame_is_intra_only(cm) || (last_frame != NULL));

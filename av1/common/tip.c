@@ -129,9 +129,19 @@ static int tip_motion_field_projection(AV1_COMMON *cm,
 #else
   const int start_frame_order_hint = start_frame_buf->order_hint;
 #endif  // CONFIG_EXPLICIT_TEMPORAL_DIST_CALC
-
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+  const int is_scaled = (start_frame_buf->width != cm->width ||
+    start_frame_buf->height != cm->height);
+  struct scale_factors sf_;
+  // Inverse scale factor
+  av1_setup_scale_factors_for_frame(&sf_, cm->width, cm->height,
+    start_frame_buf->width,
+    start_frame_buf->height);
+  const struct scale_factors* sf = &sf_;
+#else
   assert(start_frame_buf->width == cm->width &&
          start_frame_buf->height == cm->height);
+#endif
 #if CONFIG_EXPLICIT_TEMPORAL_DIST_CALC
   const int *const ref_order_hints = start_frame_buf->ref_display_order_hint;
   const int cur_order_hint = cm->cur_frame->display_order_hint;
@@ -158,7 +168,33 @@ static int tip_motion_field_projection(AV1_COMMON *cm,
   const int mvs_cols =
       ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
   const int mvs_stride = mvs_cols;
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+  uint32_t scaled_blk_col_hr_0 = 0;
+  uint32_t scaled_blk_col_hr_step = 0;
+  uint32_t scaled_blk_col_hr = 0;
+  uint32_t scaled_blk_row_hr_0 = 0;
+  uint32_t scaled_blk_row_hr_step = 0;
+  uint32_t scaled_blk_row_hr = 0;
+  if (is_scaled) {
+    scaled_blk_col_hr_0 =
+        (uint32_t)sf->x_scale_fp * 4;  // center of first block
+    scaled_blk_col_hr_step = (uint32_t)sf->x_scale_fp * 8;  // step
+    scaled_blk_row_hr_0 =
+        (uint32_t)sf->y_scale_fp * 4;  // center of first block
+    scaled_blk_row_hr_step = (uint32_t)sf->y_scale_fp * 8;  // step
+    scaled_blk_row_hr = scaled_blk_row_hr_0;
+  }
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   for (int blk_row = 0; blk_row < mvs_rows; ++blk_row) {
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+    int scaled_blk_row = blk_row;
+    if (is_scaled) {
+      scaled_blk_col_hr = scaled_blk_col_hr_0;
+      scaled_blk_row =
+          ROUND_POWER_OF_TWO(scaled_blk_row_hr, REF_SCALE_SHIFT + 3);
+      scaled_blk_row = AOMMIN(scaled_blk_row, mvs_rows - 1);
+    }
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
     for (int blk_col = 0; blk_col < mvs_cols; ++blk_col) {
       const MV_REF *mv_ref = &mv_ref_base[blk_row * mvs_stride + blk_col];
       MV_REFERENCE_FRAME ref_frame[2] = { mv_ref->ref_frame[0],
@@ -168,6 +204,16 @@ static int tip_motion_field_projection(AV1_COMMON *cm,
           const int ref_frame_order_hint = ref_order_hints[ref_frame[idx]];
           if (ref_frame_order_hint == target_order_hint) {
             MV ref_mv = mv_ref->mv[idx].as_mv;
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+            int scaled_blk_col = blk_col;
+            if (is_scaled) {
+              scaled_blk_col =
+                  ROUND_POWER_OF_TWO(scaled_blk_col_hr, REF_SCALE_SHIFT + 3);
+              scaled_blk_col = AOMMIN(scaled_blk_col, mvs_cols - 1);
+              ref_mv.row = sf->scale_value_y_gen(ref_mv.row, sf);
+              ref_mv.col = sf->scale_value_x_gen(ref_mv.col, sf);
+            }
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
             int_mv this_mv;
             int mi_r = 0;
             int mi_c = 0;
@@ -180,7 +226,6 @@ static int tip_motion_field_projection(AV1_COMMON *cm,
                 ref_mv.row = -ref_mv.row;
                 ref_mv.col = -ref_mv.col;
               }
-
               const int mi_offset = mi_r * mvs_stride + mi_c;
               if (tpl_mvs_base[mi_offset].mfmv0.as_int == INVALID_MV) {
                 tpl_mvs_base[mi_offset].mfmv0.as_mv.row = ref_mv.row;
@@ -191,7 +236,13 @@ static int tip_motion_field_projection(AV1_COMMON *cm,
           }
         }
       }
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+      if (is_scaled) scaled_blk_col_hr += scaled_blk_col_hr_step;
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
     }
+#if CONFIG_ACROSS_SCALE_TPL_MVS
+    if (is_scaled) scaled_blk_row_hr += scaled_blk_row_hr_step;
+#endif  // CONFIG_ACROSS_SCALE_TPL_MVS
   }
 
   return 1;
@@ -590,10 +641,26 @@ static AOM_INLINE void tip_highbd_inter_predictor(
   const int is_scaled = has_scale(subpel_params->xs, subpel_params->ys);
   assert(conv_params->dst != NULL);
   if (is_scaled) {
+// Note when CONFIG_2D_SR_STRIDED_CONV_SPEED is enabled, we can use the
+// accelerated functions and so do not have to force the use of av1_highbd_convolve_2d_scale_c
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if (conv_params->stride_scale == 1) {
+      av1_highbd_convolve_2d_scale(
+          src, src_stride, dst, dst_stride, w, h, interp_filters[0],
+          interp_filters[1], subpel_params->subpel_x, subpel_params->xs,
+          subpel_params->subpel_y, subpel_params->ys, conv_params, bd);
+    } else {
+      av1_highbd_convolve_2d_scale_strided(
+          src, src_stride, dst, dst_stride, w, h, interp_filters[0],
+          interp_filters[1], subpel_params->subpel_x, subpel_params->xs,
+          subpel_params->subpel_y, subpel_params->ys, conv_params, bd);
+    }
+#else
     av1_highbd_convolve_2d_scale(
         src, src_stride, dst, dst_stride, w, h, interp_filters[0],
         interp_filters[1], subpel_params->subpel_x, subpel_params->xs,
         subpel_params->subpel_y, subpel_params->ys, conv_params, bd);
+#endif
   } else {
     revert_scale_extra_bits(subpel_params);
     tip_highbd_convolve_2d_facade_compound(src, src_stride, dst, dst_stride, w,
@@ -937,6 +1004,9 @@ static AOM_INLINE void tip_build_inter_predictors_8x8(
     av1_init_inter_params(&inter_pred_params, comp_bw, comp_bh, comp_pixel_y,
                           comp_pixel_x, ss_x, ss_y, bd, 0, sf, pred_buf,
                           MULTITAP_SHARP);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
 
 #if CONFIG_REFINEMV
     if (apply_refinemv) {
@@ -1078,6 +1148,9 @@ static AOM_INLINE void tip_build_inter_predictors_8x8_and_bigger(
     av1_init_inter_params(&inter_pred_params, comp_bw, comp_bh, comp_pixel_y,
                           comp_pixel_x, ss_x, ss_y, bd, 0, sf, pred_buf,
                           MULTITAP_SHARP);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+    av1_init_phase_offset(&inter_pred_params, cm);
+#endif
 
     inter_pred_params.comp_mode = UNIFORM_COMP;
 
@@ -1257,6 +1330,20 @@ void av1_setup_tip_frame(AV1_COMMON *cm, MACROBLOCKD *xd, uint16_t **mc_buf,
       ROUND_POWER_OF_TWO(cm->mi_params.mi_cols, TMVP_SHIFT_BITS);
   tip_setup_tip_frame_planes(cm, xd, 0, 0, mvs_rows, mvs_cols, mvs_cols, mc_buf,
                              tmp_conv_dst, calc_subpel_params_func);
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+  // TODO: Selectively skip upsampling if PEF is to be executed, since PEF would perform the upsampiling.
+  // Possible condition to check for PEF: if (cm->seq_params.enable_pef && cm->features.allow_pef) {
+  if (av1_superres_scaled(cm)) {
+    // Upscale tip_frame and store in upsampled_tip_frame_buf
+#if CONFIG_2D_SR
+    av1_upscale_normative_2d_and_extend_frame(
+        cm, &cm->tip_ref.tip_frame->buf, &cm->tip_ref.upscaled_tip_frame_buf);
+#else
+    av1_upscale_normative_and_extend_frame(cm, &cm->tip_ref.tip_frame->buf,
+                                           &cm->tip_ref.upscaled_tip_frame_buf);
+#endif  // CONFIG_2D_SR
+  }
+#endif  // CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
 }
 
 static void tip_extend_plane_block_based_highbd(

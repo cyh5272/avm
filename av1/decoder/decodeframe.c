@@ -76,9 +76,15 @@
 
 // This is needed by ext_tile related unit tests.
 #define EXT_TILE_DEBUG 1
+#if CONFIG_2D_SR_SCALE_EXT
+#define MC_TEMP_BUF_PELS                       \
+  (((MAX_SB_SIZE)*6 + (AOM_INTERP_EXTEND)*2) * \
+   ((MAX_SB_SIZE)*6 + (AOM_INTERP_EXTEND)*2))  
+#else  // CONFIG_2D_SR_SCALE_EXT
 #define MC_TEMP_BUF_PELS                       \
   (((MAX_SB_SIZE)*2 + (AOM_INTERP_EXTEND)*2) * \
    ((MAX_SB_SIZE)*2 + (AOM_INTERP_EXTEND)*2))
+#endif  // CONFIG_2D_SR_SCALE_EXT
 
 #if CONFIG_THROUGHPUT_ANALYSIS
 int64_t tot_ctx_syms = { 0 };
@@ -687,6 +693,7 @@ int update_extend_mc_border_params(const struct scale_factors *const sf,
       (is_scaled || scaled_mv.col || scaled_mv.row || (frame_width & 0x7) ||
        (frame_height & 0x7))) {
 #endif  // CONFIG_OPTFLOW_REFINEMENT || CONFIG_TIP
+
     if (subpel_x_mv || (sf->x_step_q4 != SUBPEL_SHIFTS)) {
       block->x0 -= AOM_INTERP_EXTEND - 1;
       block->x1 += AOM_INTERP_EXTEND;
@@ -724,7 +731,6 @@ static INLINE void extend_mc_border(const struct scale_factors *const sf,
                                      ,
                                      NULL
 #endif  // CONFIG_REFINEMV
-
                                      )) {
     // Get reference block pointer.
     const uint16_t *const buf_ptr =
@@ -742,6 +748,7 @@ static INLINE void extend_mc_border(const struct scale_factors *const sf,
            x_pad * (AOM_INTERP_EXTEND - 1);
   }
 }
+
 #if !CONFIG_REFINEMV
 static void dec_calc_subpel_params(
     const MV *const src_mv, InterPredParams *const inter_pred_params,
@@ -751,6 +758,7 @@ static void dec_calc_subpel_params(
     int use_optflow_refinement,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     MV32 *scaled_mv, int *subpel_x_mv, int *subpel_y_mv) {
+
   const struct scale_factors *sf = inter_pred_params->scale_factors;
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
 #if CONFIG_OPTFLOW_REFINEMENT
@@ -788,19 +796,120 @@ static void dec_calc_subpel_params(
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
 
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif
+
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
+
     const int bottom = (pre_buf->height + AOM_INTERP_EXTEND)
                        << SCALE_SUBPEL_BITS;
     const int right = (pre_buf->width + AOM_INTERP_EXTEND) << SCALE_SUBPEL_BITS;
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const MV mv_q4 = clamp_mv_to_umv_border_sb(xd, src_mv, bw, bh, use_optflow_refinement, inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+
+      inter_pred_params->conv_params.stride_scale = scale;
+
+      int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
+      int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+
+      const MV orig_mv_q4 = clamp_mv_to_umv_border_sb(
+          xd, src_mv, bw, bh, use_optflow_refinement,
+          inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+
+      orig_pos_x += orig_mv_q4.col;
+      orig_pos_y += orig_mv_q4.row;
+
+      orig_pos_y = clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         top, bottom);
+      orig_pos_x = clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         left, right);
+
+      // Get reference block top left coordinate.
+      block->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 = ((orig_pos_x +
+                    (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+      block->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+                                     subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+
+      // Get reference block top left coordinate.
+      block->x0 = pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 =
+          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          1;
+      block->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  1;
+    }
+
+    MV temp_mv;
+      temp_mv = clamp_mv_to_umv_border_sb(xd, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                          use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                          inter_pred_params->subsampling_x,
+                                          inter_pred_params->subsampling_y);
+      *scaled_mv = av1_scale_mv(&temp_mv, mi_x, mi_y, sf);
+      scaled_mv->row += SCALE_EXTRA_OFF;
+      scaled_mv->col += SCALE_EXTRA_OFF;
+
+      *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
+      *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#else
     // Get reference block top left coordinate.
     block->x0 = pos_x >> SCALE_SUBPEL_BITS;
     block->y0 = pos_y >> SCALE_SUBPEL_BITS;
@@ -828,6 +937,7 @@ static void dec_calc_subpel_params(
 
     *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
     *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#endif
   } else {
     // Get block position in current frame.
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
@@ -920,6 +1030,7 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
     int use_optflow_refinement,
 #endif  // CONFIG_OPTFLOW_REFINEMENT
     MV32 *scaled_mv, int *subpel_x_mv, int *subpel_y_mv) {
+
   const struct scale_factors *sf = inter_pred_params->scale_factors;
   struct buf_2d *pre_buf = &inter_pred_params->ref_frame_buf;
 
@@ -964,6 +1075,22 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
 
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif
+
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
     const int bottom = (pre_buf->height + AOM_INTERP_EXTEND)
@@ -972,11 +1099,100 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const MV mv_q4 = tip_clamp_mv_to_umv_border_sb(inter_pred_params, src_mv, bw, bh, use_optflow_refinement, inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
+
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+      inter_pred_params->conv_params.stride_scale = scale;
+
+      int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
+      int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+
+    const MV orig_mv_q4 = tip_clamp_mv_to_umv_border_sb(
+          inter_pred_params, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+          use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+        inter_pred_params->subsampling_x, inter_pred_params->subsampling_y);
+
+      orig_pos_x += orig_mv_q4.col;
+      orig_pos_y += orig_mv_q4.row;
+
+      orig_pos_y =
+          clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale, top,
+                bottom);
+      orig_pos_x =
+          clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale, left,
+                right);
+
+
+      // Get reference block top left coordinate.
+      block->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 = ((orig_pos_x +
+                    (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          scale;
+      block->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  scale;
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+
+      // Get reference block top left coordinate.
+      block->x0 = pos_x >> SCALE_SUBPEL_BITS;
+      block->y0 = pos_y >> SCALE_SUBPEL_BITS;
+
+      // Get reference block bottom right coordinate.
+      block->x1 =
+          ((pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+           SCALE_SUBPEL_BITS) +
+          1;
+      block->y1 = ((pos_y + (inter_pred_params->block_height - 1) *
+                                subpel_params->ys) >>
+                   SCALE_SUBPEL_BITS) +
+                  1;
+    }
+      MV temp_mv;
+    temp_mv = tip_clamp_mv_to_umv_border_sb(inter_pred_params, src_mv, bw, bh,
+#if CONFIG_OPTFLOW_REFINEMENT
+                                            use_optflow_refinement,
+#endif  // CONFIG_OPTFLOW_REFINEMENT
+                                            inter_pred_params->subsampling_x,
+                                            inter_pred_params->subsampling_y);
+      *scaled_mv = av1_scale_mv(&temp_mv, mi_x, mi_y, sf);
+      scaled_mv->row += SCALE_EXTRA_OFF;
+      scaled_mv->col += SCALE_EXTRA_OFF;
+
+      *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
+      *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#else
     // Get reference block top left coordinate.
     block->x0 = pos_x >> SCALE_SUBPEL_BITS;
     block->y0 = pos_y >> SCALE_SUBPEL_BITS;
@@ -1011,6 +1227,7 @@ static AOM_INLINE void tip_dec_calc_subpel_params(
 
     *subpel_x_mv = scaled_mv->col & SCALE_SUBPEL_MASK;
     *subpel_y_mv = scaled_mv->row & SCALE_SUBPEL_MASK;
+#endif
   } else {
     // Get block position in current frame.
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
@@ -2421,6 +2638,40 @@ static void set_sb_mv_precision(SB_INFO *sbi, AV1Decoder *const pbi) {
 }
 #endif
 
+
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+static AOM_INLINE void decode_partition_loop_restoration(AV1Decoder *const pbi,
+	ThreadData *const td, int mi_row,
+	int mi_col, aom_reader *reader,
+	BLOCK_SIZE bsize) {
+	AV1_COMMON *const cm = &pbi->common;
+	const int num_planes = av1_num_planes(cm);
+	DecoderCodingBlock *const dcb = &td->dcb;
+	MACROBLOCKD *const xd = &dcb->xd;
+	assert(bsize == cm->seq_params.sb_size);
+
+	for (int plane = 0; plane < num_planes; plane++) {
+		int rcol0, rcol1, rrow0, rrow1;
+		if ((cm->rst_info[plane].frame_restoration_type != RESTORE_NONE
+#if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
+                     || cm->rst_info[plane].frame_cross_restoration_type != RESTORE_NONE
+#endif  // CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
+                        ) &&
+			av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
+				&rcol0, &rcol1, &rrow0, &rrow1)) {
+			const int rstride = cm->rst_info[plane].horz_units_per_tile;
+			for (int rrow = rrow0; rrow < rrow1; ++rrow) {
+				for (int rcol = rcol0; rcol < rcol1; ++rcol) {
+					const int runit_idx = rcol + rrow * rstride;
+					loop_restoration_read_sb_coeffs(cm, xd, reader, plane, runit_idx);
+				}
+			}
+		}
+	}
+}
+#endif
+
+
 // TODO(slavarnway): eliminate bsize and subsize in future commits
 static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
                                         ThreadData *const td, int mi_row,
@@ -2480,6 +2731,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
     const int plane_start = get_partition_plane_start(xd->tree_type);
     const int plane_end =
         get_partition_plane_end(xd->tree_type, av1_num_planes(cm));
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+    if (!av1_superres_scaled(cm)) {
+#endif
     for (int plane = plane_start; plane < plane_end; ++plane) {
       int rcol0, rcol1, rrow0, rrow1;
       if ((cm->rst_info[plane].frame_restoration_type != RESTORE_NONE
@@ -2498,6 +2752,9 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
         }
       }
     }
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+    }
+#endif
 
     ptree->bsize = bsize;
     ptree->mi_row = mi_row;
@@ -3002,7 +3259,7 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
 #if CONFIG_LR_FLEX_SYNTAX
     uint8_t plane_lr_tools_disable_mask =
         cm->seq_params.lr_tools_disable_mask[p > 0];
-#if CONFIG_PC_WIENER
+#if CONFIG_PC_WIENER && !CONFIG_2D_SR_PC_WIENER_ENABLE_FOR_SR
     // If superres is used turn off PC_WIENER since tx_skip values will
     // be misaligned.
     if (av1_superres_scaled(cm))
@@ -3093,7 +3350,11 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
   const int frame_height = cm->superres_upscaled_height;
   set_restoration_unit_size(frame_width, frame_height,
                             cm->seq_params.subsampling_x,
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+                            cm->seq_params.subsampling_y, cm->rst_info, cm->superres_scale_denominator);
+#else                            
                             cm->seq_params.subsampling_y, cm->rst_info);
+#endif    
   int size = cm->rst_info[0].max_restoration_unit_size;
 
   cm->rst_info[0].restoration_unit_size =
@@ -3108,6 +3369,8 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
         cm->rst_info[0].restoration_unit_size = size >> 2;
     }
   }
+
+
   if (num_planes > 1) {
     cm->rst_info[1].restoration_unit_size =
         cm->rst_info[1].max_restoration_unit_size;
@@ -3135,7 +3398,6 @@ static AOM_INLINE void decode_restoration_mode(AV1_COMMON *cm,
       cm->rst_info[p].restoration_unit_size = sb_size;
 
     RestorationInfo *rsi = &cm->rst_info[0];
-
     if (sb_size == 64) {
       rsi->restoration_unit_size <<= aom_rb_read_bit(rb);
     }
@@ -3890,11 +4152,25 @@ static AOM_INLINE void setup_superres(AV1_COMMON *const cm,
   cm->superres_upscaled_width = *width;
   cm->superres_upscaled_height = *height;
   cm->superres_scale_denominator = SCALE_NUMERATOR;
+#if CONFIG_2D_SR
+  cm->superres_scale_numerator = SCALE_NUMERATOR;
+#endif  // CONFIG_2D_SR
 
   const SequenceHeader *const seq_params = &cm->seq_params;
   if (!seq_params->enable_superres) return;
 
   if (aom_rb_read_bit(rb)) {
+#if CONFIG_2D_SR
+    cm->superres_scale_index =
+        (uint8_t)aom_rb_read_literal(rb, SUPERRES_SCALE_BITS);
+    cm->superres_scale_denominator =
+        superres_scales[cm->superres_scale_index].scale_denom;
+    cm->superres_scale_numerator =
+        superres_scales[cm->superres_scale_index].scale_num;
+    av1_calculate_scaled_superres_size(width, height,
+                                       cm->superres_scale_denominator,
+                                       cm->superres_scale_numerator);
+#else   // CONFIG_2D_SR
     cm->superres_scale_denominator =
         (uint8_t)aom_rb_read_literal(rb, SUPERRES_SCALE_BITS);
     cm->superres_scale_denominator += SUPERRES_SCALE_DENOMINATOR_MIN;
@@ -3902,6 +4178,7 @@ static AOM_INLINE void setup_superres(AV1_COMMON *const cm,
     // resized correctly
     av1_calculate_scaled_superres_size(width, height,
                                        cm->superres_scale_denominator);
+#endif  // CONFIG_2D_SR
   } else {
     // 1:1 scaling - ie. no scaling, scale not provided
     cm->superres_scale_denominator = SCALE_NUMERATOR;
@@ -3972,6 +4249,16 @@ static AOM_INLINE void setup_tip_frame_size(AV1_COMMON *cm) {
     tip_frame_buf->render_width = cm->render_width;
     tip_frame_buf->render_height = cm->render_height;
   }
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+  if (aom_realloc_frame_buffer(
+          &cm->tip_ref.upscaled_tip_frame_buf, cm->superres_upscaled_width,
+          cm->superres_upscaled_height, seq_params->subsampling_x,
+          seq_params->subsampling_y, AOM_DEC_BORDER_IN_PIXELS,
+          cm->features.byte_alignment, NULL, NULL, NULL)) {
+    aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
+                       "Failed to allocate frame buffer");
+  }
+#endif  // CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
 }
 #endif  // CONFIG_TIP
 
@@ -4758,6 +5045,29 @@ static AOM_INLINE void decode_tile(AV1Decoder *pbi, ThreadData *const td,
                              num_filter_classes
 #endif  // CONFIG_WIENER_NONSEP
   );
+
+#if CONFIG_2D_SR_RESTORATION_TILE_BASED_WRITE_SB
+  if (av1_superres_scaled(cm)) {
+	  int scaled_mi_row_end = tile_info.mi_row_end * cm->superres_scale_denominator / SCALE_NUMERATOR;
+	  int scaled_mi_col_end = tile_info.mi_col_end * cm->superres_scale_denominator / SCALE_NUMERATOR;
+	  for (int mi_row = tile_info.mi_row_start; mi_row < scaled_mi_row_end;
+		  mi_row += cm->seq_params.mib_size) {
+//		  av1_zero_left_context(xd);
+		  for (int mi_col = tile_info.mi_col_start; mi_col < scaled_mi_col_end;
+			  mi_col += cm->seq_params.mib_size) {
+//			  av1_reset_is_mi_coded_map(xd, cm->seq_params.mib_size);
+
+ 			  decode_partition_loop_restoration(pbi, td, mi_row, mi_col, td->bit_reader,
+			  cm->seq_params.sb_size);
+
+			  if (aom_reader_has_overflowed(td->bit_reader)) {
+				  aom_merge_corrupted_flag(&dcb->corrupted, 1);
+				  return;
+			  }
+		  }
+	  }
+  }
+#endif
 
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += cm->seq_params.mib_size) {
@@ -5652,6 +5962,7 @@ static AOM_INLINE void decode_mt_init(AV1Decoder *pbi) {
       thread_data->error_info.setjmp = 0;
     }
   }
+
   const int buf_size = MC_TEMP_BUF_PELS << 1;
   for (worker_idx = 0; worker_idx < pbi->max_threads - 1; ++worker_idx) {
     DecWorkerData *const thread_data = pbi->thread_data + worker_idx;
@@ -7465,11 +7776,13 @@ static int read_uncompressed_header(AV1Decoder *pbi,
           aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                              "Invalid TIP mode.");
         }
+#if !CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
         if (features->tip_frame_mode == TIP_FRAME_AS_OUTPUT &&
             av1_superres_scaled(cm)) {
           aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
                              "Invalid TIP Direct mode with superres.");
         }
+#endif  // !CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
 
         if (features->tip_frame_mode && cm->seq_params.enable_tip_hole_fill) {
           features->allow_tip_hole_fill = aom_rb_read_bit(rb);
@@ -7920,6 +8233,9 @@ static AOM_INLINE void process_tip_mode(AV1Decoder *pbi) {
     av1_copy_tip_frame_tmvp_mvs(cm);
     aom_yv12_copy_frame(&cm->tip_ref.tip_frame->buf, &cm->cur_frame->buf,
                         num_planes);
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+    superres_post_decode(pbi);
+#endif  // CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
     for (int i = 0; i < INTER_REFS_PER_FRAME; ++i) {
       cm->global_motion[i] = default_warp_params;
       cm->cur_frame->global_motion[i] = default_warp_params;
@@ -8097,6 +8413,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
   }
 
   if (!is_global_intrabc_allowed(cm) && !tiles->single_tile_decoding) {
+
     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
       if (pbi->num_workers > 1) {
         av1_loop_filter_frame_mt(
@@ -8191,7 +8508,11 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
         !do_cdef && !do_superres;
 
     if (!optimized_loop_restoration) {
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR
+      if (do_loop_restoration && !do_superres)
+#else      
       if (do_loop_restoration)
+#endif      
         av1_loop_restoration_save_boundary_lines(&pbi->common.cur_frame->buf,
                                                  cm, 0);
 

@@ -121,6 +121,7 @@ static void tf_motion_search(AV1_COMP *cpi,
       min_frame_size >= 720
           ? MV_COST_L1_HDRES
           : (min_frame_size >= 480 ? MV_COST_L1_MIDRES : MV_COST_L1_LOWRES);
+
 #if CONFIG_FLEX_MVRES
   assert(cm->features.fr_mv_precision == MV_PRECISION_ONE_EIGHTH_PEL);
   const MvSubpelPrecision pb_mv_precision = MV_PRECISION_ONE_EIGHTH_PEL;
@@ -158,7 +159,11 @@ static void tf_motion_search(AV1_COMP *cpi,
 #endif
 #endif
                                      search_site_cfg,
-                                     /*fine_search_interval=*/0);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	  /*fine_search_interval=*/0, 0);
+#else
+	  /*fine_search_interval=*/0);
+#endif
   av1_set_mv_search_method(&full_ms_params, search_site_cfg, search_method);
   full_ms_params.run_mesh_search = 1;
   full_ms_params.mv_cost_params.mv_cost_type = mv_cost_type;
@@ -184,7 +189,11 @@ static void tf_motion_search(AV1_COMP *cpi,
 #if CONFIG_FLEX_MVRES
                                       pb_mv_precision,
 #endif
-                                      cost_list);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+		cost_list, 0);
+#else
+		cost_list);
+#endif
     ms_params.forced_stop = EIGHTH_PEL;
     ms_params.var_params.subpel_search_type = subpel_search_type;
     // Since we are merely refining the result from full pixel search, we don't
@@ -231,7 +240,11 @@ static void tf_motion_search(AV1_COMP *cpi,
 #endif
 #endif
                                            search_site_cfg,
-                                           /*fine_search_interval=*/0);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+			/*fine_search_interval=*/0, 0);
+#else
+			/*fine_search_interval=*/0);
+#endif
         av1_set_mv_search_method(&full_ms_params, search_site_cfg,
                                  search_method);
         full_ms_params.run_mesh_search = 1;
@@ -246,7 +259,11 @@ static void tf_motion_search(AV1_COMP *cpi,
 #if CONFIG_FLEX_MVRES
                                           pb_mv_precision,
 #endif
-                                          cost_list);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+			cost_list, 0);
+#else
+			cost_list);
+#endif
         ms_params.forced_stop = EIGHTH_PEL;
         ms_params.var_params.subpel_search_type = subpel_search_type;
         // Since we are merely refining the result from full pixel search, we
@@ -353,12 +370,22 @@ static void tf_determine_block_partition(const MV block_mv, const int block_mse,
  *
  * Nothing returned, But the contents of `pred` will be modified.
  */
+#if CONFIG_2D_SR_MC_PHASE_FIX
+static void tf_build_predictor(const YV12_BUFFER_CONFIG *ref_frame,
+                               const MACROBLOCKD *mbd,
+                               const BLOCK_SIZE block_size, const int mb_row,
+                               const int mb_col, const int num_planes,
+                               const struct scale_factors *scale,
+                               const MV *subblock_mvs, uint16_t *pred,
+                               const struct AV1Common *const cm) {
+#else
 static void tf_build_predictor(const YV12_BUFFER_CONFIG *ref_frame,
                                const MACROBLOCKD *mbd,
                                const BLOCK_SIZE block_size, const int mb_row,
                                const int mb_col, const int num_planes,
                                const struct scale_factors *scale,
                                const MV *subblock_mvs, uint16_t *pred) {
+#endif
   // Information of the entire block.
   const int mb_height = block_size_high[block_size];  // Height.
   const int mb_width = block_size_wide[block_size];   // Width.
@@ -407,6 +434,9 @@ static void tf_build_predictor(const YV12_BUFFER_CONFIG *ref_frame,
         av1_init_inter_params(&inter_pred_params, w, h, y, x, subsampling_x,
                               subsampling_y, bit_depth, is_intrabc, scale,
                               &ref_buf, interp_filters);
+#if CONFIG_2D_SR_MC_PHASE_FIX
+        av1_init_phase_offset(&inter_pred_params, cm);
+#endif
         inter_pred_params.conv_params = get_conv_params(0, plane, bit_depth);
         av1_enc_build_one_inter_predictor(&pred[plane_offset + i * plane_w + j],
                                           plane_w, &mv, &inter_pred_params);
@@ -800,6 +830,7 @@ static FRAME_DIFF tf_do_filtering(AV1_COMP *cpi, YV12_BUFFER_CONFIG **frames,
   // Setup.
   mbd->block_ref_scale_factors[0] = scale;
   mbd->block_ref_scale_factors[1] = scale;
+
   // A temporary block info used to store state in temporal filtering process.
   MB_MODE_INFO *tmp_mb_mode_info = (MB_MODE_INFO *)malloc(sizeof(MB_MODE_INFO));
   memset(tmp_mb_mode_info, 0, sizeof(MB_MODE_INFO));
@@ -825,6 +856,7 @@ static FRAME_DIFF tf_do_filtering(AV1_COMP *cpi, YV12_BUFFER_CONFIG **frames,
       memset(accum, 0, num_planes * mb_pels * sizeof(accum[0]));
       memset(count, 0, num_planes * mb_pels * sizeof(count[0]));
       MV ref_mv = kZeroMv;  // Reference motion vector passed down along frames.
+
       // Perform temporal filtering frame by frame.
       for (int frame = 0; frame < num_frames; frame++) {
         if (frames[frame] == NULL) continue;
@@ -841,8 +873,15 @@ static FRAME_DIFF tf_do_filtering(AV1_COMP *cpi, YV12_BUFFER_CONFIG **frames,
                            mb_row, mb_col, &ref_mv, subblock_mvs,
                            subblock_mses);
         }
+
+#if CONFIG_2D_SR_MC_PHASE_FIX
+        const AV1_COMMON *const cm = &cpi->common;
+        tf_build_predictor(frames[frame], mbd, block_size, mb_row, mb_col,
+                           num_planes, scale, subblock_mvs, pred, cm);
+#else
         tf_build_predictor(frames[frame], mbd, block_size, mb_row, mb_col,
                            num_planes, scale, subblock_mvs, pred);
+#endif
 
         // Perform weighted averaging.
         if (frame == filter_frame_idx) {  // Frame to be filtered.
@@ -1086,6 +1125,7 @@ int av1_temporal_filter(AV1_COMP *cpi, const int filter_frame_lookahead_idx,
   const GF_GROUP *const gf_group = &cpi->gf_group;
   const uint8_t group_idx = gf_group->index;
   const FRAME_UPDATE_TYPE update_type = gf_group->update_type[group_idx];
+
   // Filter one more ARF if the lookahead index is leq 7 (w.r.t. 9-th frame).
   // This frame is ALWAYS a show existing frame.
   const int is_second_arf =
@@ -1103,6 +1143,7 @@ int av1_temporal_filter(AV1_COMP *cpi, const int filter_frame_lookahead_idx,
   int num_frames_for_filtering = 0;
   int filter_frame_idx = -1;
   double noise_levels[MAX_MB_PLANE] = { 0 };
+
   tf_setup_filtering_buffer(cpi, filter_frame_lookahead_idx, is_second_arf,
                             frames, &num_frames_for_filtering,
                             &filter_frame_idx, noise_levels);
@@ -1183,7 +1224,6 @@ int av1_temporal_filter(AV1_COMP *cpi, const int filter_frame_lookahead_idx,
       }
     }
   }
-
   return 1;
 }
 /*!\endcond */

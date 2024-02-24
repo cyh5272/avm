@@ -437,13 +437,21 @@ static INLINE int highbd_error_measure(int err, int bd) {
     leads to a maximum value of about 282 * 2^k after applying the offset.
     So in that case we still need to clamp.
 */
+
 void av1_highbd_warp_affine_c(const int32_t *mat, const uint16_t *ref,
                               int width, int height, int stride, uint16_t *pred,
                               int p_col, int p_row, int p_width, int p_height,
                               int p_stride, int subsampling_x,
                               int subsampling_y, int bd,
                               ConvolveParams *conv_params, int16_t alpha,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                              int16_t beta, int16_t gamma, int16_t delta,
+                              const int x_step_qn, const int y_step_qn) {
+#else
                               int16_t beta, int16_t gamma, int16_t delta) {
+#endif
+//  printf("C");
+
   int32_t tmp[15 * 8];
   const int reduce_bits_horiz =
       conv_params->round_0 +
@@ -461,6 +469,36 @@ void av1_highbd_warp_affine_c(const int32_t *mat, const uint16_t *ref,
   (void)max_bits_horiz;
   assert(IMPLIES(conv_params->is_compound, conv_params->dst != NULL));
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+  // Determine our stride
+  assert( (x_step_qn >> SCALE_SUBPEL_BITS) == (y_step_qn >> SCALE_SUBPEL_BITS) );
+  const int x_conv_stride = x_step_qn >> SCALE_SUBPEL_BITS;
+  const int y_conv_stride = y_step_qn >> SCALE_SUBPEL_BITS;
+
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+  static uint16_t * buffer = NULL;
+  static int buffer_width = -1;
+  const int mode_1_5x_flag = ( x_step_qn + ( 1 << (SCALE_SUBPEL_BITS - 2 ) ) ) >> (SCALE_SUBPEL_BITS -1 ) == 3 ? 1 : 0;
+
+  if( mode_1_5x_flag && buffer_width < width ) {
+    if(buffer==NULL)
+      buffer = malloc( width * sizeof(uint16_t) );
+    else
+      buffer = realloc( buffer, width * sizeof(uint16_t) );
+
+    buffer_width = width;
+  }
+#endif
+
+  // Determine the width of the image if it was converted to the lower resolution
+  // and then back to the current resolution.  Note that when mode_1_5x_flag is
+  // false, the width is equal x_conv_stride * (width/x_conv_stride - 1).  This
+  // is written as width - width%x_conv_stride - x_conv_stride in the warp functions.
+  const int width_strided_minus_1 = mode_1_5x_flag ? 3*(2*width/3 - 1)/2:
+                                       width - width%x_conv_stride - x_conv_stride;
+#endif
+
+
   for (int i = p_row; i < p_row + p_height; i += 8) {
     for (int j = p_col; j < p_col + p_width; j += 8) {
       // Calculate the center of this 8x8 block,
@@ -471,11 +509,13 @@ void av1_highbd_warp_affine_c(const int32_t *mat, const uint16_t *ref,
       const int32_t src_y = (i + 4) << subsampling_y;
       const int32_t dst_x = mat[2] * src_x + mat[3] * src_y + mat[0];
       const int32_t dst_y = mat[4] * src_x + mat[5] * src_y + mat[1];
+
       const int32_t x4 = dst_x >> subsampling_x;
       const int32_t y4 = dst_y >> subsampling_y;
 
       const int32_t ix4 = x4 >> WARPEDMODEL_PREC_BITS;
       int32_t sx4 = x4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
+
       const int32_t iy4 = y4 >> WARPEDMODEL_PREC_BITS;
       int32_t sy4 = y4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
@@ -487,11 +527,63 @@ void av1_highbd_warp_affine_c(const int32_t *mat, const uint16_t *ref,
 
       // Horizontal filter
       for (int k = -7; k < 8; ++k) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+        const int iy = clamp(x_conv_stride * (iy4 + k), 0, height - 1);
+#else
         const int iy = clamp(iy4 + k, 0, height - 1);
+#endif
+
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+
+        // Create an intermediate input buffer when the scale factor is 1.5x.
+        if( mode_1_5x_flag ) {
+          // Determine the line in the reference image that corresponds to the desired iy
+          const int src_iy = clamp(3 * (iy4 + k) / 2, 0, height - 1);
+
+          // Determine if we are interpolating vertically
+          // Note: A modulo-3 value of two indicates interpolation but
+          // should only occur due to the integer division in the clamp
+          // operation above - except when the clamping limits are applied.
+          // In practice, this happens at the bottom of the frame.  We disable
+          // interpolation in that case.
+          const int interp_vertical = ( (src_iy % 3 == 1) && (src_iy < (height-1)) ) ? 1 : 0;
+
+          // Create the buffer
+          if (interp_vertical) {
+            const uint16_t *ptr0 = &(ref[src_iy * stride]);
+            const uint16_t *ptr1 = &(ref[(src_iy + 1) * stride]);
+
+            for (int ix = ix4 - 7; ix < ix4 + 8; ix++) {
+              int src_ix = clamp(3 * ix / 2, 0, width_strided_minus_1);
+              int dst_ix = clamp( ix, 0, width - 1);
+
+              if (src_ix % 3 == 1){
+                buffer[dst_ix] = (ptr0[src_ix] + ptr0[src_ix + 1]
+                                  + ptr1[src_ix] + ptr1[src_ix + 1] + 2) >> 2;
+              } else
+                buffer[dst_ix] = (ptr0[src_ix] + ptr1[src_ix] + 1) >> 1;
+            }
+          } else {
+            const uint16_t *ptr = &(ref[src_iy * stride]);
+
+            for (int ix = ix4 - 7; ix < ix4 + 8; ix++) {
+              int src_ix = clamp(3 * ix / 2, 0, width_strided_minus_1);
+              int dst_ix = clamp( ix, 0, width - 1);
+
+              if (src_ix % 3 == 1) {
+                buffer[dst_ix] = (ptr[src_ix] + ptr[src_ix + 1] + 1) >> 1;
+              } else
+                buffer[dst_ix] = ptr[src_ix];
+            }
+          }
+        }
+#endif
 
         int sx = sx4 + beta * (k + 4);
+
         for (int l = -4; l < 4; ++l) {
           int ix = ix4 + l - 3;
+
           const int offs = ROUND_POWER_OF_TWO(sx, WARPEDDIFF_PREC_BITS) +
                            WARPEDPIXEL_PREC_SHIFTS;
           assert(offs >= 0 && offs <= WARPEDPIXEL_PREC_SHIFTS * 3);
@@ -499,8 +591,21 @@ void av1_highbd_warp_affine_c(const int32_t *mat, const uint16_t *ref,
 
           int32_t sum = 1 << offset_bits_horiz;
           for (int m = 0; m < 8; ++m) {
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+            const int sample_x = clamp(x_conv_stride * (ix + m), 0, width_strided_minus_1);
+#else
             const int sample_x = clamp(ix + m, 0, width - 1);
+#endif
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+            if( mode_1_5x_flag ) {
+              int sample_x = clamp( (ix+m), 0, width - 1);
+              sum += buffer[sample_x] * coeffs[m];
+            }
+            else
+              sum += ref[iy * stride + sample_x] * coeffs[m];
+#else
             sum += ref[iy * stride + sample_x] * coeffs[m];
+#endif
           }
           sum = ROUND_POWER_OF_TWO(sum, reduce_bits_horiz);
           assert(0 <= sum && sum < (1 << max_bits_horiz));
@@ -566,7 +671,12 @@ void highbd_warp_plane(WarpedMotionParams *wm, const uint16_t *const ref,
                        int width, int height, int stride, uint16_t *const pred,
                        int p_col, int p_row, int p_width, int p_height,
                        int p_stride, int subsampling_x, int subsampling_y,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                       int bd, ConvolveParams *conv_params,
+                       const SubpelParams *subpel_params) {
+#else
                        int bd, ConvolveParams *conv_params) {
+#endif 
   assert(wm->wmtype <= AFFINE);
   if (wm->wmtype == ROTZOOM) {
     wm->wmmat[5] = wm->wmmat[2];
@@ -578,10 +688,27 @@ void highbd_warp_plane(WarpedMotionParams *wm, const uint16_t *const ref,
   const int16_t gamma = wm->gamma;
   const int16_t delta = wm->delta;
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+  if(subpel_params->xs != (1 << SCALE_SUBPEL_BITS)) {
+
+    av1_highbd_warp_affine_sse4_1(mat, ref, width, height, stride, pred, p_col, p_row,
+                                  p_width, p_height, p_stride, subsampling_x,
+                                  subsampling_y, bd, conv_params, alpha, beta, gamma,
+                                  delta, subpel_params->xs, subpel_params->ys);
+
+  }
+  else {
+    av1_highbd_warp_affine(mat, ref, width, height, stride, pred, p_col, p_row,
+                           p_width, p_height, p_stride, subsampling_x,
+                           subsampling_y, bd, conv_params, alpha, beta, gamma,
+                           delta, subpel_params->xs, subpel_params->ys);
+  }
+#else
   av1_highbd_warp_affine(mat, ref, width, height, stride, pred, p_col, p_row,
                          p_width, p_height, p_stride, subsampling_x,
                          subsampling_y, bd, conv_params, alpha, beta, gamma,
                          delta);
+#endif    
 }
 
 int64_t av1_calc_highbd_frame_error(const uint16_t *const ref, int stride,
@@ -643,10 +770,18 @@ void av1_warp_plane(WarpedMotionParams *wm, int bd, const uint16_t *ref,
                     int width, int height, int stride, uint16_t *pred,
                     int p_col, int p_row, int p_width, int p_height,
                     int p_stride, int subsampling_x, int subsampling_y,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                    ConvolveParams *conv_params, const SubpelParams *subpel_params) {
+#else
                     ConvolveParams *conv_params) {
+#endif 
   highbd_warp_plane(wm, ref, width, height, stride, pred, p_col, p_row, p_width,
                     p_height, p_stride, subsampling_x, subsampling_y, bd,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                    conv_params, subpel_params);
+#else
                     conv_params);
+#endif
 }
 
 #define LS_MV_MAX 256  // max mv in 1/8-pel

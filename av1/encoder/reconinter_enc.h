@@ -32,7 +32,12 @@ void av1_enc_build_inter_predictor(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                    const BUFFER_SET *ctx, BLOCK_SIZE bsize,
                                    int plane_from, int plane_to);
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_enc_build_inter_predictor_y(MACROBLOCKD *xd, int mi_row, int mi_col,
+                                     const struct AV1Common *const cm);
+#else
 void av1_enc_build_inter_predictor_y(MACROBLOCKD *xd, int mi_row, int mi_col);
+#endif
 
 void enc_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
                                 int plane, MB_MODE_INFO *mi,
@@ -65,9 +70,16 @@ void av1_build_prediction_by_left_preds(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
 void av1_build_obmc_inter_predictors_sb(const AV1_COMMON *cm, MACROBLOCKD *xd);
 
+#if CONFIG_2D_SR_MC_PHASE_FIX
+void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
+                                            int ref, uint16_t *dst,
+                                            int ext_dst_stride,
+                                            const struct AV1Common *const cm);
+#else
 void av1_build_inter_predictor_single_buf_y(MACROBLOCKD *xd, BLOCK_SIZE bsize,
                                             int ref, uint16_t *ext_dst,
                                             int ext_dst_stride);
+#endif
 
 void av1_build_wedge_inter_predictor_from_buf_y(
     MACROBLOCKD *xd, BLOCK_SIZE bsize, uint16_t *ext_dst0, int ext_dst_stride0,

@@ -395,7 +395,11 @@ static void set_good_speed_features_framesize_independent(
   }
 
   sf->rd_sf.perform_coeff_opt = 1;
+#if CONFIG_2D_SR
+  sf->hl_sf.superres_auto_search_type = SUPERRES_AUTO_ALL;
+#else   // CONFIG_2D_SR
   sf->hl_sf.superres_auto_search_type = SUPERRES_AUTO_DUAL;
+#endif  // CONFIG_2D_SR
 
   if (speed >= 1) {
 #if CONFIG_EXT_RECUR_PARTITIONS
@@ -1165,8 +1169,13 @@ void av1_set_speed_features_framesize_independent(AV1_COMP *cpi, int speed) {
     sf->rd_sf.optimize_coefficients = NO_TRELLIS_OPT;
 
   // No recode or trellis for 1 pass.
+#if CONFIG_2D_SR_AUTO_DISABLE_SCREEN_CONTENT_TOOLS_FOR_NON_1x
+  if ((oxcf->pass == 0 && has_no_stats_stage(cpi)) || oxcf->superres_cfg.superres_mode == AOM_SUPERRES_AUTO)
+#else
   if (oxcf->pass == 0 && has_no_stats_stage(cpi))
+#endif
     sf->hl_sf.recode_loop = DISALLOW_RECODE;
+
 
   MotionVectorSearchParams *const mv_search_params = &cpi->mv_search_params;
   if (sf->mv_sf.subpel_search_method == SUBPEL_TREE) {

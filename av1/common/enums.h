@@ -96,6 +96,9 @@ enum {
 #endif
 #endif
 #if CONFIG_ADAPTIVE_MVD
+#define CONFIG_ADAPTIVE_MVD_TEST1 0
+#define CONFIG_ADAPTIVE_MVD_TEST2 0
+#define CONFIG_ADAPTIVE_MVD_TEST3 0
 #define IMPROVED_AMVD 1
 #else
 #define IMPROVED_AMVD 0
@@ -1072,7 +1075,12 @@ typedef uint8_t TXFM_CONTEXT;
 // REF_FRAMES for the cm->ref_frame_map array, 1 scratch frame for the new
 // frame in cm->cur_frame, INTER_REFS_PER_FRAME for scaled references on the
 // encoder in the cpi->scaled_ref_buf array.
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+// TODO: Change to accomodate downsampled references at encoder-side. A separate variable needs to be created for decoder.
+#define FRAME_BUFFERS (REF_FRAMES + 1 + INTER_REFS_PER_FRAME * (SUPERRES_SCALES + 1))
+#else
 #define FRAME_BUFFERS (REF_FRAMES + 1 + INTER_REFS_PER_FRAME)
+#endif
 
 #define FWD_RF_OFFSET(ref) (ref - LAST_FRAME)
 #define BWD_RF_OFFSET(ref) (ref - BWDREF_FRAME)
@@ -1141,8 +1149,18 @@ enum {
   SCALABILITY_SS = 14
 } UENUM1BYTE(SCALABILITY_STRUCTURES);
 
+#if CONFIG_2D_SR
+#if CONFIG_2D_SR_SCALE_EXT
+#define SUPERRES_SCALE_BITS 3
+#define SUPERRES_SCALES (1 << SUPERRES_SCALE_BITS)
+#else  // CONFIG_2D_SR_SCALE_EXT
+#define SUPERRES_SCALE_BITS 2
+#define SUPERRES_SCALES (1 << SUPERRES_SCALE_BITS)
+#endif  // CONFIG_2D_SR_SCALE_EXT
+#else  // CONFIG_2D_SR
 #define SUPERRES_SCALE_BITS 3
 #define SUPERRES_SCALE_DENOMINATOR_MIN (SCALE_NUMERATOR + 1)
+#endif  // CONFIG_2D_SR
 
 // In large_scale_tile coding, external references are used.
 #define MAX_EXTERNAL_REFERENCES 128

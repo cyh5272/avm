@@ -117,7 +117,7 @@ static const arg_def_t *all_args[] = {
   &threadsarg,     &verbosearg, &scalearg,      &fb_arg,
   &md5arg,         &verifyarg,  &framestatsarg, &continuearg,
   &outbitdeptharg, &isannexb,   &oppointarg,    &outallarg,
-  &skipfilmgrain,  NULL
+  &skipfilmgrain, NULL
 };
 
 #if CONFIG_LIBYUV

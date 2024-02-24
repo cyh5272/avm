@@ -1896,7 +1896,9 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp,
 
 #if CONFIG_ADAPTIVE_MVD
   int use_mv_class_offset = 1;
+#if !CONFIG_ADAPTIVE_MVD_TEST2
   if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_mv_class_offset = 0;
+#endif  
   if (use_mv_class_offset) {
 #endif  // CONFIG_ADAPTIVE_MVD
     // Integer part
@@ -1917,7 +1919,7 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp,
     const int n = mv_class + CLASS0_BITS - 1;  // number of bits
     d = 0;
     for (int i = 0; i < n; ++i) d |= 1 << i;
-    mag = CLASS0_SIZE << (mv_class + 2);
+    mag = CLASS0_SIZE << (mv_class + 2);   
   }
 #endif  // CONFIG_ADAPTIVE_MVD
 

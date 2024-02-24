@@ -994,6 +994,11 @@ struct CommonModeInfoParams {
   CctxType *cctx_type_map;
 #endif  // CONFIG_CROSS_CHROMA_TX
 
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  uint8_t superres_scale_denominator;
+  int frm_width, frm_height;
+#endif
+
   /**
    * \name Function pointers to allow separate logic for encoder and decoder.
    */
@@ -1324,6 +1329,14 @@ typedef struct TIP_Buffer {
    * than the coded dimensions of the current frame.
    */
   RefCntBuffer *scaled_tip_frame;
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+  /*!
+   * Buffer into which the upscaled interpolated tip frame will be stored and
+   * other related info. This is required for generating and upscaled version
+   * of the tip_ref frame for use in the case when super-res is used.
+   */
+  YV12_BUFFER_CONFIG upscaled_tip_frame_buf;
+#endif  // CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
   /*!
    * Check a block is already interpolated
    */
@@ -1402,11 +1415,24 @@ typedef struct AV1Common {
   int superres_upscaled_height; /*!< Super-resolved frame height */
   /**@}*/
 
+#if CONFIG_2D_SR
+  /**
+   * \name Super-resolution scaling factor information.
+   * The index, numerator, and denominator of the superres scale used by this
+   * frame.
+   */
+  /**@{*/
+  uint8_t superres_scale_index;       /*!< Superres scaling index */
+  uint8_t superres_scale_numerator;   /*!< Superres scaling numerator */
+  uint8_t superres_scale_denominator; /*!< Superres scaling denominator */
+  /**@}*/
+#else   // CONFIG_2D_SR
   /*!
    * The denominator of the superres scale used by this frame.
    * Note: The numerator is fixed to be SCALE_NUMERATOR.
    */
   uint8_t superres_scale_denominator;
+#endif  // CONFIG_2D_SR
 
   /*!
    * If true, buffer removal times are present.
@@ -3641,12 +3667,14 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
 
 #if CONFIG_TIP
   if (is_tip_ref_frame(mbmi->ref_frame[0])) {
+//    printf("Warp enabled for TIP? %d", (allowed_motion_modes & enabled_motion_modes));
     return (allowed_motion_modes & enabled_motion_modes);
   }
 #endif  // CONFIG_TIP
 
 #if CONFIG_ALLOW_SAME_REF_COMPOUND
   if (mbmi->ref_frame[0] == mbmi->ref_frame[1]) {
+//    printf("Warp enabled for same ref? %d", (allowed_motion_modes & enabled_motion_modes));
     return (allowed_motion_modes & enabled_motion_modes);
   }
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
@@ -3655,6 +3683,7 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
     const TransformationType gm_type =
         cm->global_motion[mbmi->ref_frame[0]].wmtype;
     if (is_global_mv_block(mbmi, gm_type)) {
+//      printf("Warp enabled for globa? %d", (allowed_motion_modes & enabled_motion_modes));
       return (allowed_motion_modes & enabled_motion_modes);
     }
   }
@@ -3673,7 +3702,6 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   // From here on, all modes are warped, so have some common criteria:
   const int allow_warped_motion =
       motion_variation_allowed &&
-      !av1_is_scaled(xd->block_ref_scale_factors[0]) &&
       !xd->cur_frame_force_integer_mv;
 
   if (obmc_allowed && allow_warped_motion && mbmi->num_proj_ref >= 1
@@ -3717,6 +3745,7 @@ static INLINE int motion_mode_allowed(const AV1_COMMON *cm,
   if (warp_delta_allowed) {
     allowed_motion_modes |= (1 << WARP_DELTA);
   }
+// printf("Warp enabled? %d", (allowed_motion_modes & enabled_motion_modes));
 
   return (allowed_motion_modes & enabled_motion_modes);
 }
@@ -3753,8 +3782,12 @@ static INLINE MOTION_MODE motion_mode_allowed(const AV1_COMMON *cm,
     assert(!has_second_ref(mbmi));
     const int allow_warped_motion = cm->features.allow_warped_motion;
     if (mbmi->num_proj_ref >= 1 &&
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+        (allow_warped_motion) {
+#else
         (allow_warped_motion &&
          !av1_is_scaled(xd->block_ref_scale_factors[0]))) {
+#endif
       if (xd->cur_frame_force_integer_mv) {
         return OBMC_CAUSAL;
       }

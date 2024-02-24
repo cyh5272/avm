@@ -2424,6 +2424,11 @@ typedef struct AV1_COMP {
    */
   struct lookahead_ctx *lookahead;
 
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+  uint8_t allowed_non1x_superres_scale_denominator[SUPERRES_SCALES];
+  int allowed_non1x_scale_count;
+#endif
+
   /*!
    * When set, this flag indicates that the current frame is a forward keyframe.
    */
@@ -2494,7 +2499,11 @@ typedef struct AV1_COMP {
    * Pointer to the buffer holding the scaled reference frames.
    * scaled_ref_buf[i] holds the scaled reference frame of type i.
    */
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+  RefCntBuffer *scaled_ref_buf[INTER_REFS_PER_FRAME * (SUPERRES_SCALES + 1)];
+#else
   RefCntBuffer *scaled_ref_buf[INTER_REFS_PER_FRAME];
+#endif
 
   /*!
    * Pointer to the buffer holding the last show frame.
@@ -2958,6 +2967,7 @@ typedef struct AV1_COMP {
    * found in the frame update type with enum value equal to i
    */
   int valid_gm_model_found[FRAME_UPDATE_TYPES];
+
 } AV1_COMP;
 
 /*!
@@ -3067,7 +3077,6 @@ void av1_init_seq_coding_tools(SequenceHeader *seq, AV1_COMMON *cm,
 int av1_receive_raw_frame(AV1_COMP *cpi, aom_enc_frame_flags_t frame_flags,
                           YV12_BUFFER_CONFIG *sd, int64_t time_stamp,
                           int64_t end_time_stamp);
-
 /*!\brief Encode a frame
  *
  * \ingroup high_level_algo
@@ -3583,6 +3592,26 @@ static INLINE char const *get_frame_type_enum(int type) {
     default: assert(0);
   }
   return "error";
+}
+#endif
+
+#if CONFIG_2D_SR_AUTO_SCALED_REF_SUPPORT
+static INLINE int to_scale_index(const AV1_COMP *cpi, uint8_t denom) {
+  int scale_idx = -1;
+
+  for (int this_index = 0; this_index < cpi->allowed_non1x_scale_count; ++this_index) {
+    if (cpi->allowed_non1x_superres_scale_denominator[this_index] == denom) {
+      scale_idx = this_index;
+      break;
+    }
+  }
+
+  if (scale_idx < 0)  {
+    printf("scale_idx < 0, did not match denom=%d\n", denom);
+    exit(0);
+  }
+
+  return scale_idx;
 }
 #endif
 

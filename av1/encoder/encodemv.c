@@ -123,7 +123,9 @@ static void update_mv_component_stats(int comp, nmv_component *mvcomp,
     precision = MV_SUBPEL_NONE;
 #endif
   }
+#if !CONFIG_ADAPTIVE_MVD_TEST2
   if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_mv_class_offset = 0;
+#endif 
   if (use_mv_class_offset) {
 #endif  // CONFIG_ADAPTIVE_MVD
     // Integer bits
@@ -333,7 +335,9 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
       precision = MV_SUBPEL_NONE;
 #endif
     }
+#if !CONFIG_ADAPTIVE_MVD_TEST2
     if (mv_class > MV_CLASS_0 && is_adaptive_mvd) use_mv_class_offset = 0;
+#endif    
     if (use_mv_class_offset) {
 #endif  // CONFIG_ADAPTIVE_MVD
 
@@ -541,7 +545,9 @@ void av1_update_mv_stats(const MV *mv, const MV *ref, nmv_context *mvctx,
         if (is_adaptive_mvd && (c != MV_CLASS_0 || d > 0)) {
           pb_mv_precision = MV_PRECISION_ONE_PEL;
         }
+#if !CONFIG_ADAPTIVE_MVD_TEST2
         if (c > MV_CLASS_0 && is_adaptive_mvd) use_mv_class_offset = 0;
+#endif        
         if (use_mv_class_offset) {
 #endif
 

@@ -56,6 +56,12 @@ static AOM_INLINE void alloc_compressor_data(AV1_COMP *cpi) {
   AV1_COMMON *cm = &cpi->common;
   TokenInfo *token_info = &cpi->token_info;
 
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  cm->mi_params.superres_scale_denominator = cpi->oxcf.superres_cfg.superres_scale_denominator;
+  cm->mi_params.frm_width = cpi->oxcf.frm_dim_cfg.width;
+  cm->mi_params.frm_height = cpi->oxcf.frm_dim_cfg.height;
+#endif
+
   if (av1_alloc_context_buffers(cm, cm->width, cm->height)) {
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate context buffers");

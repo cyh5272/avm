@@ -292,7 +292,11 @@ void AV1HighbdCompMaskUpVarianceTest::RunSpeedTest(
     for (int j = 0; j < num_loops; ++j) {
       aom_highbd_comp_mask_upsampled_pred(
           NULL, NULL, 0, 0, NULL, comp_pred1_, pred_, w, h, subx, suby, ref_,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+          MAX_SB_SIZE, mask, w, 0, bd_, subpel_search, 0);
+#else          
           MAX_SB_SIZE, mask, w, 0, bd_, subpel_search);
+#endif          
     }
     aom_usec_timer_mark(&timer);
     double time = static_cast<double>(aom_usec_timer_elapsed(&timer));

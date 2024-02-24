@@ -40,6 +40,13 @@ extern "C" {
   (((((double)(R)) * (RM)) / (double)(1 << AV1_PROB_COST_SHIFT)) + \
    ((double)((D) >> (2 * (BD - 8))) * (1 << RDDIV_BITS)))
 
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+#define RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(RM, R, D, BD, S)                  \
+  (((((double)(R)) * (RM) * (S) * (S) / 4) / (double)(1 << AV1_PROB_COST_SHIFT)) + \
+   ((double)((D) >> (2 * (BD - 8))) * (1 << RDDIV_BITS))); assert(S > 1)
+#endif
+
+
 #define QIDX_SKIP_THRESH 115
 
 #define MV_COST_WEIGHT 108

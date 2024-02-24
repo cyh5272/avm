@@ -185,6 +185,9 @@ typedef struct {
   bool is_cross_filter_round;
 #endif  // CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
   AV1PixelRect tile_rect;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  bool skip_acc_txskip_flag;
+#endif  
 } RestSearchCtxt;
 
 #if CONFIG_WIENER_NONSEP
@@ -299,7 +302,11 @@ static AOM_INLINE void init_rsc(const YV12_BUFFER_CONFIG *src,
 static int64_t try_restoration_unit(const RestSearchCtxt *rsc,
                                     const RestorationTileLimits *limits,
                                     const AV1PixelRect *tile_rect,
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+                                    RestorationUnitInfo *rui) {
+#else
                                     const RestorationUnitInfo *rui) {
+#endif                                    
   const AV1_COMMON *const cm = rsc->cm;
   const int plane = rsc->plane;
   const int is_uv = plane > 0;
@@ -311,6 +318,9 @@ static int64_t try_restoration_unit(const RestSearchCtxt *rsc,
   // TODO(yunqing): For now, only use optimized LR filter in decoder. Can be
   // also used in encoder.
   const int optimized_lr = 0;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rui->skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
   if (rsc->is_cross_filter_round) {
     // copy the pre-filtered data to dst buffer, this implementation could be
@@ -915,9 +925,13 @@ static AOM_INLINE void search_sgrproj_visitor(
 
   rusi->sse[RESTORE_SGRPROJ] =
       try_restoration_unit(rsc, limits, &rsc->tile_rect, &rui);
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
   double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+#endif
 
 #if CONFIG_LR_MERGE_COEFFS
   Vector *current_unit_stack = rsc->unit_stack;
@@ -928,14 +942,23 @@ static AOM_INLINE void search_sgrproj_visitor(
   const int bank_ref_base = rusi->sgrproj_info.bank_ref;
   // Only test the reference in rusi->sgrproj_info.bank_ref, generated from
   // the count call above.
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
   double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+#endif
   const int bits_min = x->mode_costs.sgrproj_restore_cost[1] +
                        x->mode_costs.merged_param_cost[1] +
                        (1 << AV1_PROB_COST_SHIFT);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
   const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_min >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+#endif
   const double cost_nomerge_thr = (cost_nomerge_base + 3 * cost_min) / 4;
   RestorationType rtype =
       (cost_none <= cost_nomerge_thr) ? RESTORE_NONE : RESTORE_SGRPROJ;
@@ -1062,9 +1085,15 @@ static AOM_INLINE void search_sgrproj_visitor(
       if (old_rusi->best_rtype[RESTORE_SGRPROJ - 1] == RESTORE_SGRPROJ &&
           !check_sgrproj_eq(&old_rusi->sgrproj_info, ref_sgrproj_info_cand))
         continue;
-      cost_nomerge_cand +=
-          RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
-                                         old_unit->current_sse, bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	  cost_nomerge_cand +=
+		  RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(x->rdmult, old_unit->current_bits >> 4,
+			  old_unit->current_sse, bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
+	  cost_nomerge_cand +=
+		  RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
+			  old_unit->current_sse, bit_depth);
+#endif
     }
 
     // Iterate through vector to get sse and bits for each on the new filter.
@@ -1101,9 +1130,15 @@ static AOM_INLINE void search_sgrproj_visitor(
         old_unit->merge_bits_cand =
             x->mode_costs.sgrproj_restore_cost[1] + merge_bits;
       }
-      cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
-          x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
-          bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	  cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+		  x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		  bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
+	  cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+		  x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		  bit_depth);
+#endif
     }
     if (cost_merge_cand - cost_nomerge_cand < cost_merge - cost_nomerge) {
       begin_idx = begin_idx_cand;
@@ -1192,8 +1227,13 @@ static AOM_INLINE void search_sgrproj_visitor(
       x->mode_costs.sgrproj_restore_cost[1] +
       count_sgrproj_bits(&x->mode_costs, &rusi->sgrproj_info,
                          &rsc->sgrproj_bank);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_sgr = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_sgr >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth, av1_superres_scaled(cm) ? (cm->superres_scale_denominator << 1)/ SCALE_NUMERATOR : 2);
+#else
   double cost_sgr = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_sgr >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+	  x->rdmult, bits_sgr >> 4, rusi->sse[RESTORE_SGRPROJ], bit_depth);
+#endif
   if (rusi->sgrproj_info.ep < 10)
     cost_sgr *=
         (1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level);
@@ -1277,17 +1317,32 @@ static AOM_INLINE void search_pc_wiener_visitor(
   initialize_rui_for_nonsep_search(rsc, &rui);
 
   rui.restoration_type = RESTORE_PC_WIENER;
+
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+    rui.skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif  
+
   rusi->sse[RESTORE_PC_WIENER] =
       try_restoration_unit(rsc, limits, &rsc->tile_rect, &rui);
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+#endif
 
   const int64_t bits_pc_wiener =
       x->mode_costs.pc_wiener_restore_cost[1] +
       (count_pc_wiener_bits() << AV1_PROB_COST_SHIFT);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_pc_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_pc_wiener >> 4, rusi->sse[RESTORE_PC_WIENER], bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_pc_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_pc_wiener >> 4, rusi->sse[RESTORE_PC_WIENER], bit_depth);
+	  x->rdmult, bits_pc_wiener >> 4, rusi->sse[RESTORE_PC_WIENER], bit_depth);
+#endif
 
   RestorationType rtype =
       (cost_pc_wiener < cost_none) ? RESTORE_PC_WIENER : RESTORE_NONE;
@@ -1710,7 +1765,11 @@ static int64_t count_wiener_bits_set(int wiener_win,
 
 // If limits != NULL, calculates error for current restoration unit.
 // Otherwise, calculates error for all units in the stack using stored limits.
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+static int64_t calc_finer_tile_search_error(RestSearchCtxt *rsc,
+#else
 static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
+#endif
                                             const RestorationTileLimits *limits,
                                             const AV1PixelRect *tile,
                                             RestorationUnitInfo *rui) {
@@ -1718,6 +1777,10 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
   if (rsc->is_cross_filter_round) rui->wienerns_cross_info = rui->wienerns_info;
 #endif  // CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+  rui->skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif 
 #if CONFIG_LR_MERGE_COEFFS
   if (limits != NULL) {
     err = try_restoration_unit(rsc, limits, tile, rui);
@@ -1744,11 +1807,20 @@ static int64_t calc_finer_tile_search_error(const RestSearchCtxt *rsc,
 
 #if CONFIG_WIENER_NONSEP && CONFIG_LR_MERGE_COEFFS
 // This function resets the dst buffers using the correct filters.
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+static int64_t reset_unit_stack_dst_buffers(RestSearchCtxt *rsc,
+#else
 static int64_t reset_unit_stack_dst_buffers(const RestSearchCtxt *rsc,
+#endif
                                             const RestorationTileLimits *limits,
                                             const AV1PixelRect *tile,
                                             RestorationUnitInfo *rui) {
   int64_t err = 0;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+    rui->skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif  
+
   if (limits != NULL) {
     err = try_restoration_unit(rsc, limits, tile, rui);
   } else {
@@ -1824,8 +1896,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #else
   int64_t bits = 0;
 #endif  // RD_WIENER_REFINEMENT_SEARCH
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(x->rdmult, bits >> 4, err,
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, err,
-                                               rsc->cm->seq_params.bit_depth);
+	  rsc->cm->seq_params.bit_depth);
+#endif
   int tap_min[] = { WIENER_FILT_TAP0_MINV, WIENER_FILT_TAP1_MINV,
                     WIENER_FILT_TAP2_MINV };
   int tap_max[] = { WIENER_FILT_TAP0_MAXV, WIENER_FILT_TAP1_MAXV,
@@ -1853,8 +1930,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #else
           int64_t bits2 = 0;
 #endif  // RD_WIENER_REFINEMENT_SEARCH
-          double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost2 > cost) {
             plane_wiener->hfilter[p] += s;
             plane_wiener->hfilter[WIENER_WIN - p - 1] += s;
@@ -1887,8 +1969,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #else
           int64_t bits2 = 0;
 #endif  // RD_WIENER_REFINEMENT_SEARCH
-          double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost2 > cost) {
             plane_wiener->hfilter[p] -= s;
             plane_wiener->hfilter[WIENER_WIN - p - 1] -= s;
@@ -1922,8 +2009,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #else
           int64_t bits2 = 0;
 #endif  // RD_WIENER_REFINEMENT_SEARCH
-          double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost2 > cost) {
             plane_wiener->vfilter[p] += s;
             plane_wiener->vfilter[WIENER_WIN - p - 1] += s;
@@ -1956,8 +2048,13 @@ static int64_t finer_tile_search_wiener(RestSearchCtxt *rsc,
 #else
           int64_t bits2 = 0;
 #endif  // RD_WIENER_REFINEMENT_SEARCH
-          double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  double cost2 = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits2 >> 4, err2, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost2 > cost) {
             plane_wiener->vfilter[p] -= s;
             plane_wiener->vfilter[WIENER_WIN - p - 1] -= s;
@@ -2055,6 +2152,10 @@ static AOM_INLINE void search_wiener_visitor(
   rui.restoration_type = RESTORE_WIENER;
   finalize_sym_filter(reduced_wiener_win, vfilter, rui.wiener_info.vfilter);
   finalize_sym_filter(reduced_wiener_win, hfilter, rui.wiener_info.hfilter);
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+  rui.skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif  
 
   // Filter score computes the value of the function x'*A*x - x'*b for the
   // learned filter and compares it against identity filer. If there is no
@@ -2082,10 +2183,15 @@ static AOM_INLINE void search_wiener_visitor(
     assert(rui.wiener_info.hfilter[0] == 0 &&
            rui.wiener_info.hfilter[WIENER_WIN - 1] == 0);
   }
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE],
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE],
-      rsc->cm->seq_params.bit_depth);
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE],
+	  rsc->cm->seq_params.bit_depth);
+#endif
 
 #if CONFIG_LR_MERGE_COEFFS
   Vector *current_unit_stack = rsc->unit_stack;
@@ -2096,16 +2202,27 @@ static AOM_INLINE void search_wiener_visitor(
   const int bank_ref_base = rusi->wiener_info.bank_ref;
   // Only test the reference in rusi->wiener_info.bank_ref, generated from
   // the count call above.
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER],
-      rsc->cm->seq_params.bit_depth);
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth);
+#endif
   const int bits_min = x->mode_costs.wiener_restore_cost[1] +
                        x->mode_costs.merged_param_cost[1] +
                        (1 << AV1_PROB_COST_SHIFT);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER],
-      rsc->cm->seq_params.bit_depth);
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth);
+#endif
   const double cost_nomerge_thr = (cost_nomerge_base + 3 * cost_min) / 4;
   RestorationType rtype =
       (cost_none <= cost_nomerge_thr) ? RESTORE_NONE : RESTORE_WIENER;
@@ -2235,10 +2352,15 @@ static AOM_INLINE void search_wiener_visitor(
       if (old_rusi->best_rtype[RESTORE_WIENER - 1] == RESTORE_WIENER &&
           !check_wiener_eq(&old_rusi->wiener_info, ref_wiener_info_cand))
         continue;
-
-      cost_nomerge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
-          x->rdmult, old_unit->current_bits >> 4, old_unit->current_sse,
-          rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	  cost_nomerge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+		  x->rdmult, old_unit->current_bits >> 4, old_unit->current_sse,
+		  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+	  cost_nomerge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+		  x->rdmult, old_unit->current_bits >> 4, old_unit->current_sse,
+		  rsc->cm->seq_params.bit_depth);
+#endif
       for (int index = 0; index < WIENER_WIN2; ++index) {
         M_AVG[index] += old_unit->M[index] / current_unit_indices->size;
       }
@@ -2303,9 +2425,15 @@ static AOM_INLINE void search_wiener_visitor(
         old_unit->merge_bits_cand =
             x->mode_costs.wiener_restore_cost[1] + merge_bits;
       }
-      cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
-          x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
-          rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	  cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+		  x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+	  cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+		  x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		  rsc->cm->seq_params.bit_depth);
+#endif
     }
     if (cost_merge_cand - cost_nomerge_cand < cost_merge - cost_nomerge) {
       begin_idx = begin_idx_cand;
@@ -2394,10 +2522,15 @@ static AOM_INLINE void search_wiener_visitor(
       x->mode_costs.wiener_restore_cost[1] +
       count_wiener_bits(wiener_win, &x->mode_costs, &rusi->wiener_info,
                         &rsc->wiener_bank);
-
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_wiener >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_wiener = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_wiener >> 4, rusi->sse[RESTORE_WIENER],
-      rsc->cm->seq_params.bit_depth);
+	  x->rdmult, bits_wiener >> 4, rusi->sse[RESTORE_WIENER],
+	  rsc->cm->seq_params.bit_depth);
+#endif
 
   RestorationType rtype =
       (cost_wiener < cost_none) ? RESTORE_WIENER : RESTORE_NONE;
@@ -2647,8 +2780,13 @@ static int64_t finer_tile_search_wienerns(
       count_wienerns_bits(rsc->plane, &x->mode_costs, &curr, ref_wienerns_bank,
                           nsfilter_params, wiener_class_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double best_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, best_bits >> 4, best_err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double best_cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, best_bits >> 4, best_err, rsc->cm->seq_params.bit_depth);
+	  x->rdmult, best_bits >> 4, best_err, rsc->cm->seq_params.bit_depth);
+#endif
 
   int is_uv = (rui->plane != AOM_PLANE_Y);
   const int beg_feat = 0;
@@ -2692,8 +2830,13 @@ static int64_t finer_tile_search_wienerns(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
               ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-          const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost < best_cost) {
             no_improv = 0;
             best_err = err;
@@ -2741,8 +2884,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2769,8 +2917,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2801,8 +2954,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2837,8 +2995,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2864,8 +3027,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2894,8 +3062,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2928,8 +3101,13 @@ static int64_t finer_tile_search_wienerns(
             count_wienerns_bits(rsc->plane, &x->mode_costs, &rui->wienerns_info,
                                 ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_err = err;
           best_cost = cost;
@@ -2992,8 +3170,13 @@ static int64_t finer_tile_search_wienerns(
               rsc->plane, &x->mode_costs, &rui->wienerns_info,
               ref_wienerns_bank, nsfilter_params, c_id);
 #endif  // CONFIG_LR_MERGE_COEFFS
-          const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		  const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+			  x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		  const double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
+			  x->rdmult, bits >> 4, err, rsc->cm->seq_params.bit_depth);
+#endif
           if (cost < best_cost) {
             no_improv = 0;
             best_err = err;
@@ -3342,9 +3525,15 @@ static int compute_quantized_wienerns_filter(
             rui->plane, &rsc->x->mode_costs, &rui->wienerns_info,
             &rsc->wienerns_bank, nsfilter_params, ALL_WIENERNS_CLASSES);
 #endif  // CONFIG_LR_MERGE_COEFFS
-        double cost =
-            RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, bits >> 4, real_errq,
-                                           rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+		double cost =
+			RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(rsc->x->rdmult, bits >> 4, real_errq,
+				rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+		double cost =
+			RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, bits >> 4, real_errq,
+				rsc->cm->seq_params.bit_depth);
+#endif
         if (cost < best_cost) {
           best_cost = cost;
           copy_nsfilter_taps(&best, &rui->wienerns_info);
@@ -3435,6 +3624,11 @@ double set_cand_merge_sse_and_bits(
   double cost_merge_cand = 0;
   int equal_ref_for_class[WIENERNS_MAX_CLASSES] = { 0 };
   rui_merge_cand->wiener_class_id_restrict = wiener_class_id;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+    rui_merge_cand->skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif  
+
   bool has_begun = false;
   VECTOR_FOR_EACH(current_unit_stack, listed_unit) {
     RstUnitSnapshot *old_unit = (RstUnitSnapshot *)(listed_unit.pointer);
@@ -3503,9 +3697,15 @@ double set_cand_merge_sse_and_bits(
       old_unit->merge_bits_cand =
           x->mode_costs.wienerns_restore_cost[1] + merge_bits;
     }
-    cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
-        x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
-        bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+		x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+	cost_merge_cand += RDCOST_DBL_WITH_NATIVE_BD_DIST(
+		x->rdmult, old_unit->merge_bits_cand >> 4, old_unit->merge_sse_cand,
+		bit_depth);
+#endif
   }
   return cost_merge_cand;
 }
@@ -3537,10 +3737,15 @@ double accumulate_merge_stats(const RestSearchCtxt *rsc,
         !check_wienerns_eq(&old_rusi->wienerns_info, ref_wienerns_info_cand,
                            nsfilter_params->ncoeffs, wiener_class_id))
       continue;
-
-    cost_nomerge_cand +=
-        RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
-                                       old_unit->current_sse, bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	cost_nomerge_cand +=
+		RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(x->rdmult, old_unit->current_bits >> 4,
+			old_unit->current_sse, bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+	cost_nomerge_cand +=
+		RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, old_unit->current_bits >> 4,
+			old_unit->current_sse, bit_depth);
+#endif
 
     for (int index = 0; index < dim_A; ++index) {
       solver_A_AVG[index] += old_unit->A[index + offset_A];
@@ -3623,8 +3828,13 @@ static void search_wienerns_visitor(const RestorationTileLimits *limits,
   const MACROBLOCK *const x = rsc->x;
   const int64_t bits_none = x->mode_costs.wienerns_restore_cost[0];
   const int bit_depth = rsc->cm->seq_params.bit_depth;
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_none = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+	  x->rdmult, bits_none >> 4, rusi->sse[RESTORE_NONE], bit_depth);
+#endif
 
   RestorationUnitInfo rui;
   initialize_rui_for_nonsep_search(rsc, &rui);
@@ -3699,14 +3909,25 @@ static void search_wienerns_visitor(const RestorationTileLimits *limits,
   memcpy(rui.wienerns_info.bank_ref_for_class,
          rusi->wienerns_info.bank_ref_for_class,
          num_classes * sizeof(*ns_bank_ref_base));
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+	  bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_nomerge_base = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
-      bit_depth);
+	  x->rdmult, bits_nomerge_base >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+	  bit_depth);
+#endif
   const int bits_min = x->mode_costs.wienerns_restore_cost[1] +
                        x->mode_costs.merged_param_cost[1] +
                        (1 << AV1_PROB_COST_SHIFT);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER_NONSEP], bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   const double cost_min = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER_NONSEP], bit_depth);
+	  x->rdmult, bits_min >> 4, rusi->sse[RESTORE_WIENER_NONSEP], bit_depth);
+#endif
   const double cost_nomerge_thr = (cost_nomerge_base + 3 * cost_min) / 4;
   const RestorationType rtype =
       (cost_none <= cost_nomerge_thr) ? RESTORE_NONE : RESTORE_WIENER_NONSEP;
@@ -4005,9 +4226,15 @@ static void search_wienerns_visitor(const RestorationTileLimits *limits,
       count_wienerns_bits(rui.plane, &x->mode_costs, &rusi->wienerns_info,
                           &rsc->wienerns_bank, nsfilter_params,
                           ALL_WIENERNS_CLASSES);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  double cost_wienerns = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(
+	  x->rdmult, bits_wienerns >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+	  bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   double cost_wienerns = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      x->rdmult, bits_wienerns >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
-      bit_depth);
+	  x->rdmult, bits_wienerns >> 4, rusi->sse[RESTORE_WIENER_NONSEP],
+	  bit_depth);
+#endif
   const RestorationType rtype =
       (cost_wienerns < cost_none) ? RESTORE_WIENER_NONSEP : RESTORE_NONE;
   rusi->best_rtype[RESTORE_WIENER_NONSEP - 1] = rtype;
@@ -4142,8 +4369,13 @@ static void search_switchable_visitor(const RestorationTileLimits *limits,
 
     const int64_t sse = rusi->sse[r];
     int64_t bits = count_switchable_bits(r, rsc, rusi);
-    double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, sse,
-                                                 rsc->cm->seq_params.bit_depth);
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+	double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(x->rdmult, bits >> 4, sse,
+		rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
+	double cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(x->rdmult, bits >> 4, sse,
+		rsc->cm->seq_params.bit_depth);
+#endif
     if (r == RESTORE_SGRPROJ && rusi->sgrproj_info.ep < 10)
       cost *= (1 + DUAL_SGR_PENALTY_MULT * rsc->lpf_sf->dual_sgr_penalty_level);
     if (r == 0 || cost < best_cost) {
@@ -4347,7 +4579,11 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
                                int *processed, rest_unit_visitor_t fun) {
   const int is_uv = rsc->plane > 0;
   const int ss_y = is_uv && rsc->cm->seq_params.subsampling_y;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  RestorationInfo *rsi = &rsc->cm->rst_info[rsc->plane];
+#else
   const RestorationInfo *rsi = &rsc->cm->rst_info[rsc->plane];
+#endif  
   const int ru_size = rsi->restoration_unit_size;
   TileInfo tile_info;
   av1_tile_set_row(&tile_info, rsc->cm, tile_row);
@@ -4355,12 +4591,28 @@ static void process_one_rutile(RestSearchCtxt *rsc, int tile_row, int tile_col,
   assert(tile_info.mi_row_start < tile_info.mi_row_end);
   assert(tile_info.mi_col_start < tile_info.mi_col_end);
 
+#if CONFIG_2D_SR_RESTORATION_BUG_FIX
+  int scaled_mi_row_end = av1_superres_scaled(rsc->cm) ? tile_info.mi_row_end * rsc->cm->superres_scale_denominator / SCALE_NUMERATOR : tile_info.mi_row_end;
+  int scaled_mi_col_end = av1_superres_scaled(rsc->cm) ? tile_info.mi_col_end * rsc->cm->superres_scale_denominator / SCALE_NUMERATOR : tile_info.mi_col_end;
+#endif  // CONFIG_2D_SR_RESTORATION_BUG_FIX
+
   reset_rsc(rsc);
   rsc_on_tile(rsc, *processed);
+ #if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsc->skip_acc_txskip_flag = (rsc->cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+  rsi->skip_acc_txskip_flag = rsc->skip_acc_txskip_flag;
+#endif        
+#if CONFIG_2D_SR_RESTORATION_BUG_FIX
+  for (int mi_row = tile_info.mi_row_start; mi_row < scaled_mi_row_end;
+       mi_row += rsc->cm->seq_params.mib_size) {
+    for (int mi_col = tile_info.mi_col_start; mi_col < scaled_mi_col_end;
+         mi_col += rsc->cm->seq_params.mib_size) {
+#else  // CONFIG_2D_SR_RESTORATION_BUG_FIX
   for (int mi_row = tile_info.mi_row_start; mi_row < tile_info.mi_row_end;
        mi_row += rsc->cm->seq_params.mib_size) {
     for (int mi_col = tile_info.mi_col_start; mi_col < tile_info.mi_col_end;
          mi_col += rsc->cm->seq_params.mib_size) {
+#endif  // CONFIG_2D_SR_RESTORATION_BUG_FIX
       int rrow0, rrow1, rcol0, rcol1;
       if (av1_loop_restoration_corners_in_sb(
               rsc->cm, rsc->plane, mi_row, mi_col, rsc->cm->seq_params.sb_size,
@@ -4403,9 +4655,15 @@ static double process_rd_by_rutile(RestSearchCtxt *rsc,
       total_sse += rsc->sse;
     }
   }
+#if CONFIG_2D_SR_RESTORATION_BIT_ESTIMATE_SCALE
+  return RDCOST_DBL_WITH_NATIVE_BD_DIST_SCALE(rsc->x->rdmult, total_bits >> 4,
+	  total_sse,
+	  rsc->cm->seq_params.bit_depth, av1_superres_scaled(rsc->cm) ? (rsc->cm->superres_scale_denominator << 1) / SCALE_NUMERATOR : 2);
+#else
   return RDCOST_DBL_WITH_NATIVE_BD_DIST(rsc->x->rdmult, total_bits >> 4,
-                                        total_sse,
-                                        rsc->cm->seq_params.bit_depth);
+	  total_sse,
+	  rsc->cm->seq_params.bit_depth);
+#endif
 }
 
 static void gather_stats_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
@@ -4424,7 +4682,6 @@ static void gather_stats_rest_type(RestSearchCtxt *rsc, RestorationType rtype) {
 #if CONFIG_WIENER_NONSEP
   if (rtype == RESTORE_WIENER_NONSEP) aom_vector_clear(rsc->wienerns_stats);
 #endif  // CONFIG_WIENER_NONSEP
-
   if (funs[rtype]) process_by_rutile(rsc, funs[rtype]);
 }
 
@@ -4579,6 +4836,11 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   rsc.luma = luma;
 #endif  // CONFIG_WIENER_NONSEP_CROSS_FILT
 #endif  // CONFIG_WIENER_NONSEP
+
+
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsc.skip_acc_txskip_flag = (cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+#endif
 
 #if CONFIG_HIGH_PASS_CROSS_WIENER_FILTER
   rsc.is_cross_filter_round = 0;
@@ -4857,6 +5119,10 @@ void av1_pick_cross_filter_restoration(const YV12_BUFFER_CONFIG *src,
   );
   assert(luma_buf != NULL);
   rsc.luma = luma;
+
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsc.skip_acc_txskip_flag = (cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0;
+#endif  
 
   rsc.is_cross_filter_round = 1;
 

@@ -1354,6 +1354,22 @@ AOM_INLINE void av1_tip_enc_calc_subpel_params(
     pos_x += SCALE_EXTRA_OFF;
     pos_y += SCALE_EXTRA_OFF;
 
+#if CONFIG_2D_SR_ZERO_PHASE
+    // TODO: Determine plane type from something other than ssx, ssy
+    if (sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += (ssx == 1) ? inter_pred_params->posx_offset[1]
+                          : inter_pred_params->posx_offset[0];
+    }
+    if (sf->y_scale_fp != REF_NO_SCALE) {
+      pos_y += (ssy == 1) ? inter_pred_params->posy_offset[1]
+                          : inter_pred_params->posy_offset[0];
+    }
+#elif CONFIG_2D_SR_MC_PHASE_FIX
+    if (ssx == 1 && sf->x_scale_fp != REF_NO_SCALE) {
+      pos_x += inter_pred_params->posx_offset[1];
+    }
+#endif
+
     const int top = -AOM_LEFT_TOP_MARGIN_SCALED(ssy);
     const int left = -AOM_LEFT_TOP_MARGIN_SCALED(ssx);
     const int bottom = (pre_buf->height + AOM_INTERP_EXTEND)
@@ -1362,11 +1378,167 @@ AOM_INLINE void av1_tip_enc_calc_subpel_params(
     pos_y = clamp(pos_y, top, bottom);
     pos_x = clamp(pos_x, left, right);
 
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      const int bw = use_optflow_refinement ? inter_pred_params->orig_block_width : inter_pred_params->block_width;
+      const int bh = use_optflow_refinement ? inter_pred_params->orig_block_height : inter_pred_params->block_height;
+
+      MV mv_q4;
+      if (use_optflow_refinement) {
+        // optflow refinement always returns MVs with 1/16 precision so it is
+        // not necessary to shift the MV before clamping
+        mv_q4.row = (int16_t)ROUND_POWER_OF_TWO_SIGNED(src_mv->row * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + inter_pred_params->subsampling_y);
+        mv_q4.col = (int16_t)ROUND_POWER_OF_TWO_SIGNED(src_mv->col * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + inter_pred_params->subsampling_x);
+      } else {
+        mv_q4.row = (int16_t)(src_mv->row * (1 << (1 - inter_pred_params->subsampling_y)));
+        mv_q4.col = (int16_t)(src_mv->col * (1 << (1 - inter_pred_params->subsampling_x)));
+      }
+
+      const int spel_left = (AOM_INTERP_EXTEND + bw) << SUBPEL_BITS;
+      const int spel_right = spel_left - SUBPEL_SHIFTS;
+      const int spel_top = (AOM_INTERP_EXTEND + bh) << SUBPEL_BITS;
+      const int spel_bottom = spel_top - SUBPEL_SHIFTS;
+
+      const SubpelMvLimits mv_limits = {
+        inter_pred_params->dist_to_left_edge * (1 << (1 - inter_pred_params->subsampling_x)) - spel_left,
+        inter_pred_params->dist_to_right_edge * (1 << (1 - inter_pred_params->subsampling_x)) + spel_right,
+        inter_pred_params->dist_to_top_edge * (1 << (1 - inter_pred_params->subsampling_y)) - spel_top,
+        inter_pred_params->dist_to_bottom_edge * (1 << (1 - inter_pred_params->subsampling_y)) + spel_bottom
+      };
+
+      clamp_mv(&mv_q4, &mv_limits);
+
+      int subbpel_pos_x = ((inter_pred_params->pix_col << SUBPEL_BITS) + mv_q4.col) << SCALE_EXTRA_BITS;
+      int subbpel_pos_y = ((inter_pred_params->pix_row << SUBPEL_BITS) + mv_q4.row) << SCALE_EXTRA_BITS;
+      subpel_params->subpel_x = subbpel_pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = subbpel_pos_y & SCALE_SUBPEL_MASK;
+    } else {
+      subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
+      subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+    }
+#else
     subpel_params->subpel_x = pos_x & SCALE_SUBPEL_MASK;
     subpel_params->subpel_y = pos_y & SCALE_SUBPEL_MASK;
+#endif
     subpel_params->xs = sf->x_step_q4;
     subpel_params->ys = sf->y_step_q4;
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+    if ((sf->x_scale_fp == sf->y_scale_fp) && ((sf->x_scale_fp == REF_2x_SCALE) || (sf->x_scale_fp == REF_3x_SCALE) || (sf->x_scale_fp == REF_4x_SCALE) || (sf->x_scale_fp == REF_6x_SCALE))) {
+      int scale = 0;
+      if (sf->x_scale_fp == REF_2x_SCALE) scale = 2;
+      if (sf->x_scale_fp == REF_3x_SCALE) scale = 3;
+      if (sf->x_scale_fp == REF_4x_SCALE) scale = 4;
+      if (sf->x_scale_fp == REF_6x_SCALE) scale = 6;
+      assert(scale != 0);
+      inter_pred_params->conv_params.stride_scale = scale;
+#if CONFIG_2D_SR_CLAMP_MV_FOR_TIP
 
+      int orig_pos_y = inter_pred_params->pix_row << SUBPEL_BITS;
+      int orig_pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
+
+#if CONFIG_OPTFLOW_REFINEMENT
+      MV clamped_mv;
+      if (use_optflow_refinement) {
+        clamped_mv.row = (int16_t)ROUND_POWER_OF_TWO_SIGNED(
+            src_mv->row * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + ssy);
+        clamped_mv.col = (int16_t)ROUND_POWER_OF_TWO_SIGNED(
+            src_mv->col * (1 << SUBPEL_BITS), MV_REFINE_PREC_BITS + ssx);
+      } else {
+        clamped_mv.row = (int16_t)(src_mv->row * (1 << (1 - ssy)));
+        clamped_mv.col = (int16_t)(src_mv->col * (1 << (1 - ssx)));
+      }
+#endif
+
+      const int spel_left = (AOM_INTERP_EXTEND + inter_pred_params->block_width)
+                            << SUBPEL_BITS;
+      const int spel_right = spel_left - SUBPEL_SHIFTS;
+      const int spel_top = (AOM_INTERP_EXTEND + inter_pred_params->block_height)
+                           << SUBPEL_BITS;
+      const int spel_bottom = spel_top - SUBPEL_SHIFTS;
+
+      int mi_row = inter_pred_params->pix_row /
+                   (MI_SIZE >> inter_pred_params->subsampling_y);
+      int mi_col = inter_pred_params->pix_col /
+                   (MI_SIZE >> inter_pred_params->subsampling_x);
+      int mb_to_top_edge = -GET_MV_SUBPEL(mi_row * MI_SIZE);
+      int mb_to_bottom_edge =
+          GET_MV_SUBPEL((inter_pred_params->mi_rows - mi_row) * MI_SIZE -
+                        inter_pred_params->block_height);
+      int mb_to_left_edge = -GET_MV_SUBPEL((mi_col * MI_SIZE));
+      int mb_to_right_edge =
+          GET_MV_SUBPEL((inter_pred_params->mi_cols - mi_col) * MI_SIZE -
+                        inter_pred_params->block_width);
+
+      const SubpelMvLimits mv_limits = {
+        mb_to_left_edge * (1 << (1 - ssx)) - spel_left,
+        mb_to_right_edge * (1 << (1 - ssx)) + spel_right,
+        mb_to_top_edge * (1 << (1 - ssy)) - spel_top,
+        mb_to_bottom_edge * (1 << (1 - ssy)) + spel_bottom
+      };
+
+      clamp_mv(&clamped_mv, &mv_limits);
+
+      orig_pos_x += clamped_mv.col;
+      orig_pos_y += clamped_mv.row;
+
+      orig_pos_y = ((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale;
+      orig_pos_x = ((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale;
+
+#if CONFIG_D071_IMP_MSK_BLD
+      if (inter_pred_params->border_data.enable_bacp) {
+        // Get reference block top left coordinate.
+        subpel_params->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+        subpel_params->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+        // Get reference block bottom right coordinate.
+        subpel_params->x1 =
+            ((orig_pos_x +
+              (inter_pred_params->block_width - 1) * subpel_params->xs) >>
+             SCALE_SUBPEL_BITS) +
+            scale;
+        subpel_params->y1 =
+            ((orig_pos_y +
+              (inter_pred_params->block_height - 1) * subpel_params->ys) >>
+             SCALE_SUBPEL_BITS) +
+            scale;
+      }
+#endif  // CONFIG_D071_IMP_MSK_BLD
+#else
+      orig_pos_y = clamp(((orig_pos_y >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         top, bottom);
+      orig_pos_x = clamp(((orig_pos_x >> SUBPEL_BITS) << SCALE_SUBPEL_BITS) * scale,
+                         left, right);
+#if CONFIG_D071_IMP_MSK_BLD
+      if (inter_pred_params->border_data.enable_bacp) {
+        // Get reference block top left coordinate.
+        subpel_params->x0 = orig_pos_x >> SCALE_SUBPEL_BITS;
+        subpel_params->y0 = orig_pos_y >> SCALE_SUBPEL_BITS;
+        // Get reference block bottom right coordinate.
+        subpel_params->x1 = ((orig_pos_x + (inter_pred_params->block_width - 1) * subpel_params->xs) >> SCALE_SUBPEL_BITS) + scale;
+        subpel_params->y1 = ((orig_pos_y + (inter_pred_params->block_height - 1) * subpel_params->ys) >> SCALE_SUBPEL_BITS) + scale;
+        //subpel_params->x1 = subpel_params->x0 + inter_pred_params->block_width * scale;
+        //subpel_params->y1 = subpel_params->y0 + inter_pred_params->block_height * scale;
+      }
+#endif  // CONFIG_D071_IMP_MSK_BLD
+#endif
+      *pre = pre_buf->buf0 +
+             (orig_pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
+             (orig_pos_x >> SCALE_SUBPEL_BITS);
+    } else {
+      inter_pred_params->conv_params.stride_scale = 1;
+#if CONFIG_D071_IMP_MSK_BLD
+      if (inter_pred_params->border_data.enable_bacp) {
+        // Get reference block top left coordinate.
+        subpel_params->x0 = pos_x >> SCALE_SUBPEL_BITS;
+        subpel_params->y0 = pos_y >> SCALE_SUBPEL_BITS;
+        // Get reference block bottom right coordinate.
+        subpel_params->x1 = subpel_params->x0 + inter_pred_params->block_width;
+        subpel_params->y1 = subpel_params->y0 + inter_pred_params->block_height;
+      }
+#endif  // CONFIG_D071_IMP_MSK_BLD
+      *pre = pre_buf->buf0 + (pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
+             (pos_x >> SCALE_SUBPEL_BITS);
+    }
+#else
 #if CONFIG_D071_IMP_MSK_BLD
     if (inter_pred_params->border_data.enable_bacp) {
       // Get reference block top left coordinate.
@@ -1377,9 +1549,9 @@ AOM_INLINE void av1_tip_enc_calc_subpel_params(
       subpel_params->y1 = subpel_params->y0 + inter_pred_params->block_height;
     }
 #endif  // CONFIG_D071_IMP_MSK_BLD
-
     *pre = pre_buf->buf0 + (pos_y >> SCALE_SUBPEL_BITS) * pre_buf->stride +
            (pos_x >> SCALE_SUBPEL_BITS);
+#endif
   } else {
     int pos_x = inter_pred_params->pix_col << SUBPEL_BITS;
     int pos_y = inter_pred_params->pix_row << SUBPEL_BITS;

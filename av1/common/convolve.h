@@ -29,6 +29,9 @@ typedef struct ConvolveParams {
   int is_compound;
   int fwd_offset;
   int bck_offset;
+#if CONFIG_2D_SR_PHASE_ADJUSTMENT
+  int stride_scale;
+#endif
 } ConvolveParams;
 
 #if CONFIG_PC_WIENER || CONFIG_WIENER_NONSEP

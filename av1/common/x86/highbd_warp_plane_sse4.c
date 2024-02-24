@@ -250,6 +250,7 @@ static INLINE void highbd_warp_horizontal_filter(
     const uint16_t *ref, __m128i *tmp, int stride, int32_t ix4, int32_t iy4,
     int32_t sx4, int alpha, int beta, int p_height, int height, int i,
     const int offset_bits_horiz, const int reduce_bits_horiz) {
+
   int k;
   for (k = -7; k < AOMMIN(8, p_height - i); ++k) {
     int iy = iy4 + k;
@@ -274,6 +275,7 @@ static INLINE void highbd_prepare_warp_horizontal_filter(
     const uint16_t *ref, __m128i *tmp, int stride, int32_t ix4, int32_t iy4,
     int32_t sx4, int alpha, int beta, int p_height, int height, int i,
     const int offset_bits_horiz, const int reduce_bits_horiz) {
+
   if (alpha == 0 && beta == 0)
     highbd_warp_horizontal_filter_alpha0_beta0(
         ref, tmp, stride, ix4, iy4, sx4, alpha, beta, p_height, height, i,
@@ -294,13 +296,255 @@ static INLINE void highbd_prepare_warp_horizontal_filter(
                                   reduce_bits_horiz);
 }
 
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+static __m128i strided_load_2x(const uint16_t *const src) {
+
+  __m128i control = _mm_setr_epi8(0, 1, 4, 5,
+                                  8, 9, 12, 13,
+                                  0x80, 0x80, 0x80, 0x80,
+                                  0x80, 0x80, 0x80, 0x80 );
+
+  // Load the first 8 values and de-interleave into the lowest 64 bits of data0
+  __m128i data0 = _mm_loadu_si128((__m128i *)src );
+  __m128i data1 = _mm_shuffle_epi8( data0, control );
+
+  // Load the second 8 values and de-interleave in the lowest 64 bits of data2
+  __m128i data2 = _mm_loadu_si128((__m128i *)src+1 );
+  __m128i data3 = _mm_shuffle_epi8( data2, control );
+
+  // Combine the results
+  __m128i data4 = _mm_unpacklo_epi64( data1, data3);
+
+  return data4;
+
+}
+
+static __m128i strided_load_3x(const uint16_t *const src) {
+
+  //[*0 1 2 *3 4 5 *6 7][8 *9 10 11 *12 13 14 *15][16 17 *18 19 20 *21 22 23]
+
+  // Load data from the first 8 values and store in their correct location
+  const __m128i control0 = _mm_setr_epi8(0, 1, 6, 7,
+                                         12, 13, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i data0 = _mm_loadu_si128((__m128i *)src );
+  const __m128i data1 = _mm_shuffle_epi8( data0, control0 );
+
+  // Load data from the first 8 values and store in their correct location
+  const __m128i control1 = _mm_setr_epi8(0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 2, 3,
+                                         8, 9, 14, 15,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i data2 = _mm_loadu_si128((__m128i *)src+1 );
+  const __m128i data3 = _mm_shuffle_epi8( data2, control1 );
+
+  // Load data from the first 8 values and store in their correct location
+  const __m128i control2 = _mm_setr_epi8(0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         4, 5, 10, 11 );
+
+  const __m128i data4 = _mm_loadu_si128((__m128i *)src+2 );
+  const __m128i data5 = _mm_shuffle_epi8( data4, control2 );
+
+  // Combine the results
+  const __m128i data6 = _mm_blend_epi16(data1, data3, 0b00111000);
+  const __m128i data7 = _mm_blend_epi16(data6, data5, 0b11000000);
+
+  return data7;
+}
+
+static __m128i strided_load_4x(const uint16_t *const src) {
+
+  const __m128i control0 = _mm_setr_epi8(0, 1, 8, 9,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i control1 = _mm_setr_epi8(0x80, 0x80, 0x80, 0x80,
+                                         0, 1, 8, 9,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+
+  // Load the first 8 values and store the two desired values in the lowest 64 bits of data0
+  const __m128i data0 = _mm_loadu_si128((__m128i *)src );
+  const __m128i data1 = _mm_shuffle_epi8( data0, control0 );
+
+  // Load the second 8 values and store the two desired values in the lowest 64 bits of data2
+  const __m128i data2 = _mm_loadu_si128((__m128i *)src+1 );
+  const __m128i data3 = _mm_shuffle_epi8( data2, control1 );
+
+  // Load the third 8 values and store the two desired values in the lowest 64 bits of data2
+  const __m128i data4 = _mm_loadu_si128((__m128i *)src+2 );
+  const __m128i data5 = _mm_shuffle_epi8( data4, control0 );
+
+  // Load the fourth 8 values and store the two desired values in the lowest 64 bits of data2
+  const __m128i data6 = _mm_loadu_si128((__m128i *)src+3 );
+  const __m128i data7 = _mm_shuffle_epi8( data6, control1 );
+
+  // Combine the results
+  /*
+  const __m128i data8 = _mm_blend_epi16(data1, data3, 0b00001100);
+  const __m128i data9 = _mm_blend_epi16(data5, data7, 0b00001100);
+  const __m128i data10 = _mm_unpacklo_epi64( (__m128i)data8, (__m128i)data9);
+  */
+  __m128i data8 = _mm_blend_epi16(data1, data3, 0b00001100);
+  __m128i data9 = _mm_blend_epi16(data5, data7, 0b00001100);
+  const __m128i data10 = _mm_unpacklo_epi64(data8, data9);
+
+  return data10;
+
+}
+
+static __m128i strided_load_6x(const uint16_t *const src) {
+
+  //[*0 1 2 3 4 5 *6 7][8 9 10 11 *12 13 14 15][16 17 *18 19 20 21 22 23]...
+
+  // Load data from the first 8 values and store in their correct location
+  const __m128i control0 = _mm_setr_epi8(0, 1, 12, 13,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i data0 = _mm_loadu_si128((__m128i *)src );
+  const __m128i data1 = _mm_shuffle_epi8( data0, control0 );
+
+  // Load data from the second 8 values and store in their correct location
+  const __m128i control1 = _mm_setr_epi8(0x80, 0x80, 0x80, 0x80,
+                                         8, 9, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i data2 = _mm_loadu_si128((__m128i *)src+1 );
+  const __m128i data3 = _mm_shuffle_epi8( data2, control1 );
+
+  // Load data from the third 8 values and store in their correct location
+  const __m128i control2 = _mm_setr_epi8(0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 4, 5,
+                                         0x80, 0x80, 0x80, 0x80,
+                                         0x80, 0x80, 0x80, 0x80 );
+
+  const __m128i data4 = _mm_loadu_si128((__m128i *)src+2 );
+  const __m128i data5 = _mm_shuffle_epi8( data4, control2 );
+
+  // Combine the results
+  const __m128i data6 = _mm_blend_epi16(data1, data3, 0b00000100);
+  const __m128i data7 = _mm_blend_epi16(data6, data5, 0b00001000);
+
+  // Load data from the four 8 values and store in the low bits
+  const __m128i data8 = _mm_shuffle_epi8( _mm_loadu_si128((__m128i *)src+3 ), control0 );
+
+  // Load data from the four 8 values and store in the low bits
+  const __m128i data9 = _mm_shuffle_epi8( _mm_loadu_si128((__m128i *)src+4 ), control1 );
+
+  // Load data from the four 8 values and store in the low bits
+  const __m128i data10 = _mm_shuffle_epi8( _mm_loadu_si128((__m128i *)src+5 ), control2 );
+
+  // Combine the results
+  const __m128i data11 = _mm_blend_epi16(data8, data9, 0b00000100);
+  const __m128i data12 = _mm_blend_epi16(data11, data10, 0b00001000);
+  const __m128i data13 = _mm_unpacklo_epi64( data7, data12);
+
+  return data13;
+
+}
+
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+//Note: This function is typically called twice to load a total
+//of 16 elements.  This would be more efficient to do in a single
+//function, as there is some overlap between the data we are reading
+//in the first and second call.
+static __m128i interpolated_load_1_5x(const uint16_t *const src,
+                                      int first_sample_in_subpel,
+                                      int line_is_subpel,
+                                      int stride) {
+
+  __m128i control0, control1;
+
+  assert(first_sample_in_subpel < 2);
+  if( !first_sample_in_subpel){
+    control0 = _mm_setr_epi8( 0, 1, 0, 1, 2, 3, 4, 5,
+                              6, 7, 6, 7, 8, 9, 10, 11);
+
+    control1 = _mm_setr_epi8( 12, 13, 12, 13, 14, 15, 0, 1,
+                               2, 3, 2, 3, 4, 5, 6, 7);
+  }
+  else{
+
+    control0 = _mm_setr_epi8(0, 1, 2, 3, 4, 5, 4, 5,
+                            6, 7, 8, 9, 10, 11, 10, 11);
+
+    control1 = _mm_setr_epi8(12, 13, 14, 15, 0, 1, 0, 1,
+                            2, 3, 4, 5, 6, 7, 6, 7);
+  }
+
+  // Load the first and second 8 values
+  __m128i data0 = _mm_loadu_si128((__m128i *)src );
+  __m128i data1 = _mm_loadu_si128((__m128i *)src+1 );
+
+  // Perform vertical interpolation if needed
+  if(line_is_subpel) {
+    const __m128i data0_1 = _mm_loadu_si128((__m128i *)(src + stride) );
+    const __m128i data1_1 = _mm_loadu_si128((__m128i *)(src + stride) + 1);
+
+    data0 = _mm_add_epi16(data0, data0_1);
+    data1 = _mm_add_epi16( data1, data1_1);
+  }
+
+  // Move the last two samples in data0 to data1.  While the ordering is not
+  // correct yet, this will give us the first six samples in the first register
+  // and the second six samples in the second register
+  uint16_t dummy[8];
+  _mm_storeu_si128( &dummy, data0);
+
+  uint16_t dummy1[8];
+  _mm_storeu_si128( &dummy1, data1);
+
+  const __m128i data3 = _mm_blend_epi16(data0, data1, 0b00111111);
+
+  _mm_storeu_si128( &dummy, data3);
+
+  // Shuffle the values so that we have the six samples in each register
+  // correctly ordered, and with the collocated samples duplicated
+  const __m128i data4 = _mm_shuffle_epi8( data0, control0);
+  _mm_storeu_si128( &dummy, data4);
+
+  const __m128i data5 = _mm_shuffle_epi8( data3, control1);
+  _mm_storeu_si128( &dummy, data5);
+
+  // Horizontal add
+  const __m128i data6 = _mm_hadd_epi16(data4, data5);
+  _mm_storeu_si128( &dummy, data6);
+
+  // Normalize with rounding
+  const __m128i data7 = _mm_add_epi16( data6, _mm_set1_epi16( line_is_subpel?2:1) );
+  _mm_storeu_si128( &dummy, data7);
+  const __m128i data8 = _mm_srli_epi16( data7, line_is_subpel?2:1);
+  _mm_storeu_si128( &dummy, data8);
+
+  return data8;
+
+}
+#endif
+#endif
+
 void av1_highbd_warp_affine_sse4_1(const int32_t *mat, const uint16_t *ref,
                                    int width, int height, int stride,
                                    uint16_t *pred, int p_col, int p_row,
                                    int p_width, int p_height, int p_stride,
                                    int subsampling_x, int subsampling_y, int bd,
                                    ConvolveParams *conv_params, int16_t alpha,
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+                                   int16_t beta, int16_t gamma, int16_t delta,
+                                   const int x_step_qn, const int y_step_qn) {
+#else
                                    int16_t beta, int16_t gamma, int16_t delta) {
+#endif 
+
   __m128i tmp[15];
   int i, j, k;
   const int reduce_bits_horiz =
@@ -335,6 +579,17 @@ void av1_highbd_warp_affine_sse4_1(const int32_t *mat, const uint16_t *ref,
   const __m128i wt0 = _mm_set1_epi32(w0);
   const __m128i wt1 = _mm_set1_epi32(w1);
   const int use_wtd_comp_avg = is_uneven_wtd_comp_avg(conv_params);
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+  // Determine our stride
+#if !CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+  assert(x_step_qn == y_step_qn);
+#endif
+  const int x_conv_stride = x_step_qn >> SCALE_SUBPEL_BITS;
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+  const int mode_1_5x_flag = ( x_step_qn + ( 1 << (SCALE_SUBPEL_BITS - 2 ) ) ) >> (SCALE_SUBPEL_BITS -1 ) == 3 ? 1 : 0;
+#endif
+#endif
 
   /* Note: For this code to work, the left/right frame borders need to be
   extended by at least 13 pixels each. By the time we get here, other
@@ -377,33 +632,161 @@ void av1_highbd_warp_affine_sse4_1(const int32_t *mat, const uint16_t *ref,
       // skip the expensive horizontal filter.
       if (ix4 <= -7) {
         for (k = -7; k < AOMMIN(8, p_height - i); ++k) {
+
           int iy = iy4 + k;
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          // Converting iy from the current frame resolution
+          // to the reference frame resolution.  For an integer
+          // relationship, this results in a strided operation.
+          // Results are a bit undefined for non-integer factors.
+          //
+          // We chose not to covert ix4 above, since we would
+          // also need to convert the -7 value in this case.
+          // The end result would be unchanged.
+          iy = x_conv_stride * iy;
+#endif
           if (iy < 0)
             iy = 0;
           else if (iy > height - 1)
             iy = height - 1;
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+          int src_iy = -1;
+          uint16_t value;
+          if( mode_1_5x_flag){
+
+            // Determine the line in the reference image that corresponds to the desired iy
+            src_iy = clamp(3 * (iy4 + k) / 2, 0, height - 1);
+
+            //uint16_t value;
+            if(src_iy % 3 == 1 && src_iy < (height-1))
+              value = ( ref[src_iy * stride] + ref[(src_iy+1) * stride] + 1 ) >> 1;
+            else
+              value = ref[src_iy * stride];
+
+            tmp[k + 7] = _mm_set1_epi16(
+                (1 << (bd + FILTER_BITS - reduce_bits_horiz - 1)) +
+                value * (1 << (FILTER_BITS - reduce_bits_horiz)));
+          }
+          else
+            tmp[k + 7] = _mm_set1_epi16(
+                (1 << (bd + FILTER_BITS - reduce_bits_horiz - 1)) +
+                ref[iy * stride] * (1 << (FILTER_BITS - reduce_bits_horiz)));
+
+#else
           tmp[k + 7] = _mm_set1_epi16(
               (1 << (bd + FILTER_BITS - reduce_bits_horiz - 1)) +
               ref[iy * stride] * (1 << (FILTER_BITS - reduce_bits_horiz)));
+#endif
         }
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+      } else if ( (ix4*x_conv_stride) >= ((width/x_conv_stride + 6) * x_conv_stride) && !mode_1_5x_flag) {
+#else
+      } else if ( (ix4*x_conv_stride) >= width + (6*x_conv_stride) ) {
+#endif
+#else
       } else if (ix4 >= width + 6) {
+#endif
         for (k = -7; k < AOMMIN(8, p_height - i); ++k) {
+
           int iy = iy4 + k;
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          // Converting iy from the current frame resolution
+          // to the reference frame resolution.  For an integer
+          // relationship, this results in a strided operation.
+          // Results are a bit undefined for non-integer factors.
+          iy = x_conv_stride * iy;
+#endif
           if (iy < 0)
             iy = 0;
           else if (iy > height - 1)
             iy = height - 1;
           tmp[k + 7] =
               _mm_set1_epi16((1 << (bd + FILTER_BITS - reduce_bits_horiz - 1)) +
-                             ref[iy * stride + (width - 1)] *
+                             ref[iy * stride + width - width%x_conv_stride - x_conv_stride] *
                                  (1 << (FILTER_BITS - reduce_bits_horiz)));
         }
-      } else if (((ix4 - 7) < 0) || ((ix4 + 9) > width)) {
-        const int out_of_boundary_left = -(ix4 - 6);
-        const int out_of_boundary_right = (ix4 + 8) - width;
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+      } else if ( ( (3*ix4/2) >= 3*(2*width/3 + 6)/2 ) && mode_1_5x_flag) {
 
         for (k = -7; k < AOMMIN(8, p_height - i); ++k) {
+
+          const int src_iy = clamp(3 * (iy4 + k) / 2, 0, height - 1);
+          const int sample_x = 3*(2*width/3 - 1) / 2;
+
+          uint16_t value;
+          if(src_iy % 3 == 1 && sample_x % 3 == 1 && src_iy < (height-1))
+            value = ( ref[src_iy * stride + sample_x]
+                     + ref[src_iy * stride + sample_x + 1]
+                     + ref[(src_iy+1) * stride + sample_x]
+                     + ref[(src_iy+1) * stride + sample_x + 1] + 2 ) / 4;
+          else if(src_iy % 3 == 1)
+            value = ( ref[src_iy * stride + sample_x]
+                     + ref[(src_iy+1) * stride + sample_x] + 1 ) / 2;
+          else if(sample_x % 3 == 1)
+            value = ( ref[src_iy * stride + sample_x]
+                     + ref[src_iy * stride + sample_x + 1] + 1 ) / 2;
+          else
+            value = ref[src_iy * stride + sample_x];
+
+          tmp[k + 7] =
+              _mm_set1_epi16((1 << (bd + FILTER_BITS - reduce_bits_horiz - 1)) +
+                             value *
+                                 (1 << (FILTER_BITS - reduce_bits_horiz)));
+        }
+#endif
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP  && !CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+      // Always use the code below if the reference frame and current frame have
+      // different resolutions.
+      } else if ( ( ((ix4 - 7) < 0) || ((ix4 + 9) > width)) || x_conv_stride != 1 ){
+#elif CONFIG_2D_SR_SUBSAMPLE_FOR_WARP && CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+      } else if ( ( ((ix4 - 7) < 0) || ((ix4 + 9) > width)) || x_conv_stride != 1 || mode_1_5x_flag){
+#else
+      } else if (((ix4 - 7) < 0) || ((ix4 + 9) > width)) {
+#endif
+        const int out_of_boundary_left = -(ix4 - 6);
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP && ! CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+        // The full resolution code may have an off-by-one error
+        const int out_of_boundary_right = (ix4 + 8) - width/x_conv_stride;
+#elif CONFIG_2D_SR_SUBSAMPLE_FOR_WARP && CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+        int out_of_boundary_right;
+        if( !mode_1_5x_flag)
+          out_of_boundary_right = (ix4 + 8) - width/x_conv_stride;
+        else
+          out_of_boundary_right = (ix4 + 8) - 2*width/3;
+#else
+        const int out_of_boundary_right = (ix4 + 8) - width;
+#endif
+
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+        // Converting ix4 from the current frame resolution
+        // to the reference frame resolution.  For an integer
+        // relationship, this results in a strided operation.
+        // Results are a bit undefined for non-integer factors.
+        ix4 = x_conv_stride * ix4;
+#endif
+        for (k = -7; k < AOMMIN(8, p_height - i); ++k) {
+
           int iy = iy4 + k;
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          // Converting iy from the current frame resolution
+          // to the reference frame resolution.  For an integer
+          // relationship, this results in a strided operation.
+          // Results are a bit undefined for non-integer factors.
+          iy = x_conv_stride * iy;
+
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+          // Converting iy from the current frame resolution
+          // to the reference frame resolution when the sample
+          // factor is 1.5x.
+          if(mode_1_5x_flag)
+            iy = 3 * iy / 2;
+#endif
+#endif
           if (iy < 0)
             iy = 0;
           else if (iy > height - 1)
@@ -411,11 +794,54 @@ void av1_highbd_warp_affine_sse4_1(const int32_t *mat, const uint16_t *ref,
           int sx = sx4 + beta * (k + 4);
 
           // Load source pixels
+#if CONFIG_2D_SR_SUBSAMPLE_FOR_WARP
+          __m128i src, src2;
+
+#if CONFIG_2D_SR_1_5X_SUBSAMPLE_FOR_WARP
+          if(mode_1_5x_flag==1 && x_conv_stride==1) {
+
+            // Compute 3 * (ix4 - 7) / 2 with rounding toward -infinity
+            int ix4_src = 3 * (ix4 - 7) / 2;
+            ix4_src -= (ix4_src%3==-1);
+
+            src = interpolated_load_1_5x(ref + iy * stride + ix4_src,
+                                         ix4_src%3, iy%3==1, stride);
+
+            src2 = interpolated_load_1_5x(ref + iy * stride + ix4_src + 12,
+                                         ix4_src%3, iy%3==1, stride);
+          }
+          else if(x_conv_stride==1) {
+#else
+          if(x_conv_stride==1) {
+#endif
+            src  = _mm_loadu_si128((__m128i *)(ref + iy * stride + ix4 - 7));
+            src2 = _mm_loadu_si128((__m128i *)(ref + iy * stride + ix4 + 1));
+          }
+          else if(x_conv_stride==2 ) {
+            src = strided_load_2x(ref + iy * stride + ix4 - 7*2);
+            src2 = strided_load_2x(ref + iy * stride + ix4 + 1*2);
+          }
+          else if(x_conv_stride==3) {
+            src = strided_load_3x(ref + iy * stride + ix4 - 7*3);
+            src2 = strided_load_3x(ref + iy * stride + ix4 + 1*3);
+          }
+          else if(x_conv_stride==4) {
+            src = strided_load_4x(ref + iy * stride + ix4 - 7*4);
+            src2 = strided_load_4x(ref + iy * stride + ix4 + 1*4);
+          }
+          else if(x_conv_stride==6) {
+            src = strided_load_6x(ref + iy * stride + ix4 - 7*6);
+            src2 = strided_load_6x(ref + iy * stride + ix4 + 1*6);
+          }
+          else{
+            assert(0);
+          }
+#else
           const __m128i src =
               _mm_loadu_si128((__m128i *)(ref + iy * stride + ix4 - 7));
           const __m128i src2 =
               _mm_loadu_si128((__m128i *)(ref + iy * stride + ix4 + 1));
-
+#endif
           const __m128i src_01 = _mm_shuffle_epi8(
               src, _mm_loadu_si128((__m128i *)warp_highbd_arrange_bytes));
           const __m128i src2_01 = _mm_shuffle_epi8(

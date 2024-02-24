@@ -83,8 +83,16 @@ static INLINE void init_mv_cost_params(MV_COST_PARAMS *mv_cost_params,
 #endif
 }
 
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+static INLINE void init_ms_buffers(MSBuffers *ms_buffers, const MACROBLOCK *x, int ref_idx) {
+#else
 static INLINE void init_ms_buffers(MSBuffers *ms_buffers, const MACROBLOCK *x) {
-  ms_buffers->ref = &x->e_mbd.plane[0].pre[0];
+#endif
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	ms_buffers->ref = &x->e_mbd.plane[0].pre[ref_idx];
+#else
+	ms_buffers->ref = &x->e_mbd.plane[0].pre[0];
+#endif
   ms_buffers->src = &x->plane[0].src;
 
   av1_set_ms_compound_refs(ms_buffers, NULL, NULL, 0, 0);
@@ -124,7 +132,11 @@ void av1_make_default_fullpel_ms_params(
 #endif
 #endif
     const search_site_config search_sites[NUM_DISTINCT_SEARCH_METHODS],
-    int fine_search_interval) {
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	int fine_search_interval, int ref_idx) {
+#else
+	int fine_search_interval) {
+#endif
   const MV_SPEED_FEATURES *mv_sf = &cpi->sf.mv_sf;
 
 #if CONFIG_ADAPTIVE_MVD || CONFIG_TIP || CONFIG_FLEX_MVRES
@@ -143,8 +155,11 @@ void av1_make_default_fullpel_ms_params(
   // High level params
   ms_params->bsize = bsize;
   ms_params->vfp = &cpi->fn_ptr[bsize];
-
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+  init_ms_buffers(&ms_params->ms_buffers, x, ref_idx);
+#else
   init_ms_buffers(&ms_params->ms_buffers, x);
+#endif
 
   SEARCH_METHODS search_method = mv_sf->search_method;
   if (mv_sf->use_bsize_dependent_search_method) {
@@ -231,7 +246,11 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
 #if CONFIG_FLEX_MVRES
                                        const MvSubpelPrecision pb_mv_precision,
 #endif
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+                                       const int *cost_list, int ref_idx) {
+#else
                                        const int *cost_list) {
+#endif
 
 #if CONFIG_ADAPTIVE_MVD || !CONFIG_FLEX_MVRES
   const AV1_COMMON *cm = &cpi->common;
@@ -269,7 +288,11 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
   ms_params->cost_list = cond_cost_list_const(cpi, cost_list);
 
 #if CONFIG_TIP
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+  if (is_tip_ref_frame(mbmi->ref_frame[ref_idx])) {
+#else
   if (is_tip_ref_frame(mbmi->ref_frame[0])) {
+#endif
     av1_set_tip_subpel_mv_search_range(&ms_params->mv_limits, &x->mv_limits);
   } else {
 #endif  // CONFIG_TIP
@@ -313,7 +336,11 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
 
   // Ref and src buffers
   MSBuffers *ms_buffers = &ms_params->var_params.ms_buffers;
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+  init_ms_buffers(ms_buffers, x, ref_idx);
+#else
   init_ms_buffers(ms_buffers, x);
+#endif
 #if CONFIG_FLEX_MVRES
   assert(ms_params->var_params.subpel_search_type &&
          "Subpel type 2_TAPS_ORIG is no longer supported!");
@@ -2488,7 +2515,7 @@ static int full_pixel_exhaustive(const FULLPEL_MV start_mv,
 // This function is called when we do joint motion search in comp_inter_inter
 // mode, or when searching for one component of an ext-inter compound mode.
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv) {
+	const FULLPEL_MV start_mv, FULLPEL_MV *best_mv) {
   static const search_neighbors neighbors[8] = {
     { { -1, 0 }, -1 * SEARCH_GRID_STRIDE_8P + 0 },
     { { 0, -1 }, 0 * SEARCH_GRID_STRIDE_8P - 1 },
@@ -2517,10 +2544,11 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
   const int ref_stride = ref->stride;
 
   *best_mv = start_mv;
+
   clamp_fullmv(best_mv, mv_limits);
 
   unsigned int best_sad = get_mvpred_compound_sad(
-      ms_params, src, get_buf_from_fullmv(ref, best_mv), ref_stride);
+	  ms_params, src, get_buf_from_fullmv(ref, best_mv), ref_stride);
 #if CONFIG_FLEX_MVRES
   best_sad += mvsad_err_cost(*best_mv, mv_cost_params);
 #else
@@ -2582,8 +2610,8 @@ int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
 // comp_inter_inter mode, or when searching for one component of an ext-inter
 // compound mode.
 int av1_refining_search_8p_c_low_precision(
-    const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv, int fast_mv_refinement) {
+	const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
+	FULLPEL_MV *best_mv, int fast_mv_refinement) {
   assert(ms_params->mv_cost_params.pb_mv_precision < MV_PRECISION_ONE_PEL);
   const int search_range =
       1 << (MV_PRECISION_ONE_PEL - ms_params->mv_cost_params.pb_mv_precision);
@@ -2614,12 +2642,11 @@ int av1_refining_search_8p_c_low_precision(
   const int ref_stride = ref->stride;
 
   *best_mv = start_mv;
-  clamp_fullmv(best_mv, mv_limits);
 
+  clamp_fullmv(best_mv, mv_limits);
   unsigned int best_sad = get_mvpred_compound_sad(
       ms_params, src, get_buf_from_fullmv(ref, best_mv), ref_stride);
   best_sad += mvsad_err_cost(*best_mv, mv_cost_params);
-
   for (int step = 0; step < num_of_search_steps; step++) {
     int best_site = -1;
     // TODO(Mohammed): remove retundant search points to reduce complexity
@@ -2633,7 +2660,7 @@ int av1_refining_search_8p_c_low_precision(
         sad = get_mvpred_compound_sad(
             ms_params, src, get_buf_from_fullmv(ref, &mv), ref_stride);
         if (sad < best_sad) {
-          sad += mvsad_err_cost(mv, mv_cost_params);
+			    sad += mvsad_err_cost(mv, mv_cost_params);
           if (sad < best_sad) {
             best_sad = sad;
             best_site = j;
@@ -2649,7 +2676,6 @@ int av1_refining_search_8p_c_low_precision(
       best_mv->col += neighbors[best_site].coord.col;
     }
   }
-
   return best_sad;
 }
 
@@ -3361,7 +3387,7 @@ static int obmc_full_pixel_diamond(
 int av1_obmc_full_pixel_search(const FULLPEL_MV start_mv,
                                const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
                                const int step_param, FULLPEL_MV *best_mv) {
-  if (!ms_params->fast_obmc_search) {
+	if (!ms_params->fast_obmc_search) {
     const int do_refine = 1;
     const int bestsme = obmc_full_pixel_diamond(ms_params, start_mv, step_param,
                                                 do_refine, best_mv);
@@ -3388,7 +3414,6 @@ int av1_obmc_full_pixel_search(const FULLPEL_MV start_mv,
  * 32 cols area that is enough for 16x16 macroblock. Later, for SPLITMV, we
  * could reduce the area.
  */
-
 // Returns the subpel offset used by various subpel variance functions [m]sv[a]f
 static INLINE int get_subpel_part(int x) { return x & 7; }
 
@@ -3400,7 +3425,6 @@ static INLINE const uint16_t *get_buf_from_mv(const struct buf_2d *buf,
   const int offset = (mv.row >> 3) * buf->stride + (mv.col >> 3);
   return &buf->buf[offset];
 }
-
 // Estimates the variance of prediction residue using bilinear filter for fast
 // search.
 static INLINE int estimated_pref_error(
@@ -3432,7 +3456,6 @@ static INLINE int estimated_pref_error(
                      sse, second_pred);
   }
 }
-
 // Calculates the variance of prediction residue.
 static int upsampled_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                 const MV *this_mv,
@@ -3468,7 +3491,11 @@ static int upsampled_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
       aom_highbd_comp_mask_upsampled_pred(
           xd, cm, mi_row, mi_col, this_mv, pred, second_pred, w, h, subpel_x_q3,
           subpel_y_q3, ref, ref_stride, mask, mask_stride, invert_mask, xd->bd,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+          subpel_search_type, is_scaled_ref);
+#else
           subpel_search_type);
+#endif          
     } else {
 #if CONFIG_CWP
       if (get_cwp_idx(xd->mi[0]) != CWP_EQUAL) {
@@ -3478,14 +3505,22 @@ static int upsampled_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
         aom_highbd_dist_wtd_comp_avg_upsampled_pred(
             xd, cm, mi_row, mi_col, this_mv, pred, second_pred, w, h,
             subpel_x_q3, subpel_y_q3, ref, ref_stride, xd->bd, &jcp_param,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+            subpel_search_type, is_scaled_ref);
+#else
             subpel_search_type);
+#endif
       } else
 #endif  // CONFIG_CWP
 
         aom_highbd_comp_avg_upsampled_pred(xd, cm, mi_row, mi_col, this_mv,
                                            pred, second_pred, w, h, subpel_x_q3,
                                            subpel_y_q3, ref, ref_stride, xd->bd,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+                                           subpel_search_type, is_scaled_ref);
+#else
                                            subpel_search_type);
+#endif
     }
   } else {
     aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, this_mv, pred, w, h,
@@ -3876,7 +3911,7 @@ static unsigned int upsampled_setup_center_error(
     MACROBLOCKD *xd, const AV1_COMMON *const cm, const MV *bestmv,
     const SUBPEL_SEARCH_VAR_PARAMS *var_params,
     const MV_COST_PARAMS *mv_cost_params, unsigned int *sse1, int *distortion) {
-  unsigned int besterr = upsampled_pref_error(xd, cm, bestmv, var_params, sse1);
+  int besterr = upsampled_pref_error(xd, cm, bestmv, var_params, sse1);
   *distortion = besterr;
 #if CONFIG_FLEX_MVRES
   besterr += mv_err_cost(*bestmv, mv_cost_params);
@@ -4345,7 +4380,6 @@ int adaptive_mvd_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
   int hstep = 8 >> round;  // Step size, initialized to 4/8=1/2 pel
 
   unsigned int besterr = INT_MAX;
-
   *bestmv = start_mv;
 
 #if CONFIG_FLEX_MVRES
@@ -4464,7 +4498,6 @@ int av1_joint_amvd_motion_search(const AV1_COMMON *const cm, MACROBLOCKD *xd,
     besterr = setup_center_error(xd, bestmv, var_params, mv_cost_params, sse1,
                                  distortion);
   }
-
   MV iter_center_mv = *start_mv;
   const int cand_pos[4][2] = {
     { 0, -1 },  // left
@@ -5848,11 +5881,20 @@ static int upsampled_obmc_pref_error(MACROBLOCKD *xd, const AV1_COMMON *cm,
   const int mi_row = xd->mi_row;
   const int mi_col = xd->mi_col;
 
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+  const int is_scaled_ref = ms_buffers->src->width == ms_buffers->ref->width &&
+                            ms_buffers->src->height == ms_buffers->ref->height;
+#endif
+
   unsigned int besterr;
   DECLARE_ALIGNED(16, uint16_t, pred[MAX_SB_SQUARE]);
   aom_highbd_upsampled_pred(xd, cm, mi_row, mi_col, this_mv, pred, w, h,
                             subpel_x_q3, subpel_y_q3, ref, ref_stride, xd->bd,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+                            subpel_search_type, is_scaled_ref);
+#else
                             subpel_search_type, 0);
+#endif                            
   besterr = vfp->ovf(pred, w, wsrc, mask, sse);
 
   return besterr;

@@ -847,6 +847,7 @@ static int denoise_and_encode(AV1_COMP *const cpi, uint8_t *const dest,
       arf_src_index = gf_group->arf_src_offset[gf_group->index];
     }
   }
+
   // Save the pointer to the original source image.
   YV12_BUFFER_CONFIG *source_buffer = frame_input->source;
   // apply filtering to frame
@@ -854,6 +855,7 @@ static int denoise_and_encode(AV1_COMP *const cpi, uint8_t *const dest,
   if (apply_filtering) {
     // TODO(bohanli): figure out why we need frame_type in cm here.
     cm->current_frame.frame_type = frame_params->frame_type;
+
     const int code_arf =
         av1_temporal_filter(cpi, arf_src_index, &show_existing_alt_ref);
     if (code_arf) {
@@ -905,6 +907,9 @@ static int denoise_and_encode(AV1_COMP *const cpi, uint8_t *const dest,
 
   // Set frame_input source to true source for psnr calculation.
   if (apply_filtering && is_psnr_calc_enabled(cpi)) {
+#if 0
+printf("invoking in denoise_and_encode() - 1\n");
+#endif
     cpi->source =
         av1_scale_if_required(cm, source_buffer, &cpi->scaled_source,
                               cm->features.interp_filter, 0, false, true);
@@ -982,6 +987,7 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
 
   struct lookahead_entry *source = NULL;
   struct lookahead_entry *last_source = NULL;
+
   if (frame_params.show_existing_frame) {
     source = av1_lookahead_pop(cpi->lookahead, flush, cpi->compressor_stage);
     frame_params.show_frame = 1;
@@ -998,7 +1004,11 @@ int av1_encode_strategy(AV1_COMP *const cpi, size_t *const size,
   }
   // Source may be changed if temporal filtered later.
   frame_input.source = &source->img;
+#if 0
+printf("av1_encode_strategy(): frame_input.source->y_crop_width=%d, frame_input.source->y_crop_height=%d\n", frame_input.source->y_crop_width, frame_input.source->y_crop_height);
+#endif
   frame_input.last_source = last_source != NULL ? &last_source->img : NULL;
+
   frame_input.ts_duration = source->ts_end - source->ts_start;
   // Save unfiltered source. It is used in av1_get_second_pass_params().
   cpi->unfiltered_source = frame_input.source;

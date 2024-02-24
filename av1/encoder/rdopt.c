@@ -830,7 +830,20 @@ static AOM_INLINE void setup_buffer_ref_mvs_inter(
   }
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
+#if CONFIG_2D_SR_REF_MVS_INTER_FIX
+  if (mbmi->skip_mode) {
+    // Go back to unscaled reference.
+    if (scaled_ref_frame) {
+      // We had temporarily setup pred block based on scaled reference above. Go
+      // back to unscaled reference now, for subsequent use.
+      av1_setup_pred_block(xd, yv12_mb[ref_frame_idx], yv12, sf, sf,
+        num_planes);
+    }
+    return;
+}
+#else
   if (mbmi->skip_mode) return;
+#endif
 #endif  // CONFIG_SKIP_MODE_ENHANCEMENT
 
   // Gets an initial list of candidate vectors from neighbours and orders them
@@ -2187,7 +2200,11 @@ static int64_t motion_mode_rd(
 #if CONFIG_FLEX_MVRES
                                                 pb_mv_precision,
 #endif
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+                                                NULL, 0);
+#else
                                                 NULL);
+#endif
               // Refine MV in a small range.
               av1_refine_warped_mv(xd, cm, &ms_params, bsize, pts0, pts_inref0,
                                    total_samples,
@@ -2300,8 +2317,12 @@ static int64_t motion_mode_rd(
 #if CONFIG_FLEX_MVRES
                                             mbmi->pb_mv_precision,
 #endif
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+                                            NULL, 0);
+#else
                                             NULL);
-          int valid = 0;
+#endif
+        int valid = 0;
 #if CONFIG_WARP_REF_LIST
           if (!allow_warp_parameter_signaling(
 #if CONFIG_CWG_D067_IMPROVED_WARP
@@ -2439,7 +2460,11 @@ static int64_t motion_mode_rd(
 #if CONFIG_FLEX_MVRES
                                               mbmi->pb_mv_precision,
 #endif
-                                              NULL);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+			                                        NULL, 0);
+#else
+			                                        NULL);
+#endif
             const SubpelMvLimits *mv_limits = &ms_params.mv_limits;
 
             // Note: The warp filter is only able to accept small deviations
@@ -3414,6 +3439,7 @@ static bool ref_mv_idx_early_breakout(
   const int drl_cost =
       get_drl_cost(cpi->common.features.max_drl_bits, mbmi, mbmi_ext, x);
   est_rd_rate += drl_cost;
+
   if (RDCOST(x->rdmult, est_rd_rate, 0) > ref_best_rd) {
     return true;
   }
@@ -3719,11 +3745,15 @@ static int ref_mv_idx_to_search(AV1_COMP *const cpi, MACROBLOCK *x,
   if (num_pels_log2_lookup[bsize] <= 6) return good_indices;
   // Do not prune when there is internal resizing. TODO(elliottk) fix this
   // so b/2384 can be resolved.
+#if CONFIG_2D_SR_USE_GOOD_INDICES
+  return good_indices;
+#else
   if (av1_is_scaled(get_ref_scale_factors(cm, mbmi->ref_frame[0])) ||
       (is_inter_ref_frame(mbmi->ref_frame[1]) &&
        av1_is_scaled(get_ref_scale_factors(cm, mbmi->ref_frame[1])))) {
     return good_indices;
   }
+#endif
 
   // Calculate the RD cost for the motion vectors using simple translation.
 #if CONFIG_SEP_COMP_DRL
@@ -4470,8 +4500,14 @@ static void set_cwp_search_mask(const AV1_COMP *const cpi, MACROBLOCK *const x,
   const int bw = block_size_wide[bsize];
   const int bh = block_size_high[bsize];
   // get inter predictors to use for masked compound modes
+#if CONFIG_2D_SR_MC_PHASE_FIX
+  const AV1_COMMON *const cm = &cpi->common;
+  av1_build_inter_predictor_single_buf_y(xd, bsize, 0, p0, stride, cm);
+  av1_build_inter_predictor_single_buf_y(xd, bsize, 1, p1, stride, cm);
+#else
   av1_build_inter_predictor_single_buf_y(xd, bsize, 0, p0, stride);
   av1_build_inter_predictor_single_buf_y(xd, bsize, 1, p1, stride);
+#endif
   const struct buf_2d *const src = &x->plane[0].src;
 
   aom_highbd_subtract_block(bh, bw, residual1, bw, src->buf, src->stride, p1,
@@ -4480,7 +4516,9 @@ static void set_cwp_search_mask(const AV1_COMP *const cpi, MACROBLOCK *const x,
 
   MB_MODE_INFO *const mbmi = xd->mi[0];
 
+#if !CONFIG_2D_SR_MC_PHASE_FIX
   const AV1_COMMON *const cm = &cpi->common;
+#endif
   const int same_side = is_ref_frame_same_side(cm, mbmi);
 
   const int N = 1 << num_pels_log2_lookup[bsize];
@@ -5406,7 +5444,11 @@ static int64_t handle_inter_mode(
                       lower_mv_precision(&ref_mv, mbmi->pb_mv_precision);
                     av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize,
                                                       &ref_mv, pb_mv_precision,
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+                                                      NULL, ref);
+#else
                                                       NULL);
+#endif
                     if (!av1_is_subpelmv_in_range(&ms_params.mv_limits,
                                                   cur_mv[ref].as_mv)) {
                       mv_outlim = 1;
@@ -6271,7 +6313,11 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
                                      is_ibc_cost,
 #endif
                                      lookahead_search_sites,
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+                                     /*fine_search_interval=*/0, 0);
+#else
                                      /*fine_search_interval=*/0);
+#endif
 #else
   av1_make_default_fullpel_ms_params(&fullms_params, cpi, x, bsize,
                                      &dv_ref.as_mv, lookahead_search_sites,
@@ -8243,6 +8289,7 @@ static int inter_mode_search_order_independent_skip(
     InterModeSearchState *search_state, int skip_ref_frame_mask,
 #endif  // CONFIG_ALLOW_SAME_REF_COMPOUND
     PREDICTION_MODE mode, const MV_REFERENCE_FRAME *ref_frame) {
+
   if (mask_says_skip(mode_skip_mask, ref_frame, mode)) {
     return 1;
   }

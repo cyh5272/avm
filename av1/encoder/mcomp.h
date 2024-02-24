@@ -130,7 +130,11 @@ int av1_get_mvpred_compound_var(
 // =============================================================================
 typedef struct {
   // The reference buffer
-  const struct buf_2d *ref;
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	struct buf_2d *ref;
+#else
+	const struct buf_2d *ref;
+#endif
 
   // The source and predictors/mask used by translational search
   const struct buf_2d *src;
@@ -266,7 +270,12 @@ void av1_make_default_fullpel_ms_params(
 #endif
 #endif
     const search_site_config search_sites[NUM_DISTINCT_SEARCH_METHODS],
-    int fine_search_interval);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	int fine_search_interval, int ref_idx);
+#else
+	int fine_search_interval);
+#endif
+
 
 // Sets up configs for fullpixel diamond search method.
 void av1_init_dsmotion_compensation(search_site_config *cfg, int stride);
@@ -354,11 +363,11 @@ void av1_set_tip_mv_search_range(FullMvLimits *mv_limits);
 int av1_init_search_range(int size);
 
 int av1_refining_search_8p_c(const FULLPEL_MOTION_SEARCH_PARAMS *ms_params,
-                             const FULLPEL_MV start_mv, FULLPEL_MV *best_mv);
+	const FULLPEL_MV start_mv, FULLPEL_MV *best_mv);
 #if CONFIG_FLEX_MVRES
 int av1_refining_search_8p_c_low_precision(
-    const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
-    FULLPEL_MV *best_mv, int fast_mv_refinement);
+	const FULLPEL_MOTION_SEARCH_PARAMS *ms_params, const FULLPEL_MV start_mv,
+	FULLPEL_MV *best_mv, int fast_mv_refinement);
 #endif
 
 int av1_full_pixel_search(const FULLPEL_MV start_mv,
@@ -398,6 +407,7 @@ static INLINE int av1_is_fullmv_in_range(const FullMvLimits *mv_limits,
 // =============================================================================
 //  Subpixel Motion Search
 // =============================================================================
+
 enum {
   EIGHTH_PEL,
   QUARTER_PEL,
@@ -431,6 +441,7 @@ typedef struct {
   // Distortion calculation params
   SUBPEL_SEARCH_VAR_PARAMS var_params;
 } SUBPEL_MOTION_SEARCH_PARAMS;
+
 
 #if CONFIG_JOINT_MVD
 // motion search for joint MVD coding
@@ -477,7 +488,11 @@ void av1_make_default_subpel_ms_params(SUBPEL_MOTION_SEARCH_PARAMS *ms_params,
 #if CONFIG_FLEX_MVRES
                                        const MvSubpelPrecision pb_mv_precision,
 #endif
-                                       const int *cost_list);
+#if CONFIG_2D_SR_SECOND_PRED_FIX
+	const int *cost_list, int ref_idx);
+#else
+	const int *cost_list);
+#endif
 
 typedef int(fractional_mv_step_fp)(MACROBLOCKD *xd, const AV1_COMMON *const cm,
                                    const SUBPEL_MOTION_SEARCH_PARAMS *ms_params,

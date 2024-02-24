@@ -234,7 +234,11 @@ class AV1HighBDDISTWTDCOMPAVGUPSAMPLEDTest
                   NULL, NULL, 0, 0, NULL, output,
                   pred8 + offset_r * w + offset_c, in_w, in_h, sub_x_q3,
                   sub_y_q3, ref8 + offset_r * w + offset_c, in_w, bd,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+                  &dist_wtd_comp_params, subpel_search, 0);
+#else
                   &dist_wtd_comp_params, subpel_search);
+#endif
               test_impl(NULL, NULL, 0, 0, NULL, output2,
                         pred8 + offset_r * w + offset_c, in_w, in_h, sub_x_q3,
                         sub_y_q3, ref8 + offset_r * w + offset_c, in_w, bd,
@@ -288,7 +292,11 @@ class AV1HighBDDISTWTDCOMPAVGUPSAMPLEDTest
     for (int i = 0; i < num_loops; ++i)
       aom_highbd_dist_wtd_comp_avg_upsampled_pred_c(
           NULL, NULL, 0, 0, NULL, output, pred8, in_w, in_h, sub_x_q3, sub_y_q3,
+#if CONFIG_2D_SR_FIX_COMPOUND_ME
+          ref8, in_w, bd, &dist_wtd_comp_params, subpel_search, 0);
+#else
           ref8, in_w, bd, &dist_wtd_comp_params, subpel_search);
+#endif
 
     aom_usec_timer_mark(&timer);
     const int elapsed_time = static_cast<int>(aom_usec_timer_elapsed(&timer));

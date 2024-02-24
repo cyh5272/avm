@@ -549,9 +549,36 @@ void av1_loop_restoration_precal() {
 // maximum RU size is equal to RESTORATION_UNITSIZE_MAX
 // The setting here is also for encoder search.
 void set_restoration_unit_size(int width, int height, int sx, int sy,
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+                               RestorationInfo *rst, uint8_t superres_scale_denominator) {
+#else
                                RestorationInfo *rst) {
+#endif
   int s = AOMMIN(sx, sy);
+#if CONFIG_2D_SR_RESTORATION_FLEXIBLE_RU_SIZE_SCALE
+  rst[0].max_restoration_unit_size = ((RESTORATION_UNITSIZE_MAX / 6) * ((int)(superres_scale_denominator / SCALE_NUMERATOR))) >> 0;
+  rst[0].min_restoration_unit_size = ((RESTORATION_UNITSIZE_MAX / 6) * ((int)(superres_scale_denominator / SCALE_NUMERATOR))) >> 2;
 
+  if(superres_scale_denominator != SCALE_NUMERATOR) {
+    rst[1].max_restoration_unit_size = rst[0].max_restoration_unit_size;
+    rst[1].min_restoration_unit_size = rst[0].min_restoration_unit_size; 
+  } else {
+    // For large resolution, the minimum RU size is set to
+    // RESTORATION_UNITSIZE_MAX >> 1 to reduce the encode complexity.
+    if (width * height > 1920 * 1080 * 2)
+      rst[0].min_restoration_unit_size = (RESTORATION_UNITSIZE_MAX / 6) >> 1;
+
+    rst[1].max_restoration_unit_size = rst[0].max_restoration_unit_size >> s;
+    rst[1].min_restoration_unit_size = rst[0].min_restoration_unit_size >> s;
+  }
+  
+  rst[2].max_restoration_unit_size = rst[1].max_restoration_unit_size;
+  rst[2].min_restoration_unit_size = rst[1].min_restoration_unit_size;
+
+  rst[0].restoration_unit_size = rst[0].min_restoration_unit_size;
+  rst[1].restoration_unit_size = rst[1].min_restoration_unit_size;
+  rst[2].restoration_unit_size = rst[2].min_restoration_unit_size;
+#else
   rst[0].max_restoration_unit_size = RESTORATION_UNITSIZE_MAX >> 0;
   rst[0].min_restoration_unit_size = RESTORATION_UNITSIZE_MAX >> 2;
 
@@ -569,11 +596,17 @@ void set_restoration_unit_size(int width, int height, int sx, int sy,
   rst[0].restoration_unit_size = rst[0].min_restoration_unit_size;
   rst[1].restoration_unit_size = rst[1].min_restoration_unit_size;
   rst[2].restoration_unit_size = rst[2].min_restoration_unit_size;
+#endif
 }
 #endif  // CONFIG_FLEXIBLE_RU_SIZE
 
 static void extend_frame_highbd(uint16_t *data, int width, int height,
                                 int stride, int border_horz, int border_vert) {
+
+#if 0
+  printf("\textend_frame_highbd: %d\n", height);
+#endif
+
   uint16_t *data_p;
   int i, j;
   for (i = 0; i < height; ++i) {
@@ -1415,11 +1448,18 @@ static void init_tskip_feature_accumulator(int col, int tskip_lead,
 // Initializes the accumulators.
 static void initialize_feature_accumulators(int feature_lead, int feature_lag,
                                             int tskip_lead, int tskip_lag,
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+                                            PcwienerBuffers *buffers, bool skip_acc_txskip_flag) {
+#else
                                             PcwienerBuffers *buffers) {
+#endif                                            
   av1_zero(buffers->directional_feature_accumulator);
   av1_zero(buffers->tskip_feature_accumulator);
   // Initialize accumulators on the leftmost portion of the line.
   init_directional_feature_accumulator(0, feature_lead, feature_lag, buffers);
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  if(!skip_acc_txskip_flag)
+#endif  
   init_tskip_feature_accumulator(0, tskip_lead, tskip_lag, buffers);
 }
 
@@ -1452,6 +1492,9 @@ static void calculate_features(int32_t *feature_vector, int bit_depth, int col,
           ROUND_POWER_OF_TWO_SIGNED(feature_vector[f], bit_depth_shift);
   }
   const int tskip_index = NUM_PC_WIENER_FEATURES;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  assert(buffers->tskip_feature_accumulator[accum_index] >= 0);
+#endif  
   feature_vector[tskip_index] =
       buffers->tskip_feature_accumulator[accum_index] *
       buffers->feature_normalizers[tskip_index];
@@ -1515,7 +1558,11 @@ static uint8_t get_pcwiener_index(int bit_depth, int32_t *multiplier, int col,
   const int tskip_index = NUM_PC_WIENER_FEATURES;
   const int tskip = feature_vector[tskip_index];
 
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  assert(tskip >= 0 && tskip < 256);
+#else
   assert(tskip < 256);
+#endif
   for (int i = 0; i < NUM_PC_WIENER_FEATURES; ++i)
     assert(feature_vector[i] >= 0);
 
@@ -1548,7 +1595,11 @@ void apply_pc_wiener_highbd(
     uint8_t *wiener_class_id, int wiener_class_id_stride, bool is_uv,
     int bit_depth, bool classify_only,
     const int16_t (*pcwiener_filters_luma)[NUM_PC_WIENER_TAPS_LUMA],
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    const uint8_t *filter_selector, PcwienerBuffers *buffers, bool skip_acc_txskip_flag) {
+#else
     const uint8_t *filter_selector, PcwienerBuffers *buffers) {
+#endif    
   (void)is_uv;
   const bool skip_filtering = classify_only;
   assert(!is_uv);
@@ -1610,6 +1661,9 @@ void apply_pc_wiener_highbd(
         row - feature_lead, row, dgd, stride, width, feature_lead, feature_lag);
   }
   for (int row = 0; row < tskip_length - 1; ++row) {
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    if(!skip_acc_txskip_flag)
+#endif
     av1_fill_tskip_sum_buffer(row - tskip_lead, tskip, tskip_stride,
                               buffers->tskip_sum_buffer, width, height,
                               tskip_lead, tskip_lag, tskip_strict);
@@ -1621,7 +1675,9 @@ void apply_pc_wiener_highbd(
         buffers->feature_sum_buffers, buffers->feature_line_buffers,
         row_to_process, feature_length - 1, dgd, stride, width, feature_lead,
         feature_lag);
-
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    if(!skip_acc_txskip_flag)
+#endif
     av1_fill_tskip_sum_buffer(i + tskip_lag, tskip, tskip_stride,
                               buffers->tskip_sum_buffer, width, height,
                               tskip_lead, tskip_lag, tskip_strict);
@@ -1634,7 +1690,11 @@ void apply_pc_wiener_highbd(
     if (!skip_row_compute) {
       // Initialize accumulators on the leftmost portion of the line.
       initialize_feature_accumulators(feature_lead, feature_lag, tskip_lead,
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+                                      tskip_lag, buffers, skip_acc_txskip_flag);
+#else
                                       tskip_lag, buffers);
+#endif      
       // Fill accumulators for processing width.
       update_accumulators(feature_lead, feature_lag, tskip_lead, tskip_lag,
                           width, buffers);
@@ -1768,7 +1828,11 @@ static void pc_wiener_stripe_highbd(const RestorationUnitInfo *rui,
         rui->tskip + (j >> MI_SIZE_LOG2), rui->tskip_stride,
         rui->wiener_class_id + (j >> MI_SIZE_LOG2), rui->wiener_class_id_stride,
         rui->plane != AOM_PLANE_Y, bit_depth, false, pcwiener_filters_luma,
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+        filter_selector, rui->pcwiener_buffers, rui->skip_acc_txskip_flag);
+#else
         filter_selector, rui->pcwiener_buffers);
+#endif        
   }
 }
 #endif  // CONFIG_PC_WIENER
@@ -2506,6 +2570,9 @@ static void filter_frame_on_unit(const RestorationTileLimits *limits,
       ctxt->wiener_class_id_stride;
   rsi->unit_info[rest_unit_idx].qindex_offset = ctxt->qindex_offset;
   rsi->unit_info[rest_unit_idx].wiener_class_id_restrict = -1;
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+  rsi->unit_info[rest_unit_idx].skip_acc_txskip_flag = rsi->skip_acc_txskip_flag;
+#endif  
 #endif  // CONFIG_PC_WIENER
 
   av1_loop_restoration_filter_unit(
@@ -2654,6 +2721,10 @@ static void foreach_rest_unit_in_planes(AV1LrStruct *lr_ctxt, AV1_COMMON *cm,
     ctxt[plane].wiener_class_id = cm->mi_params.wiener_class_id[plane];
     ctxt[plane].wiener_class_id_stride =
         cm->mi_params.wiener_class_id_stride[plane];
+#if CONFIG_2D_SR_SET_TX_SKIP_ZERO
+    cm->rst_info[plane].skip_acc_txskip_flag = (cm->superres_scale_denominator != SCALE_NUMERATOR) ? 1 : 0; 
+    ctxt[plane].rsi->skip_acc_txskip_flag = cm->rst_info[plane].skip_acc_txskip_flag;
+#endif        
 #endif  // CONFIG_PC_WIENER
 
     av1_foreach_rest_unit_in_plane(cm, plane, lr_ctxt->on_rest_unit,
@@ -2672,7 +2743,6 @@ void av1_loop_restoration_filter_frame(YV12_BUFFER_CONFIG *frame,
   const int num_planes = av1_num_planes(cm);
 
   AV1LrStruct *loop_rest_ctxt = (AV1LrStruct *)lr_ctxt;
-
   av1_loop_restoration_filter_frame_init(loop_rest_ctxt, frame, cm,
                                          optimized_lr, num_planes);
 
@@ -2900,13 +2970,30 @@ int av1_loop_restoration_corners_in_sb(const struct AV1Common *cm, int plane,
   //   MI_SIZE * m = N / D u
   //
   // from which we get u = D * MI_SIZE * m / N
+#if CONFIG_2D_SR_RESTORATION_BUG_FIX
+  const int mi_to_num_x = mi_size_x;
+  const int mi_to_num_y = mi_size_y;
+  const int denom_x = size;
+  const int denom_y = size;
+#else  // CONFIG_2D_SR_RESTORATION_BUG_FIX
   const int mi_to_num_x = av1_superres_scaled(cm)
                               ? mi_size_x * cm->superres_scale_denominator
                               : mi_size_x;
+#if CONFIG_2D_SR
+  const int mi_to_num_y = av1_superres_scaled(cm)
+                              ? mi_size_y * cm->superres_scale_denominator
+                              : mi_size_y;
+#else   // CONFIG_2D_SR
   const int mi_to_num_y = mi_size_y;
-  const int denom_x = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
-  const int denom_y = size;
+#endif  // CONFIG_2D_SR
 
+  const int denom_x = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
+#if CONFIG_2D_SR
+  const int denom_y = av1_superres_scaled(cm) ? size * SCALE_NUMERATOR : size;
+#else   // CONFIG_2D_SR
+  const int denom_y = size;
+#endif  // CONFIG_2D_SR
+#endif  // CONFIG_2D_SR_RESTORATION_BUG_FIX
   const int rnd_x = denom_x - 1;
   const int rnd_y = denom_y - 1;
 
@@ -2943,7 +3030,26 @@ static void save_deblock_boundary_lines(
   const int is_uv = plane > 0;
   const uint16_t *src_buf = frame->buffers[plane];
   const int src_stride = frame->strides[is_uv];
+#if CONFIG_2D_SR_RESTORATION_FIX
+  int row_ = row;
+  // NOTE: For now just scale the row value down to the downscaled domain.
+  // This may not be the best way, but it works for now. Needs revist in the
+  // future.
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR  
+  if (0) {
+#else
+  if (av1_superres_scaled(cm)) {
+#endif
+    row_ = (row * cm->superres_scale_numerator +
+            cm->superres_scale_denominator / 2) /
+           cm->superres_scale_denominator;
+  }
+#endif  // CONFIG_2D_SR
+#if CONFIG_2D_SR_RESTORATION_FIX
+  const uint16_t *src_rows = src_buf + row_ * src_stride;
+#else
   const uint16_t *src_rows = src_buf + row * src_stride;
+#endif
 
   uint16_t *bdry_buf = is_above ? boundaries->stripe_boundary_above
                                 : boundaries->stripe_boundary_below;
@@ -2958,12 +3064,20 @@ static void save_deblock_boundary_lines(
   // fetching 2 "below" rows we need to fetch one and duplicate it.
   // This is equivalent to clamping the sample locations against the crop border
   const int lines_to_save =
+#if CONFIG_2D_SR_RESTORATION_FIX
+      AOMMIN(RESTORATION_CTX_VERT, frame->crop_heights[is_uv] - row_);
+#else
       AOMMIN(RESTORATION_CTX_VERT, frame->crop_heights[is_uv] - row);
+#endif
   assert(lines_to_save == 1 || lines_to_save == 2);
 
   int upscaled_width;
   int line_bytes;
-  if (av1_superres_scaled(cm)) {
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR  
+  if (0) { 
+#else 
+  if (av1_superres_scaled(cm)) { 
+#endif    
     const int ss_x = is_uv && cm->seq_params.subsampling_x;
     upscaled_width = (cm->superres_upscaled_width + ss_x) >> ss_x;
     line_bytes = upscaled_width << 1;
@@ -2993,7 +3107,26 @@ static void save_cdef_boundary_lines(const YV12_BUFFER_CONFIG *frame,
   const int is_uv = plane > 0;
   const uint16_t *src_buf = frame->buffers[plane];
   const int src_stride = frame->strides[is_uv];
+#if CONFIG_2D_SR_RESTORATION_FIX
+  int row_ = row;
+  // NOTE: For now just scale the row value down to the downscaled domain.
+  // This may not be the best way, but it works for now. Needs revist in the
+  // future.
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR  
+  if (0) {
+#else  
+  if (av1_superres_scaled(cm)) {
+#endif    
+    row_ = (row * cm->superres_scale_numerator +
+            cm->superres_scale_denominator / 2) /
+           cm->superres_scale_denominator;
+  }
+#endif  // CONFIG_2D_SR
+#if CONFIG_2D_SR_RESTORATION_FIX
+  const uint16_t *src_rows = src_buf + row_ * src_stride;
+#else
   const uint16_t *src_rows = src_buf + row * src_stride;
+#endif
 
   uint16_t *bdry_buf = is_above ? boundaries->stripe_boundary_above
                                 : boundaries->stripe_boundary_below;
@@ -3037,8 +3170,12 @@ static void save_tile_row_boundary_lines(const YV12_BUFFER_CONFIG *frame,
 
   RestorationStripeBoundaries *boundaries = &cm->rst_info[plane].boundaries;
 
+#if CONFIG_2D_SR_RESTORATION_FIX
+  const int plane_height = after_cdef ? ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y) : ROUND_POWER_OF_TWO(cm->height, ss_y);
+#else
   const int plane_height =
       ROUND_POWER_OF_TWO(cm->superres_upscaled_height, ss_y);
+#endif      
 
   int tile_stripe;
   for (tile_stripe = 0;; ++tile_stripe) {
@@ -3056,8 +3193,24 @@ static void save_tile_row_boundary_lines(const YV12_BUFFER_CONFIG *frame,
     // can use deblocked pixels from adjacent tiles for context.
     const int use_deblock_above = (frame_stripe > 0);
     const int use_deblock_below = (y1 < plane_height);
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR
+    int save_deblock = 0;
+    int save_cdef = 0;
 
+    if(av1_superres_scaled(cm) && after_cdef) {
+      save_deblock = 1;
+      save_cdef = 1;    
+    }
+    else {
+      save_deblock = after_cdef ? 0 : 1;
+      save_cdef =  after_cdef ? 1 : 0;       
+    }
+#endif
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR
+    if (save_deblock) {
+#else
     if (!after_cdef) {
+#endif      
       // Save deblocked context where needed.
       if (use_deblock_above) {
         save_deblock_boundary_lines(frame, cm, plane, y0 - RESTORATION_CTX_VERT,
@@ -3067,7 +3220,12 @@ static void save_tile_row_boundary_lines(const YV12_BUFFER_CONFIG *frame,
         save_deblock_boundary_lines(frame, cm, plane, y1, frame_stripe, 0,
                                     boundaries);
       }
-    } else {
+    }
+#if CONFIG_2D_SR_SAVE_BOUNDARY_AFTER_SR
+    if (save_cdef) {
+#else     
+    else {
+#endif      
       // Save CDEF context where needed. Note that we need to save the CDEF
       // context for a particular boundary iff we *didn't* save deblocked
       // context for that boundary.

@@ -21,6 +21,9 @@
 #include "av1/common/av1_loopfilter.h"
 #include "av1/common/reconinter.h"
 #include "av1/common/seg_common.h"
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+#include "av1/common/resize.h"
+#endif
 static const int pef_w_mult[4] = { 85, 51, 37, 28 };
 static const int pef_q_mult[4] = { 32, 25, 19, 19 };
 
@@ -477,6 +480,18 @@ void enhance_tip_frame(AV1_COMMON *cm, MACROBLOCKD *xd) {
                     &pef_input);
     enhance_sub_prediction_blocks(cm, xd, &pef_input);
   }
+#if CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
+  if (av1_superres_scaled(cm)) {
+    // Upscale tip_frame and store in upsampled_tip_frame_buf
+#if CONFIG_2D_SR
+    av1_upscale_normative_2d_and_extend_frame(
+        cm, &cm->tip_ref.tip_frame->buf, &cm->tip_ref.upscaled_tip_frame_buf);
+#else
+    av1_upscale_normative_and_extend_frame(cm, &cm->tip_ref.tip_frame->buf,
+                                           &cm->tip_ref.upscaled_tip_frame_buf);
+#endif  // CONFIG_2D_SR
+  }
+#endif  // CONFIG_ALLOW_TIP_DIRECT_WITH_SUPERRES
 }
 #endif  // CONFIG_TIP
 
