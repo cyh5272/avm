@@ -1135,8 +1135,8 @@ void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
   // compute the gap of bit depth to that of the largest diagonal element,
   // and apply an upshift based on this gap.
   for (int i = 0; i < 4; i++) {
-    shifts[i] +=
-        AOMMIN(max_mat_bits - bits_diag[i], (max_sum - bits_sum[i]) >> 2);
+    shifts[i] += AOMMIN((max_mat_bits - bits_diag[i]) >> 1,
+                        (max_sum - bits_sum[i]) >> 2);
   }
 }
 
@@ -1271,7 +1271,15 @@ int64_t stable_mult_shift(const int64_t a, const int64_t b, const int shift,
 
   assert(s1 >= 0);
   assert(s2 >= 0);
-  assert(shift - s1 - s2 >= 0);
+  if (shift - s1 - s2 < 0) {
+#if DEBUG_BIT_DEPTH
+    fprintf(stderr, "[bit depth too small] s1 %d s2 %d shift %d\n", s1, s2,
+            shift);
+#endif
+    // bit depth not large enough to hold the result
+    return ((a > 0) ^ (b > 0)) ? -((1 << (max_bd - 1)) - 1)
+                               : ((1 << (max_bd - 1)) - 1);
+  }
 #if DEBUG_STAB_MULT
   int64_t res = ROUND_POWER_OF_TWO_SIGNED_64(
       ROUND_POWER_OF_TWO_SIGNED_64(a, s1) * ROUND_POWER_OF_TWO_SIGNED_64(b, s2),
@@ -1435,13 +1443,13 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
   // Backward substitution
   for (int i = dim - 1; i >= 0; i--) {
     // To reduce bit depth requirement, do a MSB check and downshift the entire
-    // matrix row.
+    // matrix row: 1+MSB(Aij)+1+MSB(bj) <= K-1-2(3 subtractions), for all i,j.
     int max_mult_bits = 0;
     for (int j = i + 1; j < dim; j++)
       max_mult_bits =
           AOMMAX(max_mult_bits, 2 + get_msb_signed_64(mat[i * dim + j]) +
                                     get_msb_signed_64(sol[j]));
-    int redbit = AOMMAX(0, max_mult_bits - MAX_LS_BITS + 2);
+    int redbit = AOMMAX(0, max_mult_bits - MAX_LS_BITS + 3);
     sol[i] = ROUND_POWER_OF_TWO_SIGNED_64(sol[i], redbit);
     for (int j = i + 1; j < dim; j++) {
       diff = ROUND_POWER_OF_TWO_SIGNED_64(mat[i * dim + j], redbit) * sol[j];
@@ -1660,6 +1668,9 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
   int shifts[4] = { 0 };
   const int max_mat_bits = (MAX_LS_BITS - 2) >> 1;
   get_mat4d_shifts(mat, shifts, max_mat_bits);
+  for (int i = 0; i < 4; i++) {
+    shifts[i] = AOMMIN(shifts[i], max_mat_bits - 1 - get_msb_signed_64(vec[i]));
+  }
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
       int shift_ij = shifts[i] + shifts[j];

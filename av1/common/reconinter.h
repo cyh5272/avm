@@ -731,7 +731,7 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // excluded) as the maximum bit depth for autocorrelation matrix filling.
 // This value should not be set lower than 25, since gx*x+gy*y can reach 25
 // bits given the most extreme case (16+8+1 bits).
-#define MAX_AFFINE_AUTOCORR_BITS 32
+#define MAX_AFFINE_AUTOCORR_BITS 28
 // Clamp range for autocorrelation matrix element
 #define AFFINE_AUTOCORR_CLAMP_VAL ((1L << (MAX_AFFINE_AUTOCORR_BITS - 1)) - 1)
 // Clamp range for a[]. If it uses h unsigned bits, then a[s]a[t] uses 2h
