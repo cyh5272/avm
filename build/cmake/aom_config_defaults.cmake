@@ -350,6 +350,8 @@ set_aom_config_var(CONFIG_REFINED_MVS_IN_TMVP 1
                    "Keep optical flow refined MVs in TMVP list.")
 set_aom_config_var(CONFIG_AFFINE_REFINEMENT 1
                    "Decoder side affine motion refinement.")
+set_aom_config_var(CONFIG_AFFINE_REFINEMENT_SB 0
+                   "Subblock based affine refinement")
 #
 # Variables in this section control optional features of the build system.
 #

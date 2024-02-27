@@ -129,4 +129,10 @@ macro(fix_experiment_configs)
                            !CONFIG_OPTFLOW_REFINEMENT)
   endif()
 
+  # CONFIG_AFFINE_REFINEMENT_SB depends on CONFIG_AFFINE_REFINEMENT
+  if(NOT CONFIG_AFFINE_REFINEMENT AND CONFIG_AFFINE_REFINEMENT_SB)
+    change_config_and_warn(CONFIG_AFFINE_REFINEMENT_SB 0
+                           !CONFIG_AFFINE_REFINEMENT)
+  endif()
+
 endmacro()

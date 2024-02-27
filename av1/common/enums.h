@@ -883,6 +883,14 @@ enum {
 } UENUM1BYTE(MOTION_MODE);
 
 #if CONFIG_AFFINE_REFINEMENT
+#if CONFIG_AFFINE_REFINEMENT_SB
+// Max affine refinement unit size
+#define AFFINE_MAX_UNIT_LOG2 4  // per 16x16 subblock
+#define AFFINE_MAX_UNIT (1 << AFFINE_MAX_UNIT_LOG2)
+#define NUM_AFFINE_PARAMS_1D (1 << (MAX_SB_SIZE_LOG2 - AFFINE_MAX_UNIT_LOG2))
+#define NUM_AFFINE_PARAMS (NUM_AFFINE_PARAMS_1D * NUM_AFFINE_PARAMS_1D)
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+
 enum {
   COMP_REFINE_NONE,  // No refinement
   // Refine types to be searched and signaled in *MV_OPTFLOW modes
