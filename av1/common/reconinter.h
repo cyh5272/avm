@@ -550,13 +550,13 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 // Number of bits allowed for covariance matrix elements (su2, sv2, suv, suw
 // and svw) so that det, det_x, and det_y does not cause overflow issue in
 // int64_t. Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
-#define MAX_OPFL_AUTOCORR_BITS 28
+#define MAX_OPFL_AUTOCORR_BITS 30
 #if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 #define OPFL_AUTOCORR_CLAMP_VAL ((1 << MAX_OPFL_AUTOCORR_BITS) - 1)
 // Clamp range for u/v/w. If it uses h unsigned bits, then u2/v2 uses 2h
 // unsigned bits. Every sum of 8 u2/v2 use at most 2h+3 unsigned bits, and
-// must not exceed half of the max bit depth of su2/sv2. Thus, 2h+3 <= H-2
-#define OPFL_SAMP_CLAMP_VAL ((1 << ((MAX_OPFL_AUTOCORR_BITS - 5) >> 1)) - 1)
+// must not exceed max bd of su2/sv2 minus 2. Thus, 2h+3 <= H-2
+#define OPFL_SAMP_CLAMP_VAL ((1 << ((MAX_OPFL_AUTOCORR_BITS - 6) >> 1)) - 1)
 #else
 #define OPFL_AUTOCORR_CLAMP_VAL (1 << MAX_OPFL_AUTOCORR_BITS)
 #endif  // CONFIG_REDUCE_LS_BIT_DEPTH
@@ -731,13 +731,12 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // excluded) as the maximum bit depth for autocorrelation matrix filling.
 // This value should not be set lower than 25, since gx*x+gy*y can reach 25
 // bits given the most extreme case (16+8+1 bits).
-#define MAX_AFFINE_AUTOCORR_BITS 28
-// Clamp range for autocorrelation matrix element
-#define AFFINE_AUTOCORR_CLAMP_VAL ((1L << (MAX_AFFINE_AUTOCORR_BITS - 1)) - 1)
-// Clamp range for a[]. If it uses h unsigned bits, then a[s]a[t] uses 2h
+#define MAX_AFFINE_AUTOCORR_BITS 30
+// Clamp range for a[] and d. If it uses h unsigned bits, then a[s]a[t] uses 2h
 // unsigned bits. Every sum of 16 a[s]a[t] use at most 2h+4 unsigned bits, and
-// must not exceed half of the max bit depth of A. Thus, 2h+4 <= H-2
-#define AFFINE_SAMP_CLAMP_VAL ((1 << ((MAX_AFFINE_AUTOCORR_BITS - 6) >> 1)) - 1)
+// must not exceed max bd of A minus 2. Thus, 2h+4 <= H-2
+#define AFFINE_SAMP_CLAMP_VAL ((1 << ((MAX_AFFINE_AUTOCORR_BITS - 7) >> 1)) - 1)
+#define AFFINE_COORDS_OFFSET_BITS 2
 #else
 // Number of bits allowed for covariance matrix elements so that determinants
 // do not overflow int64_t. For dim=3, input bit depth must be
@@ -746,11 +745,11 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // the second stage (determinant and divide_and_round_signed).
 #define AFFINE_SAMP_CLAMP_VAL (1 << 15)
 #define AFFINE_AUTOCORR_CLAMP_VAL (1 << 30)
+#define AFFINE_COORDS_OFFSET_BITS 3
 #endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
 // Internal bit depths for affine parameter derivation
 #define AFFINE_GRAD_BITS_THR 32
-#define AFFINE_COORDS_OFFSET_BITS 3
 #define AFFINE_PREC_BITS 16
 #define AFFINE_RLS_PARAM 2
 

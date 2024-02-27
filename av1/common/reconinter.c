@@ -2414,6 +2414,7 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
   su2 += rls_alpha;
   sv2 += rls_alpha;
 
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
   su2 = clamp64(su2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
@@ -2421,6 +2422,7 @@ int derive_rotation_scale_2p(const uint16_t *p0, int pstride0,
   suv = clamp64(suv, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
   suw = clamp64(suw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
   svw = clamp64(svw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -2513,6 +2515,7 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
   mat_a[10] += rls_alpha;
   mat_a[15] += rls_alpha;
 
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   // Bit depths for each stage (assuming d0 and d1 are within [-16,16])
   // gx0/gy0/gx1/gy1/p0/p1: 16
   // d = p0 - p1: 17
@@ -2530,6 +2533,7 @@ int derive_rotation_scale_translation_4p(const uint16_t *p0, int pstride0,
     vec_b[s] = clamp64(vec_b[s], -AFFINE_AUTOCORR_CLAMP_VAL,
                        AFFINE_AUTOCORR_CLAMP_VAL);
   }
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
   int prec_bits[4] = {
     grad_prec_bits + AFFINE_PREC_BITS - coords_bits,
@@ -2650,6 +2654,7 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
   su2 += rls_alpha;
   sv2 += rls_alpha;
 
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
   su2 = clamp64(su2, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
@@ -2657,6 +2662,7 @@ int derive_rotation_scale_2p_interp_grad(const int16_t *pdiff, int pstride,
   suv = clamp64(suv, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
   suw = clamp64(suw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
   svw = clamp64(svw, -AFFINE_AUTOCORR_CLAMP_VAL, AFFINE_AUTOCORR_CLAMP_VAL);
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
@@ -2793,6 +2799,7 @@ int derive_rotation_scale_translation_4p_interp_grad(
   mat_a[10] += rls_alpha;
   mat_a[15] += rls_alpha;
 
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   for (int s = 0; s < 4; ++s) {
     for (int t = 0; t < 4; ++t) {
       mat_a[s * 4 + t] = clamp64(mat_a[s * 4 + t], -AFFINE_AUTOCORR_CLAMP_VAL,
@@ -2801,7 +2808,7 @@ int derive_rotation_scale_translation_4p_interp_grad(
     vec_b[s] = clamp64(vec_b[s], -AFFINE_AUTOCORR_CLAMP_VAL,
                        AFFINE_AUTOCORR_CLAMP_VAL);
   }
-
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   int prec_bits[4] = {
     grad_prec_bits + AFFINE_PREC_BITS - coords_bits,
     grad_prec_bits + AFFINE_PREC_BITS - coords_bits,
