@@ -290,23 +290,6 @@ static const AffineModelParams default_affine_params = { 0, 0, 0, 0, 0 };
 // is 2^(3 - SUBPEL_GRAD_DELTA_BITS). The max value of this macro is 3.
 #define SUBPEL_GRAD_DELTA_BITS 2
 
-// Combine computations of interpolated gradients and the least squares
-// solver. The basic idea is that, typically we would compute the following:
-// 1. d0, d1, P0 and P1
-// 2. Gradients of P0 and P1: gx0, gx1, gy0, and gy1
-// 3. Solving least squares for vx and vy, which requires d0*gx0-d1*gx1,
-//    d0*gy0-d1*gy1, and P0-P1.
-// When this flag is turned on, we compute the following
-// 1. d0, d1, P0 and P1
-// 2. tmp0 = d0*P0-d1*P1 and tmp1 = P0-P1
-// 3. Gradients of tmp0: gx and gy
-// 4. Solving least squares for vx and vy using gx, gy and tmp1
-// Note that this only requires 2 gradient operators instead of 4 and thus
-// reduces the complexity. However, it is only feasible when gradients are
-// obtained using bilinear or bicubic interpolation. Thus, this flag should
-// only be on when either of OPFL_BILINEAR_GRAD and OPFL_BICUBIC_GRAD is on.
-#define OPFL_COMBINE_INTERP_GRAD_LS 1
-
 // Bilinear and bicubic coefficients. Note that, at boundary, we apply
 // coefficients that are doubled because spatial distance between the two
 // interpolated pixels is halved. In other words, instead of computing
@@ -573,7 +556,7 @@ void av1_opfl_build_inter_predictor(
 );
 
 // Generate refined MVs using optflow refinement
-void av1_get_optflow_based_mv_highbd(
+void av1_get_optflow_based_mv(
     const AV1_COMMON *cm, MACROBLOCKD *xd, int plane, const MB_MODE_INFO *mbmi,
     int_mv *mv_refined, int bw, int bh, int mi_x, int mi_y, uint16_t **mc_buf,
     CalcSubpelParamsFunc calc_subpel_params_func, int16_t *gx0, int16_t *gy0,
@@ -790,8 +773,7 @@ static INLINE int damr_refine_subblock(int plane, const int bw, const int bh,
 #endif
 
   if (comp_refine_type < COMP_AFFINE_REFINE_START) return 0;
-  return comp_refine_type == COMP_REFINE_ROTZOOM4P_SUBBLK2P ||
-         comp_refine_type == COMP_REFINE_ROTZOOM2P_SUBBLK2P;
+  return comp_refine_type == COMP_REFINE_ROTZOOM4P_SUBBLK2P;
 }
 
 static INLINE int get_allowed_comp_refine_type_mask(const AV1_COMMON *cm,
@@ -1145,31 +1127,17 @@ void tip_common_calc_subpel_params_and_extend(
 #endif  // CONFIG_REFINEMV
 
 #if CONFIG_REFINEMV || CONFIG_OPTFLOW_ON_TIP
-
 unsigned int get_highbd_sad(const uint16_t *src_ptr, int source_stride,
                             const uint16_t *ref_ptr, int ref_stride, int bd,
                             int bw, int bh);
 #endif  // CONFIG_REFINEMV || CONFIG_OPTFLOW_ON_TIP
 
 #if CONFIG_OPTFLOW_REFINEMENT || CONFIG_OPFL_MV_SEARCH
-void av1_opfl_mv_refinement_highbd(const uint16_t *p0, int pstride0,
-                                   const uint16_t *p1, int pstride1,
-                                   const int16_t *gx0, const int16_t *gy0,
-                                   const int16_t *gx1, const int16_t *gy1,
-                                   int gstride, int bw, int bh, int d0, int d1,
-                                   int grad_prec_bits, int mv_prec_bits,
-                                   int *vx0, int *vy0, int *vx1, int *vy1);
-void av1_opfl_mv_refinement_interp_grad(const int16_t *pdiff, int pstride0,
-                                        const int16_t *gx, const int16_t *gy,
-                                        int gstride, int bw, int bh, int d0,
-                                        int d1, int grad_prec_bits,
-                                        int mv_prec_bits, int *vx0, int *vy0,
-                                        int *vx1, int *vy1);
-void av1_compute_subpel_gradients_mc_highbd(
-    MACROBLOCKD *xd, const MB_MODE_INFO *mi, int bw, int bh, int mi_x, int mi_y,
-    uint16_t **mc_buf, InterPredParams *inter_pred_params,
-    CalcSubpelParamsFunc calc_subpel_params_func, int ref, int *grad_prec_bits,
-    int16_t *x_grad, int16_t *y_grad);
+void av1_opfl_mv_refinement(const int16_t *pdiff, int pstride0,
+                            const int16_t *gx, const int16_t *gy, int gstride,
+                            int bw, int bh, int d0, int d1, int grad_prec_bits,
+                            int mv_prec_bits, int *vx0, int *vy0, int *vx1,
+                            int *vy1);
 void av1_compute_subpel_gradients_interp(int16_t *pred_dst, int bw, int bh,
                                          int *grad_prec_bits, int16_t *x_grad,
                                          int16_t *y_grad);

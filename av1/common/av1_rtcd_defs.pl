@@ -117,18 +117,11 @@ if (aom_config("CONFIG_OPTFLOW_REFINEMENT") eq "yes") {
   add_proto qw/void av1_bicubic_grad_interpolation_highbd/, "const int16_t *pred_src,int16_t *x_grad,int16_t *y_grad,const int blk_width,const int blk_height";
   specialize qw/av1_bicubic_grad_interpolation_highbd sse4_1/;
 
-  add_proto qw/int av1_opfl_mv_refinement_nxn_highbd/, " const uint16_t *p0, int pstride0, const uint16_t *p1, int pstride1, const int16_t *gx0, const int16_t *gy0, const int16_t *gx1, const int16_t *gy1, int gstride, int bw, int bh, int n, int d0, int d1, int grad_prec_bits, int mv_prec_bits, int *vx0, int *vy0, int *vx1, int *vy1";
+  add_proto qw/int av1_opfl_mv_refinement_nxn/, " const int16_t *pdiff, int pstride,const int16_t *gx, const int16_t *gy, int gstride, int bw, int bh, int n,int d0, int d1, int grad_prec_bits,int mv_prec_bits, int *vx0, int *vy0,int *vx1, int *vy1";
   if (aom_config("CONFIG_REDUCE_AUTOCORR_BIT_DEPTH") eq "yes") {
-    specialize qw/av1_opfl_mv_refinement_nxn_highbd c/;
+    specialize qw/av1_opfl_mv_refinement_nxn c/;
   } else {
-    specialize qw/av1_opfl_mv_refinement_nxn_highbd sse4_1/;
-  }
-
-  add_proto qw/int av1_opfl_mv_refinement_nxn_interp_grad/, " const int16_t *pdiff, int pstride,const int16_t *gx, const int16_t *gy, int gstride, int bw, int bh, int n,int d0, int d1, int grad_prec_bits,int mv_prec_bits, int *vx0, int *vy0,int *vx1, int *vy1";
-  if (aom_config("CONFIG_REDUCE_AUTOCORR_BIT_DEPTH") eq "yes") {
-    specialize qw/av1_opfl_mv_refinement_nxn_interp_grad c/;
-  } else {
-    specialize qw/av1_opfl_mv_refinement_nxn_interp_grad sse4_1/;
+    specialize qw/av1_opfl_mv_refinement_nxn sse4_1/;
   }
 
   add_proto qw/void av1_copy_pred_array_highbd/, "const uint16_t *src1, const uint16_t *src2, int16_t *dst1,int16_t *dst2, int bw, int bh, int d0, int d1, int centered";
