@@ -155,20 +155,20 @@ int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
 
 // TODO(urvang@google.com): replace quantSet with struct.
 // guided conv unet intra
-int qp255_quadtree_model_quantSet_intra[] = { 135615, 210812, -13, -6 };
-int qp205_quadtree_model_quantSet_intra[] = { 1317, 1438, -9, 1 };
-int qp175_quadtree_model_quantSet_intra[] = { 5105146, 7694779, -11, -2 };
-int qp145_quadtree_model_quantSet_intra[] = { 493456, 118186, -13, -6 };
-int qp120_quadtree_model_quantSet_intra[] = { 32812, 16342, -13, -3 };
-int qp90_quadtree_model_quantSet_intra[] = { 74993, 95282, -2, 0 };
+int qp255_quadtree_model_quantSet_intra[] = { 25, 197, 0, -8 };
+int qp205_quadtree_model_quantSet_intra[] = { 643189, 690747, -17, -5 };
+int qp175_quadtree_model_quantSet_intra[] = { 1838, 2153, 3, -12 };
+int qp145_quadtree_model_quantSet_intra[] = { 27230, 33505, -21, 3 };
+int qp120_quadtree_model_quantSet_intra[] = { 133, 199, 1, -7 };
+int qp90_quadtree_model_quantSet_intra[] = { 988, 1428, 0, -11 };
 
 // guided conv unet with attention inter
-int qp255_quadtree_model_quantSet_inter[] = { 503514, 804206, -17, 3 };
-int qp205_quadtree_model_quantSet_inter[] = { 189323520, 77995960, 2, -18 };
-int qp175_quadtree_model_quantSet_inter[] = { 9972142, 8721002, -17, -4 };
-int qp145_quadtree_model_quantSet_inter[] = { 3152061, 1563598, -8, -3 };
-int qp120_quadtree_model_quantSet_inter[] = { 274513, 115603, -7, 1 };
-int qp90_quadtree_model_quantSet_inter[] = { 116948, 143520, -1, 2 };
+int qp255_quadtree_model_quantSet_inter[] = { 56619, 15796, -9, -13 };
+int qp205_quadtree_model_quantSet_inter[] = { 551342, 949167, -14, -5 };
+int qp175_quadtree_model_quantSet_inter[] = { 2011, 3876, 0, -14 };
+int qp145_quadtree_model_quantSet_inter[] = { 32668, 44115, -18, 2 };
+int qp120_quadtree_model_quantSet_inter[] = { 20817, 19072, -12, -12 };
+int qp90_quadtree_model_quantSet_inter[] = { 3455, 16494, -16, -8 };
 
 #if CONFIG_EXT_SUPERRES
 // Superres guided conv unet intra.
