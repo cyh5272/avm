@@ -2141,16 +2141,6 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 #endif  // CONFIG_AFFINE_REFINEMENT || CONFIG_OPFL_MV_SEARCH
 
 #if CONFIG_AFFINE_REFINEMENT
-// Combine two set of affine parameters into one.
-void combine_affine_params(AffineModelParams *am1,
-                           const AffineModelParams *am2) {
-  am1->rot_angle += am2->rot_angle;
-  am1->scale_alpha += am2->scale_alpha;
-  am1->scale_beta += am2->scale_beta;
-  am1->tran_x += am2->tran_x;
-  am1->tran_y += am2->tran_y;
-}
-
 /* Map affine model parameters to warped motion parameters based on signed
    temporal distance d (positive for past ref, negative for future ref).
 
@@ -2561,26 +2551,30 @@ int av1_opfl_mv_refinement_nxn_c(const int16_t *pdiff, int pstride,
 // Solve the affine model given pdiff = P0 - P1 and the gradients gx/gy of
 // d0 * P0 - d1 * P1.
 // TODO(kslu) add SIMD version
-void av1_opfl_affine_refinement_mxn_c(
-    const int16_t *pdiff, int pstride0, const int16_t *gx, const int16_t *gy,
-    int gstride, int bw, int bh, int d0, int d1, int mi_x, int mi_y,
+void av1_opfl_affine_refinement_mxn_c(const int16_t *pdiff, int pstride0,
+                                      const int16_t *gx, const int16_t *gy,
+                                      int gstride, int bw, int bh, int d0,
+                                      int d1, int mi_x, int mi_y,
 #if CONFIG_REFINEMV
-    const MV *const src_mv,
+                                      const MV *const src_mv,
 #endif  // CONFIG_REFINEMV
-    AffineModelParams *ams, int grad_prec_bits, WarpedMotionParams *wms) {
+                                      int grad_prec_bits,
+                                      WarpedMotionParams *wms) {
   AffineModelParams affine_params = default_affine_params;
   // In some rare cases, the determinant in the solver may be zero or
   // negative due to numerical errors. In this case we still set invalid=0,
   // but the warped parameters remain the default values.
   if (!av1_opfl_affine_refinement(pdiff, pstride0, gx, gy, gstride, bw, bh,
                                   grad_prec_bits, &affine_params)) {
-    combine_affine_params(ams, &affine_params);
 #if CONFIG_REFINEMV
-    get_ref_affine_params(bw, bh, mi_x, mi_y, ams, wms, d0, &src_mv[0]);
-    get_ref_affine_params(bw, bh, mi_x, mi_y, ams, wms + 1, d1, &src_mv[1]);
+    get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params, wms, d0,
+                          &src_mv[0]);
+    get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params, wms + 1, d1,
+                          &src_mv[1]);
 #else
-    get_ref_affine_params(bw, bh, mi_x, mi_y, ams, wms, d0, &mbmi->mv[0].as_mv);
-    get_ref_affine_params(bw, bh, mi_x, mi_y, ams, wms + 1, d1,
+    get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params, wms, d0,
+                          &mbmi->mv[0].as_mv);
+    get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params, wms + 1, d1,
                           &mbmi->mv[1].as_mv);
 #endif  // CONFIG_REFINEMV
   }
@@ -3333,8 +3327,6 @@ void av1_get_optflow_based_mv(
 
   if (mbmi->comp_refine_type >= COMP_AFFINE_REFINE_START && wms &&
       *use_affine_opfl) {
-    AffineModelParams affine_params = default_affine_params;
-
 #if AFFINE_AVERAGING_BITS > 0
     const int block_len_low = 1 << (7 - AFFINE_AVERAGING_BITS);
     avg_pooling_pdiff_gradients(tmp1, bw, gx0, gy0, bw, bw, bh, block_len_low);
@@ -3345,7 +3337,7 @@ void av1_get_optflow_based_mv(
 #if CONFIG_REFINEMV
                                      best_mv_ref,
 #endif  // CONFIG_REFINEMV
-                                     &affine_params, grad_prec_bits, wms);
+                                     grad_prec_bits, wms);
 
 #if DEBUG_AFFINE_COMBINE
     struct macroblockd_plane *const pd = &xd->plane[plane];
