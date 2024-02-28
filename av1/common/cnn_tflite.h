@@ -94,13 +94,6 @@ static INLINE bool av1_use_cnn_encode(const AV1_COMMON *cm,
 
 // Restores image in 'dgd' with a CNN model using TFlite and stores output in
 // 'rst'. Returns true on success.
-int av1_restore_cnn_img_tflite(int qindex, int superres_denom,
-                               const uint8_t *dgd, int width, int height,
-                               int dgd_stride, uint8_t *rst, int rst_stride,
-                               int num_threads, int is_intra_only, int is_luma,
-                               int cnn_index);
-
-// Same as 'av1_restore_cnn_img_tflite' for highbd.
 int av1_restore_cnn_img_tflite_highbd(int qindex, int superres_denom,
                                       const uint16_t *dgd, int width,
                                       int height, int dgd_stride, uint16_t *rst,
@@ -118,24 +111,18 @@ void av1_restore_cnn_tflite(const struct AV1Common *cm, int num_threads,
 
 #if CONFIG_CNN_GUIDED_QUADTREE
 
-int av1_restore_cnn_quadtree_img_tflite_highbd(
-    YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
-    int RDMULT, int *splitcosts, int (*norestorecosts)[2], int num_threads,
-    int bit_depth, int is_intra_only, int is_luma, int cnn_index);
+// Apply Guided CNN restoration on encoder side.
+int av1_restore_cnn_quadtree_encode_tflite(
+    struct AV1Common *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
+    int *splitcosts, int (*norestorecosts)[2], int num_threads,
+    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE],
+    double *rdcost);
 
-int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
-    AV1_COMMON *cm, int superres_denom, int num_threads, int bit_depth,
-    int is_intra_only, int is_luma, int cnn_index);
-
-void av1_restore_cnn_quadtree_tflite(struct AV1Common *cm,
-                                     YV12_BUFFER_CONFIG *source_frame,
-                                     int RDMULT, int *splitcosts,
-                                     int (*norestorecosts)[2], int num_threads,
-                                     const int apply_cnn[MAX_MB_PLANE],
-                                     const int cnn_indices[MAX_MB_PLANE]);
-void av1_restore_cnn_quadtree_decode_tflite(
-    struct AV1Common *cm, int num_threads, int use_quadtree,
-    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE]);
+// Apply Guided CNN restoration on decoder side.
+int av1_restore_cnn_quadtree_decode_tflite(struct AV1Common *cm,
+                                           int num_threads, int use_quadtree,
+                                           const int apply_cnn[MAX_MB_PLANE],
+                                           const int cnn_indices[MAX_MB_PLANE]);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #ifdef __cplusplus

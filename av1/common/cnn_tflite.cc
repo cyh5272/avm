@@ -546,117 +546,34 @@ extern "C" void av1_restore_cnn_tflite(const AV1_COMMON *cm, int num_threads,
 
 #if CONFIG_CNN_GUIDED_QUADTREE
 
-void deTree_tflite(QUADInfo *quad_info, int *Aindex, int *A, int *Sindex,
-                   int *Split) {
-  int flag0 = quad_info->split_info[quad_info->split_info_index].split;
-  quad_info->split_info_index++;
-  int flag1 = quad_info->split_info[quad_info->split_info_index].split;
-  quad_info->split_info_index++;
-  if (flag0 == 0 && flag1 == 1) {
-    *(Split + (*Sindex)) = 1;
-    (*Sindex)++;
+// ------------------- Guided Quadtree: Common -------------------------------//
 
-    int a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    int a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-    a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-    a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-    a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-  } else if (flag0 == 1 && flag1 == 1) {
-    *(Split + (*Sindex)) = 3;
-    (*Sindex)++;
-
-    int a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    int a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-    a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-  } else if (flag0 == 1 && flag1 == 0) {
-    *(Split + (*Sindex)) = 2;
-    (*Sindex)++;
-
-    int a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    int a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-    a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-
-  } else if (flag0 == 0 && flag1 == 0) {
-    *(Split + (*Sindex)) = 0;
-    (*Sindex)++;
-
-    int a0 = quad_info->unit_info[quad_info->unit_info_index].xqd[0];
-    int a1 = quad_info->unit_info[quad_info->unit_info_index].xqd[1];
-    quad_info->unit_info_index++;
-    A[(*Aindex)++] = a0;
-    A[(*Aindex)++] = a1;
-  }
-}
-
-extern "C" int TFlite_Predict_quadtree_hbd(
-    uint16_t *dgd, uint16_t *src, int *A, int A_size, int height, int width,
-    int dgd_stride, int src_stride, int QP, int unit_width, int unit_height,
-    uint16_t *rePic, int rec_stride, int superres_denom, int num_threads,
-    int bit_depth, int is_intra_only, int is_luma, int cnn_index, int RDMULT,
-    int norestorecost[2]) {
-  // makesure can downscale 3 times
-  int padding_width = (int)ceil(width * 1.0 / 8) * 8;
-  int padding_height = (int)ceil(height * 1.0 / 8) * 8;
+// Given single-channel input in 'dgd', generate intermediate 2-channel CNN
+// output 'interm'.
+static int generate_interm_guided_restoration(
+    const uint16_t *dgd, int dgd_stride, int qindex, int superres_denom,
+    int width, int height, int num_threads, int is_intra_only, int is_luma,
+    int cnn_index, int bit_depth,
+    std::vector<std::vector<std::vector<double>>> &interm) {
+  // Make sure we can downscale 4 times.
+  const int padding_width = (int)ceil(width * 1.0 / 16) * 16;
+  const int padding_height = (int)ceil(height * 1.0 / 16) * 16;
 #if USE_XNNPACK
   TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
 #endif  // USE_XNNPACK
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
-                             num_threads, is_intra_only, is_luma, cnn_index
+  std::unique_ptr<tflite::Interpreter> interpreter = get_tflite_interpreter(
+      qindex, superres_denom, padding_width, padding_height, num_threads,
+      is_intra_only, is_luma, cnn_index
 #if USE_XNNPACK
-                             ,
-                             xnnpack_delegate
+      ,
+      xnnpack_delegate
 #endif  // USE_XNNPACK
-      );
+  );
 
   // Prepare input.
   const auto max_val = static_cast<float>((1 << bit_depth) - 1);
   const int in_stride = padding_width;
   auto input = interpreter->typed_input_tensor<float>(0);
-  // for (int r = 0; r < height; ++r) {
-  //  for (int c = 0; c < width; ++c) {
-  //    input[r * in_stride + c] =
-  //        static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-  //    assert(input[r * in_stride + c] >= 0.0f);
-  //    assert(input[r * in_stride + c] <= 1.0f);
-  //  }
-  //}
   for (int r = 0; r < padding_height; ++r) {
     for (int c = 0; c < padding_width; ++c) {
       if (r < height && c < width) {
@@ -665,7 +582,6 @@ extern "C" int TFlite_Predict_quadtree_hbd(
         assert(input[r * in_stride + c] >= 0.0f);
         assert(input[r * in_stride + c] <= 1.0f);
       } else {
-        // input[r * in_stride + c] = 0;
         input[r * in_stride + c] =
             static_cast<float>(dgd[AOMMIN(r, height - 1) * dgd_stride +
                                    AOMMIN(c, width - 1)]) /
@@ -681,236 +597,181 @@ extern "C" int TFlite_Predict_quadtree_hbd(
     reporter->Report("Failed at interpreter invocation");
     return 0;
   }
-  // Use the output to restore 'dgd' and store in 'rst'.
+
+  // Store the output in 'interm'.
   const auto output = interpreter->typed_output_tensor<float>(0);
   const int out_stride = padding_width;
 
-  uint16_t **sub_dgr = new uint16_t *[height];
-  for (int i = 0; i < height; i++) {
-    sub_dgr[i] = new uint16_t[width];
-  }
-  uint16_t **sub_src = new uint16_t *[height];
-  for (int i = 0; i < height; i++) {
-    sub_src[i] = new uint16_t[width];
-  }
-  int **sub_r = new int *[height];
-  for (int i = 0; i < height; i++) {
-    sub_r[i] = new int[width];
-  }
-  // channel 0
-  double **r0 = new double *[height];
-  for (int i = 0; i < height; i++) {
-    r0[i] = new double[width];
-  }
-  // channel 1
-  double **r1 = new double *[height];
-  for (int i = 0; i < height; i++) {
-    r1[i] = new double[width];
-  }
-
-  uint16_t **repic = new uint16_t *[height];
-  for (int i = 0; i < height; i++) {
-    repic[i] = new uint16_t[width];
-  }
-
   for (int r = 0; r < height; ++r) {
     for (int c = 0; c < width; ++c) {
-      // reconstruct image
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      // src img
-      sub_src[r][c] = src[r * src_stride + c];
-      // src img-reconstruct image
-      sub_r[r][c] = sub_src[r][c] - sub_dgr[r][c];
-      // from tflite get channel 0
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      // from tflite get channel 1
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
+      interm[r][c][0] = output[r * 2 * out_stride + c * 2] * max_val;
+      interm[r][c][1] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
     }
   }
 
-  int scale0, scale1, A0_min, A1_min;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_intra_only,
-                                      is_luma, cnn_index);
-  scale0 = quadtset[0];
-  scale1 = quadtset[1];
-  A0_min = quadtset[2];
-  A1_min = quadtset[3];
+  // Cleanup.
+  interpreter.reset();
+#if USE_XNNPACK
+  // IMPORTANT: release the interpreter before destroying the delegate.
+  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
+#endif  // USE_XNNPACK
+  return 1;
+}
 
-  int rows = int(ceil(double(height) / unit_height));
-  int cols = int(ceil(double(width) / unit_width));
-  int index_A = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-  for (int row = 0; row < rows; row++) {
-    for (int col = 0; col < cols; col++) {
-      if (col == cols - 1) {
-        start_clow = col * unit_width;
-        end_clow = width;
-      } else {
-        start_clow = col * unit_width;
-        end_clow = (col + 1) * unit_width;
-      }
-      if (row == rows - 1) {
-        start_row = row * unit_height;
-        end_row = height;
-      } else {
-        start_row = row * unit_height;
-        end_row = (row + 1) * unit_height;
-      }
-      if (width < unit_width) {
-        start_clow = 0;
-        end_clow = width;
-      }
-      if (height < unit_height) {
-        start_row = 0;
-        end_row = height;
-      }
-      int lenth_clows = end_clow - start_clow;
-      int lenth_rows = end_row - start_row;
+typedef enum {
+  GUIDED_QT_NONE,
+  GUIDED_QT_SPLIT,
+  GUIDED_QT_HORZ,
+  GUIDED_QT_VERT,
+  GUIDED_QT_TYPES,
+  GUIDED_QT_INVALID = -1
+} GuidedQuadTreePartitionType;
 
-      int lenth = lenth_clows * lenth_rows;
-      int *sub_r_flatten = new int[lenth];
-      int k = 0;
-      for (int i = start_row; i < end_row; i++) {
-        for (int j = start_clow; j < end_clow; j++) {
-          sub_r_flatten[k] = sub_r[i][j];
-          k = k + 1;
+// Get unit width and height based on max size and partition type.
+static void get_unit_size(int quadtree_max_size,
+                          GuidedQuadTreePartitionType partition_type,
+                          int *unit_width, int *unit_height) {
+  assert(partition_type >= 0 && partition_type < GUIDED_QT_TYPES);
+  const int full_size = quadtree_max_size;
+  const int half_size = quadtree_max_size >> 1;
+  *unit_width =
+      (partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_HORZ)
+          ? full_size
+          : half_size;
+  *unit_height =
+      (partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_VERT)
+          ? full_size
+          : half_size;
+}
+
+// ------------------- Guided Quadtree: Encoder ------------------------------//
+
+// Given 2-channel intermediate output 'interm', degraded frame 'dgd' and source
+// frame 'src', generates the single-channel output 'out' and corresponding
+// linear combination weight pairs 'a'.
+// Assumes that `width x height` area needs to be combined using unit of size
+// `unit_width x unit_height`.
+static void generate_linear_combination(
+    const std::vector<std::vector<std::vector<double>>> &interm,
+    const uint16_t *src, int src_stride, const uint16_t *dgd, int dgd_stride,
+    int start_row, int end_row, int start_col, int end_col, int unit_width,
+    int unit_height, const int *quadtset, int rdmult, const int *norestorecost,
+    int bit_depth, std::vector<std::vector<uint16_t>> &out,
+    std::vector<std::pair<int, int>> &A) {
+  const int scale0 = quadtset[0];
+  const int scale1 = quadtset[1];
+  const int A0_min = quadtset[2];
+  const int A1_min = quadtset[3];
+
+  for (int row = start_row; row < end_row; row += unit_height) {
+    const int this_start_row = row;
+    const int this_end_row = AOMMIN(row + unit_height, end_row);
+    for (int col = start_col; col < end_col; col += unit_width) {
+      const int this_start_col = col;
+      const int this_end_col = AOMMIN(col + unit_width, end_col);
+      const int num_pixels =
+          (this_end_row - this_start_row) * (this_end_col - this_start_col);
+
+      // Extract some flattened arrays.
+      std::vector<int> sub_r_flatten;
+      sub_r_flatten.reserve(num_pixels);
+      for (int i = this_start_row; i < this_end_row; i++) {
+        for (int j = this_start_col; j < this_end_col; j++) {
+          sub_r_flatten.push_back(src[i * src_stride + j] -
+                                  dgd[i * dgd_stride + j]);
         }
       }
+      assert((int)sub_r_flatten.size() == num_pixels);
 
-      double *sub_r0 = new double[lenth];
-
-      int k_r0 = 0;
-      for (int i = start_row; i < end_row; i++) {
-        for (int j = start_clow; j < end_clow; j++) {
-          sub_r0[k_r0] = r0[i][j];
-          k_r0++;
+      std::vector<double> sub_r0;
+      sub_r0.reserve(num_pixels);
+      for (int i = this_start_row; i < this_end_row; i++) {
+        for (int j = this_start_col; j < this_end_col; j++) {
+          sub_r0.push_back(interm[i][j][0]);
         }
       }
+      assert((int)sub_r0.size() == num_pixels);
 
-      double *sub_r1 = new double[lenth];
-      int k_r1 = 0;
-      for (int i = start_row; i < end_row; i++) {
-        for (int j = start_clow; j < end_clow; j++) {
-          sub_r1[k_r1] = r1[i][j];
-          k_r1++;
+      std::vector<double> sub_r1;
+      sub_r1.reserve(num_pixels);
+      for (int i = this_start_row; i < this_end_row; i++) {
+        for (int j = this_start_col; j < this_end_col; j++) {
+          sub_r1.push_back(interm[i][j][1]);
         }
       }
+      assert((int)sub_r1.size() == num_pixels);
 
-      double **R = new double *[lenth];
-      for (int i = 0; i < lenth; i++) {
-        R[i] = new double[2];
+      // Get R.
+      std::vector<std::vector<double>> R(num_pixels, std::vector<double>(2));
+      for (int i = 0; i < num_pixels; i++) {
+        R[i][0] = sub_r0[i];
+        R[i][1] = sub_r1[i];
       }
 
-      for (int i = 0; i < lenth; i++) {
+      // Get R^T.
+      std::vector<std::vector<double>> R_T(2, std::vector<double>(num_pixels));
+      for (int i = 0; i < num_pixels; i++) {
+        R_T[0][i] = sub_r0[i];
+        R_T[1][i] = sub_r1[i];
+      }
+
+      // Get R^T * R.
+      double R_TDotR[2][2] = { 0 };
+      for (int i = 0; i < 2; i++) {
         for (int j = 0; j < 2; j++) {
-          if (j == 0) {
-            R[i][j] = sub_r0[i];
-          }
-          if (j == 1) {
-            R[i][j] = sub_r1[i];
+          for (int k = 0; k < num_pixels; k++) {
+            R_TDotR[i][j] += R_T[i][k] * R[k][j];
           }
         }
       }
 
-      double **R_T = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_T[i] = new double[lenth];
-      }
-
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < lenth; j++) {
-          if (i == 0) {
-            R_T[i][j] = sub_r0[j];
-          }
-          if (i == 1) {
-            R_T[i][j] = sub_r1[j];
-          }
-        }
-      }
-
-      double **R_TDotR = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_TDotR[i] = new double[2];
-      }
-
-      R_TDotR[0][0] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[0][0] += R_T[0][i] * R[i][0];
-      }
-      R_TDotR[0][1] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[0][1] += R_T[0][i] * R[i][1];
-      }
-      R_TDotR[1][0] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[1][0] += R_T[1][i] * R[i][0];
-      }
-      R_TDotR[1][1] = 0;
-      for (int i = 0; i < lenth; i++) {
-        R_TDotR[1][1] += R_T[1][i] * R[i][1];
-      }
-
-      double value_R_TDotR =
+      // Get (R^T * R)^-1.
+      const double value_R_TDotR =
           R_TDotR[0][0] * R_TDotR[1][1] - R_TDotR[0][1] * R_TDotR[1][0];
-      double a00 = R_TDotR[1][1] / value_R_TDotR;
-      double a01 = -1 * R_TDotR[0][1] / value_R_TDotR;
-      double a10 = -1 * R_TDotR[1][0] / value_R_TDotR;
-      double a11 = R_TDotR[0][0] / value_R_TDotR;
 
-      double **R_TDotR_inver = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        R_TDotR_inver[i] = new double[2];
+      double R_TDotR_inver[2][2] = {
+        { R_TDotR[1][1] / value_R_TDotR, -1 * R_TDotR[0][1] / value_R_TDotR },
+        { -1 * R_TDotR[1][0] / value_R_TDotR, R_TDotR[0][0] / value_R_TDotR }
+      };
+
+      // Get (R^T * R)^-1 * R^T.
+      std::vector<std::vector<double>> mid(2, std::vector<double>(num_pixels));
+      for (int j = 0; j < num_pixels; j++) {
+        mid[0][j] =
+            R_TDotR_inver[0][0] * R_T[0][j] + R_TDotR_inver[0][1] * R_T[1][j];
+        mid[1][j] =
+            R_TDotR_inver[1][0] * R_T[0][j] + R_TDotR_inver[1][1] * R_T[1][j];
       }
 
-      R_TDotR_inver[0][0] = a00;
-      R_TDotR_inver[0][1] = a01;
-      R_TDotR_inver[1][0] = a10;
-      R_TDotR_inver[1][1] = a11;
-
-      double **mid = new double *[2];
-      for (int i = 0; i < 2; i++) {
-        mid[i] = new double[lenth];
-      }
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < lenth; j++) {
-          if (i == 0) {
-            mid[i][j] = R_TDotR_inver[0][0] * R_T[0][j] +
-                        R_TDotR_inver[0][1] * R_T[1][j];
-          }
-          if (i == 1) {
-            mid[i][j] = R_TDotR_inver[1][0] * R_T[0][j] +
-                        R_TDotR_inver[1][1] * R_T[1][j];
-          }
-        }
-      }
-
+      // Compute A = (R^T * R)^-1 * R^T * residual.
       double A0 = 0;
       double A1 = 0;
-      for (int i = 0; i < lenth; i++) {
+      for (int i = 0; i < num_pixels; i++) {
         A0 += mid[0][i] * sub_r_flatten[i];
         A1 += mid[1][i] * sub_r_flatten[i];
       }
       A0 = A0 * scale0;
       A1 = A1 * scale1;
 
-      bool do_finer_search = true;
+      // Do a finer search for best A0, A1 pair amongst four options:
+      // (1) A0_floor = floor(A0), A1_floor = floor(A1)
+      // (2) A0_floor, A1_floor + 1
+      // (3) A0_floor + 1, A1_floor
+      // (4) A0_floor + 1, A1_floor + 1
+      const bool do_finer_search = true;
       if (do_finer_search) {
         double bestA0 = 0;
         double bestA1 = 0;
         double cost;
         int64_t err = 0;
-        for (int i = start_row; i < end_row; i++) {
-          for (int j = start_clow; j < end_clow; j++) {
-            const int diff = sub_src[i][j] - sub_dgr[i][j];
+        for (int i = this_start_row; i < this_end_row; i++) {
+          for (int j = this_start_col; j < this_end_col; j++) {
+            const int diff = src[i * src_stride + j] - dgd[i * dgd_stride + j];
             err += diff * diff;
           }
         }
         double bestcost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            RDMULT, norestorecost[1] >> 4, err, bit_depth);
+            rdmult, norestorecost[1] >> 4, err, bit_depth);
 
         // finer search
         double flrA0 = (floor(A0));
@@ -921,18 +782,19 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           A0 = flrA0;
           A1 = flrA1;
           err = 0;
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              int rest = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale0 +
-                                   A1 * r1[i][j] / scale1));
+          for (int i = this_start_row; i < this_end_row; i++) {
+            for (int j = this_start_col; j < this_end_col; j++) {
+              int rest = int(round(dgd[i * dgd_stride + j] +
+                                   A0 * interm[i][j][0] / scale0 +
+                                   A1 * interm[i][j][1] / scale1));
               rest = clip_pixel_highbd(rest, bit_depth);
-              const int diff = sub_src[i][j] - rest;
+              const int diff = src[i * src_stride + j] - rest;
               err += diff * diff;
             }
           }
           // approx RD cost assuming 7 bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              RDMULT, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
+              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
               bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
@@ -944,18 +806,19 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           A0 = flrA0 + 1;
           A1 = flrA1;
           err = 0;
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              int rest = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale0 +
-                                   A1 * r1[i][j] / scale1));
+          for (int i = this_start_row; i < this_end_row; i++) {
+            for (int j = this_start_col; j < this_end_col; j++) {
+              int rest = int(round(dgd[i * dgd_stride + j] +
+                                   A0 * interm[i][j][0] / scale0 +
+                                   A1 * interm[i][j][1] / scale1));
               rest = clip_pixel_highbd(rest, bit_depth);
-              const int diff = sub_src[i][j] - rest;
+              const int diff = src[i * src_stride + j] - rest;
               err += diff * diff;
             }
           }
           // approx RD cost assuming 7 bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              RDMULT, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
+              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
               bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
@@ -967,18 +830,19 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           A0 = flrA0;
           A1 = flrA1 + 1;
           err = 0;
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              int rest = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale0 +
-                                   A1 * r1[i][j] / scale1));
+          for (int i = this_start_row; i < this_end_row; i++) {
+            for (int j = this_start_col; j < this_end_col; j++) {
+              int rest = int(round(dgd[i * dgd_stride + j] +
+                                   A0 * interm[i][j][0] / scale0 +
+                                   A1 * interm[i][j][1] / scale1));
               rest = clip_pixel_highbd(rest, bit_depth);
-              const int diff = sub_src[i][j] - rest;
+              const int diff = src[i * src_stride + j] - rest;
               err += diff * diff;
             }
           }
           // approx RD cost assuming 7 bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              RDMULT, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
+              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
               bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
@@ -990,18 +854,19 @@ extern "C" int TFlite_Predict_quadtree_hbd(
           A0 = flrA0 + 1;
           A1 = flrA1 + 1;
           err = 0;
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              int rest = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale0 +
-                                   A1 * r1[i][j] / scale1));
+          for (int i = this_start_row; i < this_end_row; i++) {
+            for (int j = this_start_col; j < this_end_col; j++) {
+              int rest = int(round(dgd[i * dgd_stride + j] +
+                                   A0 * interm[i][j][0] / scale0 +
+                                   A1 * interm[i][j][1] / scale1));
               rest = clip_pixel_highbd(rest, bit_depth);
-              const int diff = sub_src[i][j] - rest;
+              const int diff = src[i * src_stride + j] - rest;
               err += diff * diff;
             }
           }
           // approx RD cost assuming 7 bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              RDMULT, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
+              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
               bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
@@ -1020,1416 +885,281 @@ extern "C" int TFlite_Predict_quadtree_hbd(
 
       A0 = AOMMIN(AOMMAX(A0, A0_min), A0_min + 15);
       A1 = AOMMIN(AOMMAX(A1, A1_min), A1_min + 15);
-      A[index_A] = int(A0);
-      index_A = index_A + 1;
-      A[index_A] = int(A1);
-      // fprintf(stderr, "ENCODER A VALUES ARE %d, %d\n", int(A0), int(A1));
-      index_A = index_A + 1;
-      // printf("A0:%lf  A1:%lf\n", A0, A1);
-      int64_t err = 0;
-      int64_t err0 = 0;
-      for (int i = start_row; i < end_row; i++) {
-        for (int j = start_clow; j < end_clow; j++) {
-          repic[i][j] = int(round(sub_dgr[i][j] + A0 * r0[i][j] / scale0 +
-                                  A1 * r1[i][j] / scale1));
-          // repic[i][j] = int(round(sub_dgr[i][j]));
-          repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-          const int diff = sub_src[i][j] - repic[i][j];
-          err += diff * diff;
-          const int diff0 = sub_src[i][j] - sub_dgr[i][j];
-          err0 += diff0 * diff0;
+      A.emplace_back((int)A0, (int)A1);
+      for (int i = this_start_row; i < this_end_row; i++) {
+        for (int j = this_start_col; j < this_end_col; j++) {
+          const int out_unclipped = int(round(dgd[i * dgd_stride + j] +
+                                              A0 * interm[i][j][0] / scale0 +
+                                              A1 * interm[i][j][1] / scale1));
+          out[i - start_row][j - start_col] =
+              clip_pixel_highbd(out_unclipped, bit_depth);
         }
       }
-      /*
-      printf("  Stats(%d x %d): orig %ld restored %ld\n", unit_width,
-             unit_height, err0, err);
-             */
-
-      for (int i = 0; i < lenth; i++) {
-        delete[] R[i];
-      }
-      delete[] R;
-      R = NULL;
-      for (int i = 0; i < 2; i++) {
-        delete[] R_T[i];
-      }
-      delete[] R_T;
-      R_T = NULL;
-      for (int i = 0; i < 2; i++) {
-        delete[] R_TDotR[i];
-      }
-      delete[] R_TDotR;
-      R_TDotR = NULL;
-      for (int i = 0; i < 2; i++) {
-        delete[] R_TDotR_inver[i];
-      }
-      delete[] R_TDotR_inver;
-      R_TDotR_inver = NULL;
-      for (int i = 0; i < 2; i++) {
-        delete[] mid[i];
-      }
-      delete[] mid;
-      mid = NULL;
-
-      delete[] sub_r_flatten;
-      delete[] sub_r0;
-      delete[] sub_r1;
-      sub_r_flatten = NULL;
-      sub_r0 = NULL;
-      sub_r1 = NULL;
     }
   }
-
-  assert(A_size == index_A);
-
-  for (int r = 0; r < height; ++r) {
-    for (int c = 0; c < width; ++c) {
-      rePic[r * rec_stride + c] = clip_pixel_highbd(repic[r][c], bit_depth);
-    }
-  }
-
-  // delete
-  for (int i = 0; i < height; i++) {
-    delete[] sub_dgr[i];
-  }
-  delete[] sub_dgr;
-  sub_dgr = NULL;
-  for (int i = 0; i < height; i++) {
-    delete[] sub_src[i];
-  }
-  delete[] sub_src;
-  sub_src = NULL;
-
-  for (int i = 0; i < height; i++) {
-    delete[] sub_r[i];
-  }
-  delete[] sub_r;
-  sub_r = NULL;
-  // channel 0
-  for (int i = 0; i < height; i++) {
-    delete[] r0[i];
-  }
-  delete[] r0;
-  r0 = NULL;
-  // channel 1
-  for (int i = 0; i < height; i++) {
-    delete[] r1[i];
-  }
-  delete[] r1;
-  r1 = NULL;
-  for (int i = 0; i < height; i++) {
-    delete[] repic[i];
-  }
-  delete[] repic;
-  repic = NULL;
-  // cv::Mat image;
-  // uint8_t cc[480][832];
-  // for (int r = 0; r < height; ++r) {
-  //  for (int c = 0; c < width; ++c) {
-  //    cc[r][c] = rePic[r * rec_stride + c];
-  //  }
-  //}
-  // image = cv::Mat(480, 832, CV_8UC1, (void *)cc);
-  // cv::imshow("dgr", image);
-  // cv::waitKey();
-  // cv::imwrite("../../res/pre_Image.jpg", image);
-
-  interpreter.reset();
-
-#if USE_XNNPACK
-  // IMPORTANT: release the interpreter before destroying the delegate.
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-#endif  // USE_XNNPACK
-
-  return 1;
+#ifndef NDEBUG
+  const auto num_units_row =
+      (size_t)ceil((double)(end_row - start_row) / unit_height);
+  const auto num_units_col =
+      (size_t)ceil((double)(end_col - start_col) / unit_width);
+  assert(A.size() == num_units_row * num_units_col);
+#endif  // NDEBUG
 }
 
-extern "C" int TFlite_recon_quadtree_regular_hbd(
-    uint16_t *dgd, int dgd_stride, int img_height, int img_width,
-    uint16_t *rePic, int rec_stride, int QP, int *A, int *Split, int block_size,
-    int superres_denom, int num_threads, int bit_depth, int is_intra_only,
-    int is_luma, int cnn_index) {
-#if USE_XNNPACK
-  TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-#endif  // USE_XNNPACK
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, superres_denom, img_width, img_height,
-                             num_threads, is_intra_only, is_luma, cnn_index
-#if USE_XNNPACK
-                             ,
-                             xnnpack_delegate
-#endif  // USE_XNNPACK
-      );
-
-  // Prepare input.
-  const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = img_width;
-  auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      input[r * in_stride + c] =
-          static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-      assert(input[r * in_stride + c] >= 0.0f);
-      assert(input[r * in_stride + c] <= 1.0f);
+// Computes SSE between 'rst' and 'src'.
+static int64_t compute_sse(const std::vector<std::vector<uint16_t>> &rst,
+                           const uint16_t *src, int src_stride, int start_row,
+                           int end_row, int start_col, int end_col) {
+  int64_t sse = 0;
+  for (int r = start_row; r < end_row; ++r) {
+    for (int c = start_col; c < end_col; ++c) {
+      const uint16_t this_rst = rst[r - start_row][c - start_col];
+      const uint16_t this_src = src[r * src_stride + c];
+      const int64_t diff = (int64_t)(this_rst - this_src);
+      sse += diff * diff;
     }
   }
-
-  // Invoke TFlite inference.
-  tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
-  auto status = interpreter->Invoke();
-  if (status != kTfLiteOk) {
-    reporter->Report("Failed at interpreter invocation");
-    return 0;
-  }
-
-  // Use the output to restore 'dgd' and store in 'rst'.
-  const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = img_width;
-  uint16_t **sub_dgr = new uint16_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    sub_dgr[i] = new uint16_t[img_width];
-  }
-
-  double **r0 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r0[i] = new double[img_width];
-  }
-
-  double **r1 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r1[i] = new double[img_width];
-  }
-
-  uint16_t **repic = new uint16_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    repic[i] = new uint16_t[img_width];
-  }
-
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      // sub_dgr[r][c] = dgd[r * in_stride + c];
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
-    }
-  }
-  int scale0, scale1;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_intra_only,
-                                      is_luma, cnn_index);
-  scale0 = quadtset[0];
-  scale1 = quadtset[1];
-
-  int index_A = 0;
-  int index_split = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-
-  for (int i = 0; i < img_height; i += block_size) {
-    for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height || j + block_size > img_width) {
-        continue;
-      } else {
-        int starty = i;
-        int startx = j;
-        int buf_height;
-        int buf_width;
-        if (Split[index_split] == 0) {
-          buf_height = block_size;
-          buf_width = block_size;
-          start_row = starty;
-          end_row = starty + buf_height;
-          start_clow = startx;
-          end_clow = startx + buf_width;
-
-          int lenth_clows = end_clow - start_clow;
-          int lenth_rows = end_row - start_row;
-
-          int lenth = lenth_clows * lenth_rows;
-          int *sub_r_flatten = new int[lenth];
-
-          int a0 = A[index_A++];
-          int a1 = A[index_A++];
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                      a1 * r1[i][j] / scale1));
-              repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-            }
-          }
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              rePic[i * rec_stride + j] =
-                  clip_pixel_highbd(repic[i][j], bit_depth);
-            }
-          }
-          delete[] sub_r_flatten;
-          sub_r_flatten = NULL;
-        } else if (Split[index_split] == 1) {
-          buf_height = block_size / 2;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 4; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-              case 2:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 3:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                        a1 * r1[i][j] / scale1));
-                repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] =
-                    clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-            delete[] sub_r_flatten;
-            sub_r_flatten = NULL;
-          }
-
-        } else if (Split[index_split] == 2) {  // vert
-
-          buf_height = block_size;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                        a1 * r1[i][j] / scale1));
-                repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] =
-                    clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-            delete[] sub_r_flatten;
-            sub_r_flatten = NULL;
-          }
-        } else if (Split[index_split] == 3) {  // horz
-
-          buf_height = block_size / 2;
-          buf_width = block_size;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-            }
-
-            int lenth_clows = end_clow - start_clow;
-            int lenth_rows = end_row - start_row;
-            int lenth = lenth_clows * lenth_rows;
-            int *sub_r_flatten = new int[lenth];
-
-            int a0 = A[index_A++];
-            int a1 = A[index_A++];
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                        a1 * r1[i][j] / scale1));
-                repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-
-            for (int i = start_row; i < end_row; i++) {
-              for (int j = start_clow; j < end_clow; j++) {
-                rePic[i * rec_stride + j] =
-                    clip_pixel_highbd(repic[i][j], bit_depth);
-              }
-            }
-            delete[] sub_r_flatten;
-            sub_r_flatten = NULL;
-          }
-        }
-
-        index_split++;
-      }
-    }
-  }
-
-  for (int i = 0; i < img_height; i++) {
-    delete[] sub_dgr[i];
-  }
-  delete[] sub_dgr;
-  sub_dgr = NULL;
-  for (int i = 0; i < img_height; i++) {
-    delete[] r0[i];
-  }
-  delete[] r0;
-  r0 = NULL;
-  for (int i = 0; i < img_height; i++) {
-    delete[] r1[i];
-  }
-  delete[] r1;
-  r1 = NULL;
-  for (int i = 0; i < img_height; i++) {
-    delete[] repic[i];
-  }
-  delete[] repic;
-  repic = NULL;
-
-  interpreter.reset();
-
-#if USE_XNNPACK
-  // IMPORTANT: release the interpreter before destroying the delegate.
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-#endif  // USE_XNNPACK
-
-  return 1;
+  return sse;
 }
 
-extern "C" int TFlite_recon_quadtree_unregular_hbd(
-    uint16_t *dgd, int dgd_stride, int img_height, int img_width,
-    uint16_t *rePic, int rec_stride, int QP, int *A, int *regular_A, int *Split,
-    int block_size, int superres_denom, int num_threads, int bit_depth,
-    int is_intra_only, int is_luma, int cnn_index) {
-  // makesure can downscale 3 times
-  int padding_width = (int)ceil(img_width * 1.0 / 8) * 8;
-  int padding_height = (int)ceil(img_height * 1.0 / 8) * 8;
-#if USE_XNNPACK
-  TfLiteDelegate *xnnpack_delegate = get_tflite_xnnpack_delegate(num_threads);
-#endif  // USE_XNNPACK
-  std::unique_ptr<tflite::Interpreter> interpreter =
-      get_tflite_interpreter(QP, superres_denom, padding_width, padding_height,
-                             num_threads, is_intra_only, is_luma, cnn_index
-#if USE_XNNPACK
-                             ,
-                             xnnpack_delegate
-#endif  // USE_XNNPACK
-      );
-
-  // Prepare input.
-  const auto max_val = static_cast<float>((1 << bit_depth) - 1);
-  const int in_stride = padding_width;
-  auto input = interpreter->typed_input_tensor<float>(0);
-  for (int r = 0; r < padding_height; ++r) {
-    for (int c = 0; c < padding_width; ++c) {
-      if (r < img_height && c < img_width) {
-        input[r * in_stride + c] =
-            static_cast<float>(dgd[r * dgd_stride + c]) / max_val;
-        assert(input[r * in_stride + c] >= 0.0f);
-        assert(input[r * in_stride + c] <= 1.0f);
-      } else {
-        // input[r * in_stride + c] = 0;
-        input[r * in_stride + c] =
-            static_cast<float>(dgd[AOMMIN(r, img_height - 1) * dgd_stride +
-                                   AOMMIN(c, img_width - 1)]) /
-            max_val;
-      }
+// Computes bitrate for the given weight parameters.
+static int compute_rate(const std::vector<std::pair<int, int>> &A,
+                        const std::pair<int, int> &prev_A, const int *quadtset,
+                        const int *norestorecosts) {
+  const int A0_min = quadtset[2];
+  const int A1_min = quadtset[3];
+  int num_bits = 0;
+  int ref0 = AOMMIN(AOMMAX(prev_A.first - A0_min, 0), 15);
+  int ref1 = AOMMIN(AOMMAX(prev_A.second - A1_min, 0), 15);
+  for (auto &this_A : A) {
+    if (this_A.first == 0 && this_A.second == 0) {
+      num_bits += norestorecosts[1];
+    } else {
+      num_bits += norestorecosts[0];
+      num_bits += (aom_count_primitive_refsubexpfin(16, 1, ref0,
+                                                    this_A.first - A0_min) +
+                   aom_count_primitive_refsubexpfin(16, 1, ref1,
+                                                    this_A.second - A1_min))
+                  << AV1_PROB_COST_SHIFT;
     }
+    ref0 = AOMMIN(AOMMAX(this_A.first - A0_min, 0), 15);
+    ref1 = AOMMIN(AOMMAX(this_A.second - A1_min, 0), 15);
   }
-  // Invoke TFlite inference.
-  tflite::ErrorReporter *reporter = tflite::DefaultErrorReporter();
-  auto status = interpreter->Invoke();
-  if (status != kTfLiteOk) {
-    reporter->Report("Failed at interpreter invocation");
-    return 0;
-  }
-
-  // Use the output to restore 'dgd' and store in 'rst'.
-  const auto output = interpreter->typed_output_tensor<float>(0);
-  const int out_stride = padding_width;
-
-  uint16_t **sub_dgr = new uint16_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    sub_dgr[i] = new uint16_t[img_width];
-  }
-
-  double **r0 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r0[i] = new double[img_width];
-  }
-
-  double **r1 = new double *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    r1[i] = new double[img_width];
-  }
-
-  uint16_t **repic = new uint16_t *[img_height];
-  for (int i = 0; i < img_height; i++) {
-    repic[i] = new uint16_t[img_width];
-  }
-
-  for (int r = 0; r < img_height; ++r) {
-    for (int c = 0; c < img_width; ++c) {
-      // sub_dgr[r][c] = dgd[r * in_stride + c];
-      sub_dgr[r][c] = dgd[r * dgd_stride + c];
-      r0[r][c] = output[r * 2 * out_stride + c * 2] * max_val;
-      r1[r][c] = output[r * 2 * out_stride + c * 2 + 1] * max_val;
-    }
-  }
-  int scale0, scale1;
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(QP, superres_denom, is_intra_only,
-                                      is_luma, cnn_index);
-  scale0 = quadtset[0];
-  scale1 = quadtset[1];
-
-  int index_A = 0;
-  int index_regular_A = 0;
-  int index_split = 0;
-  int start_row = 0;
-  int end_row = 0;
-  int start_clow = 0;
-  int end_clow = 0;
-
-  for (int i = 0; i < img_height; i += block_size) {
-    for (int j = 0; j < img_width; j += block_size) {
-      if (i + block_size > img_height || j + block_size > img_width) {
-        start_row = i;
-        end_row = img_height;
-        start_clow = j;
-        end_clow = img_width;
-
-        int a0 = A[index_A++];
-        int a1 = A[index_A++];
-
-        for (int i = start_row; i < end_row; i++) {
-          for (int j = start_clow; j < end_clow; j++) {
-            repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                    a1 * r1[i][j] / scale1));
-            repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-          }
-        }
-        for (int i = start_row; i < end_row; i++) {
-          for (int j = start_clow; j < end_clow; j++) {
-            rePic[i * rec_stride + j] =
-                clip_pixel_highbd(repic[i][j], bit_depth);
-          }
-        }
-      } else {
-        int starty = i;
-        int startx = j;
-        int buf_height;
-        int buf_width;
-        if (Split[index_split] == 0) {
-          buf_height = block_size;
-          buf_width = block_size;
-          start_row = starty;
-          end_row = starty + buf_height;
-          start_clow = startx;
-          end_clow = startx + buf_width;
-
-          int a0 = regular_A[index_regular_A++];
-          int a1 = regular_A[index_regular_A++];
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              repic[i][j] = int(round(sub_dgr[i][j] + a0 * r0[i][j] / scale0 +
-                                      a1 * r1[i][j] / scale1));
-              repic[i][j] = clip_pixel_highbd(repic[i][j], bit_depth);
-            }
-          }
-
-          for (int i = start_row; i < end_row; i++) {
-            for (int j = start_clow; j < end_clow; j++) {
-              rePic[i * rec_stride + j] =
-                  clip_pixel_highbd(repic[i][j], bit_depth);
-            }
-          }
-
-        } else if (Split[index_split] == 1) {
-          buf_height = block_size / 2;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 4; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-              case 2:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 3:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-            index_regular_A++;
-            index_regular_A++;
-          }
-        } else if (Split[index_split] == 2) {  // vert
-
-          buf_height = block_size;
-          buf_width = block_size / 2;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx + buf_width;
-                end_clow = startx + buf_width * 2;
-                break;
-            }
-            index_regular_A++;
-            index_regular_A++;
-          }
-        } else if (Split[index_split] == 3) {  // horz
-
-          buf_height = block_size / 2;
-          buf_width = block_size;
-          for (int time = 0; time < 2; time++) {
-            switch (time) {
-              case 0:
-                start_row = starty;
-                end_row = starty + buf_height;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-              case 1:
-                start_row = starty + buf_height;
-                end_row = starty + buf_height * 2;
-                start_clow = startx;
-                end_clow = startx + buf_width;
-                break;
-            }
-            index_regular_A++;
-            index_regular_A++;
-          }
-        }
-        index_split++;
-      }
-    }
-  }
-
-  interpreter.reset();
-
-#if USE_XNNPACK
-  // IMPORTANT: release the interpreter before destroying the delegate.
-  TfLiteXNNPackDelegateDelete(xnnpack_delegate);
-#endif  // USE_XNNPACK
-
-  return 1;
+  return num_bits;
 }
 
-void Tree_tflite_hbd(uint16_t *rec, uint16_t *buf_256, uint16_t *buf_128,
-                     uint16_t *buf_128_horz, uint16_t *buf_128_vert,
-                     uint16_t *dgd, uint16_t *src, int dgd_stride,
-                     int src_stride, int A0_min, int A1_min, int *A_256,
-                     int *A_128, int *A_128_horz, int *A_128_vert, int height,
-                     int width, double dgd_psnr, double delta_128,
-                     double delta_128_horz, double delta_128_vert, int depth,
-                     int block_length, int starty, int startx,
-                     std::vector<int> *Split,
-                     std::vector<std::pair<int, int>> *A, int RDMULT,
-                     int *splitcosts, int norestorecosts[2], int bit_depth) {
-  (void)dgd;
-  (void)dgd_stride;
-  (void)delta_128;
-  (void)delta_128_vert;
-  (void)delta_128_horz;
-  (void)dgd_psnr;
-  (void)height;
-  (void)depth;
-  (void)A0_min;
-  (void)A1_min;
-  (void)norestorecosts;
-  int index;
-  int quadtree_max_size = block_length;
+// Given 2-channel intermediate output in 'interm' as well as 'src' and 'dgd'
+// buffers, tries the given partition type on a single quadtree unit. Outputs
+// the RDCost in 'this_rdcost' and restored unit in 'out'.
+static void try_one_partition(
+    const std::vector<std::vector<std::vector<double>>> &interm,
+    GuidedQuadTreePartitionType partition_type, const uint16_t *src,
+    int src_stride, const uint16_t *dgd, int dgd_stride, int start_row,
+    int end_row, int start_col, int end_col, int quadtree_max_size,
+    const int *quadtset, int rdmult, const std::pair<int, int> &prev_A,
+    const int *splitcosts, const int *norestorecosts, int bit_depth,
+    bool is_partial_unit, double *this_rdcost,
+    std::vector<std::vector<uint16_t>> &out,
+    std::vector<std::pair<int, int>> &A) {
+  assert(IMPLIES(is_partial_unit, partition_type == GUIDED_QT_NONE));
+  // Get unit width and height based on partition type.
+  int unit_width;
+  int unit_height;
+  get_unit_size(quadtree_max_size, partition_type, &unit_width, &unit_height);
 
-#if CONFIG_CNN_GUIDED_QUADTREE_RDCOST
-  int prevA0 = 8 + A0_min;
-  int prevA1 = 8 + A1_min;
-  if (A[0].size()) {
-    std::pair<int, int> prevA = A[0].back();
-    prevA0 = prevA.first;
-    prevA1 = prevA.second;
-  }
-  (void)prevA0;
-  (void)prevA1;
-  int64_t split_sse =
-      computeSSE_buf_tflite_hbd(buf_128, src, startx, starty, block_length,
-                                block_length, width, src_stride);
+  // Compute restored unit, a0 and a1.
+  generate_linear_combination(interm, src, src_stride, dgd, dgd_stride,
+                              start_row, end_row, start_col, end_col,
+                              unit_width, unit_height, quadtset, rdmult,
+                              norestorecosts, bit_depth, out, A);
+  assert(IMPLIES(partition_type == GUIDED_QT_NONE, A.size() == 1));
+  assert(IMPLIES(partition_type == GUIDED_QT_HORZ, A.size() == 2));
+  assert(IMPLIES(partition_type == GUIDED_QT_VERT, A.size() == 2));
+  assert(IMPLIES(partition_type == GUIDED_QT_SPLIT, A.size() == 4));
 
-  int64_t vert_sse =
-      computeSSE_buf_tflite_hbd(buf_128_vert, src, startx, starty, block_length,
-                                block_length, width, src_stride);
+  // Compute SSE.
+  const int64_t sse =
+      compute_sse(out, src, src_stride, start_row, end_row, start_col, end_col);
 
-  int64_t horz_sse =
-      computeSSE_buf_tflite_hbd(buf_128_horz, src, startx, starty, block_length,
-                                block_length, width, src_stride);
+  // Compute Rate.
+  const int num_bits_for_a = compute_rate(A, prev_A, quadtset, norestorecosts);
+  // Partition is implied to be NONE in case of partial unit.
+  const int partition_signaling_cost =
+      is_partial_unit ? 0 : splitcosts[partition_type];
+  const int bitrate = num_bits_for_a + partition_signaling_cost;
 
-  int64_t all_sse =
-      computeSSE_buf_tflite_hbd(buf_256, src, startx, starty, block_length,
-                                block_length, width, src_stride);
-
-  // split cost
-  int a0_split[5], a1_split[5];
-  a0_split[0] = prevA0;
-  a1_split[0] = prevA1;
-  index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                starty, startx, quadtree_max_size);
-  a0_split[1] = A_128[index * 2];
-  a1_split[1] = A_128[index * 2 + 1];
-  index =
-      CalculateIndex_tflite(width, block_length / 2, block_length / 2, starty,
-                            startx + block_length / 2, quadtree_max_size);
-  a0_split[2] = A_128[index * 2];
-  a1_split[2] = A_128[index * 2 + 1];
-  index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                starty + block_length / 2, startx,
-                                quadtree_max_size);
-  a0_split[3] = A_128[index * 2];
-  a1_split[3] = A_128[index * 2 + 1];
-  index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                starty + block_length / 2,
-                                startx + block_length / 2, quadtree_max_size);
-  a0_split[4] = A_128[index * 2];
-  a1_split[4] = A_128[index * 2 + 1];
-  int bits_split = 0;
-  int ref0 = AOMMIN(AOMMAX(a0_split[0] - A0_min, 0), 15);
-  int ref1 = AOMMIN(AOMMAX(a1_split[0] - A1_min, 0), 15);
-  for (int i = 1; i <= 4; i++) {
-    if (a0_split[i] == 0 && a1_split[i] == 0) {
-      bits_split += norestorecosts[1];
-    } else {
-      bits_split += norestorecosts[0];
-      bits_split +=
-          (aom_count_primitive_refsubexpfin(16, 1, ref0, a0_split[i] - A0_min) +
-           aom_count_primitive_refsubexpfin(16, 1, ref1, a1_split[i] - A1_min))
-          << AV1_PROB_COST_SHIFT;
-    }
-    ref0 = AOMMIN(AOMMAX(a0_split[i] - A0_min, 0), 15);
-    ref1 = AOMMIN(AOMMAX(a1_split[i] - A1_min, 0), 15);
-  }
-  double cost_split = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      RDMULT, (bits_split + splitcosts[1]) >> 4, split_sse, bit_depth);
-
-  // cost vert
-  int a0_vert[3], a1_vert[3];
-  a0_vert[0] = prevA0;
-  a1_vert[0] = prevA1;
-  index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                startx, quadtree_max_size);
-  a0_vert[1] = A_128_vert[index * 2];
-  a1_vert[1] = A_128_vert[index * 2 + 1];
-  index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                startx + block_length / 2, quadtree_max_size);
-  a0_vert[2] = A_128_vert[index * 2];
-  a1_vert[2] = A_128_vert[index * 2 + 1];
-  int bits_vert = 0;
-  ref0 = AOMMIN(AOMMAX(a0_vert[0] - A0_min, 0), 15);
-  ref1 = AOMMIN(AOMMAX(a1_vert[0] - A1_min, 0), 15);
-  for (int i = 1; i <= 2; i++) {
-    if (a0_vert[i] == 0 && a1_vert[i] == 0) {
-      bits_vert += norestorecosts[1];
-    } else {
-      bits_vert += norestorecosts[0];
-      bits_vert +=
-          (aom_count_primitive_refsubexpfin(16, 1, ref0, a0_vert[i] - A0_min) +
-           aom_count_primitive_refsubexpfin(16, 1, ref1, a1_vert[i] - A1_min))
-          << AV1_PROB_COST_SHIFT;
-    }
-    ref0 = AOMMIN(AOMMAX(a0_vert[i] - A0_min, 0), 15);
-    ref1 = AOMMIN(AOMMAX(a1_vert[i] - A1_min, 0), 15);
-  }
-  double cost_vert = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      RDMULT, (bits_vert + splitcosts[2]) >> 4, vert_sse, bit_depth);
-
-  // cost horz
-  int a0_horz[3], a1_horz[3];
-  a0_horz[0] = prevA0;
-  a1_horz[0] = prevA1;
-  index = CalculateIndex_tflite(width, block_length / 2, block_length, starty,
-                                startx, quadtree_max_size);
-  a0_horz[1] = A_128_horz[index * 2];
-  a1_horz[1] = A_128_horz[index * 2 + 1];
-  index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                starty + block_length / 2, startx,
-                                quadtree_max_size);
-  a0_horz[2] = A_128_horz[index * 2];
-  a1_horz[2] = A_128_horz[index * 2 + 1];
-  int bits_horz = 0;
-  ref0 = AOMMIN(AOMMAX(a0_horz[0] - A0_min, 0), 15);
-  ref1 = AOMMIN(AOMMAX(a1_horz[0] - A1_min, 0), 15);
-  for (int i = 1; i <= 2; i++) {
-    if (a0_horz[i] == 0 && a1_horz[i] == 0) {
-      bits_horz += norestorecosts[1];
-    } else {
-      bits_horz += norestorecosts[0];
-      bits_horz +=
-          (aom_count_primitive_refsubexpfin(16, 1, ref0, a0_horz[i] - A0_min) +
-           aom_count_primitive_refsubexpfin(16, 1, ref1, a1_horz[i] - A1_min))
-          << AV1_PROB_COST_SHIFT;
-    }
-    ref0 = AOMMIN(AOMMAX(a0_horz[i] - A0_min, 0), 15);
-    ref1 = AOMMIN(AOMMAX(a1_horz[i] - A1_min, 0), 15);
-  }
-  double cost_horz = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      RDMULT, (bits_horz + splitcosts[3]) >> 4, horz_sse, bit_depth);
-
-  // cost all
-  int a0_all[2], a1_all[2];
-  a0_all[0] = prevA0;
-  a1_all[0] = prevA1;
-  index = CalculateIndex_tflite(width, block_length, block_length, starty,
-                                startx, quadtree_max_size);
-  a0_all[1] = A_256[index * 2];
-  a1_all[1] = A_256[index * 2 + 1];
-  int bits_all = 0;
-  ref0 = AOMMIN(AOMMAX(a0_all[0] - A0_min, 0), 15);
-  ref1 = AOMMIN(AOMMAX(a1_all[0] - A1_min, 0), 15);
-  for (int i = 1; i <= 1; i++) {
-    if (a0_all[i] == 0 && a1_all[i] == 0) {
-      bits_all += norestorecosts[1];
-    } else {
-      bits_all += norestorecosts[0];
-      bits_all +=
-          (aom_count_primitive_refsubexpfin(16, 1, ref0, a0_all[i] - A0_min) +
-           aom_count_primitive_refsubexpfin(16, 1, ref1, a1_all[i] - A1_min))
-          << AV1_PROB_COST_SHIFT;
-    }
-    ref0 = AOMMIN(AOMMAX(a0_all[i] - A0_min, 0), 15);
-    ref1 = AOMMIN(AOMMAX(a1_all[i] - A1_min, 0), 15);
-  }
-  double cost_all = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-      RDMULT, (bits_all + splitcosts[0]) >> 4, all_sse, bit_depth);
-
-  double best_cost = min_tflite(cost_split, cost_vert, cost_horz, cost_all);
-
-  int64_t best_sse;
-  if (cost_split == best_cost) {
-    best_sse = split_sse;
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec, buf_128,
-                       width);
-    Split[0].push_back(0);
-    Split[0].push_back(1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty, startx, quadtree_max_size);
-    int a0 = A_128[index * 2];
-    int a1 = A_128[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index =
-        CalculateIndex_tflite(width, block_length / 2, block_length / 2, starty,
-                              startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (cost_horz == best_cost) {
-    best_sse = horz_sse;
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec,
-                       buf_128_horz, width);
-    Split[0].push_back(1);
-    Split[0].push_back(1);
-
-    int index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_horz[index * 2];
-    int a1 = A_128_horz[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128_horz[index * 2];
-    a1 = A_128_horz[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (cost_vert == best_cost) {
-    best_sse = vert_sse;
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec,
-                       buf_128_vert, width);
-    Split[0].push_back(1);
-    Split[0].push_back(0);
-
-    int index = CalculateIndex_tflite(width, block_length, block_length / 2,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_vert[index * 2];
-    int a1 = A_128_vert[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128_vert[index * 2];
-    a1 = A_128_vert[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else {
-    best_sse = all_sse;
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec, buf_256,
-                       width);
-    Split[0].push_back(0);
-    Split[0].push_back(0);
-    index = CalculateIndex_tflite(width, block_length, block_length, starty,
-                                  startx, quadtree_max_size);
-    int a0 = A_256[index * 2];
-    int a1 = A_256[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-  }
-  (void)best_sse;
-  /*
-  int64_t none_sse =
-      computeSSE_buf_tflite_hbd(dgd, src, startx, starty, block_length,
-                                block_length, dgd_stride, src_stride);
-  if (best_sse > none_sse)
-    printf("Warning %ld > %ld\n", best_sse, none_sse);
-  else
-    printf("Awesome %ld < %ld\n", best_sse, none_sse);
-  (void)none_sse;
-  */
-
-#else
-  double split_psnr = computePSNR_buf_tflite_hbd(
-      buf_128, dgd, src, startx, starty, block_length, block_length, height,
-      width, width, dgd_stride, src_stride, bit_depth);
-
-  double split_psnr_horz = computePSNR_buf_tflite_hbd(
-      buf_128_horz, dgd, src, startx, starty, block_length, block_length,
-      height, width, width, dgd_stride, src_stride, bit_depth);
-
-  double split_psnr_vert = computePSNR_buf_tflite_hbd(
-      buf_128_vert, dgd, src, startx, starty, block_length, block_length,
-      height, width, width, dgd_stride, src_stride, bit_depth);
-
-  // int64_t split_rate = 4 * 2 * 3 + 4;
-  // int64_t split_rate =4;
-  double split_delta = (split_psnr - dgd_psnr) * 1000 / 4;
-  double split_delta_horz = (split_psnr_horz - dgd_psnr) * 1000 / 2;
-  double split_delta_vert = (split_psnr_vert - dgd_psnr) * 1000 / 2;
-
-  double best_delta =
-      AOMMAX(AOMMAX(split_delta, split_delta_horz), split_delta_vert);
-
-  if (split_delta > delta_128 && best_delta == split_delta) {
-    // printf("fast using split\n");
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec, buf_128,
-                       width);
-    Split[0].push_back(0);
-    Split[0].push_back(1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty, startx, quadtree_max_size);
-    int a0 = A_128[index * 2];
-    int a1 = A_128[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index =
-        CalculateIndex_tflite(width, block_length / 2, block_length / 2, starty,
-                              startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length / 2,
-                                  starty + block_length / 2,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128[index * 2];
-    a1 = A_128[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-  } else if (split_delta_horz > delta_128_horz &&
-             best_delta == split_delta_horz) {
-    // printf("fast using horz\n");
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec,
-                       buf_128_horz, width);
-    Split[0].push_back(1);
-    Split[0].push_back(1);
-
-    int index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_horz[index * 2];
-    int a1 = A_128_horz[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length / 2, block_length,
-                                  starty + block_length / 2, startx,
-                                  quadtree_max_size);
-    a0 = A_128_horz[index * 2];
-    a1 = A_128_horz[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-
-  } else if (split_delta_vert > delta_128_vert &&
-             best_delta == split_delta_vert) {
-    // printf("fast using vert\n");
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec,
-                       buf_128_vert, width);
-    Split[0].push_back(1);
-    Split[0].push_back(0);
-
-    int index = CalculateIndex_tflite(width, block_length, block_length / 2,
-                                      starty, startx, quadtree_max_size);
-    int a0 = A_128_vert[index * 2];
-    int a1 = A_128_vert[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-
-    index = CalculateIndex_tflite(width, block_length, block_length / 2, starty,
-                                  startx + block_length / 2, quadtree_max_size);
-    a0 = A_128_vert[index * 2];
-    a1 = A_128_vert[index * 2 + 1];
-    A0A1.first = a0;
-    A0A1.second = a1;
-    A[0].push_back(A0A1);
-  } else {
-    // printf("fast using all\n");
-    replace_tflite_hbd(startx, starty, block_length, block_length, rec, buf_256,
-                       width);
-    Split[0].push_back(0);
-    Split[0].push_back(0);
-    index = CalculateIndex_tflite(width, block_length, block_length, starty,
-                                  startx, quadtree_max_size);
-    int a0 = A_256[index * 2];
-    int a1 = A_256[index * 2 + 1];
-    std::pair<int, int> A0A1(a0, a1);
-    A[0].push_back(A0A1);
-  }
-
-#endif  // CONFIG_CNN_GUIDED_QUADTREE_RDCOST
+  // Compute RDCost.
+  *this_rdcost =
+      RDCOST_DBL_WITH_NATIVE_BD_DIST(rdmult, bitrate >> 4, sse, bit_depth);
 }
 
-extern "C" int av1_restore_cnn_quadtree_img_tflite_highbd(
+// Given intermediate restoration 'interm' and 'src', computes the best
+// partitioning out of NONE, SPLIT, HORZ and VERT based on RD cost, and uses it
+// to restore the unit starting at 'row' and 'col' inside 'dgd'.
+// Also, stores the split decisions in 'split' and a0,a1 pairs in 'A'.
+static void select_quadtree_partitioning(
+    const std::vector<std::vector<std::vector<double>>> &interm,
+    const uint16_t *src, int src_stride, int start_row, int start_col,
+    int width, int height, int quadtree_max_size, const int *quadtset,
+    int rdmult, const std::pair<int, int> &prev_A, const int *splitcosts,
+    const int norestorecosts[2], int bit_depth, uint16_t *dgd, int dgd_stride,
+    std::vector<int> &split, std::vector<std::pair<int, int>> &A,
+    double *rdcost) {
+  const int end_row = AOMMIN(start_row + quadtree_max_size, height);
+  const int end_col = AOMMIN(start_col + quadtree_max_size, width);
+  const bool is_partial_unit = (start_row + quadtree_max_size > height) ||
+                               (start_col + quadtree_max_size > width);
+
+  auto best_rdcost = DBL_MAX;
+  std::vector<std::pair<int, int>> best_A;
+  std::vector<std::vector<uint16_t>> best_out(
+      quadtree_max_size, std::vector<uint16_t>(quadtree_max_size));
+  GuidedQuadTreePartitionType best_partition_type = GUIDED_QT_INVALID;
+
+  for (int type = 0; type < GUIDED_QT_TYPES; ++type) {
+    const auto this_partition_type = (GuidedQuadTreePartitionType)type;
+    // Special case: if only partial unit is within boundary, we implicitly
+    // use NONE partitioning and do not try the splitting options.
+    if (is_partial_unit && (this_partition_type != GUIDED_QT_NONE)) {
+      continue;
+    }
+
+    double this_rdcost;
+    std::vector<std::pair<int, int>> this_A;
+    std::vector<std::vector<uint16_t>> this_out(
+        quadtree_max_size, std::vector<uint16_t>(quadtree_max_size));
+    try_one_partition(interm, this_partition_type, src, src_stride, dgd,
+                      dgd_stride, start_row, end_row, start_col, end_col,
+                      quadtree_max_size, quadtset, rdmult, prev_A, splitcosts,
+                      norestorecosts, bit_depth, is_partial_unit, &this_rdcost,
+                      this_out, this_A);
+    if (this_rdcost < best_rdcost) {
+      best_rdcost = this_rdcost;
+      best_A = this_A;
+      best_out = this_out;
+      best_partition_type = this_partition_type;
+    }
+  }
+
+  // Save RDCost.
+  *rdcost = best_rdcost;
+
+  // Restore this unit in 'dgd'.
+  for (int row = start_row; row < end_row; ++row) {
+    for (int col = start_col; col < end_col; ++col) {
+      dgd[row * dgd_stride + col] = best_out[row - start_row][col - start_col];
+    }
+  }
+
+  // Save a0, a1 pairs.
+  for (auto &a0a1 : best_A) {
+    A.push_back(a0a1);
+  }
+
+  // Save split decision.
+  if (is_partial_unit) {
+    // Nothing should be added to 'split' array.
+    assert(best_partition_type == GUIDED_QT_NONE);
+    return;
+  }
+  switch (best_partition_type) {
+    case GUIDED_QT_NONE:
+      split.push_back(0);
+      split.push_back(0);
+      break;
+    case GUIDED_QT_SPLIT:
+      split.push_back(0);
+      split.push_back(1);
+      break;
+    case GUIDED_QT_HORZ:
+      split.push_back(1);
+      split.push_back(1);
+      break;
+    case GUIDED_QT_VERT:
+      split.push_back(1);
+      split.push_back(0);
+      break;
+    default: assert(0 && "Wrong partition type"); break;
+  }
+}
+
+// Top-level function to apply guided restoration on encoder side.
+static int restore_cnn_quadtree_encode_img_tflite_highbd(
     YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
-    int RDMULT, int *splitcosts, int (*norestorecosts)[2], int num_threads,
-    int bit_depth, int is_intra_only, int is_luma, int cnn_index) {
-  // save Split flag
-  std::vector<int> Split;
-  // save a0 a1
-  std::vector<std::pair<int, int>> A;
+    int rdmult, const int *splitcosts, int (*norestorecosts)[2],
+    int num_threads, int bit_depth, int is_intra_only, int is_luma,
+    int cnn_index, double *rdcost) {
+  YV12_BUFFER_CONFIG *dgd_buf = &cm->cur_frame->buf;
+  uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd_buf->y_buffer);
+  const int dgd_stride = dgd_buf->y_stride;
+  const int qindex = cm->quant_params.base_qindex;
+  const int width = cm->superres_upscaled_width;
+  const int height = cm->superres_upscaled_height;
 
-  YV12_BUFFER_CONFIG *pcPicYuvRec = &cm->cur_frame->buf;
-  uint16_t *dgr = CONVERT_TO_SHORTPTR(pcPicYuvRec->y_buffer);
-  uint16_t *src = CONVERT_TO_SHORTPTR(source_frame->y_buffer);
+  // Get 2-channel intermediate restoration.
+  std::vector<std::vector<std::vector<double>>> interm(
+      height, std::vector<std::vector<double>>(width, std::vector<double>(2)));
+  if (!generate_interm_guided_restoration(
+          dgd, dgd_stride, qindex, superres_denom, width, height, num_threads,
+          is_intra_only, is_luma, cnn_index, bit_depth, interm)) {
+    return 0;
+  }
 
-  int quadtree_max_size = cm->cur_quad_info.unit_size;
-  int height = cm->superres_upscaled_height;
-  int width = cm->superres_upscaled_width;
-  int dgr_stride = pcPicYuvRec->y_stride;
-  int src_stride = source_frame->y_stride;
-  int qp = cm->quant_params.base_qindex;
-
-  // temp buf
-  uint16_t *rec = new uint16_t[height * width];
-  uint16_t *buf_level_0 = new uint16_t[height * width];
-  uint16_t *buf_level_1 = new uint16_t[height * width];
-  uint16_t *buf_level_1_horz = new uint16_t[height * width];
-  uint16_t *buf_level_1_vert = new uint16_t[height * width];
-
-  int *quadtset;
-  quadtset = get_quadparm_from_qindex(qp, superres_denom, is_intra_only,
-                                      is_luma, cnn_index);
+  // Initialization.
+  const uint16_t *src = CONVERT_TO_SHORTPTR(source_frame->y_buffer);
+  const int src_stride = source_frame->y_stride;
+  const int quadtree_max_size = cm->cur_quad_info.unit_size;
+  const int *quadtset = get_quadparm_from_qindex(
+      qindex, superres_denom, is_intra_only, is_luma, cnn_index);
+  const int A0_min = quadtset[2];
+  const int A1_min = quadtset[3];
   const int norestore_ctx =
-      get_guided_norestore_ctx(qp, superres_denom, is_intra_only);
-  int null_norestorecosts[2] = { 0, 0 };
-  int *this_norestorecosts =
+      get_guided_norestore_ctx(qindex, superres_denom, is_intra_only);
+  const int null_norestorecosts[2] = { 0, 0 };
+  const int *this_norestorecosts =
       norestore_ctx == -1 ? null_norestorecosts : norestorecosts[norestore_ctx];
 
-  // save unfilter frame psnr
-  double dgdpsnr = computePSNR_tflite_hbd(dgr, src, height, width, dgr_stride,
-                                          src_stride, bit_depth);
-
-  int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
-  int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
-  int block_num_level_0 = (int)ceil(((float)width) / quadtree_max_size) *
-                          (int)ceil(((float)height) / quadtree_max_size);
-  int regularblock_num = regular_height_num * regular_width_num;
-
-  int A_num_level_0 = block_num_level_0 * 2;
-  int *A_level_0 = new int[A_num_level_0];
-
-  int A_num_level_1 = regularblock_num * 4 * 2;
-  int *A_level_1 = new int[A_num_level_1];
-
-  int A_num_level_1_horz = regularblock_num * 2 * 2;
-  int *A_level_1_horz = new int[A_num_level_1_horz];
-
-  int A_num_level_1_vert = regularblock_num * 2 * 2;
-  int *A_level_1_vert = new int[A_num_level_1_vert];
-
-  // uint16_t buf[512][512];
-  // cv::Mat image;
-  // for (int i = 0; i < 512; i++)
-  //  for (int j = 0; j < 512; j++)
-  //      buf[i][j] = dgr[i * dgr_stride + j];
-  // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
-  //// cv::imshow("rec", image);
-  //// cv::waitKey();
-  // cv::imwrite("../../res/beforeloop.jpg", image);
-
-  // loopfilter all frame
-  TFlite_Predict_quadtree_hbd(
-      dgr, src, A_level_0, A_num_level_0, height, width, dgr_stride, src_stride,
-      qp, quadtree_max_size, quadtree_max_size, buf_level_0, width,
-      superres_denom, num_threads, bit_depth, is_intra_only, is_luma, cnn_index,
-      RDMULT, this_norestorecosts);
-  // double psnr_level_0 = computePSNR_tflite_hbd(buf_level_0, src, height,
-  // width,
-  //                                              width, src_stride, bit_depth);
-  // for (int i = 0; i < 512; i++)
-  //  for (int j = 0; j < 512; j++) buf[i][j] = buf_level_0[i * width + j];
-  // image = cv::Mat(512, 512, CV_16UC1, (void *)buf);
-  ////cv::imshow("rec", image);
-  ////cv::waitKey();
-  // cv::imwrite("../../res/afterloop.jpg", image);
-
-  replace_tflite_hbd(0, 0, width, height, rec, buf_level_0, width);
-
-  double delta_level_1 = 0;
-  double delta_level_1_horz = 0;
-  double delta_level_1_vert = 0;
-  if (regularblock_num != 0) {  // start quadtree
-    TFlite_Predict_quadtree_hbd(
-        dgr, src, A_level_1, A_num_level_1,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size / 2, quadtree_max_size / 2, buf_level_1, width,
-        superres_denom, num_threads, bit_depth, is_intra_only, is_luma,
-        cnn_index, RDMULT, this_norestorecosts);
-    double psnr_level_1 = computePSNR_tflite_hbd(
-        buf_level_1, src, height, width, width, src_stride, bit_depth);
-    double num_level_1 = regular_height_num * regular_width_num * 4;
-    delta_level_1 = ((psnr_level_1 - dgdpsnr) * 1000) / num_level_1;
-
-    TFlite_Predict_quadtree_hbd(
-        dgr, src, A_level_1_horz, A_num_level_1_horz,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size, quadtree_max_size / 2, buf_level_1_horz, width,
-        superres_denom, num_threads, bit_depth, is_intra_only, is_luma,
-        cnn_index, RDMULT, this_norestorecosts);
-    double psnr_buf_level_1_horz = computePSNR_tflite_hbd(
-        buf_level_1_horz, src, height, width, width, src_stride, bit_depth);
-    double rate_buf_level_1_horz = regular_height_num * regular_width_num * 2;
-    delta_level_1_horz =
-        ((psnr_buf_level_1_horz - dgdpsnr) * 1000) / rate_buf_level_1_horz;
-
-    TFlite_Predict_quadtree_hbd(
-        dgr, src, A_level_1_vert, A_num_level_1_vert,
-        regular_height_num * quadtree_max_size,
-        regular_width_num * quadtree_max_size, dgr_stride, src_stride, qp,
-        quadtree_max_size / 2, quadtree_max_size, buf_level_1_vert, width,
-        superres_denom, num_threads, bit_depth, is_intra_only, is_luma,
-        cnn_index, RDMULT, this_norestorecosts);
-    double psnr_buf_level_1_vert = computePSNR_tflite_hbd(
-        buf_level_1_vert, src, height, width, width, src_stride, bit_depth);
-    double rate_buf_level_1_vert = regular_height_num * regular_width_num * 2;
-    delta_level_1_vert =
-        ((psnr_buf_level_1_vert - dgdpsnr) * 1000) / rate_buf_level_1_vert;
-  }
-
-  int index = 0;
-  for (int i = 0; i < height; i += quadtree_max_size) {
-    for (int j = 0; j < width; j += quadtree_max_size) {
-      if (i + quadtree_max_size > height ||
-          j + quadtree_max_size > width) {  // unregular block  replace
-        index =
-            CalculateIndex_tflite(width, quadtree_max_size, quadtree_max_size,
-                                  i, j, quadtree_max_size);
-        int a0 = A_level_0[index * 2];
-        int a1 = A_level_0[index * 2 + 1];
-        std::pair<int, int> A0A1(a0, a1);
-        A.push_back(A0A1);
-      } else {  // retular block  start   judge
-        int A0_min = quadtset[2];
-        int A1_min = quadtset[3];
-        Tree_tflite_hbd(rec, buf_level_0, buf_level_1, buf_level_1_horz,
-                        buf_level_1_vert, dgr, src, dgr_stride, src_stride,
-                        A0_min, A1_min, A_level_0, A_level_1, A_level_1_horz,
-                        A_level_1_vert, height, width, dgdpsnr, delta_level_1,
-                        delta_level_1_horz, delta_level_1_vert, 0,
-                        quadtree_max_size, i, j, &Split, &A, RDMULT, splitcosts,
-                        this_norestorecosts, bit_depth);
-      }
+  // For each quadtree unit, compute the best partitioning out of
+  // NONE, SPLIT, HORZ and VERT based on RD cost.
+  std::vector<int> split;              // selected partitioning options.
+  std::vector<std::pair<int, int>> A;  // selected a0, a1 weight pairs.
+  // Previous a0, a1 pair is mid-point of the range by default.
+  std::pair<int, int> prev_A = std::make_pair(8 + A0_min, 8 + A1_min);
+  *rdcost = 0;
+  // TODO(urvang): Include padded area in a unit if it's < unit size / 2?
+  // If so, need to modify / replace quad_tree_get_unit_info_length().
+  // Also double check: quad_tree_get_split_info_length().
+  for (int row = 0; row < height; row += quadtree_max_size) {
+    for (int col = 0; col < width; col += quadtree_max_size) {
+      double this_rdcost;
+      select_quadtree_partitioning(
+          interm, src, src_stride, row, col, width, height, quadtree_max_size,
+          quadtset, rdmult, prev_A, splitcosts, this_norestorecosts, bit_depth,
+          dgd, dgd_stride, split, A, &this_rdcost);
+      // updates.
+      *rdcost += this_rdcost;
+      prev_A = A.back();
     }
   }
 
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      *(dgr + i * dgr_stride + j) =
-          *(rec + i * width + j);  // Fill in the luma buffer again
-    }
-  }
-
-  dgdpsnr = computePSNR_tflite_hbd(dgr, src, height, width, dgr_stride,
-                                   src_stride, bit_depth);
-
-  // FILE *fp_out;
-  // fp_out = fopen("../../res/rec_unregular.txt", "w");
-  // for (int i = 0; i < 256; i++) {
-  //  for (int j = 0; j < 256; j++) {
-  //    fprintf(fp_out, "%d\n", *(rec + i * width + j));
-  //  }
-  //}
-  if (rec != NULL) {
-    delete[] rec;
-    rec = NULL;
-  }
-  if (buf_level_0 != NULL) {
-    delete[] buf_level_0;
-    buf_level_0 = NULL;
-  }
-  if (buf_level_1 != NULL) {
-    delete[] buf_level_1;
-    buf_level_1 = NULL;
-  }
-  if (buf_level_1_horz != NULL) {
-    delete[] buf_level_1_horz;
-    buf_level_1_horz = NULL;
-  }
-  if (buf_level_1_vert != NULL) {
-    delete[] buf_level_1_vert;
-    buf_level_1_vert = NULL;
-  }
-  if (A_level_0 != NULL) {
-    delete[] A_level_0;
-    A_level_0 = NULL;
-  }
-  if (A_level_1 != NULL) {
-    delete[] A_level_1;
-    A_level_1 = NULL;
-  }
-  if (A_level_1_horz != NULL) {
-    delete[] A_level_1_horz;
-    A_level_1_horz = NULL;
-  }
-  if (A_level_1_vert != NULL) {
-    delete[] A_level_1_vert;
-    A_level_1_vert = NULL;
-  }
-
-  cm->cur_quad_info.split_info_length = (int)Split.size();
+  // Fill in the decisions.
+  cm->cur_quad_info.split_info_length = (int)split.size();
   cm->cur_quad_info.unit_info_length = (int)A.size();
-
-  for (unsigned int i = 0; i < Split.size(); ++i) {
-    cm->cur_quad_info.split_info[i].split = Split[i];
+  for (unsigned int i = 0; i < split.size(); ++i) {
+    cm->cur_quad_info.split_info[i].split = split[i];
   }
-
   for (unsigned int i = 0; i < A.size(); ++i) {
     cm->cur_quad_info.unit_info[i].xqd[0] = A[i].first;
     cm->cur_quad_info.unit_info[i].xqd[1] = A[i].second;
-    // printf("a0:%d a1:%d\n", A[i].first, A[i].second);
   }
-
   return 1;
 }
 
-extern "C" int av1_restore_cnn_quadtree_decode_img_tflite_highbd(
-    AV1_COMMON *cm, int superres_denom, int num_threads, int bit_depth,
-    int is_intra_only, int is_luma, int cnn_index) {
-  YV12_BUFFER_CONFIG *pcPicYuvRec = &cm->cur_frame->buf;
-  uint16_t *dgr = CONVERT_TO_SHORTPTR(pcPicYuvRec->y_buffer);
-  int height = cm->superres_upscaled_height;
-  int width = cm->superres_upscaled_width;
-  int dgr_stride = pcPicYuvRec->y_stride;
-  int qp = cm->quant_params.base_qindex;
-
-  int quadtree_max_size = cm->postcnn_quad_info.unit_size;
-  int regular_height_num = (int)floor(((float)height) / quadtree_max_size);
-  int regular_width_num = (int)floor(((float)width) / quadtree_max_size);
-  int block_size_256 = (int)ceil(((float)width) / quadtree_max_size) *
-                       (int)ceil(((float)height) / quadtree_max_size);
-  int regularblock_num = regular_height_num * regular_width_num;
-  int un_regularblock_num = block_size_256 - regularblock_num;
-
-  QUADInfo quadinfo = cm->postcnn_quad_info;
-  quadinfo.split_info_index = 0;
-  quadinfo.unit_info_index = 0;
-
-  uint16_t *rec = new uint16_t[height * width];
-
-  int A_num_unregular = un_regularblock_num * 2;
-  int unregular_index = 0;
-  int *A_unregular = new int[A_num_unregular];
-
-  int A_num_regular = quadinfo.unit_info_length * 2;
-  int regular_index = 0;
-  int *A_regular = new int[A_num_regular];
-
-  int split_index = 0;
-  int *Split = new int[quadinfo.split_info_length / 2];
-
-  int index = 0;
-  for (int i = 0; i < height; i += quadtree_max_size) {
-    for (int j = 0; j < width; j += quadtree_max_size) {
-      if (i + quadtree_max_size > height || j + quadtree_max_size > width) {
-        int a0 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[0];
-        int a1 = quadinfo.unit_info[quadinfo.unit_info_index].xqd[1];
-        quadinfo.unit_info_index++;
-        A_unregular[unregular_index++] = a0;
-        A_unregular[unregular_index++] = a1;
-
-      } else {
-        deTree_tflite(&quadinfo, &regular_index, A_regular, &split_index,
-                      Split);
-      }
-      index++;
-    }
-  }
-
-  TFlite_recon_quadtree_regular_hbd(
-      dgr, dgr_stride, regular_height_num * quadtree_max_size,
-      regular_width_num * quadtree_max_size, rec, width, qp, A_regular, Split,
-      quadtree_max_size, superres_denom, num_threads, bit_depth, is_intra_only,
-      is_luma, cnn_index);
-
-  TFlite_recon_quadtree_unregular_hbd(
-      dgr, dgr_stride, height, width, rec, width, qp, A_unregular, A_regular,
-      Split, quadtree_max_size, superres_denom, num_threads, bit_depth,
-      is_intra_only, is_luma, cnn_index);
-
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      *(dgr + i * dgr_stride + j) =
-          *(rec + i * width + j);  // Fill in the luma buffer again
-    }
-  }
-  // FILE *fp_out;
-  // fp_out = fopen("../../res/dec_unregular.txt", "w");
-  // for (int i = 0; i < 256; i++) {
-  //  for (int j = 0; j < 256; j++) {
-  //    fprintf(fp_out, "%d\n", *(rec + i * width + j));
-  //  }
-  //}
-  delete[] rec;
-  rec = NULL;
-  return 1;
-}
-
-extern "C" void av1_restore_cnn_quadtree_tflite(
+extern "C" int av1_restore_cnn_quadtree_encode_tflite(
     AV1_COMMON *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
     int *splitcosts, int (*norestorecosts)[2], int num_threads,
-    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE]) {
+    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE],
+    double *rdcost) {
   YV12_BUFFER_CONFIG *buf = &cm->cur_frame->buf;
   const int is_intra_only = frame_is_intra_only(cm);
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
@@ -2438,35 +1168,184 @@ extern "C" void av1_restore_cnn_quadtree_tflite(
     const int cnn_index = cnn_indices[plane];
     assert(cnn_index >= 0 &&
            cnn_index < av1_num_cnn_indices_for_plane(cm, plane));
+    int ret = 1;
     switch (plane) {
       case AOM_PLANE_Y:
-        av1_restore_cnn_quadtree_img_tflite_highbd(
+        ret = restore_cnn_quadtree_encode_img_tflite_highbd(
             source_frame, cm, cm->superres_scale_denominator, RDMULT,
             splitcosts, norestorecosts, num_threads, cm->seq_params.bit_depth,
-            is_intra_only, is_luma, cnn_index);
+            is_intra_only, is_luma, cnn_index, rdcost);
+        if (ret == 0) return ret;
         break;
       case AOM_PLANE_U:
-        av1_restore_cnn_img_tflite_highbd(
+        ret = av1_restore_cnn_img_tflite_highbd(
             cm->quant_params.base_qindex, cm->superres_scale_denominator,
             CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
             buf->uv_crop_height, buf->uv_stride,
             CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
             cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        if (ret == 0) return ret;
         break;
       case AOM_PLANE_V:
-        av1_restore_cnn_img_tflite_highbd(
+        ret = av1_restore_cnn_img_tflite_highbd(
             cm->quant_params.base_qindex, cm->superres_scale_denominator,
             CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
             buf->uv_crop_height, buf->uv_stride,
             CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
             cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        if (ret == 0) return ret;
         break;
-      default: assert(0 && "Invalid plane index");
+      default: assert(0 && "Invalid plane index"); return 0;
+    }
+  }
+  return 1;
+}
+
+// ------------------- Guided Quadtree: Decoder ------------------------------//
+
+// Given the 2-channel intermediate output in 'interm' and weight parameters,
+// restores one quadtree unit in 'dgd'.
+static void apply_linear_combination(
+    const std::vector<std::vector<std::vector<double>>> &interm, int start_row,
+    int end_row, int start_col, int end_col, int unit_width, int unit_height,
+    const int *quadtset, int bit_depth,
+    const std::vector<std::pair<int, int>> &A, size_t &A_index, uint16_t *dgd,
+    int dgd_stride) {
+  // Get scale parameters.
+  const int scale0 = quadtset[0];
+  const int scale1 = quadtset[1];
+
+  for (int row = start_row; row < end_row; row += unit_height) {
+    const int this_start_row = row;
+    const int this_end_row = AOMMIN(row + unit_height, end_row);
+    for (int col = start_col; col < end_col; col += unit_width) {
+      const int this_start_col = col;
+      const int this_end_col = AOMMIN(col + unit_width, end_col);
+
+      // Get weight parameters for this unit.
+      const auto this_A = A[A_index++];
+      const int a0 = this_A.first;
+      const int a1 = this_A.second;
+
+      // Restore this unit.
+      for (int r = this_start_row; r < this_end_row; ++r) {
+        for (int c = this_start_col; c < this_end_col; ++c) {
+          const int dgd_unclipped = int(round(dgd[r * dgd_stride + c] +
+                                              a0 * interm[r][c][0] / scale0 +
+                                              a1 * interm[r][c][1] / scale1));
+          dgd[r * dgd_stride + c] = clip_pixel_highbd(dgd_unclipped, bit_depth);
+        }
+      }
     }
   }
 }
 
-extern "C" void av1_restore_cnn_quadtree_decode_tflite(
+// Given intermediate restoration 'interm', quadtree partitioning info 'split'
+// and weight parameters 'A', restores the unit starting at 'row' and 'col'
+// inside 'dgd'.
+static void apply_quadtree_partitioning(
+    const std::vector<std::vector<std::vector<double>>> &interm, int start_row,
+    int start_col, int width, int height, int quadtree_max_size,
+    const int *quadtset, int bit_depth, const std::vector<int> &split,
+    size_t &split_index, const std::vector<std::pair<int, int>> &A,
+    size_t &A_index, uint16_t *dgd, int dgd_stride) {
+  const int end_row = AOMMIN(start_row + quadtree_max_size, height);
+  const int end_col = AOMMIN(start_col + quadtree_max_size, width);
+  const bool is_partial_unit = (start_row + quadtree_max_size > height) ||
+                               (start_col + quadtree_max_size > width);
+
+  // Get partition type.
+  GuidedQuadTreePartitionType partition_type = GUIDED_QT_NONE;
+  if (!is_partial_unit) {
+    const int spl1 = split[split_index++];
+    const int spl2 = split[split_index++];
+    if (spl1 == 0) {
+      if (spl2 == 0) {
+        partition_type = GUIDED_QT_NONE;  // (0, 0)
+      } else {
+        assert(spl2 == 1);
+        partition_type = GUIDED_QT_SPLIT;  // (0, 1)
+      }
+    } else {
+      assert(spl1 == 1);
+      if (spl2 == 1) {
+        partition_type = GUIDED_QT_HORZ;  // (1, 1)
+      } else {
+        assert(spl2 == 0);
+        partition_type = GUIDED_QT_VERT;  // (1, 0)
+      }
+    }
+  }
+  assert(partition_type >= 0 && partition_type < GUIDED_QT_TYPES);
+
+  // Get unit width and height based on partition type.
+  int unit_width;
+  int unit_height;
+  get_unit_size(quadtree_max_size, partition_type, &unit_width, &unit_height);
+
+  // Compute restored unit, a0 and a1 with given A parameters.
+  apply_linear_combination(interm, start_row, end_row, start_col, end_col,
+                           unit_width, unit_height, quadtset, bit_depth, A,
+                           A_index, dgd, dgd_stride);
+}
+
+// Top-level function to apply guided restoration on decoder side.
+static int restore_cnn_quadtree_decode_img_tflite_highbd(
+    AV1_COMMON *cm, int superres_denom, int num_threads, int bit_depth,
+    int is_intra_only, int is_luma, int cnn_index) {
+  YV12_BUFFER_CONFIG *dgd_buf = &cm->cur_frame->buf;
+  uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd_buf->y_buffer);
+  const int dgd_stride = dgd_buf->y_stride;
+  const int qindex = cm->quant_params.base_qindex;
+  const int width = cm->superres_upscaled_width;
+  const int height = cm->superres_upscaled_height;
+
+  // Get 2-channel intermediate restoration.
+  std::vector<std::vector<std::vector<double>>> interm(
+      height, std::vector<std::vector<double>>(width, std::vector<double>(2)));
+  if (!generate_interm_guided_restoration(
+          dgd, dgd_stride, qindex, superres_denom, width, height, num_threads,
+          is_intra_only, is_luma, cnn_index, bit_depth, interm)) {
+    return 0;
+  }
+
+  // Get quadtree params.
+  const QUADInfo *const quad_info = &cm->postcnn_quad_info;
+  const int quadtree_max_size = quad_info->unit_size;
+  const int *quadtset = get_quadparm_from_qindex(
+      qindex, superres_denom, is_intra_only, is_luma, cnn_index);
+
+  // Get partitioning types.
+  std::vector<int> split;
+  split.reserve(quad_info->split_info_length);
+  for (int i = 0; i < quad_info->split_info_length; ++i) {
+    split.push_back(quad_info->split_info[i].split);
+  }
+
+  // Get a0,a1 pairs.
+  std::vector<std::pair<int, int>> A;
+  A.reserve(quad_info->unit_info_length);
+  for (int i = 0; i < quad_info->unit_info_length; ++i) {
+    A.emplace_back(quad_info->unit_info[i].xqd[0],
+                   quad_info->unit_info[i].xqd[1]);
+  }
+
+  // For each quadtree unit, apply given quadtree partitioning.
+  size_t split_index = 0;
+  size_t A_index = 0;
+  for (int row = 0; row < height; row += quadtree_max_size) {
+    for (int col = 0; col < width; col += quadtree_max_size) {
+      apply_quadtree_partitioning(interm, row, col, width, height,
+                                  quadtree_max_size, quadtset, bit_depth, split,
+                                  split_index, A, A_index, dgd, dgd_stride);
+    }
+  }
+  assert(split_index == split.size());
+  assert(A_index == A.size());
+  return 1;
+}
+
+extern "C" int av1_restore_cnn_quadtree_decode_tflite(
     struct AV1Common *cm, int num_threads, int use_quadtree,
     const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE]) {
   YV12_BUFFER_CONFIG *buf = &cm->cur_frame->buf;
@@ -2478,31 +1357,36 @@ extern "C" void av1_restore_cnn_quadtree_decode_tflite(
     const int cnn_index = cnn_indices[plane];
     assert(cnn_index >= 0 &&
            cnn_index < av1_num_cnn_indices_for_plane(cm, plane));
+    int ret = 1;
     switch (plane) {
       case AOM_PLANE_Y:
-        av1_restore_cnn_quadtree_decode_img_tflite_highbd(
+        ret = restore_cnn_quadtree_decode_img_tflite_highbd(
             cm, cm->superres_scale_denominator, num_threads,
             cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        if (ret == 0) return ret;
         break;
       case AOM_PLANE_U:
-        av1_restore_cnn_img_tflite_highbd(
+        ret = av1_restore_cnn_img_tflite_highbd(
             cm->quant_params.base_qindex, cm->superres_scale_denominator,
             CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_crop_width,
             buf->uv_crop_height, buf->uv_stride,
             CONVERT_TO_SHORTPTR(buf->u_buffer), buf->uv_stride, num_threads,
             cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        if (ret == 0) return ret;
         break;
       case AOM_PLANE_V:
-        av1_restore_cnn_img_tflite_highbd(
+        ret = av1_restore_cnn_img_tflite_highbd(
             cm->quant_params.base_qindex, cm->superres_scale_denominator,
             CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_crop_width,
             buf->uv_crop_height, buf->uv_stride,
             CONVERT_TO_SHORTPTR(buf->v_buffer), buf->uv_stride, num_threads,
             cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index);
+        if (ret == 0) return ret;
         break;
-      default: assert(0 && "Invalid plane index");
+      default: assert(0 && "Invalid plane index"); return 0;
     }
   }
+  return 1;
 }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 

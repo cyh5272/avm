@@ -7138,9 +7138,12 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 #if CONFIG_CNN_RESTORATION
 #if CONFIG_CNN_GUIDED_QUADTREE
       if (cm->use_cnn[0]) {
-        // printf("using quadtree\n");
-        av1_restore_cnn_quadtree_decode_tflite(
-            cm, pbi->num_workers, cm->use_cnn[0], cm->use_cnn, cm->cnn_indices);
+        if (!av1_restore_cnn_quadtree_decode_tflite(cm, pbi->num_workers,
+                                                    cm->use_cnn[0], cm->use_cnn,
+                                                    cm->cnn_indices)) {
+          aom_internal_error(&cm->error, AOM_CODEC_ERROR,
+                             "Decoder CNN Restoration failed.");
+        }
       }
 #else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,
@@ -7175,9 +7178,12 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
 #if CONFIG_CNN_RESTORATION
 #if CONFIG_CNN_GUIDED_QUADTREE
       if (cm->use_cnn[0]) {
-        printf("using quadtree\n");
-        av1_restore_cnn_quadtree_decode_tflite(
-            cm, pbi->num_workers, cm->use_cnn[0], cm->use_cnn, cm->cnn_indices);
+        if (!av1_restore_cnn_quadtree_decode_tflite(cm, pbi->num_workers,
+                                                    cm->use_cnn[0], cm->use_cnn,
+                                                    cm->cnn_indices)) {
+          aom_internal_error(&cm->error, AOM_CODEC_ERROR,
+                             "Decoder CNN Restoration failed.");
+        }
       }
 #else  // CONFIG_CNN_GUIDED_QUADTREE
         av1_restore_cnn_tflite(cm, pbi->num_workers, cm->use_cnn,

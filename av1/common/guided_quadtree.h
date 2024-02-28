@@ -23,34 +23,10 @@
 extern "C" {
 #endif
 
-int64_t computeSSE_buf_tflite_hbd(uint16_t *buf_all, uint16_t *src, int startx,
-                                  int starty, int buf_width, int buf_height,
-                                  int buf_stride, int src_stride);
-
-double min_tflite(double a, double b, double c, double d);
-
-void replace_tflite_hbd(int startx, int starty, int width, int height,
-                        uint16_t *rec, uint16_t *buf, int stride);
-
-double computePSNR_buf_tflite_hbd(uint16_t *buf_all, uint16_t *dgd,
-                                  uint16_t *src, int startx, int starty,
-                                  int buf_width, int buf_height, int height,
-                                  int width, int buf_stride, int dgd_stride,
-                                  int src_stride, int bit_depth);
-
-double computePSNR_tflite_hbd(uint16_t *dgd, uint16_t *src, int height,
-                              int width, int dgd_stride, int src_stride,
-                              int bit_depth);
-
-int CalculateIndex_tflite(int width, int block_size_h, int block_size_w,
-                          int starty, int startx, int quadtree_max_size);
-
 #if CONFIG_CNN_GUIDED_QUADTREE
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index);
 
-int64_t count_guided_quad_bits(struct AV1Common *cm, int *splitcosts,
-                               int (*norestorecosts)[2]);
 void quad_copy(QUADInfo *cur_quad_info, QUADInfo *postcnn_quad_info);
 // Get the length of unit info array based on dimensions and split info.
 int quad_tree_get_unit_info_length(int width, int height, int unit_length,

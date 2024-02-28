@@ -2346,20 +2346,19 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
           0   // av1_allow_cnn_for_plane(cm, AOM_PLANE_V)
         };
         const int curr_cnn_indices[MAX_MB_PLANE] = { y_cnn_index, 0, 0 };
-        double curr_cnn_rdcosts = 0;
-        av1_restore_cnn_quadtree_tflite(
-            cm, cpi->source, cpi->rd.RDMULT, x->mode_costs.cnn_guided_quad_cost,
-            x->mode_costs.cnn_guided_norestore_cost, cpi->mt_info.num_workers,
-            quadtree_cnn, curr_cnn_indices);
+        double curr_cnn_rdcosts = DBL_MAX;
+        if (!av1_restore_cnn_quadtree_encode_tflite(
+                cm, cpi->source, cpi->rd.RDMULT,
+                x->mode_costs.cnn_guided_quad_cost,
+                x->mode_costs.cnn_guided_norestore_cost,
+                cpi->mt_info.num_workers, quadtree_cnn, curr_cnn_indices,
+                &curr_cnn_rdcosts)) {
+          aom_internal_error(&cm->error, AOM_CODEC_ERROR,
+                             "Encoder CNN Restoration failed.");
+        }
         int64_t curr_cnn_errors[MAX_MB_PLANE];
         get_sse_planes(cpi->source, &cm->cur_frame->buf, curr_cnn_errors,
                        num_planes);
-        int64_t bits_quad =
-            count_guided_quad_bits(cm, x->mode_costs.cnn_guided_quad_cost,
-                                   x->mode_costs.cnn_guided_norestore_cost);
-        curr_cnn_rdcosts = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-            cpi->rd.RDMULT, bits_quad >> 4, curr_cnn_errors[0],
-            cm->seq_params.bit_depth);
         // printf(" CNN(%d): %g (%ld, %ld)\n", y_cnn_index, curr_cnn_rdcosts,
         //        curr_cnn_errors[0], bits_quad);
 
