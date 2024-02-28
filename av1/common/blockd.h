@@ -868,14 +868,14 @@ static AOM_INLINE bool is_uneven_4way_partition_allowed(
 static AOM_INLINE RECT_PART_TYPE
 rect_type_implied_by_bsize(BLOCK_SIZE bsize, TREE_TYPE tree_type) {
   // Handle luma part first
-#if CONFIG_BLOCK_256
+#if CONFIG_BLOCK_256 && !CONFIG_BLOCK_256_EXT
   if (bsize == BLOCK_128X256) {
     return HORZ;
   }
   if (bsize == BLOCK_256X128) {
     return VERT;
   }
-#endif  // CONFIG_BLOCK_256
+#endif  // CONFIG_BLOCK_256 && !CONFIG_BLOCK_256_EXT
   if (bsize == BLOCK_4X8 || bsize == BLOCK_64X128) {
     return HORZ;
   }
@@ -2782,6 +2782,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     2,
     2,
     3,
+#if CONFIG_BLOCK_256_EXT
+    3,
+    3,
+    3,
+    3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     0,
     2,
@@ -2819,6 +2825,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     1,
     3,
     2,
+#if CONFIG_BLOCK_256_EXT
+    3,
+    3,
+    3,
+    3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     2,
     0,
@@ -2856,6 +2868,12 @@ static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
     1,
     0,
     1,
+#if CONFIG_BLOCK_256_EXT
+    4 - 3,
+    6 - 3,
+    3 - 3,
+    5 - 3,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     0,
     1,
@@ -3313,6 +3331,12 @@ static INLINE int bsize_to_max_depth(BLOCK_SIZE bsize) {
     2,
     2,
     2,
+#if CONFIG_BLOCK_256_EXT
+    2,
+    2,
+    2,
+    2,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     2,
     2,
@@ -3367,6 +3391,12 @@ static INLINE int bsize_to_tx_size_cat(BLOCK_SIZE bsize) {
     3,
     4,
     4,
+#if CONFIG_BLOCK_256_EXT
+    4,
+    4,
+    4,
+    4,
+#endif  // CONFIG_BLOCK_256_EXT
 #if CONFIG_FLEX_PARTITION
     3,
     3,
