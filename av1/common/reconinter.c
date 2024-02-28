@@ -2316,6 +2316,8 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
   // value is very large, matrix A is likely to be clamped. To improve
   // stability, we adaptively reduce the dynamic range here
   int max_el = find_max_matrix_element(pdiff, pstride, gx, gy, gstride, bw, bh);
+  if (max_el == 0) return 0;
+
   int max_el_msb = get_msb(max_el);
   int grad_bits =
       AOMMAX(0, max_el_msb * 2 + npel_log2 +
