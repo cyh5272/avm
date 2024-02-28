@@ -869,6 +869,17 @@ static INLINE int is_refinemv_allowed_bsize(BLOCK_SIZE bsize) {
   return (block_size_wide[bsize] >= 16 || block_size_high[bsize] >= 16);
 }
 
+#if CONFIG_AFFINE_REFINEMENT
+static INLINE int is_damr_allowed_with_refinemv(const PREDICTION_MODE mode) {
+#if CONFIG_AFFINE_REFINEMENT_SB
+  return mode == NEAR_NEARMV_OPTFLOW;
+#else
+  (void)mode;
+  return 0;
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+}
+#endif  // CONFIG_AFFINE_REFINEMENT
+
 // check if the refinemv mode is allwed for a given mode and precision
 static INLINE int is_refinemv_allowed_mode_precision(
     PREDICTION_MODE mode, MvSubpelPrecision precision,
@@ -890,7 +901,10 @@ static INLINE int is_refinemv_allowed_mode_precision(
     return 0;
 
 #if CONFIG_AFFINE_REFINEMENT
-  if (cm->seq_params.enable_affine_refine) return mode == NEAR_NEARMV;
+  if (cm->seq_params.enable_affine_refine) {
+    if (is_damr_allowed_with_refinemv(mode)) return 1;
+    return mode == NEAR_NEARMV;
+  }
 #endif
   return (mode >= NEAR_NEARMV && mode <= JOINT_AMVDNEWMV_OPTFLOW);
 }
@@ -903,9 +917,11 @@ static INLINE int default_refinemv_modes(const AV1_COMMON *cm,
 static INLINE int default_refinemv_modes(const MB_MODE_INFO *mbmi) {
 #endif
 #if CONFIG_AFFINE_REFINEMENT
-  if (cm->seq_params.enable_affine_refine)
+  if (cm->seq_params.enable_affine_refine) {
+    if (is_damr_allowed_with_refinemv(mbmi->mode)) return 1;
     return (mbmi->skip_mode || mbmi->mode == NEAR_NEARMV ||
             mbmi->mode == JOINT_NEWMV);
+  }
 #endif  // CONFIG_AFFINE_REFINEMENT
   return (mbmi->skip_mode || mbmi->mode == NEAR_NEARMV ||
           mbmi->mode == NEAR_NEARMV_OPTFLOW ||

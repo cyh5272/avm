@@ -74,7 +74,7 @@ void av1_copy_frame_refined_mvs_tip_frame_mode(const AV1_COMMON *const cm,
 #if CONFIG_AFFINE_REFINEMENT
         if (mi->comp_refine_type >= COMP_AFFINE_REFINE_START
 #if CONFIG_REFINEMV
-            && !mi->refinemv_flag
+            && (is_damr_allowed_with_refinemv(mi->mode) || !mi->refinemv_flag)
 #endif  // CONFIG_REFINEMV
         ) {
           // Apply offsets based on the affine parameters
@@ -300,7 +300,7 @@ void av1_copy_frame_refined_mvs(const AV1_COMMON *const cm,
 #if CONFIG_AFFINE_REFINEMENT
           if (mi->comp_refine_type >= COMP_AFFINE_REFINE_START
 #if CONFIG_REFINEMV
-              && !mi->refinemv_flag
+              && (is_damr_allowed_with_refinemv(mi->mode) || !mi->refinemv_flag)
 #endif  // CONFIG_REFINEMV
           ) {
             // Apply offsets based on the affine parameters

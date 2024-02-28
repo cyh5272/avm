@@ -5397,16 +5397,22 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
   const int n_blocks = (bw / n) * (bh / n);
 
 #if CONFIG_AFFINE_REFINEMENT
-  int do_affine = 0;
+  int do_affine = is_damr_allowed_with_refinemv(mi->mode) &&
+                  mi->comp_refine_type >= COMP_AFFINE_REFINE_START;
+  int use_affine_opfl = do_affine;
   WarpedMotionParams wms[2];
-  int use_affine_opfl = mi->comp_refine_type >= COMP_AFFINE_REFINE_START;
-  // TODO(kslu) fix DAMR+DMVR pipeline
-  wms[0] = default_warp_params;
-  wms[1] = default_warp_params;
-  if (use_optflow_refinement && plane) {
-    wms[0] = mi->wm_params[0];
-    wms[1] = mi->wm_params[1];
+  const int wms_stride = pu_width / bw;
+  const int sb_idx = (subblk_start_y / bh) * wms_stride + subblk_start_x / bw;
+  wms[0] = wms[1] = default_warp_params;
+#if AFFINE_CHROMA_REFINE_METHOD > 0
+  if (use_optflow_refinement && do_affine && plane) {
+#if CONFIG_AFFINE_REFINEMENT_SB
+    memcpy(wms, mi->wm_params_sb + 2 * sb_idx, 2 * sizeof(wms[0]));
+#else
+    memcpy(wms, mi->wm_params, 2 * sizeof(wms[0]));
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
   }
+#endif
 #endif  // CONFIG_AFFINE_REFINEMENT
 
   if (use_optflow_refinement && plane == 0) {
@@ -5457,10 +5463,12 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
       }
     }
 #endif  // CONFIG_AFFINE_REFINEMENT || CONFIG_REFINED_MVS_IN_TMVP
-#if CONFIG_AFFINE_REFINEMENT
+#if CONFIG_AFFINE_REFINEMENT_SB
+    memcpy(mi->wm_params_sb + 2 * sb_idx, wms, 2 * sizeof(wms[0]));
+#elif CONFIG_AFFINE_REFINEMENT
     mi->wm_params[0] = wms[0];
     mi->wm_params[1] = wms[1];
-#endif  // CONFIG_AFFINE_REFINEMENT
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
   }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
@@ -5609,7 +5617,8 @@ static void build_inter_predictors_8x8_and_bigger(
   int apply_sub_block_refinemv =
       mi->refinemv_flag && (!build_for_obmc) &&
 #if CONFIG_AFFINE_REFINEMENT
-      mi->comp_refine_type < COMP_AFFINE_REFINE_START &&
+      (is_damr_allowed_with_refinemv(mi->mode) ||
+       mi->comp_refine_type < COMP_AFFINE_REFINE_START) &&
 #endif  // CONFIG_AFFINE_REFINEMENT
       !is_tip_ref_frame(mi->ref_frame[0]);
 
