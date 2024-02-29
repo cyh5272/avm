@@ -3583,8 +3583,9 @@ void make_inter_pred_of_nxn(
     uint16_t *dst, int dst_stride, int_mv *const mv_refined,
     InterPredParams *inter_pred_params, MACROBLOCKD *xd, int mi_x, int mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-    int plane, CompoundRefineType comp_refine_type, WarpedMotionParams *wms,
-    int_mv *mv, const int use_affine_opfl,
+    const AV1_COMMON *cm, int pu_width, int plane,
+    CompoundRefineType comp_refine_type, WarpedMotionParams *wms, int_mv *mv,
+    const int use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
     int ref, uint16_t **mc_buf, CalcSubpelParamsFunc calc_subpel_params_func,
     int n, SubpelParams *subpel_params) {
@@ -3638,6 +3639,7 @@ void make_inter_pred_of_nxn(
   for (int j = 0; j < bh; j += sub_bh) {
     for (int i = 0; i < bw; i += sub_bw) {
 #if CONFIG_AFFINE_REFINEMENT
+      int delta_idx = (j / n) * (pu_width / n) + (i / n);
       if (wms && comp_refine_type >= COMP_AFFINE_REFINE_START &&
           use_affine_opfl) {
         // If warped model is not valid, wmmat[0] and wmmat[1] remain the
@@ -3694,8 +3696,8 @@ void make_inter_pred_of_nxn(
                       xd->mv_delta[3].mv[ref].as_mv.row,
                   2);
             } else {
-              cur_mv.col += xd->mv_delta[n_blocks].mv[ref].as_mv.col;
-              cur_mv.row += xd->mv_delta[n_blocks].mv[ref].as_mv.row;
+              cur_mv.col += xd->mv_delta[delta_idx].mv[ref].as_mv.col;
+              cur_mv.row += xd->mv_delta[delta_idx].mv[ref].as_mv.row;
             }
           }
 #endif  // AFFINE_CHROMA_REFINE_METHOD == 3
@@ -3730,10 +3732,10 @@ void make_inter_pred_of_nxn(
                   (1 << (WARPEDMODEL_PREC_BITS - MV_REFINE_PREC_BITS - 2));
             } else {
               inter_pred_params->warp_params.wmmat[0] +=
-                  xd->mv_delta[n_blocks].mv[ref].as_mv.col *
+                  xd->mv_delta[delta_idx].mv[ref].as_mv.col *
                   (1 << (WARPEDMODEL_PREC_BITS - MV_REFINE_PREC_BITS));
               inter_pred_params->warp_params.wmmat[1] +=
-                  xd->mv_delta[n_blocks].mv[ref].as_mv.row *
+                  xd->mv_delta[delta_idx].mv[ref].as_mv.row *
                   (1 << (WARPEDMODEL_PREC_BITS - MV_REFINE_PREC_BITS));
             }
 #if CONFIG_EXTENDED_WARP_PREDICTION
@@ -3759,6 +3761,15 @@ void make_inter_pred_of_nxn(
       } else {
         subblock_mv = &(mv_refined[n_blocks * 2 + ref].as_mv);
       }
+
+      const int width = (cm->mi_params.mi_cols << MI_SIZE_LOG2);
+      const int height = (cm->mi_params.mi_rows << MI_SIZE_LOG2);
+      inter_pred_params->dist_to_top_edge = -GET_MV_SUBPEL(mi_y + j);
+      inter_pred_params->dist_to_bottom_edge =
+          GET_MV_SUBPEL(height - bh - mi_y - j);
+      inter_pred_params->dist_to_left_edge = -GET_MV_SUBPEL(mi_x + i);
+      inter_pred_params->dist_to_right_edge =
+          GET_MV_SUBPEL(width - bw - mi_x - i);
 #else
       subblock_mv = &(mv_refined[n_blocks * 2 + ref].as_mv);
 #endif  // CONFIG_AFFINE_REFINEMENT
@@ -3843,8 +3854,8 @@ void av1_opfl_rebuild_inter_predictor(
     uint16_t *dst, int dst_stride, int plane, int_mv *const mv_refined,
     InterPredParams *inter_pred_params, MACROBLOCKD *xd, int mi_x, int mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-    CompoundRefineType comp_refine_type, WarpedMotionParams *wms, int_mv *mv,
-    const int use_affine_opfl,
+    const AV1_COMMON *cm, int pu_width, CompoundRefineType comp_refine_type,
+    WarpedMotionParams *wms, int_mv *mv, const int use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
     int ref, uint16_t **mc_buf, CalcSubpelParamsFunc calc_subpel_params_func
 #if CONFIG_OPTFLOW_ON_TIP
@@ -3864,7 +3875,7 @@ void av1_opfl_rebuild_inter_predictor(
   make_inter_pred_of_nxn(
       dst, dst_stride, mv_refined, inter_pred_params, xd, mi_x, mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-      plane, comp_refine_type, wms, mv, use_affine_opfl,
+      cm, pu_width, plane, comp_refine_type, wms, mv, use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
       ref, mc_buf, calc_subpel_params_func, n, &subpel_params);
 }
@@ -5413,7 +5424,7 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
       av1_opfl_rebuild_inter_predictor(dst, dst_stride, plane, mv_refined,
                                        &inter_pred_params, xd, mi_x, mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-                                       mi->comp_refine_type,
+                                       cm, pu_width, mi->comp_refine_type,
                                        do_affine ? wms : NULL, &mi->mv[ref],
                                        use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
@@ -5840,8 +5851,8 @@ static void build_inter_predictors_8x8_and_bigger(
       av1_opfl_rebuild_inter_predictor(dst, dst_buf->stride, plane, mv_refined,
                                        &inter_pred_params, xd, mi_x, mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-                                       mi->comp_refine_type, wms, &mi->mv[ref],
-                                       use_affine_opfl,
+                                       cm, bw, mi->comp_refine_type, wms,
+                                       &mi->mv[ref], use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
                                        ref, mc_buf, calc_subpel_params_func
 #if CONFIG_OPTFLOW_ON_TIP

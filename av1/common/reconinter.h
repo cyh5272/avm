@@ -580,8 +580,8 @@ void av1_opfl_rebuild_inter_predictor(
     uint16_t *dst, int dst_stride, int plane, int_mv *const mv_refined,
     InterPredParams *inter_pred_params, MACROBLOCKD *xd, int mi_x, int mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-    CompoundRefineType comp_refine_type, WarpedMotionParams *wms, int_mv *mv,
-    const int use_affine_opfl,
+    const AV1_COMMON *cm, int pu_width, CompoundRefineType comp_refine_type,
+    WarpedMotionParams *wms, int_mv *mv, const int use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
     int ref, uint16_t **mc_buf, CalcSubpelParamsFunc calc_subpel_params_func
 #if CONFIG_OPTFLOW_ON_TIP

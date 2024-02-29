@@ -996,7 +996,7 @@ static AOM_INLINE void tip_build_inter_predictors_8x8(
           dst, dst_stride, plane, mv_refined, &inter_pred_params, xd, mi_x,
           mi_y,
 #if CONFIG_AFFINE_REFINEMENT
-          mbmi->comp_refine_type, wms, &mbmi->mv[ref], use_affine_opfl,
+          cm, bw, mbmi->comp_refine_type, wms, &mbmi->mv[ref], use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
           ref, mc_buf, calc_subpel_params_func, use_4x4);
     } else {
