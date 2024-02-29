@@ -2272,7 +2272,7 @@ int find_max_matrix_element(const int16_t *pdiff, int pstride,
 #if OPFL_DOWNSAMP_QUINCUNX
       if ((i + j) % 2 == 1) continue;
 #endif
-#if !CONFIG_AFFINE_REFINEMENT_SB && AFFINE_AVERAGING_BITS > 0
+#if AFFINE_AVERAGING_BITS > 0
       if (AOMMAX(i, j) >= (1 << (7 - AFFINE_AVERAGING_BITS))) continue;
 #endif
       max_el = AOMMAX(max_el, abs((int)gx[i * gstride + j]));
@@ -2291,7 +2291,7 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
                                AffineModelParams *am_params) {
   int x_range_log2 = get_msb(bw);
   int y_range_log2 = get_msb(bh);
-#if !CONFIG_AFFINE_REFINEMENT_SB && AFFINE_AVERAGING_BITS > 0
+#if AFFINE_AVERAGING_BITS > 0
   int step_h = AOMMAX(1, bh >> (7 - AFFINE_AVERAGING_BITS));
   int step_w = AOMMAX(1, bw >> (7 - AFFINE_AVERAGING_BITS));
   int npel_log2 = AOMMIN(7 - AFFINE_AVERAGING_BITS, x_range_log2) +
@@ -2323,7 +2323,7 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
 #if OPFL_DOWNSAMP_QUINCUNX
       if ((i + j) % 2 == 1) continue;
 #endif
-#if !CONFIG_AFFINE_REFINEMENT_SB && AFFINE_AVERAGING_BITS > 0
+#if AFFINE_AVERAGING_BITS > 0
       if (AOMMAX(i, j) >= (1 << (7 - AFFINE_AVERAGING_BITS))) continue;
       const int x = step_w * j - bw / 2 + 1;
       const int y = step_h * i - bh / 2 + 1;
@@ -3396,7 +3396,7 @@ void av1_get_optflow_based_mv(
 
   if (mbmi->comp_refine_type >= COMP_AFFINE_REFINE_START && wms &&
       *use_affine_opfl) {
-#if !CONFIG_AFFINE_REFINEMENT_SB && AFFINE_AVERAGING_BITS > 0
+#if AFFINE_AVERAGING_BITS > 0
     const int block_len_low = 1 << (7 - AFFINE_AVERAGING_BITS);
     avg_pooling_pdiff_gradients(tmp1, bw, gx0, gy0, bw, bw, bh, block_len_low);
 #endif  // !CONFIG_AFFINE_REFINEMENT_SB && AFFINE_AVERAGING_BITS > 0

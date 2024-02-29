@@ -707,7 +707,12 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // 2: {128, 64}->32
 // 3: {128, 64, 32}->16
 // 4: {128, 64, 32, 16}->8
+#if CONFIG_AFFINE_REFINEMENT_SB
+// TODO(kslu) make this compatible
+#define AFFINE_AVERAGING_BITS 0
+#else
 #define AFFINE_AVERAGING_BITS 3
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
 
 #if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 // We consider this tunable number H=MAX_AFFINE_AUTOCORR_BITS-1 (sign bit
