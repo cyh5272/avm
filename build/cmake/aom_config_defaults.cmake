@@ -352,6 +352,8 @@ set_aom_config_var(CONFIG_AFFINE_REFINEMENT 1
                    "Decoder side affine motion refinement.")
 set_aom_config_var(CONFIG_AFFINE_REFINEMENT_SB 0
                    "Subblock based affine refinement")
+set_aom_config_var(CONFIG_AFFINE_ON_REFINEMV 0
+                   "Affine refinement on top of refine MV")
 #
 # Variables in this section control optional features of the build system.
 #

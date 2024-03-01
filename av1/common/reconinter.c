@@ -5406,11 +5406,11 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
   wms[0] = wms[1] = default_warp_params;
 #if AFFINE_CHROMA_REFINE_METHOD > 0
   if (use_optflow_refinement && do_affine && plane) {
-#if CONFIG_AFFINE_REFINEMENT_SB
+#if CONFIG_AFFINE_ON_REFINEMV
     memcpy(wms, mi->wm_params_sb + 2 * sb_idx, 2 * sizeof(wms[0]));
 #else
     memcpy(wms, mi->wm_params, 2 * sizeof(wms[0]));
-#endif  // CONFIG_AFFINE_REFINEMENT_SB
+#endif  // CONFIG_AFFINE_ON_REFINEMV
   }
 #endif
 #endif  // CONFIG_AFFINE_REFINEMENT

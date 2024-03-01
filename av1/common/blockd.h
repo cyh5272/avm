@@ -478,9 +478,9 @@ typedef struct MB_MODE_INFO {
   /*! \brief Compound refinement type */
   CompoundRefineType comp_refine_type;
 #endif  // CONFIG_AFFINE_REFINEMENT
-#if CONFIG_AFFINE_REFINEMENT_SB
+#if CONFIG_AFFINE_REFINEMENT_SB || CONFIG_AFFINE_ON_REFINEMV
   WarpedMotionParams wm_params_sb[2 * NUM_AFFINE_PARAMS];
-#endif  // CONFIG_AFFINE_REFINEMENT_SB
+#endif  // CONFIG_AFFINE_REFINEMENT_SB || CONFIG_AFFINE_ON_REFINEMV
   /*! \brief The type of intra mode used by inter-intra */
   INTERINTRA_MODE interintra_mode;
   /*! \brief The type of wedge used in interintra mode. */

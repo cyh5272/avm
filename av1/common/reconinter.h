@@ -871,12 +871,12 @@ static INLINE int is_refinemv_allowed_bsize(BLOCK_SIZE bsize) {
 
 #if CONFIG_AFFINE_REFINEMENT
 static INLINE int is_damr_allowed_with_refinemv(const PREDICTION_MODE mode) {
-#if CONFIG_AFFINE_REFINEMENT_SB
+#if CONFIG_AFFINE_ON_REFINEMV
   return mode == NEAR_NEARMV_OPTFLOW;
 #else
   (void)mode;
   return 0;
-#endif  // CONFIG_AFFINE_REFINEMENT_SB
+#endif  // CONFIG_AFFINE_ON_REFINEMV
 }
 #endif  // CONFIG_AFFINE_REFINEMENT
 
