@@ -993,18 +993,18 @@ static void try_one_partition(
       RDCOST_DBL_WITH_NATIVE_BD_DIST(rdmult, bitrate >> 4, sse, bit_depth);
 }
 
-// Given intermediate restoration 'interm' and 'src', computes the best
-// partitioning out of NONE, SPLIT, HORZ and VERT based on RD cost, and uses it
-// to restore the unit starting at 'row' and 'col' inside 'dgd'.
-// Also, stores the split decisions in 'split' and a0,a1 pairs in 'A'.
+// Given intermediate restoration 'interm', source 'src' and degradade frame
+// 'dgd', computes the best partitioning out of NONE, SPLIT, HORZ and VERT based
+// on RD cost for the widthxheight unit starting at 'row' and 'col'.
+// The split decisions are stored in 'split' and a0,a1 pairs are stored in 'A'.
 static void select_quadtree_partitioning(
     const std::vector<std::vector<std::vector<double>>> &interm,
     const uint16_t *src, int src_stride, int start_row, int start_col,
     int width, int height, int quadtree_max_size, const int *quadtset,
     int rdmult, const std::pair<int, int> &prev_A, const int *splitcosts,
-    const int norestorecosts[2], int bit_depth, uint16_t *dgd, int dgd_stride,
-    std::vector<int> &split, std::vector<std::pair<int, int>> &A,
-    double *rdcost) {
+    const int norestorecosts[2], int bit_depth, const uint16_t *dgd,
+    int dgd_stride, std::vector<int> &split,
+    std::vector<std::pair<int, int>> &A, double *rdcost) {
   const int end_row = AOMMIN(start_row + quadtree_max_size, height);
   const int end_col = AOMMIN(start_col + quadtree_max_size, width);
   const bool is_partial_unit = (start_row + quadtree_max_size > height) ||
@@ -1044,13 +1044,6 @@ static void select_quadtree_partitioning(
   // Save RDCost.
   *rdcost = best_rdcost;
 
-  // Restore this unit in 'dgd'.
-  for (int row = start_row; row < end_row; ++row) {
-    for (int col = start_col; col < end_col; ++col) {
-      dgd[row * dgd_stride + col] = best_out[row - start_row][col - start_col];
-    }
-  }
-
   // Save a0, a1 pairs.
   for (auto &a0a1 : best_A) {
     A.push_back(a0a1);
@@ -1083,6 +1076,13 @@ static void select_quadtree_partitioning(
   }
 }
 
+static void apply_quadtree_partitioning(
+    const std::vector<std::vector<std::vector<double>>> &interm, int start_row,
+    int start_col, int width, int height, int quadtree_max_size,
+    const int *quadtset, int bit_depth, const std::vector<int> &split,
+    size_t &split_index, const std::vector<std::pair<int, int>> &A,
+    size_t &A_index, uint16_t *dgd, int dgd_stride);
+
 // Top-level function to apply guided restoration on encoder side.
 static int restore_cnn_quadtree_encode_img_tflite_highbd(
     YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
@@ -1108,9 +1108,6 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   // Initialization.
   const uint16_t *src = CONVERT_TO_SHORTPTR(source_frame->y_buffer);
   const int src_stride = source_frame->y_stride;
-  const int unit_index = quad_tree_get_unit_index(width, height);
-  const int quadtree_max_size =
-      quad_tree_get_unit_size(width, height, unit_index);
   const int *quadtset = get_quadparm_from_qindex(
       qindex, superres_denom, is_intra_only, is_luma, cnn_index);
   const int A0_min = quadtset[2];
@@ -1121,41 +1118,70 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   const int *this_norestorecosts =
       norestore_ctx == -1 ? null_norestorecosts : norestorecosts[norestore_ctx];
 
-  // For each quadtree unit, compute the best partitioning out of
-  // NONE, SPLIT, HORZ and VERT based on RD cost.
-  std::vector<int> split;              // selected partitioning options.
-  std::vector<std::pair<int, int>> A;  // selected a0, a1 weight pairs.
-  // Previous a0, a1 pair is mid-point of the range by default.
-  std::pair<int, int> prev_A = std::make_pair(8 + A0_min, 8 + A1_min);
-  *rdcost = 0;
-  // TODO(urvang): Include padded area in a unit if it's < unit size / 2?
-  // If so, need to modify / replace quad_tree_get_unit_info_length().
-  // Also double check: quad_tree_get_split_info_length().
-  for (int row = 0; row < height; row += quadtree_max_size) {
-    for (int col = 0; col < width; col += quadtree_max_size) {
-      double this_rdcost;
-      select_quadtree_partitioning(
-          interm, src, src_stride, row, col, width, height, quadtree_max_size,
-          quadtset, rdmult, prev_A, splitcosts, this_norestorecosts, bit_depth,
-          dgd, dgd_stride, split, A, &this_rdcost);
-      // updates.
-      *rdcost += this_rdcost;
-      prev_A = A.back();
+  // Try all possible quadtree unit sizes.
+  int best_unit_index = -1;
+  std::vector<int> best_split;              // selected partitioning options.
+  std::vector<std::pair<int, int>> best_A;  // selected a0, a1 weight pairs.
+  double best_rdcost_total = DBL_MAX;
+  for (int this_unit_index = 0; this_unit_index <= 1; ++this_unit_index) {
+    const int quadtree_max_size =
+        quad_tree_get_unit_size(width, height, this_unit_index);
+    // For each quadtree unit, compute the best partitioning out of
+    // NONE, SPLIT, HORZ and VERT based on RD cost.
+    std::vector<int> this_split;              // selected partitioning options.
+    std::vector<std::pair<int, int>> this_A;  // selected a0, a1 weight pairs.
+    double this_rdcost_total = 0.0;
+    // Previous a0, a1 pair is mid-point of the range by default.
+    std::pair<int, int> prev_A = std::make_pair(8 + A0_min, 8 + A1_min);
+    // TODO(urvang): Include padded area in a unit if it's < unit size / 2?
+    // If so, need to modify / replace quad_tree_get_unit_info_length().
+    // Also double check: quad_tree_get_split_info_length().
+    for (int row = 0; row < height; row += quadtree_max_size) {
+      for (int col = 0; col < width; col += quadtree_max_size) {
+        double this_rdcost;
+        select_quadtree_partitioning(
+            interm, src, src_stride, row, col, width, height, quadtree_max_size,
+            quadtset, rdmult, prev_A, splitcosts, this_norestorecosts,
+            bit_depth, dgd, dgd_stride, this_split, this_A, &this_rdcost);
+        // updates.
+        this_rdcost_total += this_rdcost;
+        prev_A = this_A.back();
+      }
+    }
+    // Update best options.
+    if (this_rdcost_total < best_rdcost_total) {
+      best_unit_index = this_unit_index;
+      best_split = this_split;
+      best_A = this_A;
+      best_rdcost_total = this_rdcost_total;
     }
   }
 
-  // Fill in the decisions.
-  quad_info->unit_index = unit_index;
-  quad_info->split_info_length = (int)split.size();
-  quad_info->unit_info_length = (int)A.size();
+  // Fill in the best options.
+  quad_info->unit_index = best_unit_index;
+  quad_info->split_info_length = (int)best_split.size();
+  quad_info->unit_info_length = (int)best_A.size();
   av1_alloc_quadtree_struct(cm, quad_info);
-  for (unsigned int i = 0; i < split.size(); ++i) {
-    quad_info->split_info[i].split = split[i];
+  for (unsigned int i = 0; i < best_split.size(); ++i) {
+    quad_info->split_info[i].split = best_split[i];
   }
-  for (unsigned int i = 0; i < A.size(); ++i) {
-    quad_info->unit_info[i].xqd[0] = A[i].first;
-    quad_info->unit_info[i].xqd[1] = A[i].second;
+  for (unsigned int i = 0; i < best_A.size(); ++i) {
+    quad_info->unit_info[i].xqd[0] = best_A[i].first;
+    quad_info->unit_info[i].xqd[1] = best_A[i].second;
   }
+  *rdcost = best_rdcost_total;
+
+  // Apply guided restoration to 'dgd' using best options above.
+  size_t split_index = 0;
+  size_t A_index = 0;
+  for (int row = 0; row < height; row += quad_info->unit_size) {
+    for (int col = 0; col < width; col += quad_info->unit_size) {
+      apply_quadtree_partitioning(
+          interm, row, col, width, height, quad_info->unit_size, quadtset,
+          bit_depth, best_split, split_index, best_A, A_index, dgd, dgd_stride);
+    }
+  }
+
   return 1;
 }
 

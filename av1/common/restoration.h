@@ -450,8 +450,8 @@ typedef struct {
 /*!\cond */
 #if CONFIG_CNN_GUIDED_QUADTREE
 typedef struct {
-  int unit_index;  // unit size index inferred from frame dimensions.
-  int unit_size;   // inferred from unit_index.
+  int unit_index;  // index signaled in bitstream.
+  int unit_size;   // inferred from unit_index and frame dimensions.
   int split_info_length;
   int unit_info_length;
   QUADUnitInfo *unit_info;

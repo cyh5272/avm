@@ -2146,6 +2146,15 @@ static AOM_INLINE void setup_segmentation(AV1_COMMON *const cm,
 }
 
 #if CONFIG_CNN_RESTORATION
+
+#if CONFIG_CNN_GUIDED_QUADTREE
+// Read quad tree unit index.
+static INLINE int quad_tree_read_unit_index(struct aom_read_bit_buffer *rb) {
+  const int unit_index = aom_rb_read_bit(rb);
+  return unit_index;
+}
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
     if (av1_allow_cnn_for_plane(cm, plane)) {
@@ -2169,8 +2178,7 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
 #if CONFIG_CNN_GUIDED_QUADTREE
   if (cm->use_cnn[0]) {
     QUADInfo *qi = &cm->cnn_quad_info;
-    qi->unit_index = quad_tree_get_unit_index(cm->superres_upscaled_width,
-                                              cm->superres_upscaled_height);
+    qi->unit_index = quad_tree_read_unit_index(rb);
     qi->unit_size =
         quad_tree_get_unit_size(cm->superres_upscaled_width,
                                 cm->superres_upscaled_height, qi->unit_index);

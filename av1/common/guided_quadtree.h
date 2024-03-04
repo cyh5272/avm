@@ -46,17 +46,13 @@ static INLINE int get_guided_norestore_ctx(int qindex, int superres_denom,
   return 0;
 }
 
-// Get quad tree unit index based on dimensions.
-static INLINE int quad_tree_get_unit_index(int width, int height) {
-  return (width * height <= 1280 * 720);
-}
-
 // Get quad tree unit size.
 static INLINE int quad_tree_get_unit_size(int width, int height,
-                                          int quad_level) {
-  (void)width;
-  (void)height;
-  return 512 >> quad_level;
+                                          int unit_index) {
+  const bool is_720p_or_smaller = (width * height <= 1280 * 720);
+  const int min_unit_size = is_720p_or_smaller ? 256 : 512;
+  assert(unit_index >= 0 && unit_index <= 1);
+  return min_unit_size << unit_index;
 }
 
 // Allocates buffers in 'quad_info' assuming 'quad_info->unit_index',

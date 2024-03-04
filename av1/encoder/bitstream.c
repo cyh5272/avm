@@ -3120,6 +3120,16 @@ static void write_filter_quadtree(FRAME_CONTEXT *ctx, int QP, int cnn_index,
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #if CONFIG_CNN_RESTORATION
+
+#if CONFIG_CNN_GUIDED_QUADTREE
+// Write quad tree unit index.
+static INLINE void quad_tree_write_unit_index(struct aom_write_bit_buffer *wb,
+                                              const QUADInfo *const qi) {
+  assert(qi->unit_index >= 0 && qi->unit_index <= 1);
+  aom_wb_write_bit(wb, qi->unit_index);
+}
+#endif  // CONFIG_CNN_GUIDED_QUADTREE
+
 static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
     if (av1_allow_cnn_for_plane(cm, plane)) {
@@ -3141,9 +3151,11 @@ static void encode_cnn(AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   }
 #if CONFIG_CNN_GUIDED_QUADTREE
   if (cm->use_cnn[0]) {
-    assert(cm->cnn_quad_info.unit_index ==
-           quad_tree_get_unit_index(cm->superres_upscaled_width,
-                                    cm->superres_upscaled_height));
+    quad_tree_write_unit_index(wb, &cm->cnn_quad_info);
+    assert(cm->cnn_quad_info.unit_size ==
+           quad_tree_get_unit_size(cm->superres_upscaled_width,
+                                   cm->superres_upscaled_height,
+                                   cm->cnn_quad_info.unit_index));
     assert(cm->cnn_quad_info.split_info_length ==
            quad_tree_get_split_info_length(cm->superres_upscaled_width,
                                            cm->superres_upscaled_height,
