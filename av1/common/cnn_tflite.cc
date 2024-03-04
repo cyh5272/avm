@@ -1088,7 +1088,7 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
     YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
     int rdmult, const int *splitcosts, int (*norestorecosts)[2],
     int num_threads, int bit_depth, int is_intra_only, int is_luma,
-    int cnn_index, double *rdcost) {
+    int cnn_index, QUADInfo *quad_info, double *rdcost) {
   YV12_BUFFER_CONFIG *dgd_buf = &cm->cur_frame->buf;
   uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd_buf->y_buffer);
   const int dgd_stride = dgd_buf->y_stride;
@@ -1108,7 +1108,9 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   // Initialization.
   const uint16_t *src = CONVERT_TO_SHORTPTR(source_frame->y_buffer);
   const int src_stride = source_frame->y_stride;
-  const int quadtree_max_size = cm->cur_quad_info.unit_size;
+  const int unit_index = quad_tree_get_unit_index(width, height);
+  const int quadtree_max_size =
+      quad_tree_get_unit_size(width, height, unit_index);
   const int *quadtset = get_quadparm_from_qindex(
       qindex, superres_denom, is_intra_only, is_luma, cnn_index);
   const int A0_min = quadtset[2];
@@ -1143,14 +1145,16 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   }
 
   // Fill in the decisions.
-  cm->cur_quad_info.split_info_length = (int)split.size();
-  cm->cur_quad_info.unit_info_length = (int)A.size();
+  quad_info->unit_index = unit_index;
+  quad_info->split_info_length = (int)split.size();
+  quad_info->unit_info_length = (int)A.size();
+  av1_alloc_quadtree_struct(cm, quad_info);
   for (unsigned int i = 0; i < split.size(); ++i) {
-    cm->cur_quad_info.split_info[i].split = split[i];
+    quad_info->split_info[i].split = split[i];
   }
   for (unsigned int i = 0; i < A.size(); ++i) {
-    cm->cur_quad_info.unit_info[i].xqd[0] = A[i].first;
-    cm->cur_quad_info.unit_info[i].xqd[1] = A[i].second;
+    quad_info->unit_info[i].xqd[0] = A[i].first;
+    quad_info->unit_info[i].xqd[1] = A[i].second;
   }
   return 1;
 }
@@ -1159,7 +1163,7 @@ extern "C" int av1_restore_cnn_quadtree_encode_tflite(
     AV1_COMMON *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
     int *splitcosts, int (*norestorecosts)[2], int num_threads,
     const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE],
-    double *rdcost) {
+    QUADInfo *quad_info, double *rdcost) {
   YV12_BUFFER_CONFIG *buf = &cm->cur_frame->buf;
   const int is_intra_only = frame_is_intra_only(cm);
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
@@ -1174,7 +1178,7 @@ extern "C" int av1_restore_cnn_quadtree_encode_tflite(
         ret = restore_cnn_quadtree_encode_img_tflite_highbd(
             source_frame, cm, cm->superres_scale_denominator, RDMULT,
             splitcosts, norestorecosts, num_threads, cm->seq_params.bit_depth,
-            is_intra_only, is_luma, cnn_index, rdcost);
+            is_intra_only, is_luma, cnn_index, quad_info, rdcost);
         if (ret == 0) return ret;
         break;
       case AOM_PLANE_U:
@@ -1310,7 +1314,7 @@ static int restore_cnn_quadtree_decode_img_tflite_highbd(
   }
 
   // Get quadtree params.
-  const QUADInfo *const quad_info = &cm->postcnn_quad_info;
+  const QUADInfo *const quad_info = &cm->cnn_quad_info;
   const int quadtree_max_size = quad_info->unit_size;
   const int *quadtset = get_quadparm_from_qindex(
       qindex, superres_denom, is_intra_only, is_luma, cnn_index);

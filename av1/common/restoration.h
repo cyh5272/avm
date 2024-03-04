@@ -450,14 +450,13 @@ typedef struct {
 /*!\cond */
 #if CONFIG_CNN_GUIDED_QUADTREE
 typedef struct {
-  int unit_size;
-  int is_write;
+  int unit_index;  // unit size index inferred from frame dimensions.
+  int unit_size;   // inferred from unit_index.
   int split_info_length;
   int unit_info_length;
-  int split_info_index;
-  int unit_info_index;
   QUADUnitInfo *unit_info;
   QUADSplitInfo *split_info;
+  int signaled;  // true if quadtree info has been read/written already.
 } QUADInfo;
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
@@ -568,11 +567,6 @@ extern const int32_t av1_one_by_x[MAX_NELEM];
 void av1_alloc_restoration_struct(struct AV1Common *cm, RestorationInfo *rsi,
                                   int is_uv);
 void av1_free_restoration_struct(RestorationInfo *rst_info);
-
-#if CONFIG_CNN_GUIDED_QUADTREE
-void av1_alloc_quadtree_struct(struct AV1Common *cm, QUADInfo *quad_info);
-void av1_free_quadtree_struct(QUADInfo *quad_info);
-#endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 void av1_extend_frame(uint8_t *data, int width, int height, int stride,
                       int border_horz, int border_vert);

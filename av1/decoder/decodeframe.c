@@ -1916,29 +1916,21 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
     }
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-    if (cm->use_cnn[0] && !cm->postcnn_quad_info.is_write) {
-      cm->postcnn_quad_info.is_write = 1;
-      QUADInfo *qi = (QUADInfo *)&cm->postcnn_quad_info;
-      // int split_cnt[4] = { 0 };
+    if (cm->use_cnn[0] && !cm->cnn_quad_info.signaled) {
+      QUADInfo *qi = (QUADInfo *)&cm->cnn_quad_info;
       for (int s = 0; s < qi->split_info_length; s += 2) {
         const int split_index = aom_read_symbol(
             reader, xd->tile_ctx->cnn_guided_quad_cdf, 4, ACCT_STR);
         qi->split_info[s].split = split_index >> 1;
         qi->split_info[s + 1].split = split_index & 1;
-        // unit_length += split_index == 0 ? 1 : split_index == 1 ? 4 : 2;
-        // split_cnt[split_index]++;
       }
-      // printf("Hello %d %d %d %d\n", split_cnt[0], split_cnt[1],
-      //        split_cnt[2], split_cnt[3]);
       qi->unit_info_length = quad_tree_get_unit_info_length(
           cm->superres_upscaled_width, cm->superres_upscaled_height,
-          cm->postcnn_quad_info.unit_size, cm->postcnn_quad_info.split_info,
-          cm->postcnn_quad_info.split_info_length);
-      int superres_denom = cm->superres_scale_denominator;
-      const int is_intra_only = frame_is_intra_only(cm);
+          qi->unit_size, qi->split_info, qi->split_info_length);
       read_filter_quadtree(xd->tile_ctx, cm->quant_params.base_qindex,
-                           cm->cnn_indices[0], superres_denom, is_intra_only,
-                           qi, reader);
+                           cm->cnn_indices[0], cm->superres_scale_denominator,
+                           frame_is_intra_only(cm), qi, reader);
+      cm->cnn_quad_info.signaled = 1;
     }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
@@ -2175,40 +2167,22 @@ static void decode_cnn(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
     }
   }
 #if CONFIG_CNN_GUIDED_QUADTREE
-  // printf("cm->current_frame.frame_number:%d\n",
-  // cm->current_frame.frame_number); if (cm->current_frame.frame_number ==
-  // 2)//2
-  //    printf("2 frame;\n");
   if (cm->use_cnn[0]) {
-    cm->use_quad_level = quad_tree_get_level(cm->superres_upscaled_width,
-                                             cm->superres_upscaled_height);
-    cm->postcnn_quad_info.unit_size = 512 >> cm->use_quad_level;
-    cm->postcnn_quad_info.is_write = false;
-
-    // Split info.
-    cm->postcnn_quad_info.split_info_length = quad_tree_get_split_info_length(
+    QUADInfo *qi = &cm->cnn_quad_info;
+    qi->unit_index = quad_tree_get_unit_index(cm->superres_upscaled_width,
+                                              cm->superres_upscaled_height);
+    qi->unit_size =
+        quad_tree_get_unit_size(cm->superres_upscaled_width,
+                                cm->superres_upscaled_height, qi->unit_index);
+    qi->split_info_length = quad_tree_get_split_info_length(
         cm->superres_upscaled_width, cm->superres_upscaled_height,
-        cm->postcnn_quad_info.unit_size);
-    cm->postcnn_quad_info.split_info_index = 0;
-    CHECK_MEM_ERROR(cm, cm->postcnn_quad_info.split_info,
-                    (QUADSplitInfo *)aom_memalign(
-                        16, sizeof(*cm->postcnn_quad_info.split_info) *
-                                cm->postcnn_quad_info.split_info_length));
-
-    int splittable_rus =
-        (cm->superres_upscaled_width / cm->postcnn_quad_info.unit_size) *
-        (cm->superres_upscaled_height / cm->postcnn_quad_info.unit_size);
-    int total_rus =
-        ((cm->superres_upscaled_width + cm->postcnn_quad_info.unit_size - 1) /
-         cm->postcnn_quad_info.unit_size) *
-        ((cm->superres_upscaled_height + cm->postcnn_quad_info.unit_size - 1) /
-         cm->postcnn_quad_info.unit_size);
-    int max_units = splittable_rus * 3 + total_rus;
-
-    CHECK_MEM_ERROR(
-        cm, cm->postcnn_quad_info.unit_info,
-        (QUADUnitInfo *)aom_memalign(
-            16, sizeof(*cm->postcnn_quad_info.unit_info) * max_units));
+        qi->unit_size);
+    // We allocate unit info assuming maximum number of possible units for now.
+    // Actual length will be set later after actually reading split info.
+    qi->unit_info_length = quad_tree_get_unit_info_length(
+        cm->superres_upscaled_width, cm->superres_upscaled_height,
+        qi->unit_size, NULL, qi->split_info_length);
+    av1_alloc_quadtree_struct(cm, qi);
   }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 }

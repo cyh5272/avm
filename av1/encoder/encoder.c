@@ -1783,13 +1783,6 @@ static void set_restoration_unit_size(int width, int height, int sx, int sy,
   rst[2].restoration_unit_size = rst[1].restoration_unit_size;
 }
 
-#if CONFIG_CNN_GUIDED_QUADTREE
-static void set_quadtree_unit_size(int unit_size, QUADInfo *quadinfo) {
-  quadinfo->unit_size = unit_size;
-}
-
-#endif  // CONFIG_CNN_GUIDED_QUADTREE
-
 static void init_ref_frame_bufs(AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   int i;
@@ -1948,12 +1941,6 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
     cm->rst_info[i].frame_restoration_type = RESTORE_NONE;
 
   av1_alloc_restoration_buffers(cm);
-#if CONFIG_CNN_GUIDED_QUADTREE
-  cm->use_quad_level = quad_tree_get_level(frame_width, frame_height);
-  const int guided_unit_size = 512 >> cm->use_quad_level;
-  set_quadtree_unit_size(guided_unit_size, &cm->cur_quad_info);
-  av1_alloc_quadtree_buffers(cm);
-#endif  // CONFIG_CNN_GUIDED_QUADTREE
   if (!is_stat_generation_stage(cpi)) alloc_util_frame_buffers(cpi);
   init_motion_estimation(cpi);
 
@@ -2346,13 +2333,15 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
           0   // av1_allow_cnn_for_plane(cm, AOM_PLANE_V)
         };
         const int curr_cnn_indices[MAX_MB_PLANE] = { y_cnn_index, 0, 0 };
+        QUADInfo quad_info;
+        memset(&quad_info, 0, sizeof(quad_info));
         double curr_cnn_rdcosts = DBL_MAX;
         if (!av1_restore_cnn_quadtree_encode_tflite(
                 cm, cpi->source, cpi->rd.RDMULT,
                 x->mode_costs.cnn_guided_quad_cost,
                 x->mode_costs.cnn_guided_norestore_cost,
                 cpi->mt_info.num_workers, quadtree_cnn, curr_cnn_indices,
-                &curr_cnn_rdcosts)) {
+                &quad_info, &curr_cnn_rdcosts)) {
           aom_internal_error(&cm->error, AOM_CODEC_ERROR,
                              "Encoder CNN Restoration failed.");
         }
@@ -2371,7 +2360,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
           if (av1_allow_cnn_for_plane(cm, AOM_PLANE_Y) &&
               cnn_errors[0] <= dgd_errors[0]) {
             aom_yv12_copy_y(&cm->cur_frame->buf, &cpi->postcnn_buffer);
-            quad_copy(&cm->cur_quad_info, &cm->postcnn_quad_info);
+            quad_copy(&quad_info, &cm->cnn_quad_info, cm);
           }
           if (av1_allow_cnn_for_plane(cm, AOM_PLANE_U) && num_planes > 1 &&
               cnn_errors[1] < dgd_errors[1]) {
@@ -2382,6 +2371,8 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
             aom_yv12_copy_v(&cm->cur_frame->buf, &cpi->postcnn_buffer);
           }
         }
+        // Cleanup.
+        av1_free_quadtree_struct(&quad_info);
 
         // Restore unrestored frame.
         yv12_copy_all_planes(&cpi->precnn_buffer, &cm->cur_frame->buf,
@@ -2401,7 +2392,7 @@ static void cdef_restoration_frame(AV1_COMP *cpi, AV1_COMMON *cm,
           cnn_errors[0] < res_errors[0] && cnn_errors[0] < dgd_errors[0] &&
           cnn_rdcosts < cm->lr_y_rdcost) {
         // Enable CNN for Y and copy CNN restored Y plane.
-        cm->postcnn_quad_info.is_write = 0;
+        assert(cm->cnn_quad_info.signaled == 0);
         cm->use_cnn[0] = 1;
         cm->cnn_indices[0] = cnn_indices[0];
         aom_yv12_copy_y(&cpi->postcnn_buffer, &cm->cur_frame->buf);

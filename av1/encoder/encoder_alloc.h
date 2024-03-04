@@ -15,6 +15,7 @@
 
 #include "av1/encoder/encoder.h"
 #include "av1/encoder/encodetxb.h"
+#include "av1/common/guided_quadtree.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -293,7 +294,7 @@ static AOM_INLINE void dealloc_compressor_data(AV1_COMP *cpi) {
 #endif  // CONFIG_CNN_RESTORATION
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-  av1_free_quadtree_buffers(cm);
+  av1_free_quadtree_struct(&cm->cnn_quad_info);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
   av1_free_restoration_buffers(cm);

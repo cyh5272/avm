@@ -259,21 +259,20 @@ int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
 }
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-void quad_copy(QUADInfo *cur_quad_info, QUADInfo *postcnn_quad_info) {
-  int split_length = cur_quad_info->split_info_length;
-  int unit_info_length = cur_quad_info->unit_info_length;
-  postcnn_quad_info->split_info_length = split_length;
-  postcnn_quad_info->unit_info_length = unit_info_length;
-  postcnn_quad_info->unit_size = cur_quad_info->unit_size;
-
-  for (int i = 0; i < split_length; ++i) {
-    postcnn_quad_info->split_info[i].split = cur_quad_info->split_info[i].split;
+void quad_copy(const QUADInfo *src, QUADInfo *dst, struct AV1Common *cm) {
+  dst->unit_index = src->unit_index;
+  dst->unit_size = src->unit_size;
+  dst->split_info_length = src->split_info_length;
+  dst->unit_info_length = src->unit_info_length;
+  av1_alloc_quadtree_struct(cm, dst);
+  for (int i = 0; i < dst->split_info_length; ++i) {
+    dst->split_info[i].split = src->split_info[i].split;
   }
-
-  for (int i = 0; i < unit_info_length; ++i) {
-    postcnn_quad_info->unit_info[i].xqd[0] = cur_quad_info->unit_info[i].xqd[0];
-    postcnn_quad_info->unit_info[i].xqd[1] = cur_quad_info->unit_info[i].xqd[1];
+  for (int i = 0; i < dst->unit_info_length; ++i) {
+    dst->unit_info[i].xqd[0] = src->unit_info[i].xqd[0];
+    dst->unit_info[i].xqd[1] = src->unit_info[i].xqd[1];
   }
+  dst->signaled = src->signaled;
 }
 
 // Returns (int)floor(x / y),
@@ -299,7 +298,8 @@ int quad_tree_get_unit_info_length(int width, int height, int unit_length,
 
   int regular_unit_info_len = 0;
   for (int i = 0; i < split_info_length; i += 2) {
-    if (split_info[i].split == 0 && split_info[i + 1].split == 1) {
+    if (split_info == NULL ||
+        (split_info[i].split == 0 && split_info[i + 1].split == 1)) {
       regular_unit_info_len += 4;  // Split
     } else if (split_info[i].split == 1 && split_info[i + 1].split == 1) {
       regular_unit_info_len += 2;  // Horz
@@ -321,5 +321,47 @@ int quad_tree_get_split_info_length(int width, int height, int unit_length) {
   const int num_split_info_high = DIVIDE_WITH_FLOOR(height, unit_length);
   // 2 bits signaled for each split info.
   return num_split_info_wide * num_split_info_high * 2;
+}
+
+void av1_alloc_quadtree_struct(struct AV1Common *cm, QUADInfo *quad_info) {
+  if (quad_info->unit_info != NULL) {
+    aom_free(quad_info->unit_info);
+    quad_info->unit_info = NULL;
+  }
+  if (quad_info->split_info != NULL) {
+    aom_free(quad_info->split_info);
+    quad_info->split_info = NULL;
+  }
+  quad_info->unit_size = quad_tree_get_unit_size(cm->superres_upscaled_width,
+                                                 cm->superres_upscaled_height,
+                                                 quad_info->unit_index);
+
+  if (quad_info->split_info_length > 0) {
+    CHECK_MEM_ERROR(
+        cm, quad_info->split_info,
+        (QUADSplitInfo *)aom_memalign(
+            16, sizeof(*quad_info->split_info) * quad_info->split_info_length));
+  }
+
+  assert(quad_info->unit_info_length > 0);
+
+  CHECK_MEM_ERROR(
+      cm, quad_info->unit_info,
+      (QUADUnitInfo *)aom_memalign(
+          16, sizeof(*quad_info->unit_info) * quad_info->unit_info_length));
+
+  quad_info->signaled = 0;
+}
+
+void av1_free_quadtree_struct(QUADInfo *quad_info) {
+  if (quad_info->unit_info != NULL) {
+    aom_free(quad_info->unit_info);
+    quad_info->unit_info = NULL;
+  }
+  if (quad_info->split_info != NULL) {
+    aom_free(quad_info->split_info);
+    quad_info->split_info = NULL;
+  }
+  memset(quad_info, 0, sizeof(*quad_info));
 }
 #endif  // CONFIG_CNN_GUIDED_QUADTREE

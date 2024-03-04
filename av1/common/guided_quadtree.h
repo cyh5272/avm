@@ -27,8 +27,10 @@ extern "C" {
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index);
 
-void quad_copy(QUADInfo *cur_quad_info, QUADInfo *postcnn_quad_info);
+void quad_copy(const QUADInfo *src, QUADInfo *dst, struct AV1Common *cm);
 // Get the length of unit info array based on dimensions and split info.
+// If split_info == NULL, assumes each block uses split, thereby returning
+// longest possible unit info length.
 int quad_tree_get_unit_info_length(int width, int height, int unit_length,
                                    const QUADSplitInfo *split_info,
                                    int split_info_length);
@@ -44,10 +46,25 @@ static INLINE int get_guided_norestore_ctx(int qindex, int superres_denom,
   return 0;
 }
 
-// Get quad tree level based on dimension.
-static INLINE int quad_tree_get_level(int width, int height) {
+// Get quad tree unit index based on dimensions.
+static INLINE int quad_tree_get_unit_index(int width, int height) {
   return (width * height <= 1280 * 720);
 }
+
+// Get quad tree unit size.
+static INLINE int quad_tree_get_unit_size(int width, int height,
+                                          int quad_level) {
+  (void)width;
+  (void)height;
+  return 512 >> quad_level;
+}
+
+// Allocates buffers in 'quad_info' assuming 'quad_info->unit_index',
+// 'quad_info->split_info_length' and 'quad_info->unit_info_length' are already
+// initialized.
+void av1_alloc_quadtree_struct(struct AV1Common *cm, QUADInfo *quad_info);
+// Free buffers in 'quad_info'.
+void av1_free_quadtree_struct(QUADInfo *quad_info);
 #endif  // CONFIG_CNN_GUIDED_QUADTREE
 
 #ifdef __cplusplus

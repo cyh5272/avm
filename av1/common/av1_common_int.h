@@ -1628,9 +1628,7 @@ typedef struct AV1Common {
 #endif  // CONFIG_CNN_RESTORATION
 
 #if CONFIG_CNN_GUIDED_QUADTREE
-  int use_quad_level;  // 512>>unit_level
-  QUADInfo cur_quad_info;
-  QUADInfo postcnn_quad_info;
+  QUADInfo cnn_quad_info;
   double lr_y_rdcost;
 #endif  //  CONFIG_CNN_GUIDED_QUADTREE
 
