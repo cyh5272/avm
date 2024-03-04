@@ -533,14 +533,15 @@ void av1_build_inter_predictors(const AV1_COMMON *cm, MACROBLOCKD *xd,
 // Number of bits allowed for covariance matrix elements (su2, sv2, suv, suw
 // and svw) so that det, det_x, and det_y does not cause overflow issue in
 // int64_t. Its value must be <= (64 - mv_prec_bits - grad_prec_bits) / 2.
-#define MAX_OPFL_AUTOCORR_BITS 30
 #if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
+#define MAX_OPFL_AUTOCORR_BITS 30
 #define OPFL_AUTOCORR_CLAMP_VAL ((1L << MAX_OPFL_AUTOCORR_BITS) - 1)
 // Clamp range for u/v/w. If it uses h unsigned bits, then u2/v2 uses 2h
 // unsigned bits. Every sum of 8 u2/v2 use at most 2h+3 unsigned bits, and
 // must not exceed max bd of su2/sv2 minus 2. Thus, 2h+3 <= H-2
 #define OPFL_SAMP_CLAMP_VAL ((1 << ((MAX_OPFL_AUTOCORR_BITS - 6) >> 1)) - 1)
 #else
+#define MAX_OPFL_AUTOCORR_BITS 28
 #define OPFL_AUTOCORR_CLAMP_VAL (1 << MAX_OPFL_AUTOCORR_BITS)
 #endif  // CONFIG_REDUCE_LS_BIT_DEPTH
 
@@ -734,7 +735,7 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 // Internal bit depths for affine parameter derivation
 #define AFFINE_COORDS_OFFSET_BITS 3
 #define AFFINE_GRAD_BITS_THR 32
-#define AFFINE_PREC_BITS 16
+#define AFFINE_PREC_BITS 12
 #define AFFINE_RLS_PARAM 2
 
 static INLINE int is_translational_refinement_allowed(const AV1_COMMON *cm,
