@@ -103,6 +103,10 @@ typedef struct {
   /** Context coded. */
   int num_ctx_coded;
   uint16_t *prev_context_id;
+  /** Counter for consecutive bypass strings. */
+  uint16_t counter_bypass_string;
+  /** Cycles for bypass coded symbols. */
+  int cycles_bypass_coded;
   int context_switch;
   int total_hits;
   /** Dictionary for translating strings into id. */
