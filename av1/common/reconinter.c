@@ -2285,7 +2285,11 @@ int find_max_matrix_element(const int16_t *pdiff, int pstride,
 // (in the pipeline where gradients are computed directly from d0*P0-d1*P1)
 int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
                                const int16_t *gx, const int16_t *gy,
-                               int gstride, int bw, int bh, int grad_prec_bits,
+                               int gstride, int bw, int bh,
+#if CONFIG_AFFINE_REFINEMENT_SB
+                               int x_offset, int y_offset,
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+                               int grad_prec_bits,
                                AffineModelParams *am_params) {
   int x_range_log2 = get_msb(bw);
   int y_range_log2 = get_msb(bh);
@@ -2318,8 +2322,15 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
       if ((i + j) % 2 == 1) continue;
 #endif
       if (AOMMAX(i, j) >= AFFINE_AVG_MAX_SIZE) continue;
+#if CONFIG_AFFINE_REFINEMENT_SB
+      // Offsets are added in order to obtain affine parameter relative to
+      // original block center rather than the subblock center
+      const int x = step_w * j - bw / 2 + x_offset + 1;
+      const int y = step_h * i - bh / 2 + y_offset + 1;
+#else
       const int x = step_w * j - bw / 2 + 1;
       const int y = step_h * i - bh / 2 + 1;
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
       int gidx = i * gstride + j;
       int a[4];
       a[0] =
@@ -2564,24 +2575,23 @@ void av1_opfl_affine_refinement_mxn_c(const int16_t *pdiff, int pstride,
       // In some rare cases, the determinant in the solver may be zero or
       // negative due to numerical errors. In this case we still set invalid=0,
       // but the warped parameters remain the default values.
-      if (!av1_opfl_affine_refinement(pdiff + i * pstride + j, pstride,
-                                      gx + i * gstride + j,
-                                      gy + i * gstride + j, gstride, sub_bw,
-                                      sub_bh, grad_prec_bits, &affine_params)) {
+      if (!av1_opfl_affine_refinement(
+              pdiff + i * pstride + j, pstride, gx + i * gstride + j,
+              gy + i * gstride + j, gstride, sub_bw, sub_bh,
+#if CONFIG_AFFINE_REFINEMENT_SB
+              j + (sub_bw - bw) / 2, i + (sub_bh - bh) / 2,
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+              grad_prec_bits, &affine_params)) {
 #if CONFIG_REFINEMV
-        get_ref_affine_params(sub_bw, sub_bh, mi_x + j, mi_y + i,
-                              &affine_params, wms + n_blocks * 2, d0,
-                              &src_mv[0]);
-        get_ref_affine_params(sub_bw, sub_bh, mi_x + j, mi_y + i,
-                              &affine_params, wms + n_blocks * 2 + 1, d1,
-                              &src_mv[1]);
+        get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params,
+                              wms + n_blocks * 2, d0, &src_mv[0]);
+        get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params,
+                              wms + n_blocks * 2 + 1, d1, &src_mv[1]);
 #else
-        get_ref_affine_params(sub_bw, sub_bh, mi_x + j, mi_y + i,
-                              &affine_params, wms + n_blocks * 2, d0,
-                              &mbmi->mv[0].as_mv);
-        get_ref_affine_params(sub_bw, sub_bh, mi_x + j, mi_y + i,
-                              &affine_params, wms + n_blocks * 2 + 1, d1,
-                              &mbmi->mv[1].as_mv);
+        get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params,
+                              wms + n_blocks * 2, d0, &mbmi->mv[0].as_mv);
+        get_ref_affine_params(bw, bh, mi_x, mi_y, &affine_params,
+                              wms + n_blocks * 2 + 1, d1, &mbmi->mv[1].as_mv);
 #endif  // CONFIG_REFINEMV
       }
       n_blocks++;
@@ -3120,7 +3130,7 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
                                        INT16_MIN, INT16_MAX);
       gy0[i * bw + j] = (int16_t)clamp(d0 * warped_gy[0] - d1 * warped_gy[1],
                                        INT16_MIN, INT16_MAX);
-#endif  // CONFIG_AFFINE_REFINEMENB_SB
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
     }
   }
 }
@@ -3485,6 +3495,11 @@ void av1_get_optflow_based_mv(
                                             d0, d1, grad_prec_bits, target_prec,
                                             vx0, vy0, vx1, vy1);
     }
+#if DEBUG_AFFINE_COMBINE
+    for (int i = 0; i < n_blocks; i++)
+      fprintf(stderr, "  sb %d mvd0 (%d,%d) mvd1 (%d,%d)\n", i, vy0[i], vx0[i],
+              vy1[i], vx1[i]);
+#endif
   } else {
     n_blocks = av1_opfl_mv_refinement_nxn(tmp1, bw, gx0, gy0, bw, bw, bh, n, d0,
                                           d1, grad_prec_bits, target_prec, vx0,
@@ -3863,6 +3878,14 @@ void make_inter_pred_of_nxn(
       } else {
         subblock_mv = &(mv_refined[n_blocks * 2 + ref].as_mv);
       }
+#if DEBUG_AFFINE_COMBINE
+      int32_t *curmat = wms_sb[ref].wmmat;
+      fprintf(stderr,
+              "  ref %d pos (%d,%d) wm (%d,%d,%d,%d,%d,%d) mvd (%d,%d)\n", ref,
+              j, i, curmat[0], curmat[1], curmat[2], curmat[3], curmat[4],
+              curmat[5], xd->mv_delta[delta_idx].mv[ref].as_mv.row,
+              xd->mv_delta[delta_idx].mv[ref].as_mv.col);
+#endif
 
       const int width = (cm->mi_params.mi_cols << MI_SIZE_LOG2);
       const int height = (cm->mi_params.mi_rows << MI_SIZE_LOG2);
@@ -3980,6 +4003,19 @@ void av1_opfl_rebuild_inter_predictor(
       cm, pu_width, plane, comp_refine_type, wms, mv, use_affine_opfl,
 #endif  // CONFIG_AFFINE_REFINEMENT
       ref, mc_buf, calc_subpel_params_func, n, &subpel_params);
+
+#if DEBUG_AFFINE_COMBINE
+  if (xd->mi[0]->comp_refine_type >= COMP_AFFINE_REFINE_START && wms &&
+      use_affine_opfl) {
+    fprintf(stderr, "Rec P%d:\n", ref);
+    for (int i = 0; i < h; i++) {
+      for (int j = 0; j < w; j++) {
+        fprintf(stderr, "%d,", dst[i * dst_stride + j]);
+      }
+      fprintf(stderr, "\n");
+    }
+  }
+#endif
 }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
 
