@@ -1836,8 +1836,8 @@ static AOM_INLINE void read_filter_quadtree(FRAME_CONTEXT *ctx, int QP,
   A0_min = quadtset[2];
   A1_min = quadtset[3];
 
-  int ref_0 = 8;
-  int ref_1 = 8;
+  int ref_0 = GUIDED_A_MID;
+  int ref_1 = GUIDED_A_MID;
   for (int i = 0; i < qi->unit_info_length; i++) {
     const int norestore =
         norestore_ctx == -1
@@ -1847,13 +1847,17 @@ static AOM_INLINE void read_filter_quadtree(FRAME_CONTEXT *ctx, int QP,
     if (norestore) {
       qi->unit_info[i].xqd[0] = 0;
       qi->unit_info[i].xqd[1] = 0;
-      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + 15, 0)) - A0_min;
-      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + 15, 0)) - A1_min;
+      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + GUIDED_A_RANGE, 0)) - A0_min;
+      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + GUIDED_A_RANGE, 0)) - A1_min;
     } else {
       qi->unit_info[i].xqd[0] =
-          aom_read_primitive_refsubexpfin(rb, 16, 1, ref_0, ACCT_STR) + A0_min;
+          aom_read_primitive_refsubexpfin(rb, GUIDED_A_NUM_VALUES, 1, ref_0,
+                                          ACCT_STR) +
+          A0_min;
       qi->unit_info[i].xqd[1] =
-          aom_read_primitive_refsubexpfin(rb, 16, 1, ref_1, ACCT_STR) + A1_min;
+          aom_read_primitive_refsubexpfin(rb, GUIDED_A_NUM_VALUES, 1, ref_1,
+                                          ACCT_STR) +
+          A1_min;
       ref_0 = qi->unit_info[i].xqd[0] - A0_min;
       ref_1 = qi->unit_info[i].xqd[1] - A1_min;
     }

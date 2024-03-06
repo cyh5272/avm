@@ -3065,26 +3065,18 @@ static bool is_mode_ref_delta_meaningful(AV1_COMMON *cm) {
 static void write_filter_quadtree(FRAME_CONTEXT *ctx, int QP, int cnn_index,
                                   int superres_denom, int is_intra_only,
                                   const QUADInfo *ci, aom_writer *wb) {
-  int A0_min, A1_min;
-  int *quadtset;
-  quadtset =
+  const int *const quadtset =
       get_quadparm_from_qindex(QP, superres_denom, is_intra_only, 1, cnn_index);
   const int norestore_ctx =
       get_guided_norestore_ctx(QP, superres_denom, is_intra_only);
-  A0_min = quadtset[2];
-  A1_min = quadtset[3];
-  int a0;
-  int a1;
-  int b_a0;
-  int b_a1;
-  int ref_0 = 8;
-  int ref_1 = 8;
+  const int A0_min = quadtset[2];
+  const int A1_min = quadtset[3];
+  int ref_0 = GUIDED_A_MID;
+  int ref_1 = GUIDED_A_MID;
   for (int i = 0; i < ci->unit_info_length; i++) {
-    a0 = ci->unit_info[i].xqd[0];
-    a1 = ci->unit_info[i].xqd[1];
+    const int a0 = ci->unit_info[i].xqd[0];
+    const int a1 = ci->unit_info[i].xqd[1];
     int norestore;
-
-    // printf("a0:%d  a1:%d\n", a0, a1);
     if (norestore_ctx != -1) {
       norestore = (a0 == 0 && a1 == 0);
       aom_write_symbol(wb, norestore,
@@ -3093,27 +3085,17 @@ static void write_filter_quadtree(FRAME_CONTEXT *ctx, int QP, int cnn_index,
       norestore = 0;
     }
     if (norestore) {
-      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + 15, 0)) - A0_min;
-      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + 15, 0)) - A1_min;
+      ref_0 = AOMMAX(A0_min, AOMMIN(A0_min + GUIDED_A_RANGE, 0)) - A0_min;
+      ref_1 = AOMMAX(A1_min, AOMMIN(A1_min + GUIDED_A_RANGE, 0)) - A1_min;
     } else {
-      b_a0 = a0 - A0_min;
-      if (b_a0 < 0) {
-        b_a0 = 0;
-      }
-      if (b_a0 > 15) {
-        b_a0 = 15;
-      }
-      b_a1 = a1 - A1_min;
-      if (b_a1 < 0) {
-        b_a1 = 0;
-      }
-      if (b_a1 > 15) {
-        b_a1 = 15;
-      }
-      aom_write_primitive_refsubexpfin(wb, 16, 1, ref_0, b_a0);
-      aom_write_primitive_refsubexpfin(wb, 16, 1, ref_1, b_a1);
-      ref_0 = b_a0;
-      ref_1 = b_a1;
+      const int a0_offset = AOMMIN(AOMMAX(a0 - A0_min, 0), GUIDED_A_RANGE);
+      const int a1_offset = AOMMIN(AOMMAX(a1 - A1_min, 0), GUIDED_A_RANGE);
+      aom_write_primitive_refsubexpfin(wb, GUIDED_A_NUM_VALUES, 1, ref_0,
+                                       a0_offset);
+      aom_write_primitive_refsubexpfin(wb, GUIDED_A_NUM_VALUES, 1, ref_1,
+                                       a1_offset);
+      ref_0 = a0_offset;
+      ref_1 = a1_offset;
     }
   }
 }

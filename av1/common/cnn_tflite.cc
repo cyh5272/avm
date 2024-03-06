@@ -776,8 +776,8 @@ static void generate_linear_combination(
         // finer search
         double flrA0 = (floor(A0));
         double flrA1 = (floor(A1));
-        flrA0 = AOMMIN(AOMMAX(flrA0, A0_min), A0_min + 15);
-        flrA1 = AOMMIN(AOMMAX(flrA1, A1_min), A1_min + 15);
+        flrA0 = AOMMIN(AOMMAX(flrA0, A0_min), A0_min + GUIDED_A_RANGE);
+        flrA1 = AOMMIN(AOMMAX(flrA1, A1_min), A1_min + GUIDED_A_RANGE);
         {
           A0 = flrA0;
           A1 = flrA1;
@@ -792,17 +792,20 @@ static void generate_linear_combination(
               err += diff * diff;
             }
           }
-          // approx RD cost assuming 7 bits per a0, a1 pair
+          // approx RD cost assuming GUIDED_A_PAIR_BITS bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
-              bit_depth);
+              rdmult,
+              (norestorecost[0] +
+               (GUIDED_A_PAIR_BITS << AV1_PROB_COST_SHIFT)) >>
+                  4,
+              err, bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
             bestA1 = A1;
             bestcost = cost;
           }
         }
-        if (flrA0 < A0_min + 15) {
+        if (flrA0 < A0_min + GUIDED_A_RANGE) {
           A0 = flrA0 + 1;
           A1 = flrA1;
           err = 0;
@@ -816,17 +819,20 @@ static void generate_linear_combination(
               err += diff * diff;
             }
           }
-          // approx RD cost assuming 7 bits per a0, a1 pair
+          // approx RD cost assuming GUIDED_A_PAIR_BITS bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
-              bit_depth);
+              rdmult,
+              (norestorecost[0] +
+               (GUIDED_A_PAIR_BITS << AV1_PROB_COST_SHIFT)) >>
+                  4,
+              err, bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
             bestA1 = A1;
             bestcost = cost;
           }
         }
-        if (flrA1 < A1_min + 15) {
+        if (flrA1 < A1_min + GUIDED_A_RANGE) {
           A0 = flrA0;
           A1 = flrA1 + 1;
           err = 0;
@@ -840,17 +846,21 @@ static void generate_linear_combination(
               err += diff * diff;
             }
           }
-          // approx RD cost assuming 7 bits per a0, a1 pair
+          // approx RD cost assuming GUIDED_A_PAIR_BITS bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
-              bit_depth);
+              rdmult,
+              (norestorecost[0] +
+               (GUIDED_A_PAIR_BITS << AV1_PROB_COST_SHIFT)) >>
+                  4,
+              err, bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
             bestA1 = A1;
             bestcost = cost;
           }
         }
-        if (flrA0 < A0_min + 15 && flrA1 < A1_min + 15) {
+        if (flrA0 < A0_min + GUIDED_A_RANGE &&
+            flrA1 < A1_min + GUIDED_A_RANGE) {
           A0 = flrA0 + 1;
           A1 = flrA1 + 1;
           err = 0;
@@ -864,10 +874,13 @@ static void generate_linear_combination(
               err += diff * diff;
             }
           }
-          // approx RD cost assuming 7 bits per a0, a1 pair
+          // approx RD cost assuming GUIDED_A_PAIR_BITS bits per a0, a1 pair
           cost = RDCOST_DBL_WITH_NATIVE_BD_DIST(
-              rdmult, (norestorecost[0] + (7 << AV1_PROB_COST_SHIFT)) >> 4, err,
-              bit_depth);
+              rdmult,
+              (norestorecost[0] +
+               (GUIDED_A_PAIR_BITS << AV1_PROB_COST_SHIFT)) >>
+                  4,
+              err, bit_depth);
           if (cost < bestcost) {
             bestA0 = A0;
             bestA1 = A1;
@@ -879,12 +892,12 @@ static void generate_linear_combination(
       } else {
         A0 = (round(A0));
         A1 = (round(A1));
-        A0 = AOMMIN(AOMMAX(A0, A0_min), A0_min + 15);
-        A1 = AOMMIN(AOMMAX(A1, A1_min), A1_min + 15);
+        A0 = AOMMIN(AOMMAX(A0, A0_min), A0_min + GUIDED_A_RANGE);
+        A1 = AOMMIN(AOMMAX(A1, A1_min), A1_min + GUIDED_A_RANGE);
       }
 
-      A0 = AOMMIN(AOMMAX(A0, A0_min), A0_min + 15);
-      A1 = AOMMIN(AOMMAX(A1, A1_min), A1_min + 15);
+      A0 = AOMMIN(AOMMAX(A0, A0_min), A0_min + GUIDED_A_RANGE);
+      A1 = AOMMIN(AOMMAX(A1, A1_min), A1_min + GUIDED_A_RANGE);
       A.emplace_back((int)A0, (int)A1);
       for (int i = this_start_row; i < this_end_row; i++) {
         for (int j = this_start_col; j < this_end_col; j++) {
@@ -929,21 +942,21 @@ static int compute_rate(const std::vector<std::pair<int, int>> &A,
   const int A0_min = quadtset[2];
   const int A1_min = quadtset[3];
   int num_bits = 0;
-  int ref0 = AOMMIN(AOMMAX(prev_A.first - A0_min, 0), 15);
-  int ref1 = AOMMIN(AOMMAX(prev_A.second - A1_min, 0), 15);
+  int ref0 = AOMMIN(AOMMAX(prev_A.first - A0_min, 0), GUIDED_A_RANGE);
+  int ref1 = AOMMIN(AOMMAX(prev_A.second - A1_min, 0), GUIDED_A_RANGE);
   for (auto &this_A : A) {
     if (this_A.first == 0 && this_A.second == 0) {
       num_bits += norestorecosts[1];
     } else {
       num_bits += norestorecosts[0];
-      num_bits += (aom_count_primitive_refsubexpfin(16, 1, ref0,
-                                                    this_A.first - A0_min) +
-                   aom_count_primitive_refsubexpfin(16, 1, ref1,
-                                                    this_A.second - A1_min))
+      num_bits += (aom_count_primitive_refsubexpfin(
+                       GUIDED_A_NUM_VALUES, 1, ref0, this_A.first - A0_min) +
+                   aom_count_primitive_refsubexpfin(
+                       GUIDED_A_NUM_VALUES, 1, ref1, this_A.second - A1_min))
                   << AV1_PROB_COST_SHIFT;
     }
-    ref0 = AOMMIN(AOMMAX(this_A.first - A0_min, 0), 15);
-    ref1 = AOMMIN(AOMMAX(this_A.second - A1_min, 0), 15);
+    ref0 = AOMMIN(AOMMAX(this_A.first - A0_min, 0), GUIDED_A_RANGE);
+    ref1 = AOMMIN(AOMMAX(this_A.second - A1_min, 0), GUIDED_A_RANGE);
   }
   return num_bits;
 }
@@ -1132,7 +1145,8 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
     std::vector<std::pair<int, int>> this_A;  // selected a0, a1 weight pairs.
     double this_rdcost_total = 0.0;
     // Previous a0, a1 pair is mid-point of the range by default.
-    std::pair<int, int> prev_A = std::make_pair(8 + A0_min, 8 + A1_min);
+    std::pair<int, int> prev_A =
+        std::make_pair(GUIDED_A_MID + A0_min, GUIDED_A_MID + A1_min);
     // TODO(urvang): Include padded area in a unit if it's < unit size / 2?
     // If so, need to modify / replace quad_tree_get_unit_info_length().
     // Also double check: quad_tree_get_split_info_length().

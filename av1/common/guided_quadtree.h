@@ -24,6 +24,13 @@ extern "C" {
 #endif
 
 #if CONFIG_CNN_GUIDED_QUADTREE
+
+#define GUIDED_A_BITS 4
+#define GUIDED_A_NUM_VALUES (1 << GUIDED_A_BITS)
+#define GUIDED_A_MID (GUIDED_A_NUM_VALUES >> 1)
+#define GUIDED_A_RANGE (GUIDED_A_NUM_VALUES - 1)
+#define GUIDED_A_PAIR_BITS (GUIDED_A_BITS * 2 - 1)
+
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index);
 
