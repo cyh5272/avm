@@ -82,13 +82,13 @@ void av1_copy_frame_refined_mvs_tip_frame_mode(const AV1_COMMON *const cm,
           const int32_t src_y = mi_row * MI_SIZE + h * 8 + 4;
 #if CONFIG_AFFINE_REFINEMENT_SB
           const int32_t dst_x =
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[2] * src_x +
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[3] * src_y +
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[0];
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[2] * src_x +
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[3] * src_y +
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[0];
           const int32_t dst_y =
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[4] * src_x +
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[5] * src_y +
-              mi->wm_params_sb[2 * sb_idx + idx].wmmat[1];
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[4] * src_x +
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[5] * src_y +
+              xd->wm_params_sb[2 * sb_idx + idx].wmmat[1];
 #else
           const int32_t dst_x = mi->wm_params[idx].wmmat[2] * src_x +
                                 mi->wm_params[idx].wmmat[3] * src_y +
@@ -308,13 +308,13 @@ void av1_copy_frame_refined_mvs(const AV1_COMMON *const cm,
             const int32_t src_y = mi_row * MI_SIZE + h * 8 + 4;
 #if CONFIG_AFFINE_REFINEMENT_SB
             const int32_t dst_x =
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[2] * src_x +
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[3] * src_y +
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[0];
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[2] * src_x +
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[3] * src_y +
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[0];
             const int32_t dst_y =
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[4] * src_x +
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[5] * src_y +
-                mi->wm_params_sb[2 * sb_idx + idx].wmmat[1];
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[4] * src_x +
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[5] * src_y +
+                xd->wm_params_sb[2 * sb_idx + idx].wmmat[1];
 #else
             const int32_t dst_x = mi->wm_params[idx].wmmat[2] * src_x +
                                   mi->wm_params[idx].wmmat[3] * src_y +

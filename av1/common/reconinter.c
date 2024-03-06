@@ -5407,7 +5407,7 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
 #if AFFINE_CHROMA_REFINE_METHOD > 0
   if (use_optflow_refinement && do_affine && plane) {
 #if CONFIG_AFFINE_ON_REFINEMV
-    memcpy(wms, mi->wm_params_sb + 2 * sb_idx, 2 * sizeof(wms[0]));
+    memcpy(wms, xd->wm_params_sb + 2 * sb_idx, 2 * sizeof(wms[0]));
 #else
     memcpy(wms, mi->wm_params, 2 * sizeof(wms[0]));
 #endif  // CONFIG_AFFINE_ON_REFINEMV
@@ -5464,7 +5464,7 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
     }
 #endif  // CONFIG_AFFINE_REFINEMENT || CONFIG_REFINED_MVS_IN_TMVP
 #if CONFIG_AFFINE_REFINEMENT_SB
-    memcpy(mi->wm_params_sb + 2 * sb_idx, wms, 2 * sizeof(wms[0]));
+    memcpy(xd->wm_params_sb + 2 * sb_idx, wms, 2 * sizeof(wms[0]));
 #elif CONFIG_AFFINE_REFINEMENT
     mi->wm_params[0] = wms[0];
     mi->wm_params[1] = wms[1];
@@ -5773,7 +5773,7 @@ static void build_inter_predictors_8x8_and_bigger(
   for (int i = 0; i < 2 * NUM_AFFINE_PARAMS; i++) wms[i] = default_warp_params;
 #if AFFINE_CHROMA_REFINE_METHOD > 0
   if (use_optflow_refinement && plane)
-    memcpy(wms, mi->wm_params_sb, 2 * NUM_AFFINE_PARAMS * sizeof(wms[0]));
+    memcpy(wms, xd->wm_params_sb, 2 * NUM_AFFINE_PARAMS * sizeof(wms[0]));
 #endif
 #else
   WarpedMotionParams wms[2];
@@ -5858,7 +5858,7 @@ static void build_inter_predictors_8x8_and_bigger(
     }
 #endif  // CONFIG_AFFINE_REFINEMENT || CONFIG_REFINED_MVS_IN_TMVP
 #if CONFIG_AFFINE_REFINEMENT_SB
-    memcpy(mi->wm_params_sb, wms, 2 * NUM_AFFINE_PARAMS * sizeof(wms[0]));
+    memcpy(xd->wm_params_sb, wms, 2 * NUM_AFFINE_PARAMS * sizeof(wms[0]));
 #elif CONFIG_AFFINE_REFINEMENT
     // parameters derived are saved here and may be reused by chroma
     mi->wm_params[0] = wms[0];
