@@ -273,6 +273,18 @@ static const AffineModelParams default_affine_params = { 0, 0, 0, 0, 0 };
 #endif  // CONFIG_AFFINE_REFINEMENT
 
 #if CONFIG_OPTFLOW_REFINEMENT
+#define DEBUG_BIT_DEPTH 0
+#if DEBUG_BIT_DEPTH
+static INLINE void bit_depth_check(const int64_t val, const int maxbd) {
+  int64_t min_val = -(1ULL << (maxbd - 1));
+  int64_t max_val = (1ULL << (maxbd - 1)) - 1;
+  assert(val <= max_val);
+  assert(val >= min_val);
+  if (val > max_val || val < min_val)
+    fprintf(stderr, "[BIT DEPTH ERROR] val %ld maxbd %d\n", val, maxbd);
+  return;
+}
+#endif
 
 // Apply bilinear and bicubic interpolation for subpel gradient to avoid
 // calls of build_one_inter_predictor function. Bicubic interpolation

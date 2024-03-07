@@ -384,18 +384,47 @@ static AOM_FORCE_INLINE void calc_mv_process(int64_t su2, int64_t sv2,
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
-  const int64_t det = su2 * sv2 - suv * suv;
-  if (det <= 0) return;
 #if CONFIG_REDUCE_LS_BIT_DEPTH
-  // TODO(kslu) handle the bit range of correlation matrix filling
-  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
+  int msb_su2 = 1 + get_msb_signed_64(su2);
+  int msb_sv2 = 1 + get_msb_signed_64(sv2);
+  int msb_suv = 1 + get_msb_signed_64(suv);
+  int msb_suw = 1 + get_msb_signed_64(suw);
+  int msb_svw = 1 + get_msb_signed_64(svw);
+  // Make sure the max bit depth of det, sol[0], and sol[1] are within
+  // MAX_LS_BITS
+  int max_mult_msb = AOMMAX(
+      msb_su2 + msb_sv2, AOMMAX(AOMMAX(msb_sv2 + msb_suw, msb_suv + msb_svw),
+                                AOMMAX(msb_su2 + msb_svw, msb_suv + msb_suw)));
+  int redbit = AOMMAX(0, max_mult_msb - MAX_LS_BITS + 3) >> 1;
+
+  su2 = ROUND_POWER_OF_TWO_SIGNED_64(su2, redbit);
+  sv2 = ROUND_POWER_OF_TWO_SIGNED_64(sv2, redbit);
+  suv = ROUND_POWER_OF_TWO_SIGNED_64(suv, redbit);
+  suw = ROUND_POWER_OF_TWO_SIGNED_64(suw, redbit);
+  svw = ROUND_POWER_OF_TWO_SIGNED_64(svw, redbit);
+
+  const int64_t det = su2 * sv2 - suv * suv;
+#if DEBUG_BIT_DEPTH
+  bit_depth_check(det, MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+  if (det <= 0) return;
+
+  int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
+#if DEBUG_BIT_DEPTH
+  bit_depth_check(sol[0], MAX_LS_BITS);
+  bit_depth_check(sol[1], MAX_LS_BITS);
+#endif  // DEBUG_BIT_DEPTH
+
   divide_and_round_array(sol, det, 2, shifts);
   *vx0 = (int)-sol[0];
   *vy0 = (int)-sol[1];
 #else
+  const int64_t det = su2 * sv2 - suv * suv;
+  if (det <= 0) return;
   const int64_t det_x = (suv * svw - sv2 * suw) * (1 << bits);
   const int64_t det_y = (suv * suw - su2 * svw) * (1 << bits);
+
   *vx0 = (int)divide_and_round_signed(det_x, det);
   *vy0 = (int)divide_and_round_signed(det_y, det);
 #endif  // CONFIG_REDUCE_LS_BIT_DEPTH
