@@ -1095,36 +1095,39 @@ void print_els_int64(const int64_t *arr, const int len, char *arr_name) {
 #if CONFIG_REDUCE_LS_BIT_DEPTH
 // Obtain the bit depth ranges for each row and column of a square matrix
 void get_mat4d_shifts(const int64_t *mat, int *shifts, const int max_mat_bits) {
-  int bits = 0;
-  int max_sum = 0;
-  int bits_sum[4] = { 0 };
-  int bits_diag[4] = { 0 };
+  int bits[16] = { 0 };
+  for (int i = 0; i < 4; i++) {
+    for (int j = i; j < 4; j++)
+      bits[i * 4 + j] = 1 + get_msb_signed_64(mat[i * 4 + j]);
+    shifts[i] = -AOMMAX(0, (bits[i * 4 + i] - max_mat_bits + 1) >> 1);
+  }
   for (int i = 0; i < 4; i++) {
     for (int j = i; j < 4; j++) {
-      bits = 1 + get_msb_signed_64(mat[i * 4 + j]);
-      bits_sum[i] += bits;
-      if (i == j) bits_diag[i] = bits;
-      if (i != j) bits_sum[j] += bits;
+      if (bits[i * 4 + j] + shifts[i] + shifts[j] > max_mat_bits)
+        shifts[shifts[i] < shifts[j] ? j : i]--;
     }
-    // For the i-th row/col, if bit depth exceeds the threshold, apply a
-    // downshift.
-    shifts[i] = -AOMMAX(0, (bits_diag[i] - max_mat_bits + 1) >> 1);
   }
-  // Subtract these downshifts from aggregated sum and diagonal.
+
+  // Get stats of bits after shifts
+  int bits_sum[4] = { 0 };
+  int bits_max[4] = { 0 };
   for (int i = 0; i < 4; i++) {
-    bits_diag[i] += shifts[i] * 2;
-    bits_sum[i] +=
-        shifts[0] + shifts[1] + shifts[2] + shifts[3] + 4 * shifts[i];
-    max_sum = AOMMAX(max_sum, bits_sum[i]);
+    for (int j = 0; j < 4; j++) {
+      int bits_ij =
+          (j >= i ? bits[i * 4 + j] : bits[j * 4 + i]) + shifts[i] + shifts[j];
+      bits_sum[i] += bits_ij;
+      bits_max[i] = AOMMAX(bits_max[i], bits_ij);
+    }
   }
 
   // For the i-th row/col, if bit depth does not exceeds the threshold,
   // compute the gap of bit depth to that of the largest diagonal element,
   // and apply an upshift based on this gap.
-  for (int i = 0; i < 4; i++) {
-    shifts[i] += AOMMIN((max_mat_bits - bits_diag[i]) >> 1,
-                        (max_sum - bits_sum[i]) >> 2);
-  }
+  int max_sum = AOMMAX(AOMMAX(bits_sum[0], bits_sum[1]),
+                       AOMMAX(bits_sum[2], bits_sum[3]));
+  for (int i = 0; i < 4; i++)
+    shifts[i] +=
+        AOMMIN((max_mat_bits - bits_max[i]) >> 1, (max_sum - bits_sum[i]) >> 2);
 }
 
 // Obtain the bit depth range of a vector
@@ -1640,7 +1643,6 @@ int inverse_determinant_4d(int64_t *mat, int64_t *vec, int *precbits,
 #if CONFIG_REDUCE_LS_BIT_DEPTH
 #if DEBUG_SOLVER
   int print = llabs(mat[0]) > (1L << DEBUG_SOLVER_THR);
-  ;
   if (print) {
     fprintf(stderr, "Before 1st shift\n");
     print_els_int64(mat, 16, "mat");
