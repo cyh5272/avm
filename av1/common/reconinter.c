@@ -2098,8 +2098,6 @@ void av1_compute_subpel_gradients_interp(int16_t *pred_dst, int bw, int bh,
 #if CONFIG_AFFINE_REFINEMENT || CONFIG_OPFL_MV_SEARCH
 // Apply average pooling to reduce the sizes of pred difference and gradients
 // arrays. It reduces the complexity of the parameter solving routine
-// TODO(kslu) add SIMD version, and/or combine this operation into
-// av1_bicubic_grad* function
 void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
                                  int16_t *gy, const int gstride, const int bw,
                                  const int bh, const int n) {
@@ -2260,7 +2258,6 @@ void get_ref_affine_params(int bw, int bh, int mi_x, int mi_y,
 }
 
 // Find the maximum element of pdiff/gx/gy in absolute value
-// TODO(kslu) add SIMD version
 int find_max_matrix_element(const int16_t *pdiff, int pstride,
                             const int16_t *gx, const int16_t *gy, int gstride,
                             int bw, int bh) {
@@ -2368,9 +2365,12 @@ int av1_opfl_affine_refinement(const int16_t *pdiff, int pstride,
     // depth cap. This check is done for every 16 pixels so it can be easily
     // replicated in the SIMD version.
     if (bw >= 16 || i % 2 == 1) {
-      int64_t max_diag =
+      int64_t max_autocorr =
           AOMMAX(AOMMAX(mat_a[0], mat_a[5]), AOMMAX(mat_a[10], mat_a[15]));
-      if (get_msb_signed_64(max_diag) >= MAX_AFFINE_AUTOCORR_BITS - 2) {
+      int64_t max_xcorr = AOMMAX(AOMMAX(llabs(vec_b[0]), llabs(vec_b[1])),
+                                 AOMMAX(llabs(vec_b[2]), llabs(vec_b[3])));
+      if (get_msb_signed_64(max_autocorr) >= MAX_AFFINE_AUTOCORR_BITS - 2 ||
+          get_msb_signed_64(max_xcorr) >= MAX_AFFINE_AUTOCORR_BITS - 2) {
         for (int s = 0; s < 4; ++s) {
           for (int t = 0; t < 4; ++t)
             mat_a[s * 4 + t] =
@@ -2476,8 +2476,10 @@ void av1_opfl_mv_refinement(const int16_t *pdiff, int pstride,
     if (bw >= 8 || i % 2 == 1) {
       // Do a range check and add a downshift if range is getting close to the
       // bit depth cap
-      int64_t max_diag = AOMMAX(su2, sv2);
-      if (get_msb_signed_64(max_diag) >= MAX_OPFL_AUTOCORR_BITS - 2) {
+      int64_t max_autocorr = AOMMAX(su2, sv2);
+      int64_t max_xcorr = AOMMAX(llabs(suw), llabs(svw));
+      if (get_msb_signed_64(max_autocorr) >= MAX_OPFL_AUTOCORR_BITS - 2 ||
+          get_msb_signed_64(max_xcorr) >= MAX_OPFL_AUTOCORR_BIS - 2) {
         su2 = ROUND_POWER_OF_TWO_SIGNED_64(su2, 1);
         suv = ROUND_POWER_OF_TWO_SIGNED_64(suv, 1);
         sv2 = ROUND_POWER_OF_TWO_SIGNED_64(sv2, 1);
@@ -2495,6 +2497,7 @@ void av1_opfl_mv_refinement(const int16_t *pdiff, int pstride,
   sv2 += rls_alpha;
 #endif
 
+#if !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
   // Clamp su2, sv2, suv, suw, and svw to avoid overflow in det, det_x, and
   // det_y
   su2 = clamp64(su2, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
@@ -2502,13 +2505,13 @@ void av1_opfl_mv_refinement(const int16_t *pdiff, int pstride,
   suv = clamp64(suv, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
   suw = clamp64(suw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
   svw = clamp64(svw, -OPFL_AUTOCORR_CLAMP_VAL, OPFL_AUTOCORR_CLAMP_VAL);
+#endif  // !CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
 
   // Solve 2x2 matrix inverse: [ su2  suv ]   [ vx0 ]     [ -suw ]
   //                           [ suv  sv2 ] * [ vy0 ]  =  [ -svw ]
   const int64_t det = su2 * sv2 - suv * suv;
   if (det <= 0) return;
 #if CONFIG_REDUCE_LS_BIT_DEPTH
-  // TODO(kslu) handle the bit range of correlation matrix filling
   int64_t sol[2] = { sv2 * suw - suv * svw, su2 * svw - suv * suw };
   int shifts[2] = { bits, bits };
   divide_and_round_array(sol, det, 2, shifts);
