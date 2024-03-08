@@ -2572,10 +2572,9 @@ int av1_opfl_mv_refinement_nxn_c(const int16_t *pdiff, int pstride,
 // Solve the affine model given pdiff = P0 - P1 and the gradients gx/gy of
 // d0 * P0 - d1 * P1.
 // TODO(kslu) add SIMD version
-void av1_opfl_affine_refinement_mxn_c(const int16_t *pdiff, int pstride,
-                                      const int16_t *gx, const int16_t *gy,
-                                      int gstride, int bw, int bh, int d0,
-                                      int d1, int mi_x, int mi_y,
+void av1_opfl_affine_refinement_mxn_c(int16_t *pdiff, int pstride, int16_t *gx,
+                                      int16_t *gy, int gstride, int bw, int bh,
+                                      int d0, int d1, int mi_x, int mi_y,
 #if CONFIG_REFINEMV
                                       const MV *const src_mv,
 #endif  // CONFIG_REFINEMV
@@ -2592,6 +2591,10 @@ void av1_opfl_affine_refinement_mxn_c(const int16_t *pdiff, int pstride,
 
   for (int i = 0; i < bh; i += sub_bh) {
     for (int j = 0; j < bw; j += sub_bw) {
+      avg_pooling_pdiff_gradients(pdiff + i * pstride + j, bw,
+                                  gx + i * gstride + j, gy + i * gstride + j,
+                                  gstride, sub_bw, sub_bh, AFFINE_AVG_MAX_SIZE);
+
       AffineModelParams affine_params = default_affine_params;
       // In some rare cases, the determinant in the solver may be zero or
       // negative due to numerical errors. In this case we still set invalid=0,
@@ -3416,9 +3419,6 @@ void av1_get_optflow_based_mv(
 
   if (mbmi->comp_refine_type >= COMP_AFFINE_REFINE_START && wms &&
       *use_affine_opfl) {
-    avg_pooling_pdiff_gradients(tmp1, bw, gx0, gy0, bw, bw, bh,
-                                AFFINE_AVG_MAX_SIZE);
-
     av1_opfl_affine_refinement_mxn_c(tmp1, bw, gx0, gy0, bw, bw, bh, d0, d1,
                                      mi_x, mi_y,
 #if CONFIG_REFINEMV

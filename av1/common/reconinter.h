@@ -717,12 +717,7 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 
 // Apply averaging of gradient array to downscale prediction block. It can
 // be set to MAX_SB_SIZE_LOG2 to turn off the avg pooling feature.
-#if CONFIG_AFFINE_REFINEMENT_SB
-// TODO(kslu) make it compatible
-#define AFFINE_AVG_MAX_SIZE_LOG2 MAX_SB_SIZE_LOG2
-#else
 #define AFFINE_AVG_MAX_SIZE_LOG2 4
-#endif  // CONFIG_AFFINE_REFINEMENT_SB
 #define AFFINE_AVG_MAX_SIZE (1 << AFFINE_AVG_MAX_SIZE_LOG2)
 
 #if CONFIG_REDUCE_AUTOCORR_BIT_DEPTH
