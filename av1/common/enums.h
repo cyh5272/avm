@@ -885,7 +885,7 @@ enum {
 #if CONFIG_AFFINE_REFINEMENT
 #if CONFIG_AFFINE_REFINEMENT_SB
 // Max affine refinement unit size
-#define AFFINE_MAX_UNIT_LOG2 4  // per 16x16 subblock
+#define AFFINE_MAX_UNIT_LOG2 5  // per 16x16 subblock
 #define AFFINE_MAX_UNIT (1 << AFFINE_MAX_UNIT_LOG2)
 #endif  // CONFIG_AFFINE_REFINEMENT_SB
 
