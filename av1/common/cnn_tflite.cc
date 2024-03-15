@@ -618,30 +618,19 @@ static int generate_interm_guided_restoration(
   return 1;
 }
 
-typedef enum {
-  GUIDED_QT_NONE,
-  GUIDED_QT_SPLIT,
-  GUIDED_QT_HORZ,
-  GUIDED_QT_VERT,
-  GUIDED_QT_TYPES,
-  GUIDED_QT_INVALID = -1
-} GuidedQuadTreePartitionType;
-
 // Get unit width and height based on max size and partition type.
-static void get_unit_size(int quadtree_max_size,
+static void get_unit_size(int max_unit_width, int max_unit_height,
                           GuidedQuadTreePartitionType partition_type,
                           int *unit_width, int *unit_height) {
   assert(partition_type >= 0 && partition_type < GUIDED_QT_TYPES);
-  const int full_size = quadtree_max_size;
-  const int half_size = quadtree_max_size >> 1;
   *unit_width =
       (partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_HORZ)
-          ? full_size
-          : half_size;
+          ? max_unit_width
+          : max_unit_width >> 1;
   *unit_height =
       (partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_VERT)
-          ? full_size
-          : half_size;
+          ? max_unit_height
+          : max_unit_height >> 1;
 }
 
 // ------------------- Guided Quadtree: Encoder ------------------------------//
@@ -968,17 +957,24 @@ static void try_one_partition(
     const std::vector<std::vector<std::vector<double>>> &interm,
     GuidedQuadTreePartitionType partition_type, const uint16_t *src,
     int src_stride, const uint16_t *dgd, int dgd_stride, int start_row,
-    int end_row, int start_col, int end_col, int quadtree_max_size,
-    const int *quadtset, int rdmult, const std::pair<int, int> &prev_A,
-    const int *splitcosts, const int *norestorecosts, int bit_depth,
-    bool is_partial_unit, double *this_rdcost,
-    std::vector<std::vector<uint16_t>> &out,
+    int end_row, int start_col, int end_col, int max_unit_width,
+    int max_unit_height, const int *quadtset, int rdmult,
+    const std::pair<int, int> &prev_A, const int *quad_split_costs,
+    const int *binary_split_costs, const int *norestorecosts, int bit_depth,
+    bool is_horz_partitioning_allowed, int is_vert_partitioning_allowed,
+    double *this_rdcost, std::vector<std::vector<uint16_t>> &out,
     std::vector<std::pair<int, int>> &A) {
-  assert(IMPLIES(is_partial_unit, partition_type == GUIDED_QT_NONE));
+  assert(IMPLIES(
+      !is_horz_partitioning_allowed,
+      partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_VERT));
+  assert(IMPLIES(
+      !is_vert_partitioning_allowed,
+      partition_type == GUIDED_QT_NONE || partition_type == GUIDED_QT_HORZ));
   // Get unit width and height based on partition type.
   int unit_width;
   int unit_height;
-  get_unit_size(quadtree_max_size, partition_type, &unit_width, &unit_height);
+  get_unit_size(max_unit_width, max_unit_height, partition_type, &unit_width,
+                &unit_height);
 
   // Compute restored unit, a0 and a1.
   generate_linear_combination(interm, src, src_stride, dgd, dgd_stride,
@@ -995,11 +991,16 @@ static void try_one_partition(
       compute_sse(out, src, src_stride, start_row, end_row, start_col, end_col);
 
   // Compute Rate.
-  const int num_bits_for_a = compute_rate(A, prev_A, quadtset, norestorecosts);
-  // Partition is implied to be NONE in case of partial unit.
+  const int a_signaling_cost =
+      compute_rate(A, prev_A, quadtset, norestorecosts);
+  // Partition signaling cost depending on 1, 2 or 4 possible partition types.
   const int partition_signaling_cost =
-      is_partial_unit ? 0 : splitcosts[partition_type];
-  const int bitrate = num_bits_for_a + partition_signaling_cost;
+      is_horz_partitioning_allowed && is_vert_partitioning_allowed
+          ? quad_split_costs[partition_type]
+      : (is_horz_partitioning_allowed || is_vert_partitioning_allowed)
+          ? binary_split_costs[partition_type]
+          : 0;
+  const int bitrate = a_signaling_cost + partition_signaling_cost;
 
   // Compute RDCost.
   *this_rdcost =
@@ -1013,39 +1014,54 @@ static void try_one_partition(
 static void select_quadtree_partitioning(
     const std::vector<std::vector<std::vector<double>>> &interm,
     const uint16_t *src, int src_stride, int start_row, int start_col,
-    int width, int height, int quadtree_max_size, const int *quadtset,
-    int rdmult, const std::pair<int, int> &prev_A, const int *splitcosts,
-    const int norestorecosts[2], int bit_depth, const uint16_t *dgd,
-    int dgd_stride, std::vector<int> &split,
+    int width, int height, int quadtree_max_size, int max_unit_width,
+    int max_unit_height, const int *quadtset, int rdmult,
+    const std::pair<int, int> &prev_A, const int *quad_split_costs,
+    const int *binary_split_costs, const int norestorecosts[2], int bit_depth,
+    const uint16_t *dgd, int dgd_stride, std::vector<int> &split,
     std::vector<std::pair<int, int>> &A, double *rdcost) {
-  const int end_row = AOMMIN(start_row + quadtree_max_size, height);
-  const int end_col = AOMMIN(start_col + quadtree_max_size, width);
-  const bool is_partial_unit = (start_row + quadtree_max_size > height) ||
-                               (start_col + quadtree_max_size > width);
+  const int end_row = AOMMIN(start_row + max_unit_height, height);
+  const int end_col = AOMMIN(start_col + max_unit_width, width);
+  // Check for special cases near boundary.
+  const bool is_horz_partitioning_allowed =
+      (max_unit_height >= quadtree_max_size);
+  const bool is_vert_partitioning_allowed =
+      (max_unit_width >= quadtree_max_size);
+  const bool is_split_partitioning_allowed =
+      is_horz_partitioning_allowed && is_vert_partitioning_allowed;
 
   auto best_rdcost = DBL_MAX;
   std::vector<std::pair<int, int>> best_A;
   std::vector<std::vector<uint16_t>> best_out(
-      quadtree_max_size, std::vector<uint16_t>(quadtree_max_size));
+      max_unit_height, std::vector<uint16_t>(max_unit_width));
   GuidedQuadTreePartitionType best_partition_type = GUIDED_QT_INVALID;
 
   for (int type = 0; type < GUIDED_QT_TYPES; ++type) {
     const auto this_partition_type = (GuidedQuadTreePartitionType)type;
-    // Special case: if only partial unit is within boundary, we implicitly
-    // use NONE partitioning and do not try the splitting options.
-    if (is_partial_unit && (this_partition_type != GUIDED_QT_NONE)) {
+    // Check for special cases near boundary.
+    if (!is_horz_partitioning_allowed &&
+        (this_partition_type == GUIDED_QT_HORZ)) {
       continue;
     }
-
+    if (!is_vert_partitioning_allowed &&
+        (this_partition_type == GUIDED_QT_VERT)) {
+      continue;
+    }
+    if (!is_split_partitioning_allowed &&
+        (this_partition_type == GUIDED_QT_SPLIT)) {
+      continue;
+    }
+    // Try this partition type.
     double this_rdcost;
     std::vector<std::pair<int, int>> this_A;
     std::vector<std::vector<uint16_t>> this_out(
-        quadtree_max_size, std::vector<uint16_t>(quadtree_max_size));
-    try_one_partition(interm, this_partition_type, src, src_stride, dgd,
-                      dgd_stride, start_row, end_row, start_col, end_col,
-                      quadtree_max_size, quadtset, rdmult, prev_A, splitcosts,
-                      norestorecosts, bit_depth, is_partial_unit, &this_rdcost,
-                      this_out, this_A);
+        max_unit_height, std::vector<uint16_t>(max_unit_width));
+    try_one_partition(
+        interm, this_partition_type, src, src_stride, dgd, dgd_stride,
+        start_row, end_row, start_col, end_col, max_unit_width, max_unit_height,
+        quadtset, rdmult, prev_A, quad_split_costs, binary_split_costs,
+        norestorecosts, bit_depth, is_horz_partitioning_allowed,
+        is_vert_partitioning_allowed, &this_rdcost, this_out, this_A);
     if (this_rdcost < best_rdcost) {
       best_rdcost = this_rdcost;
       best_A = this_A;
@@ -1063,45 +1079,29 @@ static void select_quadtree_partitioning(
   }
 
   // Save split decision.
-  if (is_partial_unit) {
+  if (!is_horz_partitioning_allowed && !is_vert_partitioning_allowed) {
     // Nothing should be added to 'split' array.
     assert(best_partition_type == GUIDED_QT_NONE);
     return;
   }
-  switch (best_partition_type) {
-    case GUIDED_QT_NONE:
-      split.push_back(0);
-      split.push_back(0);
-      break;
-    case GUIDED_QT_SPLIT:
-      split.push_back(0);
-      split.push_back(1);
-      break;
-    case GUIDED_QT_HORZ:
-      split.push_back(1);
-      split.push_back(1);
-      break;
-    case GUIDED_QT_VERT:
-      split.push_back(1);
-      split.push_back(0);
-      break;
-    default: assert(0 && "Wrong partition type"); break;
-  }
+  assert(best_partition_type >= 0 && best_partition_type < GUIDED_QT_TYPES);
+  split.push_back(best_partition_type);
 }
 
 static void apply_quadtree_partitioning(
     const std::vector<std::vector<std::vector<double>>> &interm, int start_row,
     int start_col, int width, int height, int quadtree_max_size,
-    const int *quadtset, int bit_depth, const std::vector<int> &split,
-    size_t &split_index, const std::vector<std::pair<int, int>> &A,
-    size_t &A_index, uint16_t *dgd, int dgd_stride);
+    int max_unit_width, int max_unit_height, const int *quadtset, int bit_depth,
+    const std::vector<int> &split, size_t &split_index,
+    const std::vector<std::pair<int, int>> &A, size_t &A_index, uint16_t *dgd,
+    int dgd_stride);
 
 // Top-level function to apply guided restoration on encoder side.
 static int restore_cnn_quadtree_encode_img_tflite_highbd(
     YV12_BUFFER_CONFIG *source_frame, AV1_COMMON *cm, int superres_denom,
-    int rdmult, const int *splitcosts, int (*norestorecosts)[2],
-    int num_threads, int bit_depth, int is_intra_only, int is_luma,
-    int cnn_index, QUADInfo *quad_info, double *rdcost) {
+    int rdmult, const int *quad_split_costs, const int *binary_split_costs,
+    int (*norestorecosts)[2], int num_threads, int bit_depth, int is_intra_only,
+    int is_luma, int cnn_index, QUADInfo *quad_info, double *rdcost) {
   YV12_BUFFER_CONFIG *dgd_buf = &cm->cur_frame->buf;
   uint16_t *dgd = CONVERT_TO_SHORTPTR(dgd_buf->y_buffer);
   const int dgd_stride = dgd_buf->y_stride;
@@ -1136,7 +1136,8 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   std::vector<int> best_split;              // selected partitioning options.
   std::vector<std::pair<int, int>> best_A;  // selected a0, a1 weight pairs.
   double best_rdcost_total = DBL_MAX;
-  for (int this_unit_index = 0; this_unit_index <= 1; ++this_unit_index) {
+  for (int this_unit_index = 0; this_unit_index < GUIDED_QT_UNIT_SIZES;
+       ++this_unit_index) {
     const int quadtree_max_size =
         quad_tree_get_unit_size(width, height, this_unit_index);
     // For each quadtree unit, compute the best partitioning out of
@@ -1147,20 +1148,27 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
     // Previous a0, a1 pair is mid-point of the range by default.
     std::pair<int, int> prev_A =
         std::make_pair(GUIDED_A_MID + A0_min, GUIDED_A_MID + A1_min);
-    // TODO(urvang): Include padded area in a unit if it's < unit size / 2?
-    // If so, need to modify / replace quad_tree_get_unit_info_length().
-    // Also double check: quad_tree_get_split_info_length().
-    for (int row = 0; row < height; row += quadtree_max_size) {
-      for (int col = 0; col < width; col += quadtree_max_size) {
+    const int ext_size = quadtree_max_size * 3 / 2;
+    for (int row = 0; row < height;) {
+      const int remaining_height = height - row;
+      const int this_unit_height =
+          (remaining_height < ext_size) ? remaining_height : quadtree_max_size;
+      for (int col = 0; col < width;) {
+        const int remaining_width = width - col;
+        const int this_unit_width =
+            (remaining_width < ext_size) ? remaining_width : quadtree_max_size;
         double this_rdcost;
         select_quadtree_partitioning(
             interm, src, src_stride, row, col, width, height, quadtree_max_size,
-            quadtset, rdmult, prev_A, splitcosts, this_norestorecosts,
+            this_unit_width, this_unit_height, quadtset, rdmult, prev_A,
+            quad_split_costs, binary_split_costs, this_norestorecosts,
             bit_depth, dgd, dgd_stride, this_split, this_A, &this_rdcost);
         // updates.
         this_rdcost_total += this_rdcost;
         prev_A = this_A.back();
+        col += this_unit_width;
       }
+      row += this_unit_height;
     }
     // Update best options.
     if (this_rdcost_total < best_rdcost_total) {
@@ -1188,22 +1196,33 @@ static int restore_cnn_quadtree_encode_img_tflite_highbd(
   // Apply guided restoration to 'dgd' using best options above.
   size_t split_index = 0;
   size_t A_index = 0;
-  for (int row = 0; row < height; row += quad_info->unit_size) {
-    for (int col = 0; col < width; col += quad_info->unit_size) {
+  const int quadtree_max_size = quad_info->unit_size;
+  const int ext_size = quadtree_max_size * 3 / 2;
+  for (int row = 0; row < height;) {
+    const int remaining_height = height - row;
+    const int this_unit_height =
+        (remaining_height < ext_size) ? remaining_height : quadtree_max_size;
+    for (int col = 0; col < width;) {
+      const int remaining_width = width - col;
+      const int this_unit_width =
+          (remaining_width < ext_size) ? remaining_width : quadtree_max_size;
       apply_quadtree_partitioning(
-          interm, row, col, width, height, quad_info->unit_size, quadtset,
-          bit_depth, best_split, split_index, best_A, A_index, dgd, dgd_stride);
+          interm, row, col, width, height, quadtree_max_size, this_unit_width,
+          this_unit_height, quadtset, bit_depth, best_split, split_index,
+          best_A, A_index, dgd, dgd_stride);
+      col += this_unit_width;
     }
+    row += this_unit_height;
   }
 
   return 1;
 }
 
 extern "C" int av1_restore_cnn_quadtree_encode_tflite(
-    AV1_COMMON *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
-    int *splitcosts, int (*norestorecosts)[2], int num_threads,
-    const int apply_cnn[MAX_MB_PLANE], const int cnn_indices[MAX_MB_PLANE],
-    QUADInfo *quad_info, double *rdcost) {
+    struct AV1Common *cm, YV12_BUFFER_CONFIG *source_frame, int RDMULT,
+    int *quad_split_costs, int *binary_split_costs, int (*norestorecosts)[2],
+    int num_threads, const int apply_cnn[MAX_MB_PLANE],
+    const int cnn_indices[MAX_MB_PLANE], QUADInfo *quad_info, double *rdcost) {
   YV12_BUFFER_CONFIG *buf = &cm->cur_frame->buf;
   const int is_intra_only = frame_is_intra_only(cm);
   for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
@@ -1217,8 +1236,9 @@ extern "C" int av1_restore_cnn_quadtree_encode_tflite(
       case AOM_PLANE_Y:
         ret = restore_cnn_quadtree_encode_img_tflite_highbd(
             source_frame, cm, cm->superres_scale_denominator, RDMULT,
-            splitcosts, norestorecosts, num_threads, cm->seq_params.bit_depth,
-            is_intra_only, is_luma, cnn_index, quad_info, rdcost);
+            quad_split_costs, binary_split_costs, norestorecosts, num_threads,
+            cm->seq_params.bit_depth, is_intra_only, is_luma, cnn_index,
+            quad_info, rdcost);
         if (ret == 0) return ret;
         break;
       case AOM_PLANE_U:
@@ -1290,42 +1310,30 @@ static void apply_linear_combination(
 static void apply_quadtree_partitioning(
     const std::vector<std::vector<std::vector<double>>> &interm, int start_row,
     int start_col, int width, int height, int quadtree_max_size,
-    const int *quadtset, int bit_depth, const std::vector<int> &split,
-    size_t &split_index, const std::vector<std::pair<int, int>> &A,
-    size_t &A_index, uint16_t *dgd, int dgd_stride) {
-  const int end_row = AOMMIN(start_row + quadtree_max_size, height);
-  const int end_col = AOMMIN(start_col + quadtree_max_size, width);
-  const bool is_partial_unit = (start_row + quadtree_max_size > height) ||
-                               (start_col + quadtree_max_size > width);
+    int max_unit_width, int max_unit_height, const int *quadtset, int bit_depth,
+    const std::vector<int> &split, size_t &split_index,
+    const std::vector<std::pair<int, int>> &A, size_t &A_index, uint16_t *dgd,
+    int dgd_stride) {
+  const int end_row = AOMMIN(start_row + max_unit_height, height);
+  const int end_col = AOMMIN(start_col + max_unit_width, width);
+  // Check for special cases near boundary.
+  const bool is_horz_partitioning_allowed =
+      (max_unit_height >= quadtree_max_size);
+  const bool is_vert_partitioning_allowed =
+      (max_unit_width >= quadtree_max_size);
 
   // Get partition type.
   GuidedQuadTreePartitionType partition_type = GUIDED_QT_NONE;
-  if (!is_partial_unit) {
-    const int spl1 = split[split_index++];
-    const int spl2 = split[split_index++];
-    if (spl1 == 0) {
-      if (spl2 == 0) {
-        partition_type = GUIDED_QT_NONE;  // (0, 0)
-      } else {
-        assert(spl2 == 1);
-        partition_type = GUIDED_QT_SPLIT;  // (0, 1)
-      }
-    } else {
-      assert(spl1 == 1);
-      if (spl2 == 1) {
-        partition_type = GUIDED_QT_HORZ;  // (1, 1)
-      } else {
-        assert(spl2 == 0);
-        partition_type = GUIDED_QT_VERT;  // (1, 0)
-      }
-    }
+  if (is_horz_partitioning_allowed || is_vert_partitioning_allowed) {
+    partition_type = (GuidedQuadTreePartitionType)split[split_index++];
   }
   assert(partition_type >= 0 && partition_type < GUIDED_QT_TYPES);
 
   // Get unit width and height based on partition type.
   int unit_width;
   int unit_height;
-  get_unit_size(quadtree_max_size, partition_type, &unit_width, &unit_height);
+  get_unit_size(max_unit_width, max_unit_height, partition_type, &unit_width,
+                &unit_height);
 
   // Compute restored unit, a0 and a1 with given A parameters.
   apply_linear_combination(interm, start_row, end_row, start_col, end_col,
@@ -1377,12 +1385,22 @@ static int restore_cnn_quadtree_decode_img_tflite_highbd(
   // For each quadtree unit, apply given quadtree partitioning.
   size_t split_index = 0;
   size_t A_index = 0;
-  for (int row = 0; row < height; row += quadtree_max_size) {
-    for (int col = 0; col < width; col += quadtree_max_size) {
+  const int ext_size = quadtree_max_size * 3 / 2;
+  for (int row = 0; row < height;) {
+    const int remaining_height = height - row;
+    const int this_unit_height =
+        (remaining_height < ext_size) ? remaining_height : quadtree_max_size;
+    for (int col = 0; col < width;) {
+      const int remaining_width = width - col;
+      const int this_unit_width =
+          (remaining_width < ext_size) ? remaining_width : quadtree_max_size;
       apply_quadtree_partitioning(interm, row, col, width, height,
-                                  quadtree_max_size, quadtset, bit_depth, split,
+                                  quadtree_max_size, this_unit_width,
+                                  this_unit_height, quadtset, bit_depth, split,
                                   split_index, A, A_index, dgd, dgd_stride);
+      col += this_unit_width;
     }
+    row += this_unit_height;
   }
   assert(split_index == split.size());
   assert(A_index == A.size());

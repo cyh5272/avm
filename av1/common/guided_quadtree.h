@@ -30,17 +30,27 @@ extern "C" {
 #define GUIDED_A_MID (GUIDED_A_NUM_VALUES >> 1)
 #define GUIDED_A_RANGE (GUIDED_A_NUM_VALUES - 1)
 #define GUIDED_A_PAIR_BITS (GUIDED_A_BITS * 2 - 1)
+#define GUIDED_QT_UNIT_SIZES_LOG2 2
+#define GUIDED_QT_UNIT_SIZES (1 << GUIDED_QT_UNIT_SIZES_LOG2)
+
+typedef enum {
+  GUIDED_QT_NONE,
+  GUIDED_QT_SPLIT,
+  GUIDED_QT_HORZ,
+  GUIDED_QT_VERT,
+  GUIDED_QT_TYPES,
+  GUIDED_QT_INVALID = -1
+} GuidedQuadTreePartitionType;
 
 int *get_quadparm_from_qindex(int qindex, int superres_denom, int is_intra_only,
                               int is_luma, int cnn_index);
 
 void quad_copy(const QUADInfo *src, QUADInfo *dst, struct AV1Common *cm);
-// Get the length of unit info array based on dimensions and split info.
-// If split_info == NULL, assumes each block uses split, thereby returning
-// longest possible unit info length.
-int quad_tree_get_unit_info_length(int width, int height, int unit_length,
-                                   const QUADSplitInfo *split_info,
-                                   int split_info_length);
+
+// Get the maximum possible length of unit info array based on dimensions,
+// assuming each block uses split.
+int quad_tree_get_max_unit_info_length(int width, int height, int unit_length);
+
 // Get the length of split info array based on dimensions.
 int quad_tree_get_split_info_length(int width, int height, int unit_length);
 
@@ -56,10 +66,12 @@ static INLINE int get_guided_norestore_ctx(int qindex, int superres_denom,
 // Get quad tree unit size.
 static INLINE int quad_tree_get_unit_size(int width, int height,
                                           int unit_index) {
-  const bool is_720p_or_smaller = (width * height <= 1280 * 720);
-  const int min_unit_size = is_720p_or_smaller ? 256 : 512;
-  assert(unit_index >= 0 && unit_index <= 1);
-  return min_unit_size << unit_index;
+  const int max_dim = AOMMAX(width, height);
+  const int max_dim_pow_2_bits = 1 + get_msb(max_dim);
+  const int max_dim_pow_2 = 1 << max_dim_pow_2_bits;
+  const int max_unit_size = AOMMAX(AOMMIN(max_dim_pow_2, 2048), 256);
+  assert(unit_index >= 0 && unit_index < GUIDED_QT_UNIT_SIZES);
+  return max_unit_size >> unit_index;
 }
 
 // Allocates buffers in 'quad_info' assuming 'quad_info->unit_index',
