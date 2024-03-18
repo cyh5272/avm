@@ -17,6 +17,14 @@ using libaom_test::ACMRandom;
 #if CONFIG_EXT_WARP_FILTER
 using libaom_test::AV1ExtHighbdWarpFilter::AV1ExtHighbdWarpFilterTest;
 #endif  // CONFIG_EXT_WARP_FILTER
+#if CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT && \
+    CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+#if OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+using libaom_test::AV1HighbdUpdatePredGradAffine::
+    AV1HighbdUpdatePredGradAffineTest;
+#endif  // OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+#endif  // CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT &&
+        // CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 using libaom_test::AV1HighbdWarpFilter::AV1HighbdWarpFilterTest;
 using std::make_tuple;
 using std::tuple;
@@ -56,3 +64,24 @@ INSTANTIATE_TEST_SUITE_P(
 #endif  // HAVE_AVX2
 
 }  // namespace
+
+#if CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT && \
+    CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+#if OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+TEST_P(AV1HighbdUpdatePredGradAffineTest, DISABLED_Speed) {
+  RunSpeedTest(std::get<4>(GET_PARAM(0)));
+}
+
+TEST_P(AV1HighbdUpdatePredGradAffineTest, CheckOutput) {
+  RunCheckOutput(::testing::get<4>(GET_PARAM(0)));
+}
+
+#if HAVE_AVX2
+INSTANTIATE_TEST_SUITE_P(
+    AVX2, AV1HighbdUpdatePredGradAffineTest,
+    libaom_test::AV1HighbdUpdatePredGradAffine::BuildParams(
+        update_pred_grad_with_affine_model_new_avx2));
+#endif
+#endif  // OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+#endif  // CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT &&
+        // CONFIG_COMBINE_AFFINE_WARP_GRADIENT

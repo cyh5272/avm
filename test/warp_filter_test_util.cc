@@ -11,6 +11,7 @@
  */
 #include "aom_ports/aom_timer.h"
 #include "test/warp_filter_test_util.h"
+#include "av1/common/av1_common_int.h"
 
 using std::make_tuple;
 using std::tuple;
@@ -478,4 +479,294 @@ void AV1ExtHighbdWarpFilterTest::RunCheckOutput(
 }
 }  // namespace AV1ExtHighbdWarpFilter
 #endif  // CONFIG_EXT_WARP_FILTER
+
+#if CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT && \
+    CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+#if OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+namespace AV1HighbdUpdatePredGradAffine {
+::testing::internal::ParamGenerator<AV1HighbdUpdatePredGradAffineParams>
+BuildParams(update_pred_grad_with_affine_model filter) {
+  const AV1HighbdUpdatePredGradAffineParam params[] = {
+    make_tuple(8, 8, 1000, 8, filter),
+    make_tuple(8, 8, 1000, 10, filter),
+    make_tuple(8, 8, 1000, 12, filter),
+    make_tuple(8, 16, 1000, 8, filter),
+    make_tuple(8, 16, 1000, 10, filter),
+    make_tuple(8, 16, 1000, 12, filter),
+    make_tuple(16, 16, 1000, 8, filter),
+    make_tuple(16, 16, 1000, 10, filter),
+    make_tuple(16, 16, 1000, 12, filter),
+    make_tuple(16, 8, 1000, 8, filter),
+    make_tuple(16, 8, 1000, 10, filter),
+    make_tuple(16, 8, 1000, 12, filter),
+    make_tuple(16, 32, 1000, 8, filter),
+    make_tuple(16, 32, 1000, 10, filter),
+    make_tuple(16, 32, 1000, 12, filter),
+    make_tuple(32, 32, 1000, 8, filter),
+    make_tuple(32, 32, 1000, 10, filter),
+    make_tuple(32, 32, 1000, 12, filter),
+    make_tuple(32, 16, 1000, 8, filter),
+    make_tuple(32, 16, 1000, 10, filter),
+    make_tuple(32, 16, 1000, 12, filter),
+    make_tuple(32, 64, 1000, 10, filter),
+    make_tuple(32, 64, 1000, 12, filter),
+    make_tuple(32, 64, 1000, 8, filter),
+    make_tuple(64, 64, 1000, 8, filter),
+    make_tuple(64, 64, 1000, 10, filter),
+    make_tuple(64, 64, 1000, 12, filter),
+    make_tuple(64, 32, 1000, 8, filter),
+    make_tuple(64, 32, 1000, 10, filter),
+    make_tuple(64, 32, 1000, 12, filter),
+    make_tuple(64, 128, 1000, 8, filter),
+    make_tuple(64, 128, 1000, 10, filter),
+    make_tuple(64, 128, 1000, 12, filter),
+    make_tuple(128, 128, 1000, 8, filter),
+    make_tuple(128, 128, 1000, 10, filter),
+    make_tuple(128, 128, 1000, 12, filter),
+    make_tuple(128, 64, 1000, 8, filter),
+    make_tuple(128, 64, 1000, 10, filter),
+    make_tuple(128, 64, 1000, 12, filter),
+    make_tuple(128, 256, 1000, 8, filter),
+    make_tuple(128, 256, 1000, 10, filter),
+    make_tuple(128, 256, 1000, 12, filter),
+    make_tuple(256, 256, 1000, 8, filter),
+    make_tuple(256, 256, 1000, 10, filter),
+    make_tuple(256, 256, 1000, 12, filter),
+    make_tuple(256, 128, 1000, 8, filter),
+    make_tuple(256, 128, 1000, 10, filter),
+    make_tuple(256, 128, 1000, 12, filter),
+  };
+  return ::testing::Combine(::testing::ValuesIn(params),
+                            ::testing::Values(0, 1), ::testing::Values(0, 1),
+                            ::testing::Values(0, 1), ::testing::Values(0, 1));
+}
+
+AV1HighbdUpdatePredGradAffineTest::~AV1HighbdUpdatePredGradAffineTest() {}
+void AV1HighbdUpdatePredGradAffineTest::SetUp() {
+  rnd_.Reset(ACMRandom::DeterministicSeed());
+}
+
+void AV1HighbdUpdatePredGradAffineTest::TearDown() {
+  libaom_test::ClearSystemState();
+}
+
+void AV1HighbdUpdatePredGradAffineTest::RunCheckOutput(
+    update_pred_grad_with_affine_model test_impl) {
+  AV1HighbdUpdatePredGradAffineParam param = GET_PARAM(0);
+  const int is_alpha_zero = GET_PARAM(1);
+  const int is_beta_zero = GET_PARAM(2);
+  const int is_gamma_zero = GET_PARAM(3);
+  const int is_delta_zero = GET_PARAM(4);
+  const int bd = ::testing::get<3>(param);
+  const int w = 256, h = 256;
+  const int bw = ::testing::get<0>(param), bh = ::testing::get<1>(param);
+  const int border = 16;
+  const int stride = w + 2 * border;
+  const int mask = (1 << bd) - 1;
+  int j, sub_x, sub_y;
+  int grad_prec_bits = 0;
+
+  uint16_t *input_ = new uint16_t[2 * h * stride];
+  uint16_t *input[2];
+  input[0] = input_ + border;
+  input[1] = input_ + h * stride + border;
+
+  int16_t *gx0 = new int16_t[bw * bh];
+  int16_t *gx0_ = new int16_t[bw * bh];
+
+  int16_t *gy0 = new int16_t[bw * bh];
+  int16_t *gy0_ = new int16_t[bw * bh];
+
+  int16_t *tmp0 = new int16_t[bw * bh];
+  int16_t *tmp0_ = new int16_t[bw * bh];
+
+  int16_t *tmp1 = new int16_t[bw * bh];
+  int16_t *tmp1_ = new int16_t[bw * bh];
+
+  WarpedMotionParams wms[2];
+  int16_t alpha, beta, gamma, delta;
+  struct buf_2d pre_buf[2];
+  OrderHintInfo oh_info;
+  int kMaxOrderHintBits = 8;
+
+  oh_info.enable_order_hint = 1;
+  for (int oh_bits = 1; oh_bits <= kMaxOrderHintBits; oh_bits++) {
+    const int cur_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+    const int ref0_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+    const int ref1_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+
+    oh_info.order_hint_bits_minus_1 = oh_bits - 1;
+    const int d0 = get_relative_dist(&oh_info, cur_frm_idx, ref0_frm_idx);
+    const int d1 = get_relative_dist(&oh_info, cur_frm_idx, ref1_frm_idx);
+    if (!d0 || !d1) continue;
+    // Generate an input block and extend its borders horizontally
+    for (int ref = 0; ref < 2; ++ref) {
+      for (int r = 0; r < h; ++r)
+        for (int c = 0; c < w; ++c)
+          input[ref][r * stride + c] = rnd_.Rand16() & mask;
+      for (int r = 0; r < h; ++r) {
+        for (int c = 0; c < border; ++c) {
+          input[ref][r * stride - border + c] = input[ref][r * stride];
+          input[ref][r * stride + w + c] = input[ref][r * stride + (w - 1)];
+        }
+      }
+      pre_buf[ref].buf = NULL;
+      pre_buf[ref].buf0 = input[ref];
+      pre_buf[ref].width = w;
+      pre_buf[ref].height = h;
+      pre_buf[ref].stride = stride;
+    }
+
+    for (sub_x = 0; sub_x < 1; ++sub_x)
+      for (sub_y = 0; sub_y < 1; ++sub_y) {
+        // Generate mat[8] for ref0 and ref1
+        generate_warped_model(&rnd_, wms[0].wmmat, &alpha, &beta, &gamma,
+                              &delta, is_alpha_zero, is_beta_zero,
+                              is_gamma_zero, is_delta_zero);
+        generate_warped_model(&rnd_, wms[1].wmmat, &alpha, &beta, &gamma,
+                              &delta, is_alpha_zero, is_beta_zero,
+                              is_gamma_zero, is_delta_zero);
+
+        update_pred_grad_with_affine_model_new_c(pre_buf, bw, bh, wms, 0, 0,
+                                                 tmp0, tmp1, gx0, gy0, d0, d1,
+                                                 &grad_prec_bits, sub_x, sub_y);
+
+        test_impl(pre_buf, bw, bh, wms, 0, 0, tmp0_, tmp1_, gx0_, gy0_, d0, d1,
+                  &grad_prec_bits, sub_x, sub_y);
+
+        for (j = 0; j < bw * bh; ++j)
+          ASSERT_EQ(tmp1[j], tmp1_[j])
+              << "Pixel mismatch at index " << j << " = (" << (j % bw) << ", "
+              << (j / bw);
+        for (j = 0; j < bw * bh; ++j)
+          ASSERT_EQ(gx0[j], gx0_[j]) << "Pixel mismatch at index " << j
+                                     << " = (" << (j % bw) << ", " << (j / bw);
+        for (j = 0; j < bw * bh; ++j)
+          ASSERT_EQ(gy0[j], gy0_[j]) << "Pixel mismatch at index " << j
+                                     << " = (" << (j % bw) << ", " << (j / bw);
+      }
+  }
+
+  delete[] input_;
+  delete[] tmp0;
+  delete[] tmp0_;
+  delete[] tmp1;
+  delete[] tmp1_;
+  delete[] gx0;
+  delete[] gx0_;
+  delete[] gy0;
+  delete[] gy0_;
+}
+
+void AV1HighbdUpdatePredGradAffineTest::RunSpeedTest(
+    update_pred_grad_with_affine_model test_impl) {
+  AV1HighbdUpdatePredGradAffineParam param = GET_PARAM(0);
+  const int is_alpha_zero = GET_PARAM(1);
+  const int is_beta_zero = GET_PARAM(2);
+  const int is_gamma_zero = GET_PARAM(3);
+  const int is_delta_zero = GET_PARAM(4);
+  const int bd = ::testing::get<3>(param);
+  const int num_iters = ::testing::get<2>(param);
+  const int w = 256, h = 256;
+  const int bw = ::testing::get<0>(param), bh = ::testing::get<1>(param);
+  const int border = 16;
+  const int stride = w + 2 * border;
+  const int mask = (1 << bd) - 1;
+  int grad_prec_bits = 0;
+
+  uint16_t *input_ = new uint16_t[2 * h * stride];
+  uint16_t *input[2];
+  input[0] = input_ + border;
+  input[1] = input_ + h * stride + border;
+
+  int16_t *gx0 = new int16_t[bw * bh];
+
+  int16_t *gy0 = new int16_t[bw * bh];
+
+  int16_t *tmp0 = new int16_t[bw * bh];
+
+  int16_t *tmp1 = new int16_t[bw * bh];
+
+  WarpedMotionParams wms[2];
+  int16_t alpha, beta, gamma, delta;
+  struct buf_2d pre_buf[2];
+  OrderHintInfo oh_info;
+  int kMaxOrderHintBits = 8;
+  int d0, d1;
+
+  oh_info.enable_order_hint = 1;
+  for (int oh_bits = 1; oh_bits <= kMaxOrderHintBits; oh_bits++) {
+    const int cur_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+    const int ref0_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+    const int ref1_frm_idx = rnd_.Rand8() & ((1 << oh_bits) - 1);
+
+    oh_info.order_hint_bits_minus_1 = oh_bits - 1;
+    d0 = get_relative_dist(&oh_info, cur_frm_idx, ref0_frm_idx);
+    d1 = get_relative_dist(&oh_info, cur_frm_idx, ref1_frm_idx);
+    if (!d0 || !d1) continue;
+  }
+  // Generate an input block and extend its borders horizontally
+  for (int ref = 0; ref < 2; ++ref) {
+    for (int r = 0; r < h; ++r)
+      for (int c = 0; c < w; ++c)
+        input[ref][r * stride + c] = rnd_.Rand16() & mask;
+    for (int r = 0; r < h; ++r) {
+      for (int c = 0; c < border; ++c) {
+        input[ref][r * stride - border + c] = input[ref][r * stride];
+        input[ref][r * stride + w + c] = input[ref][r * stride + (w - 1)];
+      }
+    }
+    pre_buf[ref].buf = NULL;
+    pre_buf[ref].buf0 = input[ref];
+    pre_buf[ref].width = w;
+    pre_buf[ref].height = h;
+    pre_buf[ref].stride = stride;
+  }
+
+  // Generate mat[8] for ref0 and ref1
+  generate_warped_model(&rnd_, wms[0].wmmat, &alpha, &beta, &gamma, &delta,
+                        is_alpha_zero, is_beta_zero, is_gamma_zero,
+                        is_delta_zero);
+  generate_warped_model(&rnd_, wms[1].wmmat, &alpha, &beta, &gamma, &delta,
+                        is_alpha_zero, is_beta_zero, is_gamma_zero,
+                        is_delta_zero);
+
+  aom_usec_timer timer_ref, timer_mod;
+
+  aom_usec_timer_start(&timer_ref);
+  for (int i = 0; i < num_iters; ++i)
+    update_pred_grad_with_affine_model_new_c(pre_buf, bw, bh, wms, 0, 0, tmp0,
+                                             tmp1, gx0, gy0, d0, d1,
+                                             &grad_prec_bits, 0, 0);
+  aom_usec_timer_mark(&timer_ref);
+  const int elapsed_time_ref =
+      static_cast<int>(aom_usec_timer_elapsed(&timer_ref));
+
+  aom_usec_timer_start(&timer_mod);
+  for (int i = 0; i < num_iters; ++i)
+    test_impl(pre_buf, bw, bh, wms, 0, 0, tmp0, tmp1, gx0, gy0, d0, d1,
+              &grad_prec_bits, 0, 0);
+
+  aom_usec_timer_mark(&timer_mod);
+  const int elapsed_time_mod =
+      static_cast<int>(aom_usec_timer_elapsed(&timer_mod));
+
+  printf(
+      "Block size: %dx%d, C time = %d \t SIMD time = %d \t Scaling = %4.2f "
+      "\n",
+      bw, bh, elapsed_time_ref, elapsed_time_mod,
+      (static_cast<float>(elapsed_time_ref) /
+       static_cast<float>(elapsed_time_mod)));
+
+  delete[] input_;
+  delete[] tmp0;
+  delete[] tmp1;
+  delete[] gx0;
+  delete[] gy0;
+}
+}  // namespace AV1HighbdUpdatePredGradAffine
+#endif  // OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+#endif  // CONFIG_OPTFLOW_REFINEMENT &&CONFIG_AFFINE_REFINEMENT &&
+        // CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+
 }  // namespace libaom_test

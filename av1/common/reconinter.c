@@ -2642,38 +2642,22 @@ static INLINE unsigned int sad_generic(const uint16_t *a, int a_stride,
 }
 #endif  // AFFINE_OPFL_BASED_ON_SAD
 
-// Methods to combine computation of bilinear warp and gradient
-// 0: combination of bilinear warp & linear interpolated based gradients
-// 1: combination of bilinear warp & cubic spline interpolated gradients
-// 2: combination of bilinear warp & cubic spline interpolated gradients,
-//    where integer pel inputs for cubic spline are reused
-// 3: combination of bilinear warp & cubic spline interpolated gradient with
-//    half-pel delta, where interpolated delta samples are reused
-// 4: composition of bilinear warp & sobel-based gradient operator
-// 5: composition of bilinear warp & sobel-based gradient operator with
-//    half-pel delta, where delta pixels are reused
-#define COMBINE_METHOD 5
-#define DEBUG_AFFINE_COMBINE 0
 // Update predicted blocks (P0 & P1) and their gradients based on the affine
 // model derived from the first DAMR step
-#if CONFIG_COMBINE_AFFINE_WARP_GRADIENT && AFFINE_FAST_WARP_METHOD == 3
-void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
+#if CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+void update_pred_grad_with_affine_model_new_c(
+    struct buf_2d *pre_buf,
 #if CONFIG_AFFINE_REFINEMENT_SB
-                                        int pstride,
+    int pstride,
 #endif  // CONFIG_AFFINE_REFINEMENT_SB
-                                        int bw, int bh, WarpedMotionParams *wms,
-                                        int mi_x, int mi_y, int16_t *tmp0,
-                                        int16_t *tmp1, int16_t *gx0,
-                                        int16_t *gy0, const int d0,
-                                        const int d1, int *grad_prec_bits) {
+    int bw, int bh, WarpedMotionParams *wms, int mi_x, int mi_y, int16_t *tmp0,
+    int16_t *tmp1, int16_t *gx0, int16_t *gy0, const int d0, const int d1,
+    int *grad_prec_bits, int ss_x, int ss_y) {
   (void)tmp0;
-  assert(wm->wmtype <= AFFINE);
-  assert(!is_uneven_wtd_comp_avg(conv_params));
-  assert(IMPLIES(conv_params->is_compound, conv_params->dst != NULL));
-
-  struct macroblockd_plane *const pd = &xd->plane[plane];
-  const int ss_x = pd->subsampling_x;
-  const int ss_y = pd->subsampling_y;
+#if AFFINE_FAST_WARP_METHOD == 3
+  // assert(wm->wmtype <= AFFINE);
+  // assert(!is_uneven_wtd_comp_avg(conv_params));
+  // assert(IMPLIES(conv_params->is_compound, conv_params->dst != NULL));
 
   const int32_t unit_offset = 1 << BILINEAR_WARP_PREC_BITS;
 #if COMBINE_METHOD == 3 || COMBINE_METHOD == 5
@@ -2727,9 +2711,8 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
       int32_t warped_gy[2] = { 0, 0 };
       for (int ref = 0; ref < 2; ref++) {
         const int32_t *const mat = wms[ref].wmmat;
-        struct buf_2d *const pre_buf = &pd->pre[ref];
-        const uint16_t *dst = pd->pre[ref].buf0;
-        const int stride = pre_buf->stride;
+        const uint16_t *dst = pre_buf[ref].buf0;
+        const int stride = pre_buf[ref].stride;
 
         // Project to luma coordinates (if in a subsampled chroma plane), apply
         // the affine transformion.
@@ -2759,12 +2742,12 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
         } else {
 #endif  // COMBINE_METHOD == 2
           const int32_t ix = (x >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t ix0 = clamp(ix, 0, pre_buf->width - 1);
-          const int32_t ix1 = clamp(ix + 1, 0, pre_buf->width - 1);
+          const int32_t ix0 = clamp(ix, 0, pre_buf[ref].width - 1);
+          const int32_t ix1 = clamp(ix + 1, 0, pre_buf[ref].width - 1);
           const int32_t sx = (x >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
           const int32_t iy = (y >> ss_y) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iy0 = clamp(iy, 0, pre_buf->height - 1);
-          const int32_t iy1 = clamp(iy + 1, 0, pre_buf->height - 1);
+          const int32_t iy0 = clamp(iy, 0, pre_buf[ref].height - 1);
+          const int32_t iy1 = clamp(iy + 1, 0, pre_buf[ref].height - 1);
           const int32_t sy = (y >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
           // Bilinear coefficients for Pi'
@@ -2804,22 +2787,22 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
           const int xoff = x + xoffs[point];
           const int yoff = y + yoffs[point];
           const int32_t ixn = (xoff >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf->width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf->width - 1);
+          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
+          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
           const int32_t sxn =
               (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
           const int32_t iyn = (yoff >> ss_y) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf->height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf->height - 1);
+          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
+          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
           const int32_t syn =
               (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
           // Mark as boundary and use one-sided difference for gradient if any
           // of the bilinear steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf->width - 1) ||
+          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
               (point == 1 && ixn + 1 <= 0))
             is_boundary_x = 1;
-          if ((point == 2 && iyn >= pre_buf->height - 1) ||
+          if ((point == 2 && iyn >= pre_buf[ref].height - 1) ||
               (point == 3 && iyn + 1 <= 0))
             is_boundary_y = 1;
 
@@ -2879,10 +2862,10 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
 
           // Mark as boundary and use one-sided difference for gradient if any
           // of the bicubic steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf->width - 1) ||
+          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
               (point == 2 && ixn + 1 <= 0))
             is_boundary_x = 1;
-          if ((point == 4 && iyn >= pre_buf->height - 1) ||
+          if ((point == 4 && iyn >= pre_buf[ref].height - 1) ||
               (point == 6 && iyn + 1 <= 0))
             is_boundary_y = 1;
 
@@ -2892,12 +2875,12 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
           if (i > 0 && (point == 7 || point == 6 || point == 4)) continue;
 #endif  // COMBINE_METHOD == 2
 
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf->width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf->width - 1);
+          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
+          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
           const int32_t sxn =
               (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf->height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf->height - 1);
+          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
+          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
           const int32_t syn =
               (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
@@ -2990,22 +2973,22 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
 
           // Mark as boundary and use one-sided difference for gradient if any
           // of the bicubic steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf->width - 1) ||
+          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
               (point == 2 && ixn + 1 <= 0))
             is_boundary_x = 1;
-          if ((point == 4 && iyn >= pre_buf->height - 1) ||
+          if ((point == 4 && iyn >= pre_buf[ref].height - 1) ||
               (point == 6 && iyn + 1 <= 0))
             is_boundary_y = 1;
 
           if (j > 0 && point == 3) continue;
           if (i > 0 && point == 7) continue;
 
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf->width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf->width - 1);
+          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
+          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
           const int32_t sxn =
               (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf->height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf->height - 1);
+          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
+          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
           const int32_t syn =
               (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
@@ -3081,10 +3064,10 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
 
           // Mark as boundary and use one-sided difference for gradient if any
           // of the sobel steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf->width - 1) ||
+          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
               (point == 1 && ixn + 1 <= 0))
             is_boundary_x = 1;
-          if ((point == 2 && iyn >= pre_buf->height - 1) ||
+          if ((point == 2 && iyn >= pre_buf[ref].height - 1) ||
               (point == 3 && iyn + 1 <= 0))
             is_boundary_y = 1;
 
@@ -3094,12 +3077,12 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
           if (i > 0 && point == 3) continue;
 #endif  // COMBINE_METHOD == 2
 
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf->width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf->width - 1);
+          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
+          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
           const int32_t sxn =
               (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf->height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf->height - 1);
+          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
+          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
           const int32_t syn =
               (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
@@ -3157,6 +3140,23 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane,
 #endif  // CONFIG_AFFINE_REFINEMENT_SB
     }
   }
+#else
+  (void)pre_buf;
+  (void)bw;
+  (void)bh;
+  (void)wms;
+  (void)mi_x;
+  (void)mi_y;
+  (void)tmp0;
+  (void)tmp1;
+  (void)gx0;
+  (void)gy0;
+  (void)d0;
+  (void)d1;
+  (void)grad_prec_bits;
+  (void)ss_x;
+  (void)ss_y;
+#endif  // AFFINE_FAST_WARP_METHOD == 3
 }
 #else
 void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
@@ -3259,7 +3259,7 @@ void update_pred_grad_with_affine_model(MACROBLOCKD *xd, int plane, int bw,
   av1_compute_subpel_gradients_interp(tmp0, bw, bh, grad_prec_bits, gx0, gy0);
   aom_free(dst_warped);
 }
-#endif  // CONFIG_COMBINE_AFFINE_WARP_GRADIENT && AFFINE_FAST_WARP_METHOD == 3
+#endif  // CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 #endif  // CONFIG_AFFINE_REFINEMENT
 
 static AOM_FORCE_INLINE void compute_pred_using_interp_grad_highbd(
@@ -3467,23 +3467,35 @@ void av1_get_optflow_based_mv(
     }
 #endif
 
-#if CONFIG_AFFINE_REFINEMENT_SB && CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+#if CONFIG_COMBINE_AFFINE_WARP_GRADIENT && AFFINE_FAST_WARP_METHOD == 3
+    struct macroblockd_plane *const pd = &xd->plane[plane];
+    struct buf_2d pre_buf[2];
+    for (int ref = 0; ref < 2; ref++) {
+      pre_buf[ref] = pd->pre[ref];
+    }
+#if CONFIG_AFFINE_REFINEMENT_SB
     int sub_bw = AOMMIN(AFFINE_MAX_UNIT, bw);
     int sub_bh = AOMMIN(AFFINE_MAX_UNIT, bh);
     int nb = 0;
     for (int i = 0; i < bh; i += sub_bh) {
       for (int j = 0; j < bw; j += sub_bw) {
-        update_pred_grad_with_affine_model(
-            xd, plane, bw, sub_bw, sub_bh, wms + 2 * nb, mi_x + j, mi_y + i,
+        update_pred_grad_with_affine_model_new(
+            pre_buf, bw, sub_bw, sub_bh, wms + 2 * nb, mi_x + j, mi_y + i,
             tmp0 + i * bw + j, tmp1 + i * bw + j, gx0 + i * bw + j,
-            gy0 + i * bw + j, d0, d1, &grad_prec_bits);
+            gy0 + i * bw + j, d0, d1, &grad_prec_bits, pd->subsampling_x,
+            pd->subsampling_y);
         nb++;
       }
     }
 #else
+    update_pred_grad_with_affine_model_new(
+        pre_buf, bw, bh, wms, mi_x, mi_y, tmp0, tmp1, gx0, gy0, d0, d1,
+        &grad_prec_bits, pd->subsampling_x, pd->subsampling_y);
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+#else
     update_pred_grad_with_affine_model(xd, plane, bw, bh, wms, mi_x, mi_y, tmp0,
                                        tmp1, gx0, gy0, d0, d1, &grad_prec_bits);
-#endif  // CONFIG_AFFINE_REFINEMENT_SB
+#endif
 
 #if DEBUG_AFFINE_COMBINE
     fprintf(stderr, "tmp1:\n");

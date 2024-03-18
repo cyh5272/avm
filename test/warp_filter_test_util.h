@@ -26,6 +26,7 @@
 
 #include "av1/common/mv.h"
 #include "av1/common/common_data.h"
+#include "av1/common/reconinter.h"
 
 namespace libaom_test {
 
@@ -134,6 +135,43 @@ class AV1ExtHighbdWarpFilterTest
 
 }  // namespace AV1ExtHighbdWarpFilter
 #endif  // CONFIG_EXT_WARP_FILTER
+
+#if CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT && \
+    CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+#if OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+namespace AV1HighbdUpdatePredGradAffine {
+typedef void (*update_pred_grad_with_affine_model)(
+    struct buf_2d *pre_buf, int bw, int bh, WarpedMotionParams *wms, int mi_x,
+    int mi_y, int16_t *tmp0, int16_t *tmp1, int16_t *gx0, int16_t *gy0,
+    const int d0, const int d1, int *grad_prec_bits, int ss_x, int ss_y);
+
+typedef ::testing::tuple<int, int, int, int, update_pred_grad_with_affine_model>
+    AV1HighbdUpdatePredGradAffineParam;
+typedef ::testing::tuple<AV1HighbdUpdatePredGradAffineParam, int, int, int, int>
+    AV1HighbdUpdatePredGradAffineParams;
+
+::testing::internal::ParamGenerator<AV1HighbdUpdatePredGradAffineParams>
+BuildParams(update_pred_grad_with_affine_model filter);
+
+class AV1HighbdUpdatePredGradAffineTest
+    : public ::testing::TestWithParam<AV1HighbdUpdatePredGradAffineParams> {
+ public:
+  virtual ~AV1HighbdUpdatePredGradAffineTest();
+  virtual void SetUp();
+
+  virtual void TearDown();
+
+ protected:
+  void RunCheckOutput(update_pred_grad_with_affine_model test_impl);
+  void RunSpeedTest(update_pred_grad_with_affine_model test_impl);
+
+  libaom_test::ACMRandom rnd_;
+};
+
+}  // namespace AV1HighbdUpdatePredGradAffine
+#endif  // OPFL_COMBINE_INTERP_GRAD_LS && AFFINE_FAST_WARP_METHOD == 3
+#endif  // CONFIG_OPTFLOW_REFINEMENT && CONFIG_AFFINE_REFINEMENT &&
+        // CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 }  // namespace libaom_test
 
 #endif  // AOM_TEST_WARP_FILTER_TEST_UTIL_H_

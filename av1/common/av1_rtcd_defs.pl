@@ -526,6 +526,15 @@ if (aom_config("CONFIG_EXT_WARP_FILTER") eq "yes") {
   specialize qw/av1_ext_highbd_warp_affine sse4_1/;
 }
 
+if (aom_config("CONFIG_OPTFLOW_REFINEMENT") eq "yes" and aom_config("CONFIG_AFFINE_REFINEMENT") eq "yes" and aom_config("CONFIG_COMBINE_AFFINE_WARP_GRADIENT") eq "yes") {
+  if (aom_config("CONFIG_AFFINE_REFINEMENT_SB") eq "yes") {
+    add_proto qw/void update_pred_grad_with_affine_model_new/, "struct buf_2d *pre_buf, int pstride, int bw, int bh, WarpedMotionParams *wms, int mi_x, int mi_y, int16_t *tmp0, int16_t *tmp1, int16_t *gx0, int16_t *gy0, const int d0, const int d1, int *grad_prec_bits, int ss_x, int ss_y";
+  } else {
+    add_proto qw/void update_pred_grad_with_affine_model_new/, "struct buf_2d *pre_buf, int bw, int bh, WarpedMotionParams *wms, int mi_x, int mi_y, int16_t *tmp0, int16_t *tmp1, int16_t *gx0, int16_t *gy0, const int d0, const int d1, int *grad_prec_bits, int ss_x, int ss_y";
+  }
+  specialize qw/update_pred_grad_with_affine_model_new avx2/;
+}
+
 if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   add_proto qw/double av1_compute_cross_correlation/, "unsigned char *im1, int stride1, int x1, int y1, unsigned char *im2, int stride2, int x2, int y2";
   specialize qw/av1_compute_cross_correlation sse4_1 avx2/;
