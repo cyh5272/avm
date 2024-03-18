@@ -5470,8 +5470,10 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
                   mi->comp_refine_type >= COMP_AFFINE_REFINE_START;
   int use_affine_opfl = do_affine;
   WarpedMotionParams wms[2];
+#if CONFIG_AFFINE_ON_REFINEMV
   const int wms_stride = pu_width / bw;
   const int sb_idx = (subblk_start_y / bh) * wms_stride + subblk_start_x / bw;
+#endif  // CONFIG_AFFINE_ON_REFINEMV
   wms[0] = wms[1] = default_warp_params;
 #if AFFINE_CHROMA_REFINE_METHOD > 0
   if (use_optflow_refinement && do_affine && plane) {
@@ -5532,7 +5534,7 @@ static void build_inter_predictors_8x8_and_bigger_refinemv(
       }
     }
 #endif  // CONFIG_AFFINE_REFINEMENT || CONFIG_REFINED_MVS_IN_TMVP
-#if CONFIG_AFFINE_REFINEMENT_SB
+#if CONFIG_AFFINE_ON_REFINEMV
     memcpy(xd->wm_params_sb + 2 * sb_idx, wms, 2 * sizeof(wms[0]));
 #elif CONFIG_AFFINE_REFINEMENT
     mi->wm_params[0] = wms[0];
