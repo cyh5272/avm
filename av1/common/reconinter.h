@@ -752,20 +752,7 @@ void avg_pooling_pdiff_gradients(int16_t *pdiff, const int pstride, int16_t *gx,
 #define BILINEAR_WARP_PREC_BITS 12
 #endif  // AFFINE_FAST_WARP_METHOD
 
-#if CONFIG_AFFINE_REFINEMENT
-// Methods to combine computation of bilinear warp and gradient
-// 0: combination of bilinear warp & linear interpolated based gradients
-// 1: combination of bilinear warp & cubic spline interpolated gradients
-// 2: combination of bilinear warp & cubic spline interpolated gradients,
-//    where integer pel inputs for cubic spline are reused
-// 3: combination of bilinear warp & cubic spline interpolated gradient with
-//    half-pel delta, where interpolated delta samples are reused
-// 4: composition of bilinear warp & sobel-based gradient operator
-// 5: composition of bilinear warp & sobel-based gradient operator with
-//    half-pel delta, where delta pixels are reused
-#define COMBINE_METHOD 5
 #define DEBUG_AFFINE_COMBINE 0
-#endif  // CONFIG_AFFINE_REFINEMENT
 
 static INLINE int is_translational_refinement_allowed(const AV1_COMMON *cm,
                                                       const int mode) {

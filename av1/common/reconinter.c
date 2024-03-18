@@ -2645,6 +2645,8 @@ static INLINE unsigned int sad_generic(const uint16_t *a, int a_stride,
 // Update predicted blocks (P0 & P1) and their gradients based on the affine
 // model derived from the first DAMR step
 #if CONFIG_COMBINE_AFFINE_WARP_GRADIENT
+// This function applies composition of bilinear warp & sobel-based gradient
+// operator with half-pel delta, where delta pixels are reused.
 void update_pred_grad_with_affine_model_new_c(
     struct buf_2d *pre_buf,
 #if CONFIG_AFFINE_REFINEMENT_SB
@@ -2660,32 +2662,11 @@ void update_pred_grad_with_affine_model_new_c(
   // assert(IMPLIES(conv_params->is_compound, conv_params->dst != NULL));
 
   const int32_t unit_offset = 1 << BILINEAR_WARP_PREC_BITS;
-#if COMBINE_METHOD == 3 || COMBINE_METHOD == 5
   *grad_prec_bits = 0;  // subpel_grad_delta_bits = 1
-#else
-  *grad_prec_bits = 3 - SUBPEL_GRAD_DELTA_BITS - 2;
-#endif  // COMBINE_METHOD == 3 || COMBINE_METHOD == 5
 
-#if COMBINE_METHOD == 2
-  // Line buffers to store previous gradient steps
-  int32_t prev_y_step[2][4 * MAX_SB_SIZE];
-  int32_t prev_x_step[2][4];
-#endif  // COMBINE_METHOD == 2
-#if COMBINE_METHOD == 3
   // Line buffers to store previous gradient steps
   int32_t prev_y_step[2][MAX_SB_SIZE];
   int32_t prev_x_step[2];
-  // Cubic spline interpolation at half-pel delta is based on
-  // x[a+0.5] = (-1 * x[a-1] + 9 * x[a] + 9 * x[a+1] - 1 * x[a+2]) / 16
-  // where a is any integer.
-  int16_t cubic_coeffs[2][2] = { { -1, -2 }, { 9, 18 } };
-  int cubic_bits = 4;
-#endif  // COMBINE_METHOD == 3
-#if COMBINE_METHOD == 5
-  // Line buffers to store previous gradient steps
-  int32_t prev_y_step[2][MAX_SB_SIZE];
-  int32_t prev_x_step[2];
-#endif  // COMBINE_METHOD == 5
 
   int32_t cur_x[2] = { wms[0].wmmat[2] * (mi_x << ss_x) +
                            wms[0].wmmat[3] * (mi_y << ss_y) + wms[0].wmmat[0],
@@ -2734,321 +2715,36 @@ void update_pred_grad_with_affine_model_new_c(
         int32_t y = mat[4] * src_x + mat[5] * src_y + mat[1];
         */
 
-#if COMBINE_METHOD == 2
-        // Reuse steps that are derived previously
-        if (j > 0 || i > 0) {
-          warped_dst[ref] =
-              j > 0 ? prev_x_step[ref][2] : prev_y_step[ref][2 * bw + j];
-        } else {
-#endif  // COMBINE_METHOD == 2
-          const int32_t ix = (x >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t ix0 = clamp(ix, 0, pre_buf[ref].width - 1);
-          const int32_t ix1 = clamp(ix + 1, 0, pre_buf[ref].width - 1);
-          const int32_t sx = (x >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iy = (y >> ss_y) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iy0 = clamp(iy, 0, pre_buf[ref].height - 1);
-          const int32_t iy1 = clamp(iy + 1, 0, pre_buf[ref].height - 1);
-          const int32_t sy = (y >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
+        const int32_t ix = (x >> ss_x) >> WARPEDMODEL_PREC_BITS;
+        const int32_t ix0 = clamp(ix, 0, pre_buf[ref].width - 1);
+        const int32_t ix1 = clamp(ix + 1, 0, pre_buf[ref].width - 1);
+        const int32_t sx = (x >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
+        const int32_t iy = (y >> ss_y) >> WARPEDMODEL_PREC_BITS;
+        const int32_t iy0 = clamp(iy, 0, pre_buf[ref].height - 1);
+        const int32_t iy1 = clamp(iy + 1, 0, pre_buf[ref].height - 1);
+        const int32_t sy = (y >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
-          // Bilinear coefficients for Pi'
-          const int32_t coeff_x = ROUND_POWER_OF_TWO(
-              sx, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-          const int32_t coeff_y = ROUND_POWER_OF_TWO(
-              sy, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
+        // Bilinear coefficients for Pi'
+        const int32_t coeff_x = ROUND_POWER_OF_TWO(
+            sx, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
+        const int32_t coeff_y = ROUND_POWER_OF_TWO(
+            sy, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
 
-          // Horizontal and vertical bilinear filter for Pi'
-          int32_t vtmp0 = dst[iy0 * stride + ix0] * (unit_offset - coeff_x) +
-                          dst[iy0 * stride + ix1] * coeff_x;
-          vtmp0 = ROUND_POWER_OF_TWO(vtmp0, BILINEAR_WARP_PREC_BITS);
-          int32_t vtmp1 = dst[iy1 * stride + ix0] * (unit_offset - coeff_x) +
-                          dst[iy1 * stride + ix1] * coeff_x;
-          vtmp1 = ROUND_POWER_OF_TWO(vtmp1, BILINEAR_WARP_PREC_BITS);
-          warped_dst[ref] = vtmp0 * (unit_offset - coeff_y) + vtmp1 * coeff_y;
-          warped_dst[ref] =
-              ROUND_POWER_OF_TWO(warped_dst[ref], BILINEAR_WARP_PREC_BITS);
-#if COMBINE_METHOD == 2
-        }
-#endif  // COMBINE_METHOD == 2
+        // Horizontal and vertical bilinear filter for Pi'
+        int32_t vtmp0 = dst[iy0 * stride + ix0] * (unit_offset - coeff_x) +
+                        dst[iy0 * stride + ix1] * coeff_x;
+        vtmp0 = ROUND_POWER_OF_TWO(vtmp0, BILINEAR_WARP_PREC_BITS);
+        int32_t vtmp1 = dst[iy1 * stride + ix0] * (unit_offset - coeff_x) +
+                        dst[iy1 * stride + ix1] * coeff_x;
+        vtmp1 = ROUND_POWER_OF_TWO(vtmp1, BILINEAR_WARP_PREC_BITS);
+        warped_dst[ref] = vtmp0 * (unit_offset - coeff_y) + vtmp1 * coeff_y;
+        warped_dst[ref] =
+            ROUND_POWER_OF_TWO(warped_dst[ref], BILINEAR_WARP_PREC_BITS);
 
-#if COMBINE_METHOD == 0
-        // 4 bilinear offset coordinates (point=0,1,2,3) are given by
-        // (src_x + 1, src_y), (src_x - 1, src_y),
-        // (src_x, src_y + 1), (src_x, src_y - 1)
-        // Their corresponding warped coordinates are given by (x,y) offset
-        // with elements of mat
-        int xoffs[4] = { mat[2], -mat[2], mat[3], -mat[3] };
-        int yoffs[4] = { mat[4], -mat[4], mat[5], -mat[5] };
-        int32_t dst_delta[4] = { 0 };
-        int is_boundary_x = 0;
-        int is_boundary_y = 0;
-
-        // Compute 4 bilinear offset with bilinear warp
-        for (int point = 0; point < 4; point++) {
-          const int xoff = x + xoffs[point];
-          const int yoff = y + yoffs[point];
-          const int32_t ixn = (xoff >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
-          const int32_t sxn =
-              (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn = (yoff >> ss_y) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
-          const int32_t syn =
-              (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-
-          // Mark as boundary and use one-sided difference for gradient if any
-          // of the bilinear steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
-              (point == 1 && ixn + 1 <= 0))
-            is_boundary_x = 1;
-          if ((point == 2 && iyn >= pre_buf[ref].height - 1) ||
-              (point == 3 && iyn + 1 <= 0))
-            is_boundary_y = 1;
-
-          // Bilinear coefficients for bilinear offset positions
-          const int32_t coeff_xn = ROUND_POWER_OF_TWO(
-              sxn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-          const int32_t coeff_yn = ROUND_POWER_OF_TWO(
-              syn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-
-          // Horizontal and vertical filter for bilinear offsets
-          int32_t vtmp_n0 =
-              dst[iyn0 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn0 * stride + ixn1] * coeff_xn;
-          vtmp_n0 = ROUND_POWER_OF_TWO(vtmp_n0, BILINEAR_WARP_PREC_BITS);
-          int32_t vtmp_n1 =
-              dst[iyn1 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn1 * stride + ixn1] * coeff_xn;
-          vtmp_n1 = ROUND_POWER_OF_TWO(vtmp_n1, BILINEAR_WARP_PREC_BITS);
-          dst_delta[point] =
-              vtmp_n0 * (unit_offset - coeff_yn) + vtmp_n1 * coeff_yn;
-          dst_delta[point] =
-              ROUND_POWER_OF_TWO(dst_delta[point], BILINEAR_WARP_PREC_BITS);
-        }
-
-        // Compute bilinear gradients given delta offsets
-        warped_gx[ref] =
-            coeffs_bilinear[SUBPEL_GRAD_DELTA_BITS][is_boundary_x] *
-            (dst_delta[0] - dst_delta[1]);
-        warped_gx[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(warped_gx[ref], bilinear_bits);
-        warped_gy[ref] =
-            coeffs_bilinear[SUBPEL_GRAD_DELTA_BITS][is_boundary_y] *
-            (dst_delta[2] - dst_delta[3]);
-        warped_gy[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(warped_gy[ref], bilinear_bits);
-#elif COMBINE_METHOD == 1 || COMBINE_METHOD == 2
-        // 8 bicubic offset coordinates (point=0,1,..,7) are given by
-        // (src_x + 1, src_y), (src_x + 2, src_y), (src_x - 1, src_y),
-        // (src_x - 2, src_y), (src_x, src_y + 1), (src_x, src_y + 2),
-        // (src_x, src_y - 1), (src_x, src_y - 2).
-        // Their corresponding warped coordinates are given by (x,y) offset
-        // with elements of mat
-        int xoffs[8] = { mat[2], 2 * mat[2], -mat[2], -2 * mat[2],
-                         mat[3], 2 * mat[3], -mat[3], -2 * mat[3] };
-        int yoffs[8] = { mat[4], 2 * mat[4], -mat[4], -2 * mat[4],
-                         mat[5], 2 * mat[5], -mat[5], -2 * mat[5] };
-        int32_t dst_delta[8] = { 0 };
-        int is_boundary_x = 0;
-        int is_boundary_y = 0;
-
-        // Compute 8 bicubic offsets with bilinear warp
-        for (int point = 0; point < 8; point++) {
-          const int xoff = x + xoffs[point];
-          const int yoff = y + yoffs[point];
-          const int32_t ixn = (xoff >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iyn = (yoff >> ss_y) >> WARPEDMODEL_PREC_BITS;
-
-          // Mark as boundary and use one-sided difference for gradient if any
-          // of the bicubic steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
-              (point == 2 && ixn + 1 <= 0))
-            is_boundary_x = 1;
-          if ((point == 4 && iyn >= pre_buf[ref].height - 1) ||
-              (point == 6 && iyn + 1 <= 0))
-            is_boundary_y = 1;
-
-#if COMBINE_METHOD == 2
-          // Reuse steps that are derived previously
-          if (j > 0 && (point == 3 || point == 2 || point == 0)) continue;
-          if (i > 0 && (point == 7 || point == 6 || point == 4)) continue;
-#endif  // COMBINE_METHOD == 2
-
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
-          const int32_t sxn =
-              (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
-          const int32_t syn =
-              (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-
-          // Bilinear coefficients for bicubic offset positions
-          const int32_t coeff_xn = ROUND_POWER_OF_TWO(
-              sxn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-          const int32_t coeff_yn = ROUND_POWER_OF_TWO(
-              syn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-
-          // Horizontal and vertical filter for bicubic offsets
-          int32_t vtmp_n0 =
-              dst[iyn0 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn0 * stride + ixn1] * coeff_xn;
-          vtmp_n0 = ROUND_POWER_OF_TWO(vtmp_n0, BILINEAR_WARP_PREC_BITS);
-          int32_t vtmp_n1 =
-              dst[iyn1 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn1 * stride + ixn1] * coeff_xn;
-          vtmp_n1 = ROUND_POWER_OF_TWO(vtmp_n1, BILINEAR_WARP_PREC_BITS);
-          dst_delta[point] =
-              vtmp_n0 * (unit_offset - coeff_yn) + vtmp_n1 * coeff_yn;
-          dst_delta[point] =
-              ROUND_POWER_OF_TWO(dst_delta[point], BILINEAR_WARP_PREC_BITS);
-        }
-#if COMBINE_METHOD == 2
-        // Reuse steps that are derived previously, and store the new steps
-        if (j > 0) {
-          dst_delta[3] = prev_x_step[ref][0];
-          dst_delta[2] = prev_x_step[ref][1];
-          dst_delta[0] = prev_x_step[ref][3];
-        }
-        if (i > 0) {
-          dst_delta[7] = prev_y_step[ref][j];
-          dst_delta[6] = prev_y_step[ref][bw + j];
-          dst_delta[4] = prev_y_step[ref][3 * bw + j];
-        }
-        if (j < bw - 1) {
-          prev_x_step[ref][0] = dst_delta[2];
-          prev_x_step[ref][1] = warped_dst[ref];
-          prev_x_step[ref][2] = dst_delta[0];
-          prev_x_step[ref][3] = dst_delta[1];
-        }
-        if (i < bh - 1) {
-          prev_y_step[ref][j] = dst_delta[6];
-          prev_y_step[ref][bw + j] = warped_dst[ref];
-          prev_y_step[ref][2 * bw + j] = dst_delta[4];
-          prev_y_step[ref][3 * bw + j] = dst_delta[5];
-        }
-#endif  // COMBINE_METHOD == 2
-
-        // Compute bicubic gradients given delta offsets
-        warped_gx[ref] =
-            coeffs_bicubic[SUBPEL_GRAD_DELTA_BITS][0][is_boundary_x] *
-                (dst_delta[0] - dst_delta[2]) +
-            coeffs_bicubic[SUBPEL_GRAD_DELTA_BITS][1][is_boundary_x] *
-                (dst_delta[1] - dst_delta[3]);
-        warped_gx[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(warped_gx[ref], bicubic_bits);
-        warped_gy[ref] =
-            coeffs_bicubic[SUBPEL_GRAD_DELTA_BITS][0][is_boundary_y] *
-                (dst_delta[4] - dst_delta[6]) +
-            coeffs_bicubic[SUBPEL_GRAD_DELTA_BITS][1][is_boundary_y] *
-                (dst_delta[5] - dst_delta[7]);
-        warped_gy[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(warped_gy[ref], bicubic_bits);
-#elif COMBINE_METHOD == 3
-        // 8 bicubic offset coordinates (point=0,1,..,7) are given by
-        // (src_x + 1, src_y), (src_x + 2, src_y), (src_x - 1, src_y),
-        // (src_x - 2, src_y), (src_x, src_y + 1), (src_x, src_y + 2),
-        // (src_x, src_y - 1), (src_x, src_y - 2).
-        // Their corresponding warped coordinates are given by (x,y) offset
-        // with elements of mat
-        int xoffs[8] = { mat[2], 2 * mat[2], -mat[2], -2 * mat[2],
-                         mat[3], 2 * mat[3], -mat[3], -2 * mat[3] };
-        int yoffs[8] = { mat[4], 2 * mat[4], -mat[4], -2 * mat[4],
-                         mat[5], 2 * mat[5], -mat[5], -2 * mat[5] };
-        int32_t dst_delta[8] = { 0 };
-        int is_boundary_x = 0;
-        int is_boundary_y = 0;
-        int32_t left_delta = 0;
-        int32_t right_delta = 0;
-        int32_t bottom_delta = 0;
-        int32_t top_delta = 0;
-
-        // Compute 8 bicubic offsets with bilinear warp
-        for (int point = 0; point < 8; point++) {
-          const int xoff = x + xoffs[point];
-          const int yoff = y + yoffs[point];
-          const int32_t ixn = (xoff >> ss_x) >> WARPEDMODEL_PREC_BITS;
-          const int32_t iyn = (yoff >> ss_y) >> WARPEDMODEL_PREC_BITS;
-
-          // Mark as boundary and use one-sided difference for gradient if any
-          // of the bicubic steps is outside the block boundary
-          if ((point == 0 && ixn >= pre_buf[ref].width - 1) ||
-              (point == 2 && ixn + 1 <= 0))
-            is_boundary_x = 1;
-          if ((point == 4 && iyn >= pre_buf[ref].height - 1) ||
-              (point == 6 && iyn + 1 <= 0))
-            is_boundary_y = 1;
-
-          if (j > 0 && point == 3) continue;
-          if (i > 0 && point == 7) continue;
-
-          const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
-          const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
-          const int32_t sxn =
-              (xoff >> ss_x) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-          const int32_t iyn0 = clamp(iyn, 0, pre_buf[ref].height - 1);
-          const int32_t iyn1 = clamp(iyn + 1, 0, pre_buf[ref].height - 1);
-          const int32_t syn =
-              (yoff >> ss_y) & ((1 << WARPEDMODEL_PREC_BITS) - 1);
-
-          // Bilinear coefficients for bicubic offset positions
-          const int32_t coeff_xn = ROUND_POWER_OF_TWO(
-              sxn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-          const int32_t coeff_yn = ROUND_POWER_OF_TWO(
-              syn, WARPEDMODEL_PREC_BITS - BILINEAR_WARP_PREC_BITS);
-
-          // Horizontal and vertical filter for bicubic offsets
-          int32_t vtmp_n0 =
-              dst[iyn0 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn0 * stride + ixn1] * coeff_xn;
-          vtmp_n0 = ROUND_POWER_OF_TWO(vtmp_n0, BILINEAR_WARP_PREC_BITS);
-          int32_t vtmp_n1 =
-              dst[iyn1 * stride + ixn0] * (unit_offset - coeff_xn) +
-              dst[iyn1 * stride + ixn1] * coeff_xn;
-          vtmp_n1 = ROUND_POWER_OF_TWO(vtmp_n1, BILINEAR_WARP_PREC_BITS);
-          dst_delta[point] =
-              vtmp_n0 * (unit_offset - coeff_yn) + vtmp_n1 * coeff_yn;
-          dst_delta[point] =
-              ROUND_POWER_OF_TWO(dst_delta[point], BILINEAR_WARP_PREC_BITS);
-        }
-
-        // Compute bicubic gradients given delta offsets
-        if (j > 0)
-          left_delta = prev_x_step[ref];
-        else
-          left_delta =
-              cubic_coeffs[0][is_boundary_x] * (dst_delta[0] + dst_delta[3]) +
-              cubic_coeffs[1][is_boundary_x] * (warped_dst[ref] + dst_delta[2]);
-        if (i > 0)
-          top_delta = prev_y_step[ref][j];
-        else
-          top_delta =
-              cubic_coeffs[0][is_boundary_x] * (dst_delta[4] + dst_delta[7]) +
-              cubic_coeffs[1][is_boundary_x] * (warped_dst[ref] + dst_delta[6]);
-        right_delta =
-            cubic_coeffs[0][is_boundary_x] * (dst_delta[1] + dst_delta[2]) +
-            cubic_coeffs[1][is_boundary_x] * (warped_dst[ref] + dst_delta[0]);
-        bottom_delta =
-            cubic_coeffs[0][is_boundary_x] * (dst_delta[5] + dst_delta[6]) +
-            cubic_coeffs[1][is_boundary_x] * (warped_dst[ref] + dst_delta[4]);
-        warped_gx[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(right_delta - left_delta, cubic_bits);
-        warped_gy[ref] =
-            ROUND_POWER_OF_TWO_SIGNED(bottom_delta - top_delta, cubic_bits);
-
-        // Store steps for future pixels
-        if (j < bw - 1) prev_x_step[ref] = right_delta;
-        if (i < bh - 1) prev_y_step[ref][j] = bottom_delta;
-#elif COMBINE_METHOD == 4 || COMBINE_METHOD == 5
         // 4 delta offset coordinates (point=0,1,2,3) are given by
         // (src_x + delta, src_y), (src_x - delta, src_y),
         // (src_x, src_y + delta), (src_x, src_y - delta).
-#if COMBINE_METHOD == 5
         int subpel_bits = 1;
-#else
-        int subpel_bits = SUBPEL_GRAD_DELTA_BITS;
-#endif
         int xoffs[8] = { mat[2], -mat[2], mat[3], -mat[3] };
         int yoffs[8] = { mat[4], -mat[4], mat[5], -mat[5] };
         int32_t dst_delta[4];
@@ -3071,11 +2767,9 @@ void update_pred_grad_with_affine_model_new_c(
               (point == 3 && iyn + 1 <= 0))
             is_boundary_y = 1;
 
-#if COMBINE_METHOD == 5
           // Reuse steps that are derived previously
           if (j > 0 && point == 1) continue;
           if (i > 0 && point == 3) continue;
-#endif  // COMBINE_METHOD == 2
 
           const int32_t ixn0 = clamp(ixn, 0, pre_buf[ref].width - 1);
           const int32_t ixn1 = clamp(ixn + 1, 0, pre_buf[ref].width - 1);
@@ -3106,19 +2800,16 @@ void update_pred_grad_with_affine_model_new_c(
           dst_delta[point] =
               ROUND_POWER_OF_TWO(dst_delta[point], BILINEAR_WARP_PREC_BITS);
         }
-#if COMBINE_METHOD == 5
         // Reuse steps that are derived previously, and store the new steps
         if (j > 0) dst_delta[1] = prev_x_step[ref];
         if (i > 0) dst_delta[3] = prev_y_step[ref][j];
         if (j < bw - 1) prev_x_step[ref] = dst_delta[0];
         if (i < bh - 1) prev_y_step[ref][j] = dst_delta[2];
-#endif  // COMBINE_METHOD == 5
 
         warped_gx[ref] = (dst_delta[0] - dst_delta[1]) *
                          (1 << (subpel_bits + is_boundary_x - 1));
         warped_gy[ref] = (dst_delta[2] - dst_delta[3]) *
                          (1 << (subpel_bits + is_boundary_y - 1));
-#endif  // COMBINE_METHOD
       }
 
 #if CONFIG_AFFINE_REFINEMENT_SB

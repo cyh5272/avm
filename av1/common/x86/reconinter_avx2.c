@@ -623,7 +623,6 @@ void av1_build_compound_diffwtd_mask_highbd_avx2(
     CONFIG_COMBINE_AFFINE_WARP_GRADIENT
 
 #if AFFINE_FAST_WARP_METHOD == 3
-#if COMBINE_METHOD == 5
 DECLARE_ALIGNED(32, static const int32_t,
                 col_inc[8]) = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
@@ -736,7 +735,6 @@ static INLINE __m256i compute_bilinear_warp(uint16_t *pre, __m256i vec_x,
   sum = round_power_of_two_avx2(sum, BILINEAR_WARP_PREC_BITS);
   return sum;
 }
-#endif  // COMBINE_METHOD == 5
 #endif  // AFFINE_FAST_WARP_METHOD == 3
 
 // Update predicted blocks (P0 & P1) and their gradients based on the affine
@@ -751,7 +749,6 @@ void update_pred_grad_with_affine_model_new_avx2(
     int *grad_prec_bits, int ss_x, int ss_y) {
   (void)tmp0;
 #if AFFINE_FAST_WARP_METHOD == 3
-#if COMBINE_METHOD == 5
   *grad_prec_bits = 0;
 
   int32_t cur_x[2] = { wms[0].wmmat[2] * (mi_x << ss_x) +
@@ -929,11 +926,6 @@ void update_pred_grad_with_affine_model_new_avx2(
     vec_y[1] = _mm256_add_epi32(
         vec_y[1], _mm256_set1_epi32(mat_proj_y[1][1] - y_row_offset[1]));
   }
-#else
-  update_pred_grad_with_affine_model_new_c(pre_buf, bw, bh, wms, mi_x, mi_y,
-                                           tmp0, tmp1, gx0, gy0, d0, d1,
-                                           grad_prec_bits, ss_x, ss_y);
-#endif
 #else
   (void)pre_buf;
   (void)bw;
