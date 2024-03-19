@@ -3178,8 +3178,8 @@ void av1_get_optflow_based_mv(
     struct buf_2d pre_buf[2];
     for (int ref = 0; ref < 2; ref++) pre_buf[ref] = pd->pre[ref];
 #if CONFIG_AFFINE_REFINEMENT_SB
-    int sub_bw = AOMMIN(AFFINE_MAX_UNIT, bw);
-    int sub_bh = AOMMIN(AFFINE_MAX_UNIT, bh);
+    int sub_bw = AOMMIN(AFFINE_MAX_UNIT >> pd->subsampling_x, bw);
+    int sub_bh = AOMMIN(AFFINE_MAX_UNIT >> pd->subsampling_y, bh);
     int nb = 0;
     for (int i = 0; i < bh; i += sub_bh) {
       for (int j = 0; j < bw; j += sub_bw) {
@@ -3482,8 +3482,10 @@ void make_inter_pred_of_nxn(
   int src_stride = 0;
 #if CONFIG_AFFINE_REFINEMENT_SB
   int sb_idx = 0;
-  int affine_sub_bw = AOMMIN(AFFINE_MAX_UNIT, bw);
-  int affine_sub_bh = AOMMIN(AFFINE_MAX_UNIT, bh);
+  int affine_sub_bw =
+      AOMMIN(AFFINE_MAX_UNIT >> inter_pred_params->subsampling_x, bw);
+  int affine_sub_bh =
+      AOMMIN(AFFINE_MAX_UNIT >> inter_pred_params->subsampling_y, bh);
   int wms_stride = bw / affine_sub_bw;
 #endif  // CONFIG_AFFINE_REFINEMENT_SB
 
@@ -3624,11 +3626,12 @@ void make_inter_pred_of_nxn(
       }
 #if DEBUG_AFFINE_COMBINE
       int32_t *curmat = wms_sb[ref].wmmat;
-      fprintf(stderr,
-              "  ref %d pos (%d,%d) wm (%d,%d,%d,%d,%d,%d) mvd (%d,%d)\n", ref,
-              j, i, curmat[0], curmat[1], curmat[2], curmat[3], curmat[4],
-              curmat[5], xd->mv_delta[delta_idx].mv[ref].as_mv.row,
-              xd->mv_delta[delta_idx].mv[ref].as_mv.col);
+      fprintf(
+          stderr,
+          "  plane %d ref %d pos (%d,%d) wm (%d,%d,%d,%d,%d,%d) mvd (%d,%d)\n",
+          plane, ref, j, i, curmat[0], curmat[1], curmat[2], curmat[3],
+          curmat[4], curmat[5], xd->mv_delta[delta_idx].mv[ref].as_mv.row,
+          xd->mv_delta[delta_idx].mv[ref].as_mv.col);
 #endif
 
       const int width = (cm->mi_params.mi_cols << MI_SIZE_LOG2);
@@ -3748,7 +3751,7 @@ void av1_opfl_rebuild_inter_predictor(
 #endif  // CONFIG_AFFINE_REFINEMENT
       ref, mc_buf, calc_subpel_params_func, n, &subpel_params);
 
-#if DEBUG_AFFINE_COMBINE
+#if DEBUG_AFFINE_COMBINE && 0
   if (xd->mi[0]->comp_refine_type >= COMP_AFFINE_REFINE_START && wms &&
       use_affine_opfl) {
     fprintf(stderr, "Rec P%d:\n", ref);
