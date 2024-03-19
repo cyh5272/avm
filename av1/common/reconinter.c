@@ -2642,6 +2642,18 @@ static INLINE unsigned int sad_generic(const uint16_t *a, int a_stride,
 }
 #endif  // AFFINE_OPFL_BASED_ON_SAD
 
+#if DEBUG_AFFINE_COMBINE
+static INLINE unsigned int sae(const int16_t *a, int a_stride, int width,
+                               int height) {
+  unsigned int sae = 0;
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) sae += abs(a[x]);
+    a += a_stride;
+  }
+  return sae;
+}
+#endif
+
 // Update predicted blocks (P0 & P1) and their gradients based on the affine
 // model derived from the first DAMR step
 #if CONFIG_COMBINE_AFFINE_WARP_GRADIENT
@@ -3118,41 +3130,44 @@ void av1_get_optflow_based_mv(
                                      grad_prec_bits, wms);
 
 #if DEBUG_AFFINE_COMBINE
-    struct macroblockd_plane *const pd = &xd->plane[plane];
-    fprintf(stderr, "[update] f %d mi (%d,%d) bs %dx%d\n",
-            cm->cur_frame->order_hint, xd->mi_row, xd->mi_col, bw, bh);
+    unsigned int sae0 = sad_generic(dst0, bw, dst1, bw, bw, bh);
+    fprintf(stderr, "[update] f %d mi (%d,%d) bs %dx%d sae %d\n",
+            cm->cur_frame->order_hint, xd->mi_row, xd->mi_col, bw, bh, sae0);
+
 #if CONFIG_AFFINE_REFINEMENT_SB
-    int sub_bw = AOMMIN(AFFINE_MAX_UNIT, bw);
-    int sub_bh = AOMMIN(AFFINE_MAX_UNIT, bh);
+    int sub_bw0 = AOMMIN(AFFINE_MAX_UNIT, bw);
+    int sub_bh0 = AOMMIN(AFFINE_MAX_UNIT, bh);
 #else
-    int sub_bw = bw;
-    int sub_bh = bh;
-#endif
-    int nb = 0;
-    for (int i = 0; i < bh; i += sub_bh) {
-      for (int j = 0; j < bw; j += sub_bw) {
+    int sub_bw0 = bw;
+    int sub_bh0 = bh;
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+    int nb0 = 0;
+    for (int i = 0; i < bh; i += sub_bh0) {
+      for (int j = 0; j < bw; j += sub_bw0) {
         fprintf(stderr,
                 "  sb %d: wm0 (%d,%d,%d,%d,%d,%d) wm1 (%d,%d,%d,%d,%d,%d)\n",
-                nb, wms[2 * nb].wmmat[0], wms[2 * nb].wmmat[1],
-                wms[2 * nb].wmmat[2], wms[2 * nb].wmmat[3],
-                wms[2 * nb].wmmat[4], wms[2 * nb].wmmat[5],
-                wms[2 * nb + 1].wmmat[0], wms[2 * nb + 1].wmmat[1],
-                wms[2 * nb + 1].wmmat[2], wms[2 * nb + 1].wmmat[3],
-                wms[2 * nb + 1].wmmat[4], wms[2 * nb + 1].wmmat[5]);
-        nb++;
+                nb0, wms[2 * nb0].wmmat[0], wms[2 * nb0].wmmat[1],
+                wms[2 * nb0].wmmat[2], wms[2 * nb0].wmmat[3],
+                wms[2 * nb0].wmmat[4], wms[2 * nb0].wmmat[5],
+                wms[2 * nb0 + 1].wmmat[0], wms[2 * nb0 + 1].wmmat[1],
+                wms[2 * nb0 + 1].wmmat[2], wms[2 * nb0 + 1].wmmat[3],
+                wms[2 * nb0 + 1].wmmat[4], wms[2 * nb0 + 1].wmmat[5]);
+        nb0++;
       }
     }
     fprintf(stderr, "P0:\n");
     for (int i = 0; i < bh; i++) {
       for (int j = 0; j < bw; j++) {
-        fprintf(stderr, "%d,", pd->pre[0].buf0[i * pd->pre[0].stride + j]);
+        fprintf(stderr, "%d,", dst0[i * bw + j]);
+        // fprintf(stderr, "%d,", pd1->pre[0].buf0[i * pd1->pre[0].stride + j]);
       }
       fprintf(stderr, "\n");
     }
     fprintf(stderr, "P1:\n");
     for (int i = 0; i < bh; i++) {
       for (int j = 0; j < bw; j++) {
-        fprintf(stderr, "%d,", pd->pre[1].buf0[i * pd->pre[1].stride + j]);
+        fprintf(stderr, "%d,", dst1[i * bw + j]);
+        // fprintf(stderr, "%d,", pd1->pre[1].buf0[i * pd1->pre[1].stride + j]);
       }
       fprintf(stderr, "\n");
     }
@@ -3161,9 +3176,7 @@ void av1_get_optflow_based_mv(
 #if CONFIG_COMBINE_AFFINE_WARP_GRADIENT && AFFINE_FAST_WARP_METHOD == 3
     struct macroblockd_plane *const pd = &xd->plane[plane];
     struct buf_2d pre_buf[2];
-    for (int ref = 0; ref < 2; ref++) {
-      pre_buf[ref] = pd->pre[ref];
-    }
+    for (int ref = 0; ref < 2; ref++) pre_buf[ref] = pd->pre[ref];
 #if CONFIG_AFFINE_REFINEMENT_SB
     int sub_bw = AOMMIN(AFFINE_MAX_UNIT, bw);
     int sub_bh = AOMMIN(AFFINE_MAX_UNIT, bh);
@@ -3189,6 +3202,13 @@ void av1_get_optflow_based_mv(
 #endif
 
 #if DEBUG_AFFINE_COMBINE
+    fprintf(stderr, "[after bwarp] sae %d (", sae(tmp1, bw, bw, bh));
+    for (int i = 0; i < bh; i += sub_bh0) {
+      for (int j = 0; j < bw; j += sub_bw0) {
+        fprintf(stderr, "%d,", sae(tmp1 + i * bw + j, bw, sub_bw0, sub_bh0));
+      }
+    }
+    fprintf(stderr, ")\n");
     fprintf(stderr, "tmp1:\n");
     for (int i = 0; i < bh; i++) {
       for (int j = 0; j < bw; j++) {
@@ -5625,7 +5645,7 @@ static void build_inter_predictors_8x8_and_bigger(
     // parameters derived are saved here and may be reused by chroma
     mi->wm_params[0] = wms[0];
     mi->wm_params[1] = wms[1];
-#endif  // CONFIG_AFFINE_REFINEMENT
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
   }
 
   int n = opfl_get_subblock_size(bw, bh, plane
@@ -5648,6 +5668,10 @@ static void build_inter_predictors_8x8_and_bigger(
   // so that we can apply PEF
   bool ext_warp_used = false;
 #endif  // CONFIG_EXT_WARP_FILTER
+
+#if DEBUG_AFFINE_COMBINE
+  uint16_t temp[256 * 256];
+#endif
 
   for (int ref = 0; ref < 1 + is_compound; ++ref) {
     const struct scale_factors *const sf =
@@ -5745,6 +5769,34 @@ static void build_inter_predictors_8x8_and_bigger(
                                        1
 #endif  // CONFIG_OPTFLOW_ON_TIP
       );
+#if DEBUG_AFFINE_COMBINE
+      if (ref == 0) {
+        for (int i = 0; i < bh; i++) {
+          for (int j = 0; j < bw; j++) {
+            temp[i * bw + j] = dst[i * dst_buf->stride + j];
+          }
+        }
+      } else {
+#if CONFIG_AFFINE_REFINEMENT_SB
+        int sub_bw0 = AOMMIN(AFFINE_MAX_UNIT, bw);
+        int sub_bh0 = AOMMIN(AFFINE_MAX_UNIT, bh);
+#else
+        int sub_bw0 = bw;
+        int sub_bh0 = bh;
+#endif  // CONFIG_AFFINE_REFINEMENT_SB
+        fprintf(stderr, "[after rec] sae %d (",
+                sad_generic(temp, bw, dst, dst_buf->stride, bw, bh));
+        for (int i = 0; i < bh; i += sub_bh0) {
+          for (int j = 0; j < bw; j += sub_bw0) {
+            fprintf(stderr, "%d,",
+                    sad_generic(temp + i * bw + j, bw,
+                                dst + i * dst_buf->stride + j, dst_buf->stride,
+                                sub_bw0, sub_bh0));
+          }
+        }
+        fprintf(stderr, ")\n");
+      }
+#endif
       continue;
     }
 #endif  // CONFIG_OPTFLOW_REFINEMENT
