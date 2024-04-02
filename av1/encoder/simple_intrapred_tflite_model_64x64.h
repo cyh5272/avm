@@ -13,21 +13,6 @@ const struct ModelParams
     a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params = { 0.03, 0.7,
                                                              DEFAULT_QP_LOW,
                                                              DEFAULT_QP_HIGH };
-#elif CONFIG_ML_PART_PRUNE_LEVEL == 1
-const struct ModelParams
-    a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params = { 0.03, 0.75,
-                                                             DEFAULT_QP_LOW,
-                                                             DEFAULT_QP_HIGH };
-#elif CONFIG_ML_PART_PRUNE_LEVEL == 2
-const struct ModelParams
-    a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params = { 0.05, 0.75,
-                                                             DEFAULT_QP_LOW,
-                                                             DEFAULT_QP_HIGH };
-#elif CONFIG_ML_PART_PRUNE_LEVEL == 3
-const struct ModelParams
-    a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params = { 0.1, 0.7,
-                                                             DEFAULT_QP_LOW,
-                                                             DEFAULT_QP_HIGH };
 #else
 const struct ModelParams
     a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params = { 0.2, 0.66,

@@ -2041,42 +2041,43 @@ void av1_gather_erp_rect_features(
 
 enum {
   FEATURE_LOG_QP_SQUARED = 0,
-  FEATURE_HAS_ABOVE = 1,
-  FEATURE_LOG_ABOVE_WIDTH = 2,
-  FEATURE_LOG_ABOVE_HEIGHT = 3,
-  FEATURE_HAS_LEFT = 4,
-  FEATURE_LOG_LEFT_WIDTH = 5,
-  FEATURE_LOG_LEFT_HEIGHT = 6,
-  FEATURE_NORM_BEST_0_SSE = 7,
-  FEATURE_NORM_BEST_0_VAR = 8,
-  FEATURE_NORM_BEST_1_SSE = 10,
-  FEATURE_NORM_BEST_1_VAR = 11,
-  FEATURE_NORM_BEST_2_SSE = 13,
-  FEATURE_NORM_BEST_2_VAR = 14,
-  FEATURE_NORM_BEST_SSE_0_00 = 16,
-  FEATURE_NORM_BEST_VAR_0_00 = 17,
-  FEATURE_NORM_BEST_SSE_0_01 = 19,
-  FEATURE_NORM_BEST_VAR_0_01 = 20,
-  FEATURE_NORM_BEST_SSE_0_10 = 22,
-  FEATURE_NORM_BEST_VAR_0_10 = 23,
-  FEATURE_NORM_BEST_SSE_0_11 = 25,
-  FEATURE_NORM_BEST_VAR_0_11 = 26,
-  FEATURE_NORM_BEST_SSE_1_00 = 28,
-  FEATURE_NORM_BEST_VAR_1_00 = 29,
-  FEATURE_NORM_BEST_SSE_1_01 = 31,
-  FEATURE_NORM_BEST_VAR_1_01 = 32,
-  FEATURE_NORM_BEST_SSE_1_10 = 34,
-  FEATURE_NORM_BEST_VAR_1_10 = 35,
-  FEATURE_NORM_BEST_SSE_1_11 = 37,
-  FEATURE_NORM_BEST_VAR_1_11 = 38,
-  FEATURE_NORM_BEST_SSE_2_00 = 40,
-  FEATURE_NORM_BEST_VAR_2_00 = 41,
-  FEATURE_NORM_BEST_SSE_2_01 = 43,
-  FEATURE_NORM_BEST_VAR_2_01 = 44,
-  FEATURE_NORM_BEST_SSE_2_10 = 46,
-  FEATURE_NORM_BEST_VAR_2_10 = 47,
-  FEATURE_NORM_BEST_SSE_2_11 = 49,
-  FEATURE_NORM_BEST_VAR_2_11 = 50,
+  FEATURE_HAS_ABOVE,
+  FEATURE_LOG_ABOVE_WIDTH,
+  FEATURE_LOG_ABOVE_HEIGHT,
+  FEATURE_HAS_LEFT,
+  FEATURE_LOG_LEFT_WIDTH,
+  FEATURE_LOG_LEFT_HEIGHT,
+  FEATURE_NORM_BEST_0_SSE,
+  FEATURE_NORM_BEST_0_VAR,
+  FEATURE_NORM_BEST_1_SSE,
+  FEATURE_NORM_BEST_1_VAR,
+  FEATURE_NORM_BEST_2_SSE,
+  FEATURE_NORM_BEST_2_VAR,
+  FEATURE_NORM_BEST_SSE_0_00,
+  FEATURE_NORM_BEST_VAR_0_00,
+  FEATURE_NORM_BEST_SSE_0_01,
+  FEATURE_NORM_BEST_VAR_0_01,
+  FEATURE_NORM_BEST_SSE_0_10,
+  FEATURE_NORM_BEST_VAR_0_10,
+  FEATURE_NORM_BEST_SSE_0_11,
+  FEATURE_NORM_BEST_VAR_0_11,
+  FEATURE_NORM_BEST_SSE_1_00,
+  FEATURE_NORM_BEST_VAR_1_00,
+  FEATURE_NORM_BEST_SSE_1_01,
+  FEATURE_NORM_BEST_VAR_1_01,
+  FEATURE_NORM_BEST_SSE_1_10,
+  FEATURE_NORM_BEST_VAR_1_10,
+  FEATURE_NORM_BEST_SSE_1_11,
+  FEATURE_NORM_BEST_VAR_1_11,
+  FEATURE_NORM_BEST_SSE_2_00,
+  FEATURE_NORM_BEST_VAR_2_00,
+  FEATURE_NORM_BEST_SSE_2_01,
+  FEATURE_NORM_BEST_VAR_2_01,
+  FEATURE_NORM_BEST_SSE_2_10,
+  FEATURE_NORM_BEST_VAR_2_10,
+  FEATURE_NORM_BEST_SSE_2_11,
+  FEATURE_NORM_BEST_VAR_2_11,
+  FEATURE_MAX
 };
 
 static inline void copy_pix(uint16_t *to, int to_stride, uint16_t *from,
@@ -2113,7 +2114,6 @@ static AOM_INLINE void av1_ml_part_split_features_square(
         get_partition_subsize(bsize, PARTITION_VERT), PARTITION_HORZ);
   }
 
-  bool sqr_split_present[4] = { false, false, false, false };
   if (subsize_sq != BLOCK_INVALID) {
     const int w_sub_mi = mi_size_wide[subsize_sq];
     const int h_sub_mi = mi_size_high[subsize_sq];
@@ -2150,7 +2150,6 @@ static AOM_INLINE void av1_ml_part_split_features_square(
         int mi_col_left = xd->tile.mi_col_end - mi_col - col_off;
         // Don't process beyond the tile boundary
         if (mi_col_left < 0) break;
-        sqr_split_present[r_idx * 2 + c_idx] = true;
         int src_off = (row_off << 2) * x->plane[0].src.stride + (col_off << 2);
         int dst_off = (row_off << 2) * xd->plane[0].dst.stride + (col_off << 2);
         xd->mb_to_top_edge = (-mi_row - row_off) << MI_SUBPEL_SIZE_LOG2;
@@ -2207,7 +2206,6 @@ static AOM_INLINE void av1_ml_part_split_features_square(
     copy_pix(xd->plane[0].dst.buf, xd->plane[0].dst.stride, save, MAX_BLK_SIZE,
              w_mi << MI_SIZE_LOG2, h_mi << MI_SIZE_LOG2);
     if (out_features) {
-      const int features_off = recon_based ? SQ_OFF_RECON : SQ_OFF;
       const int sub_area_log2 =
           mi_size_wide_log2[subsize_sq] + mi_size_high_log2[subsize_sq] + 4;
       out_features[FEATURE_NORM_BEST_SSE_0_00] =
@@ -2343,7 +2341,6 @@ static AOM_INLINE void av1_ml_part_split_features_none(
 static AOM_INLINE void av1_ml_part_split_features(AV1_COMP *const cpi,
                                                   MACROBLOCK *x, int mi_row,
                                                   int mi_col, BLOCK_SIZE bsize,
-                                                  PC_TREE *pc_tree,
                                                   float *out_features) {
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -2389,10 +2386,6 @@ static AOM_INLINE void av1_ml_part_split_features(AV1_COMP *const cpi,
   for (int recon_based = 0; recon_based < 2; ++recon_based) {
     av1_ml_part_split_features_square(cpi, x, mi_row, mi_col, bsize,
                                       recon_based, out_features);
-    av1_ml_part_split_features_horz(cpi, x, mi_row, mi_col, bsize, recon_based,
-                                    out_features);
-    av1_ml_part_split_features_vert(cpi, x, mi_row, mi_col, bsize, recon_based,
-                                    out_features);
     av1_ml_part_split_features_none(cpi, x, mi_row, mi_col, bsize, recon_based,
                                     out_features);
   }
@@ -2440,14 +2433,14 @@ int av1_ml_part_split_infer(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
       qp > (qp_offset + params.qp_high) || qp < (qp_offset + params.qp_low))
     return ML_PART_NOT_SURE;
 
-  float ml_input[FEATURE_SIZE_INTRA_PRED_PRUNE_NONE] = { 0.0f };
-  av1_ml_part_split_features(cpi, x, mi_row, mi_col, bsize, pc_tree, ml_input);
+  float ml_input[FEATURE_MAX] = { 0.0f };
+  av1_ml_part_split_features(cpi, x, mi_row, mi_col, bsize, ml_input);
 
   float ml_output[1] = { 0.0f };
 
   if (av2_simple_intra_prune_none_tflite_exec(cpi->common.partition_model,
-                                              ml_input, 37, ml_output, 1,
-                                              model_type)) {
+                                              ml_input, FEATURE_MAX, ml_output,
+                                              1, model_type)) {
     printf("Error during inference 0\n");
     exit(1);
   }

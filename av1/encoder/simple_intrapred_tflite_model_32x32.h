@@ -8,7 +8,7 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
-#if CONFIG_ML_PART_PRUNE_LEVEL < 4
+#if CONFIG_ML_PART_PRUNE_LEVEL == 0
 const struct ModelParams
     a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params = { 0.052, 0.45,
                                                              DEFAULT_QP_LOW,

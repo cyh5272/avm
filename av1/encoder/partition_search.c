@@ -7654,9 +7654,8 @@ BEGIN_PARTITION_SEARCH:
     // Note2: prune split doesn't mean prune both splits on l2, it means
     //        prune either one or both.
     if (!force_prune_flags[PRUNE_OTHER]) {
-      float dbg_ml_out;
       int ml_result = av1_ml_part_split_infer(cpi, x, mi_row, mi_col, bsize,
-                                              pc_tree, &dbg_ml_out);
+                                              pc_tree);
       if (ml_result == ML_PART_FORCE_SPLIT) {
         part_search_state.prune_partition_none = 1;
         part_search_state.prune_partition_3[0] = 1;
