@@ -171,9 +171,9 @@ set_aom_config_var(CONFIG_CCSO_EDGE_CLF 1
                    "Enable adaptive edge classifier for CCSO.")
 set_aom_config_var(CONFIG_OPTFLOW_REFINEMENT 1
                    "AV2 experiment flag for optical flow MV refinement")
-set_aom_config_var(CONFIG_OPFL_FILTER_4TAP 1
+set_aom_config_var(CONFIG_OPFL_FILTER_4TAP 0
                    "Reduce optical flow and DAMR interpolation filter taps")
-set_aom_config_var(CONFIG_COMBINE_AFFINE_WARP_GRADIENT 1
+set_aom_config_var(CONFIG_COMBINE_AFFINE_WARP_GRADIENT 0
                    "Combining warp and graident computations in DAMR")
 set_aom_config_var(CONFIG_GAUSSIAN_ELIMINATION_LS 1
                    "Gaussian elimination solver for DAMR least squares problem")
@@ -350,7 +350,7 @@ set_aom_config_var(CONFIG_REFINED_MVS_IN_TMVP 1
                    "Keep optical flow refined MVs in TMVP list.")
 set_aom_config_var(CONFIG_AFFINE_REFINEMENT 1
                    "Decoder side affine motion refinement.")
-set_aom_config_var(CONFIG_AFFINE_REFINEMENT_SB 0
+set_aom_config_var(CONFIG_AFFINE_REFINEMENT_SB 1
                    "Subblock based affine refinement")
 set_aom_config_var(CONFIG_AFFINE_ON_REFINEMV 0
                    "Affine refinement on top of refine MV")
