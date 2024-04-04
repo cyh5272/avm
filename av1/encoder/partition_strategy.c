@@ -2080,33 +2080,25 @@ enum {
   FEATURE_MAX
 };
 
-static inline void copy_pix(uint16_t *to, int to_stride, uint16_t *from,
-                            int from_stride, int w, int h) {
-  for (int i = 0; i < h; ++i) {
-    memcpy(to, from, w * sizeof(to[0]));
-    to += to_stride;
-    from += from_stride;
-  }
-}
-
 #define ZERO_ARRAY(arr) memset(arr, 0, sizeof(arr))
 
 #define MAX_BLK_SIZE (MAX_TX_SIZE << 1)
 #define MAX_BLK_SQUARE (MAX_BLK_SIZE * MAX_BLK_SIZE)
 #define MAX_TX_RECT (MAX_TX_SIZE * MAX_BLK_SIZE)
 
-static AOM_INLINE void av1_ml_part_split_features_square(
-    AV1_COMP *const cpi, MACROBLOCK *x, int mi_row, int mi_col,
-    BLOCK_SIZE bsize, bool recon_based, float *out_features) {
+static AOM_INLINE void av1_ml_part_split_features_square(AV1_COMP *const cpi,
+                                                         MACROBLOCK *x,
+                                                         int mi_row, int mi_col,
+                                                         BLOCK_SIZE bsize,
+                                                         float *out_features) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   const int w_mi = mi_size_wide[bsize];
   const int h_mi = mi_size_high[bsize];
+  DECLARE_ALIGNED(16, uint16_t, intrapred[MAX_TX_SQUARE]);
 
   // plus top line and left column
-  DECLARE_ALIGNED(16, uint16_t, save[MAX_BLK_SQUARE]);
-  DECLARE_ALIGNED(16, uint16_t, best_sub_pred[MAX_TX_SQUARE]);
   BLOCK_SIZE subsize_sq = get_partition_subsize(
       get_partition_subsize(bsize, PARTITION_HORZ), PARTITION_VERT);
   if (subsize_sq == BLOCK_INVALID) {
@@ -2133,13 +2125,6 @@ static AOM_INLINE void av1_ml_part_split_features_square(
         { MODE_INVALID, MODE_INVALID, MODE_INVALID } }
     };
 
-    uint16_t *buf = recon_based ? xd->plane[0].dst.buf : x->plane[0].src.buf;
-    int buf_stride =
-        recon_based ? xd->plane[0].dst.stride : x->plane[0].src.stride;
-
-    copy_pix(save, MAX_BLK_SIZE, xd->plane[0].dst.buf, xd->plane[0].dst.stride,
-             w_mi << MI_SIZE_LOG2, h_mi << MI_SIZE_LOG2);
-
     for (int row_off = 0, r_idx = 0; row_off < h_mi;
          row_off += h_sub_mi, ++r_idx) {
       int mi_row_left = xd->tile.mi_row_end - mi_row - row_off;
@@ -2151,30 +2136,27 @@ static AOM_INLINE void av1_ml_part_split_features_square(
         // Don't process beyond the tile boundary
         if (mi_col_left < 0) break;
         int src_off = (row_off << 2) * x->plane[0].src.stride + (col_off << 2);
-        int dst_off = (row_off << 2) * xd->plane[0].dst.stride + (col_off << 2);
         xd->mb_to_top_edge = (-mi_row - row_off) << MI_SUBPEL_SIZE_LOG2;
         xd->mb_to_left_edge = (-mi_col - col_off) << MI_SUBPEL_SIZE_LOG2;
         mbmi->sb_type[0] = subsize_sq;
         xd->up_available = (mi_row + row_off) > 0;
         xd->left_available = (mi_col + col_off) > 0;
 
-        int buf_off = recon_based ? dst_off : src_off;
-
         for (PREDICTION_MODE intra_sub_mode = INTRA_MODE_START;
              intra_sub_mode < INTRA_MODE_END; ++intra_sub_mode) {
+          memset(intrapred, 0, sizeof(intrapred));
           xd->up_available = (mi_row + row_off) > 0;
           xd->left_available = (mi_col + col_off) > 0;
           av1_predict_intra_block(
               cm, xd, w_sub_mi << MI_SIZE_LOG2, h_sub_mi << MI_SIZE_LOG2,
               tx_sub_size, intra_sub_mode, 0, 0, FILTER_INTRA_MODES,
-              buf + buf_off, buf_stride, xd->plane[0].dst.buf + dst_off,
-              xd->plane[0].dst.stride, 0, 0, 0);
+              x->plane[0].src.buf + src_off, x->plane[0].src.stride, intrapred,
+              MAX_TX_SIZE, 0, 0, 0);
 
           unsigned int curr_sse = 0, curr_var = 0;
           curr_var = cpi->fn_ptr[txsize_to_bsize[tx_sub_size]].vf(
-              x->plane[0].src.buf + src_off, x->plane[0].src.stride,
-              xd->plane[0].dst.buf + dst_off, xd->plane[0].dst.stride,
-              &curr_sse);
+              x->plane[0].src.buf + src_off, x->plane[0].src.stride, intrapred,
+              MAX_TX_SIZE, &curr_sse);
           for (int cand = 0; cand < 3; cand++) {
             if (curr_sse < best_sub_sse[r_idx][c_idx][cand]) {
               for (int s = 2; s > cand; s--) {
@@ -2188,81 +2170,31 @@ static AOM_INLINE void av1_ml_part_split_features_square(
               best_sub_sse[r_idx][c_idx][cand] = curr_sse;
               best_sub_var[r_idx][c_idx][cand] = curr_var;
               best_sub_mode[r_idx][c_idx][cand] = intra_sub_mode;
-              if (cand == 0) {
-                copy_pix(best_sub_pred, MAX_TX_SIZE,
-                         xd->plane[0].dst.buf + dst_off,
-                         xd->plane[0].dst.stride, w_sub_mi << MI_SIZE_LOG2,
-                         h_sub_mi << MI_SIZE_LOG2);
-              }
               break;
             }
           }
         }
-        copy_pix(xd->plane[0].dst.buf + dst_off, xd->plane[0].dst.stride,
-                 best_sub_pred, MAX_TX_SIZE, w_sub_mi << MI_SIZE_LOG2,
-                 h_sub_mi << MI_SIZE_LOG2);
+        if (out_features) {
+          const int sub_area_log2 =
+              mi_size_wide_log2[subsize_sq] + mi_size_high_log2[subsize_sq] + 4;
+          for (int cand = 0; cand < 3; ++cand) {
+            int foff = r_idx * 4 + c_idx * 2 + cand * 8;
+            out_features[FEATURE_NORM_BEST_SSE_0_00 + foff] = logf(
+                1.0f + (best_sub_sse[r_idx][c_idx][cand] >> sub_area_log2));
+            out_features[FEATURE_NORM_BEST_VAR_0_00 + foff] = logf(
+                1.0f + (best_sub_var[r_idx][c_idx][cand] >> sub_area_log2));
+          }
+        }
       }
-    }
-    copy_pix(xd->plane[0].dst.buf, xd->plane[0].dst.stride, save, MAX_BLK_SIZE,
-             w_mi << MI_SIZE_LOG2, h_mi << MI_SIZE_LOG2);
-    if (out_features) {
-      const int sub_area_log2 =
-          mi_size_wide_log2[subsize_sq] + mi_size_high_log2[subsize_sq] + 4;
-      out_features[FEATURE_NORM_BEST_SSE_0_00] =
-          logf(1.0f + (best_sub_sse[0][0][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_0_00] =
-          logf(1.0f + (best_sub_var[0][0][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_0_01] =
-          logf(1.0f + (best_sub_sse[0][1][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_0_01] =
-          logf(1.0f + (best_sub_var[0][1][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_0_10] =
-          logf(1.0f + (best_sub_sse[1][0][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_0_10] =
-          logf(1.0f + (best_sub_var[1][0][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_0_11] =
-          logf(1.0f + (best_sub_sse[1][1][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_0_11] =
-          logf(1.0f + (best_sub_var[1][1][0] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_1_00] =
-          logf(1.0f + (best_sub_sse[0][0][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_1_00] =
-          logf(1.0f + (best_sub_var[0][0][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_1_01] =
-          logf(1.0f + (best_sub_sse[0][1][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_1_01] =
-          logf(1.0f + (best_sub_var[0][1][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_1_10] =
-          logf(1.0f + (best_sub_sse[1][0][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_1_10] =
-          logf(1.0f + (best_sub_var[1][0][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_1_11] =
-          logf(1.0f + (best_sub_sse[1][1][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_1_11] =
-          logf(1.0f + (best_sub_var[1][1][1] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_2_00] =
-          logf(1.0f + (best_sub_sse[0][0][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_2_00] =
-          logf(1.0f + (best_sub_var[0][0][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_2_01] =
-          logf(1.0f + (best_sub_sse[0][1][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_2_01] =
-          logf(1.0f + (best_sub_var[0][1][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_2_10] =
-          logf(1.0f + (best_sub_sse[1][0][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_2_10] =
-          logf(1.0f + (best_sub_var[1][0][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_SSE_2_11] =
-          logf(1.0f + (best_sub_sse[1][1][2] >> sub_area_log2));
-      out_features[FEATURE_NORM_BEST_VAR_2_11] =
-          logf(1.0f + (best_sub_var[1][1][2] >> sub_area_log2));
     }
   }
 }
 
-static AOM_INLINE void av1_ml_part_split_features_none(
-    AV1_COMP *const cpi, MACROBLOCK *x, int mi_row, int mi_col,
-    BLOCK_SIZE bsize, bool recon_based, float *out_features) {
+static AOM_INLINE void av1_ml_part_split_features_none(AV1_COMP *const cpi,
+                                                       MACROBLOCK *x,
+                                                       int mi_row, int mi_col,
+                                                       BLOCK_SIZE bsize,
+                                                       float *out_features) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -2281,24 +2213,21 @@ static AOM_INLINE void av1_ml_part_split_features_none(
   unsigned int best_sse[3] = { INT_MAX, INT_MAX, INT_MAX };
   unsigned int best_var[3] = { 0, 0, 0 };
   PREDICTION_MODE best_mode[3] = { MODE_INVALID, MODE_INVALID, MODE_INVALID };
-  uint16_t *buf = recon_based ? xd->plane[0].dst.buf : x->plane[0].src.buf;
-  int buf_stride =
-      recon_based ? xd->plane[0].dst.stride : x->plane[0].src.stride;
   for (PREDICTION_MODE intra_mode = INTRA_MODE_START;
        intra_mode < INTRA_MODE_END; ++intra_mode) {
     unsigned int curr_sse = 0, curr_var = 0;
     memset(intrapred, 0, sizeof(intrapred));
     for (int row_off = 0; row_off < h_mi; row_off += tx_h) {
       for (int col_off = 0; col_off < w_mi; col_off += tx_w) {
-        int buf_off = (row_off << 2) * buf_stride + (col_off << 2);
         int src_off = (row_off << 2) * x->plane[0].src.stride + (col_off << 2);
         int intr_off = (row_off << 2) * MAX_BLK_SIZE + (col_off << 2);
         xd->up_available = (mi_row + row_off) > 0;
         xd->left_available = (mi_col + col_off) > 0;
-        av1_predict_intra_block(cm, xd, w_mi << MI_SIZE_LOG2,
-                                h_mi << MI_SIZE_LOG2, tx_size, intra_mode, 0, 0,
-                                FILTER_INTRA_MODES, buf + buf_off, buf_stride,
-                                intrapred + intr_off, MAX_BLK_SIZE, 0, 0, 0);
+        av1_predict_intra_block(
+            cm, xd, w_mi << MI_SIZE_LOG2, h_mi << MI_SIZE_LOG2, tx_size,
+            intra_mode, 0, 0, FILTER_INTRA_MODES, x->plane[0].src.buf + src_off,
+            x->plane[0].src.stride, intrapred + intr_off, MAX_BLK_SIZE, 0, 0,
+            0);
         unsigned int tmp = 0;
         curr_var += cpi->fn_ptr[txsize_to_bsize[tx_size]].vf(
             x->plane[0].src.buf + src_off, x->plane[0].src.stride,
@@ -2383,12 +2312,9 @@ static AOM_INLINE void av1_ml_part_split_features(AV1_COMP *const cpi,
   int old4 = mbmi->mrl_index;
   mbmi->mrl_index = 0;
 
-  for (int recon_based = 0; recon_based < 2; ++recon_based) {
-    av1_ml_part_split_features_square(cpi, x, mi_row, mi_col, bsize,
-                                      recon_based, out_features);
-    av1_ml_part_split_features_none(cpi, x, mi_row, mi_col, bsize, recon_based,
+  av1_ml_part_split_features_square(cpi, x, mi_row, mi_col, bsize,
                                     out_features);
-  }
+  av1_ml_part_split_features_none(cpi, x, mi_row, mi_col, bsize, out_features);
 
   xd->mb_to_top_edge = old1;
   xd->mb_to_left_edge = old2;
