@@ -46,19 +46,19 @@ extern "C" void *av2_simple_intra_prune_none_tflite_init() {
 }
 
 extern "C" int av2_simple_intra_prune_none_tflite_params(
-    MODEL_TYPE model_type, struct ModelParams *params) {
+    MODEL_TYPE model_type, int prune_level, struct ModelParams *params) {
   switch (model_type) {
     case MODEL_128X128:
-      *params = a3_qp96_128_160_luma_BLOCK_128X128_intra_tflite_params;
+      *params = a3_qp96_128_160_luma_BLOCK_128X128_intra_tflite_params[prune_level];
       break;
     case MODEL_64X64:
-      *params = a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params;
+      *params = a3_qp96_128_160_luma_BLOCK_64X64_intra_tflite_params[prune_level];
       break;
     case MODEL_32X32:
-      *params = a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params;
+      *params = a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params[prune_level];
       break;
     case MODEL_16X16:
-      *params = a3_qp96_128_160_luma_BLOCK_16X16_intra_tflite_params;
+      *params = a3_qp96_128_160_luma_BLOCK_16X16_intra_tflite_params[prune_level];
       break;
     default: return -1;
   }

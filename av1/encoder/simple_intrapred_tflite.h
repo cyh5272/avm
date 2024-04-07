@@ -43,6 +43,7 @@ int av2_simple_intra_prune_none_tflite_exec(void *context,
                                             MODEL_TYPE model_type);
 void av2_simple_intra_prune_none_tflite_close(void **context);
 int av2_simple_intra_prune_none_tflite_params(MODEL_TYPE model_type,
+                                              int prune_level,
                                               struct ModelParams *params);
 
 #ifdef __cplusplus

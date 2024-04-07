@@ -2342,7 +2342,8 @@ int av1_ml_part_split_infer(AV1_COMP *const cpi, MACROBLOCK *x, int mi_row,
   MODEL_TYPE model_type = get_model_type(bsize);
   struct ModelParams params;
   if (model_type != MODEL_OTHER &&
-      av2_simple_intra_prune_none_tflite_params(model_type, &params)) {
+      av2_simple_intra_prune_none_tflite_params(
+          model_type, cpi->sf.part_sf.ml_part_prune_level, &params)) {
     printf("Error during inference 2\n");
     exit(1);
   }

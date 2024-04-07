@@ -8,17 +8,10 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
-#if CONFIG_ML_PART_PRUNE_LEVEL == 0
 const struct ModelParams
-    a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params = { 0.052, 0.45,
-                                                             DEFAULT_QP_LOW,
-                                                             DEFAULT_QP_HIGH };
-#else
-const struct ModelParams
-    a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params = { 0.07, 0.44,
-                                                             DEFAULT_QP_LOW,
-                                                             DEFAULT_QP_HIGH };
-#endif
+    a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite_params[] = {
+        {0.052, 0.45, 80, 176}, {0.052, 0.45, 80, 176}, {0.07, 0.44, 80, 176},
+        {0.07, 0.25, 80, 176}};
 
 unsigned char a3_qp96_128_160_luma_BLOCK_32X32_intra_tflite[] = {
   0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33, 0x14, 0x00, 0x20, 0x00, 0x1c,
