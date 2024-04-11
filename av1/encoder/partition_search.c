@@ -2894,7 +2894,6 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
     ptree->bsize = bsize;
     ptree->mi_row = mi_row;
     ptree->mi_col = mi_col;
-    PARTITION_TREE *parent = ptree->parent;
 #if CONFIG_INTER_SDP
     ptree->region_type = pc_tree->region_type;
     const int is_sb_root = bsize == cm->sb_size;
@@ -4140,7 +4139,6 @@ static AOM_INLINE PARTITION_TYPE get_forced_partition_type(
   if (template_tree) {
     return template_tree->partition;
   }
-
 
   if (should_reuse_mode(x, REUSE_PARTITION_MODE_FLAG)
 #if CONFIG_CB1TO4_SPLIT
@@ -8751,7 +8749,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 #if CONFIG_INTER_SDP
       && (pc_tree->region_type == counterpart_block->region_type &&
           (pc_tree->region_type != INTRA_REGION || frame_is_intra_only(cm)))
-#endif // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP
   ) {
     if (counterpart_block->rd_cost.rate != INT_MAX) {
       av1_copy_pc_tree_recursive(xd, cm, pc_tree, counterpart_block,
@@ -8903,17 +8901,16 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
         partition_vert_allowed, &part_search_state.do_rectangular_split,
         sqr_split_ptr, prune_horz, prune_vert, pc_tree);
 #if CONFIG_EXT_RECUR_PARTITIONS
-    part_search_state.forced_partition =
-        get_forced_partition_type(cm, x, blk_params.mi_row, blk_params.mi_col,
-                                  blk_params.bsize,
+    part_search_state.forced_partition = get_forced_partition_type(
+        cm, x, blk_params.mi_row, blk_params.mi_col, blk_params.bsize,
 #if CONFIG_CB1TO4_SPLIT
-                                  blk_params.parent_bsize,
+        blk_params.parent_bsize,
 #endif  // CONFIG_CB1TO4_SPLIT
-                                  ptree_luma, template_tree,
+        ptree_luma, template_tree,
 #if CONFIG_INTER_SDP
-                                  pc_tree->region_type,
+        pc_tree->region_type,
 #endif  // CONFIG_INTER_SDP
-                                  &pc_tree->chroma_ref_info);
+        &pc_tree->chroma_ref_info);
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
