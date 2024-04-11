@@ -540,7 +540,8 @@ typedef struct PARTITION_SPEED_FEATURES {
 #endif  // CONFIG_BLOCK_256
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_ML_PART_SPLIT
-  int ml_part_prune_level;
+  int prune_split_with_ml;
+  int prune_split_ml_level;
 #endif  // CONFIG_ML_PART_SPLIT
 } PARTITION_SPEED_FEATURES;
 
