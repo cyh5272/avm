@@ -64,7 +64,7 @@ enum {
 #if CONFIG_INTER_SDP_DEBUG
 extern FILE *file_enc;
 extern FILE *file_dec;
-extern int is_decoding_process;
+// extern int is_decoding_process;
 #endif  // CONFIG_INTER_SDP_DEBUG
 
 static INLINE int is_comp_ref_allowed(BLOCK_SIZE bsize) {
@@ -1023,7 +1023,7 @@ static AOM_INLINE bool is_uneven_4way_partition_allowed_at_bsize(
     return false;
   }
 #else
-  (void)rect_type;
+    //(void)rect_type;
 #endif                         // CONFIG_CB1TO4_SPLIT
   if (bsize >= BLOCK_32X64) {  // 32x64, 64x32, 64x64
     assert(bsize <= BLOCK_64X64);
@@ -1384,7 +1384,8 @@ static INLINE int is_bsize_allowed_for_inter_sdp(BLOCK_SIZE bsize,
                                                  PARTITION_TYPE partition) {
   const int bw = block_size_wide[bsize];
   const int bh = block_size_high[bsize];
-  return bw <= 32 && bh <= 32 && partition < PARTITION_HORZ_4A;
+  return bw <= 32 && bh <= 32 && bw >= 8 && bh >= 8 &&
+         partition < PARTITION_HORZ_4A;
 }
 // Decide whether a block needs coding multiple chroma coding blocks in it at
 // once to get around sub-4x4 coding.

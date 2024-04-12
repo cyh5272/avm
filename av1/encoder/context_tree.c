@@ -614,6 +614,16 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                           PARTITION_NONE, 0, ss_x, ss_y, shared_bufs);
         av1_copy_tree_context(dst->none[cur_region_type],
                               src->none[cur_region_type]);
+#if CONFIG_MVP_IMPROVEMENT
+        if (is_inter_block(&src->none[cur_region_type]->mic, xd->tree_type)) {
+#if WARP_CU_BANK
+          av1_update_warp_param_bank(cm, xd, &dst->none[cur_region_type]->mic);
+#endif  // WARP_CU_BANK
+          if (cm->seq_params.enable_refmvbank) {
+            av1_update_ref_mv_bank(cm, xd, &dst->none[cur_region_type]->mic);
+          }
+        }
+#endif  // CONFIG_MVP_IMPROVEMENT
       }
 #else
       if (dst->none) av1_free_pmc(dst->none, num_planes);
