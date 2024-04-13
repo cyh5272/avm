@@ -396,10 +396,8 @@ set_aom_config_var(CONFIG_SUBBLK_PAD 1
                    "Enable subblock padding for subblock mv refinement.")
 
 set_aom_config_var(
-  CONFIG_ML_PART_SPLIT 1 "Partition SPLIT pruning/forcing for intra frames as
+  CONFIG_ML_PART_SPLIT 0 "Partition SPLIT pruning/forcing for intra frames as
                    predicted by ML.")
-set_aom_config_var(
-  CONFIG_ML_PART_PRUNE_LEVEL 1 "Prune harshness.")
 #
 # Variables in this section control optional features of the build system.
 #

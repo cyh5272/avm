@@ -760,7 +760,7 @@ static AOM_INLINE void init_part_sf(PARTITION_SPEED_FEATURES *part_sf) {
 #if CONFIG_ML_PART_SPLIT
   part_sf->prune_split_with_ml = 0;
   part_sf->prune_split_ml_level = 0;  // default pruning
-#endif  // CONFIG_ML_PART_SPLIT
+#endif                                // CONFIG_ML_PART_SPLIT
 }
 
 static AOM_INLINE void init_mv_sf(MV_SPEED_FEATURES *mv_sf) {
@@ -985,7 +985,9 @@ static AOM_INLINE void set_erp_speed_features_framesize_dependent(
     AV1_COMP *cpi) {
   SPEED_FEATURES *const sf = &cpi->sf;
   const AV1_COMMON *const cm = &cpi->common;
+#if CONFIG_ML_PART_SPLIT
   const int is_2k_or_larger = AOMMIN(cm->width, cm->height) >= 2160;
+#endif
   const int is_1080p_or_larger = AOMMIN(cm->width, cm->height) >= 1080;
   const unsigned int erp_pruning_level = cpi->oxcf.part_cfg.erp_pruning_level;
 
@@ -1112,7 +1114,9 @@ static AOM_INLINE void set_erp_speed_features(AV1_COMP *cpi) {
   }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   sf->part_sf.prune_rect_with_ml = cpi->oxcf.part_cfg.use_ml_erp_pruning & 1;
+#if CONFIG_ML_PART_SPLIT
   sf->part_sf.prune_split_with_ml = cpi->oxcf.part_cfg.use_ml_erp_pruning & 2;
+#endif
 }
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
