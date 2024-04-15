@@ -3152,7 +3152,11 @@ static AOM_INLINE void write_mb_modes_kf(
 #else
   const int skip = write_skip(cm, xd, mbmi->segment_id, mbmi, w);
 #endif  // CONFIG_SKIP_TXFM_OPT
-  if (!seg->segid_preskip && seg->update_map)
+  if (!seg->segid_preskip && seg->update_map
+#if CONFIG_INTER_SDP
+      && !(!frame_is_intra_only(cm) && xd->tree_type == CHROMA_PART)
+#endif  // CONFIG_INTER_SDP
+  )
     write_segment_id(cpi, mbmi, w, seg, segp, skip);
 
   if (xd->tree_type != CHROMA_PART) write_cdef(cm, xd, w, skip);

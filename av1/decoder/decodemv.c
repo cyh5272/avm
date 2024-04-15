@@ -1902,7 +1902,11 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 
   FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
 
-  if (seg->segid_preskip)
+  if (seg->segid_preskip
+#if CONFIG_INTER_SDP
+      && !(!frame_is_intra_only(cm) && xd->tree_type == CHROMA_PART)
+#endif  // CONFIG_INTER_SDP
+  )
     mbmi->segment_id = read_intra_segment_id(cm, xd, bsize, r, 0);
 
 #if CONFIG_SKIP_MODE_ENHANCEMENT
