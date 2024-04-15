@@ -1941,7 +1941,11 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
       read_skip_txfm(cm, xd, mbmi->segment_id, r);
 #endif  // CONFIG_SKIP_TXFM_OPT
 
-  if (!seg->segid_preskip)
+  if (!seg->segid_preskip
+#if CONFIG_INTER_SDP
+      && !(!frame_is_intra_only(cm) && xd->tree_type == CHROMA_PART)
+#endif  // CONFIG_INTER_SDP
+  )
     mbmi->segment_id = read_intra_segment_id(
         cm, xd, bsize, r, mbmi->skip_txfm[xd->tree_type == CHROMA_PART]);
 
