@@ -3131,8 +3131,8 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 #if CONFIG_INTER_SDP
   PARTITION_TREE *parent = ptree->parent;
   if (!is_sb_root && parent) {
-    if (!frame_is_intra_only(cm) && ptree->partition &&
-        parent->region_type != INTRA_REGION &&
+    if (!frame_is_intra_only(cm) && !cm->seq_params.monochrome &&
+        ptree->partition && parent->region_type != INTRA_REGION &&
         ptree->region_type == INTRA_REGION) {
       // decode chroma part in one intra region
       xd->tree_type = CHROMA_PART;

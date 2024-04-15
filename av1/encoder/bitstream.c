@@ -3997,8 +3997,8 @@ static AOM_INLINE void write_modes_sb(
     default: assert(0); break;
   }
 #if CONFIG_INTER_SDP
-  if (!is_sb_root && !frame_is_intra_only(cm) && parent && partition &&
-      parent->region_type != INTRA_REGION &&
+  if (!is_sb_root && !frame_is_intra_only(cm) && !cm->seq_params.monochrome &&
+      parent && partition && parent->region_type != INTRA_REGION &&
       ptree->region_type == INTRA_REGION) {
     // run chroma part in luma region
     xd->tree_type = CHROMA_PART;

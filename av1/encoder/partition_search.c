@@ -3344,7 +3344,7 @@ static void encode_sb(const AV1_COMP *const cpi, ThreadData *td,
 
 #if CONFIG_INTER_SDP
   // encode the chroma blocks under one intra region in inter frame
-  if (encode_sdp_intra_region_yuv) {
+  if (encode_sdp_intra_region_yuv && !cm->seq_params.monochrome) {
     xd->tree_type = CHROMA_PART;
     encode_b(cpi, tile_data, td, tp, mi_row, mi_col, dry_run, bsize,
              PARTITION_NONE, pc_tree->none_chroma, rate);
@@ -7046,7 +7046,7 @@ static INLINE void search_intra_region_partitioning(
     av1_invalid_rd_stats(sum_rdc);
   }
   // Encoder RDO for chroma component in intra region
-  if (this_rdc.rdcost != INT64_MAX) {
+  if (this_rdc.rdcost != INT64_MAX && !cm->seq_params.monochrome) {
     sum_rdc->rate += this_rdc.rate;
     sum_rdc->dist += this_rdc.dist;
     av1_rd_cost_update(x->rdmult, sum_rdc);
