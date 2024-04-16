@@ -888,7 +888,10 @@ static int read_intra_segment_id(AV1_COMMON *const cm,
                                  aom_reader *r, int skip) {
   struct segmentation *const seg = &cm->seg;
   if (!seg->enabled) return 0;  // Default for disabled segmentation
-  assert(seg->update_map && !seg->temporal_update);
+#if CONFIG_INTER_SDP
+  if (frame_is_intra_only(cm))
+#endif  // CONFIG_INTER_SDP
+    assert(seg->update_map && !seg->temporal_update);
 
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int mi_row = xd->mi_row;
@@ -1952,6 +1955,10 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   )
     mbmi->segment_id = read_intra_segment_id(
         cm, xd, bsize, r, mbmi->skip_txfm[xd->tree_type == CHROMA_PART]);
+
+#if CONFIG_INTER_SDP
+  mbmi->seg_id_predicted = 0;
+#endif  // CONFIG_INTER_SDP
 
   if (xd->tree_type != CHROMA_PART) read_cdef(cm, r, xd);
 
