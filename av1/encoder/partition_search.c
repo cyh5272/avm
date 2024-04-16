@@ -857,6 +857,11 @@ void av1_set_offsets(const AV1_COMP *const cpi, const TileInfo *const tile,
   av1_set_offsets_without_segment_id(cpi, tile, x, mi_row, mi_col, bsize,
                                      chroma_ref_info);
 
+#if CONFIG_INTER_SDP
+  // Don't set up segment ID for chroma part in SDP of inter frame
+  if (!frame_is_intra_only(cm) && xd->tree_type == CHROMA_PART) return;
+#endif
+
   // Setup segment ID.
   mbmi = xd->mi[0];
   mbmi->segment_id = 0;
