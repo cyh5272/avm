@@ -894,6 +894,7 @@ void av1_set_offsets(const AV1_COMP *const cpi, const TileInfo *const tile,
  * \param[in]    rd_cost        Pointer to structure holding rate and distortion
  *                              stats for the current block
  * \param[in]    partition      Partition mode of the parent block
+ * \param[in]    cur_region_type      Region type of the current block
  * \param[in]    bsize          Current block size
  * \param[in]    ctx            Pointer to structure holding coding contexts and
  *                              chosen modes for the current block
@@ -8607,6 +8608,7 @@ of MI_SIZE
 * \param[in]    mi_col             Column coordinate of the block in a step
 size of MI_SIZE
 * \param[in]    bsize              Current block size
+* \param[in]    parent_partition   Partition of the parent block
 * \param[in]    rd_cost            Pointer to the final rd cost of the block
 * \param[in]    best_rdc           Upper bound of rd cost of a valid partition
 * \param[in]    pc_tree            Pointer to the PC_TREE node storing the
