@@ -4341,6 +4341,7 @@ static void init_partition_search_state_params(
   blk_params->bsize = bsize;
 
 #if CONFIG_CB1TO4_SPLIT
+  assert(pc_tree != NULL);
   blk_params->parent_bsize =
       pc_tree->parent ? pc_tree->parent->block_size : BLOCK_INVALID;
 #endif  // CONFIG_CB1TO4_SPLIT
@@ -8743,6 +8744,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   // different partition path. If yes directly copy the RDO decision made for
   // the counterpart.
   PC_TREE *counterpart_block = av1_look_for_counterpart_block(pc_tree);
+  assert(pc_tree != NULL);
   if (counterpart_block
 #if CONFIG_CB1TO4_SPLIT
       &&
