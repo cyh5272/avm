@@ -1362,7 +1362,7 @@ static AOM_INLINE void dec_build_inter_predictor(const AV1_COMMON *cm,
     assert(av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type));
 #else
     assert(av1_allow_intrabc(cm));
-#endif // CONFIG_INTER_SDP
+#endif  // CONFIG_INTER_SDP
     assert(is_intrabc_block(mbmi, xd->tree_type));
     av1_build_morph_pred(cm, xd, bsize, mi_row, mi_col);
   }
