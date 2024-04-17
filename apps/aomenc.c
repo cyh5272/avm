@@ -39,9 +39,9 @@
 #include "common/stream_iter.h"
 #include "common/tools_common.h"
 #include "common/warnings.h"
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
 #include "av1/common/blockd.h"
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
 
 #if CONFIG_WEBM_IO
 #include "common/webmenc.h"
@@ -2192,11 +2192,6 @@ int main(int argc, const char **argv_) {
     usage_exit();
   }
 
-#if CONFIG_INTER_SDP_DEBUG
-  file_enc = fopen("encoder_side_log.txt", "w+");
-  file_dec = fopen("decoder_side_log.txt", "w+");
-#endif  // CONFIG_INTER_SDP
-
   /* Decide if other chroma subsamplings than 4:2:0 are supported */
   if (get_fourcc_by_aom_encoder(global.codec) == AV1_FOURCC)
     input.only_i420 = 0;
@@ -2620,11 +2615,6 @@ int main(int argc, const char **argv_) {
 #endif
 
   if (recon_file != NULL) fclose(recon_file);
-
-#if CONFIG_INTER_SDP_DEBUG
-  if (file_enc != NULL) fclose(file_enc);
-  if (file_dec != NULL) fclose(file_dec);
-#endif  // CONFIG_INTER_SDP
 
   if (allocated_raw_shift) aom_img_free(&raw_shift);
   aom_img_free(&raw);

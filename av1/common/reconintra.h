@@ -100,18 +100,18 @@ static INLINE int av1_use_angle_delta(BLOCK_SIZE bsize) {
 }
 
 static INLINE int av1_allow_intrabc(const AV1_COMMON *const cm
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
                                     ,
                                     const TREE_TYPE cur_tree_type,
                                     const REGION_TYPE cur_region_type
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
 ) {
 #if CONFIG_IBC_SR_EXT
   return (frame_is_intra_only(cm) || cm->features.allow_local_intrabc) &&
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
          cur_tree_type != CHROMA_PART &&
          (frame_is_intra_only(cm) || cur_region_type != INTRA_REGION) &&
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
          cm->features.allow_screen_content_tools && cm->features.allow_intrabc;
 #else
   return frame_is_intra_only(cm) && cm->features.allow_screen_content_tools &&

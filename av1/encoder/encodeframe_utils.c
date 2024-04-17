@@ -1716,12 +1716,12 @@ void av1_avg_cdf_symbols(FRAME_CONTEXT *ctx_left, FRAME_CONTEXT *ctx_tr,
   AVERAGE_CDF(ctx_left->uv_mode_cdf[1], ctx_tr->uv_mode_cdf[1], UV_INTRA_MODES);
 #endif  // CONFIG_UV_CFL
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   for (int i = 0; i < INTER_SDP_BSIZE_GROUP; i++) {
     AVERAGE_CDF(ctx_left->region_type_cdf[i], ctx_tr->region_type_cdf[i],
                 REGION_TYPES);
   }
-#endif
+#endif  // CONFIG_EXTENDED_SDP
 
 #if CONFIG_EXT_RECUR_PARTITIONS
   for (int plane_index = 0; plane_index < PARTITION_STRUCTURE_NUM;

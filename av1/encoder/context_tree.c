@@ -224,7 +224,7 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
   pc_tree->parent = parent;
   pc_tree->index = index;
   pc_tree->partitioning = PARTITION_NONE;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   if (parent) {
     pc_tree->region_type = parent->region_type;
     if (parent->inter_sdp_allowed_flag == 1)
@@ -235,7 +235,7 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
   } else {
     pc_tree->inter_sdp_allowed_flag = 1;
   }
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   pc_tree->block_size = bsize;
   pc_tree->is_last_subblock = is_last;
   av1_invalid_rd_stats(&pc_tree->rd_cost);
@@ -248,14 +248,14 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
                       parent ? &parent->chroma_ref_info : NULL,
                       parent ? parent->block_size : BLOCK_INVALID,
                       parent_partition, subsampling_x, subsampling_y);
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   pc_tree->none[INTRA_REGION] = NULL;
   pc_tree->none[MIXED_INTER_INTRA_REGION] = NULL;
   pc_tree->none_chroma = NULL;
 #else
   pc_tree->none = NULL;
-#endif
-#if CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
+#if CONFIG_EXTENDED_SDP
   for (REGION_TYPE cur_region_type = INTRA_REGION;
        cur_region_type < REGION_TYPES; ++cur_region_type) {
     for (int i = 0; i < 2; ++i) {
@@ -290,7 +290,7 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
     }
   }
 
-#else  // CONFIG_INTER_SDP
+#else  // CONFIG_EXTENDED_SDP
   for (int i = 0; i < 2; ++i) {
     pc_tree->horizontal[i] = NULL;
     pc_tree->vertical[i] = NULL;
@@ -321,7 +321,7 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
 #endif  // !CONFIG_EXT_RECUR_PARTITIONS
     pc_tree->split[i] = NULL;
   }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
   return pc_tree;
 }
 
@@ -337,7 +337,7 @@ void av1_free_pc_tree_recursive(PC_TREE *pc_tree, int num_planes, int keep_best,
 
   const PARTITION_TYPE partition = pc_tree->partitioning;
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   PC_TREE *parent = pc_tree->parent;
   if (!keep_none &&
       (!keep_best || (pc_tree->region_type != INTRA_REGION ||
@@ -463,7 +463,7 @@ void av1_free_pc_tree_recursive(PC_TREE *pc_tree, int num_planes, int keep_best,
       }
     }
   }    // region type index
-#else  // CONFIG_INTER_SDP
+#else  // CONFIG_EXTENDED_SDP
   if (!keep_none && (!keep_best || (partition != PARTITION_NONE)))
     FREE_PMC_NODE(pc_tree->none);
   for (int i = 0; i < 2; ++i) {
@@ -560,7 +560,7 @@ void av1_free_pc_tree_recursive(PC_TREE *pc_tree, int num_planes, int keep_best,
       }
     }
   }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
   if (!keep_best && !keep_none) aom_free(pc_tree);
 }
 
@@ -572,11 +572,11 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
   // Copy the best partition type. For basic information like bsize and index,
   // we assume they have been set properly when initializing the dst PC_TREE
   dst->partitioning = src->partitioning;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   dst->region_type = src->region_type;
   dst->inter_sdp_allowed_flag = src->inter_sdp_allowed_flag;
   REGION_TYPE cur_region_type = src->region_type;
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   dst->rd_cost = src->rd_cost;
   dst->none_rd = src->none_rd;
   dst->skippable = src->skippable;
@@ -586,7 +586,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
   const int mi_row = src->mi_row;
   const int mi_col = src->mi_col;
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   PC_TREE *src_parent = src->parent;
   if ((src->region_type == INTRA_REGION &&
        (src_parent && src_parent->region_type == MIXED_INTER_INTRA_REGION))) {
@@ -599,12 +599,12 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
       av1_copy_tree_context(dst->none_chroma, src->none_chroma);
     }
   }
-#endif
+#endif  // CONFIG_EXTENDED_SDP
 
   switch (src->partitioning) {
     // PARTITION_NONE
     case PARTITION_NONE:
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
       if (dst->none[cur_region_type])
         av1_free_pmc(dst->none[cur_region_type], num_planes);
       dst->none[cur_region_type] = NULL;
@@ -643,13 +643,13 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
         }
 #endif  // CONFIG_MVP_IMPROVEMENT
       }
-#endif
+#endif  // CONFIG_EXTENDED_SDP
       break;
     // PARTITION_SPLIT
     case PARTITION_SPLIT:
       if (is_partition_valid(bsize, PARTITION_SPLIT)) {
         for (int i = 0; i < 4; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->split[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->split[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -666,7 +666,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        ss_y, shared_bufs, tree_type,
                                        num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->split[i]) {
             av1_free_pc_tree_recursive(dst->split[i], num_planes, 0, 0);
             dst->split[i] = NULL;
@@ -681,7 +681,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        ss_x, ss_y, shared_bufs, tree_type,
                                        num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -689,7 +689,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
     case PARTITION_HORZ:
       if (is_partition_valid(bsize, PARTITION_HORZ)) {
         for (int i = 0; i < 2; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->horizontal[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->horizontal[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -719,7 +719,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->horizontal[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -727,7 +727,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
     case PARTITION_VERT:
       if (is_partition_valid(bsize, PARTITION_VERT)) {
         for (int i = 0; i < 2; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->vertical[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->vertical[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -757,7 +757,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->vertical[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -774,7 +774,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
         const BLOCK_SIZE subsizes[4] = { subsize, bsize_med, bsize_big,
                                          subsize };
         for (int i = 0; i < 4; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->horizontal4a[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->horizontal4a[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -802,7 +802,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->horizontal4a[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -819,7 +819,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
         const BLOCK_SIZE subsizes[4] = { subsize, bsize_big, bsize_med,
                                          subsize };
         for (int i = 0; i < 4; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->horizontal4b[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->horizontal4b[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -834,7 +834,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                 src->horizontal4b[cur_region_type][i], ss_x, ss_y, shared_bufs,
                 tree_type, num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->horizontal4b[i]) {
             av1_free_pc_tree_recursive(dst->horizontal4b[i], num_planes, 0, 0);
             dst->horizontal4b[i] = NULL;
@@ -847,7 +847,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->horizontal4b[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -864,7 +864,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
         const BLOCK_SIZE subsizes[4] = { subsize, bsize_med, bsize_big,
                                          subsize };
         for (int i = 0; i < 4; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->vertical4a[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->vertical4a[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -879,7 +879,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                 src->vertical4a[cur_region_type][i], ss_x, ss_y, shared_bufs,
                 tree_type, num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->vertical4a[i]) {
             av1_free_pc_tree_recursive(dst->vertical4a[i], num_planes, 0, 0);
             dst->vertical4a[i] = NULL;
@@ -892,7 +892,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->vertical4a[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -909,7 +909,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
         const BLOCK_SIZE subsizes[4] = { subsize, bsize_big, bsize_med,
                                          subsize };
         for (int i = 0; i < 4; ++i) {
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->vertical4b[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->vertical4b[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -924,7 +924,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                 src->vertical4b[cur_region_type][i], ss_x, ss_y, shared_bufs,
                 tree_type, num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->vertical4b[i]) {
             av1_free_pc_tree_recursive(dst->vertical4b[i], num_planes, 0, 0);
             dst->vertical4b[i] = NULL;
@@ -937,7 +937,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->vertical4b[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -952,7 +952,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
               get_h_partition_offset_mi_row(bsize, i, PARTITION_HORZ_3);
           const int offset_mc =
               get_h_partition_offset_mi_col(bsize, i, PARTITION_HORZ_3);
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->horizontal3[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->horizontal3[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -967,7 +967,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                 src->horizontal3[cur_region_type][i], ss_x, ss_y, shared_bufs,
                 tree_type, num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->horizontal3[i]) {
             av1_free_pc_tree_recursive(dst->horizontal3[i], num_planes, 0, 0);
             dst->horizontal3[i] = NULL;
@@ -980,7 +980,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->horizontal3[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -994,7 +994,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
               get_h_partition_offset_mi_row(bsize, i, PARTITION_VERT_3);
           const int offset_mc =
               get_h_partition_offset_mi_col(bsize, i, PARTITION_VERT_3);
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
           if (dst->vertical3[cur_region_type][i]) {
             av1_free_pc_tree_recursive(dst->vertical3[cur_region_type][i],
                                        num_planes, 0, 0);
@@ -1009,7 +1009,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                 src->vertical3[cur_region_type][i], ss_x, ss_y, shared_bufs,
                 tree_type, num_planes);
           }
-#else   // CONFIG_INTER_SDP
+#else   // CONFIG_EXTENDED_SDP
           if (dst->vertical3[i]) {
             av1_free_pc_tree_recursive(dst->vertical3[i], num_planes, 0, 0);
             dst->vertical3[i] = NULL;
@@ -1022,7 +1022,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
                                        src->vertical3[i], ss_x, ss_y,
                                        shared_bufs, tree_type, num_planes);
           }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
         }
       }
       break;
@@ -1159,7 +1159,7 @@ PC_TREE *counterpart_from_different_partition(PC_TREE *pc_tree,
   if (pc_tree == NULL || pc_tree == target) return NULL;
 
   PC_TREE *result;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   REGION_TYPE cur_region_type = pc_tree->region_type;
   result =
       look_for_counterpart_helper(pc_tree->split[cur_region_type][0], target);
@@ -1207,7 +1207,7 @@ PC_TREE *counterpart_from_different_partition(PC_TREE *pc_tree,
   if (result) return result;
   result = look_for_counterpart_helper(pc_tree->vertical3[0], target);
   if (result) return result;
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
   return NULL;
 }
 

@@ -61,12 +61,6 @@ enum {
   FRAME_TYPES,
 } UENUM1BYTE(FRAME_TYPE);
 
-#if CONFIG_INTER_SDP_DEBUG
-extern FILE *file_enc;
-extern FILE *file_dec;
-// extern int is_decoding_process;
-#endif  // CONFIG_INTER_SDP_DEBUG
-
 static INLINE int is_comp_ref_allowed(BLOCK_SIZE bsize) {
   return AOMMIN(block_size_wide[bsize], block_size_high[bsize]) >= 8;
 }
@@ -436,10 +430,10 @@ typedef struct MB_MODE_INFO {
   /*! \brief The partition type of the current coding block. */
   PARTITION_TYPE partition;
   /*! \brief The prediction mode used */
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   /*! \brief The region type used for the current block. */
   PARTITION_TYPE region_type;
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   PREDICTION_MODE mode;
   /*! \brief The JMVD scaling mode for the current coding block. The supported
    *  scale modes for JOINT_NEWMV mode is 0, 1, 2, 3, and 4. The supported scale
@@ -756,12 +750,12 @@ typedef struct PARTITION_TREE {
   struct PARTITION_TREE *sub_tree[4];
   /*! \brief The partition type used to split the current block. */
   PARTITION_TYPE partition;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   /*! \brief The region type used for the current block. */
   PARTITION_TYPE region_type;
   /*! \brief The region type used for the current block. */
   int inter_sdp_allowed_flag;
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   /*! \brief Block size of the current block. */
   BLOCK_SIZE bsize;
   /*! \brief Whether the chroma block info is ready. */
@@ -1379,7 +1373,7 @@ static INLINE void initialize_chroma_ref_info(int mi_row, int mi_col,
   info->bsize_base = bsize;
 }
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
 static INLINE int is_bsize_allowed_for_inter_sdp(BLOCK_SIZE bsize,
                                                  PARTITION_TYPE partition) {
   const int bw = block_size_wide[bsize];
@@ -1433,7 +1427,7 @@ static INLINE int is_inter_sdp_allowed(BLOCK_SIZE parent_bsize,
       break;
   }
 }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
 
 // Decide whether a block needs coding multiple chroma coding blocks in it at
 // once to get around sub-4x4 coding.

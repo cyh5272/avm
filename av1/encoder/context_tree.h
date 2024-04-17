@@ -71,12 +71,12 @@ typedef struct PICK_MODE_CONTEXT {
 
 typedef struct PC_TREE {
   PARTITION_TYPE partitioning;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   /*! \brief The region type used for the current block. */
   REGION_TYPE region_type;
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   BLOCK_SIZE block_size;
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   int inter_sdp_allowed_flag;
   PICK_MODE_CONTEXT *none[REGION_TYPES];
   // record the chroma information in intra region.
@@ -123,7 +123,7 @@ typedef struct PC_TREE {
   PICK_MODE_CONTEXT *vertical4[4];
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   struct PC_TREE *split[4];
-#endif
+#endif  // CONFIG_EXTENDED_SDP
   struct PC_TREE *parent;
   int mi_row;
   int mi_col;

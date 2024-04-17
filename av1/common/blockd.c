@@ -18,12 +18,6 @@
 #include "av1/common/blockd.h"
 #include "av1/common/enums.h"
 
-#if CONFIG_INTER_SDP_DEBUG
-FILE *file_enc = NULL;
-FILE *file_dec = NULL;
-int is_decoding_process = -1;
-#endif  // CONFIG_INTER_SDP_DEBUG
-
 #if CONFIG_AIMC
 PREDICTION_MODE av1_get_joint_mode(const MB_MODE_INFO *mi) {
   if (!mi) return DC_PRED;

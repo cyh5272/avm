@@ -455,7 +455,7 @@ static const aom_cdf_prob
     };
 #endif  // CONFIG_AIMC
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
 static aom_cdf_prob default_region_type_cdf[INTER_SDP_BSIZE_GROUP]
                                            [CDF_SIZE(REGION_TYPES)] = {
                                              // w * h <= 64
@@ -469,7 +469,7 @@ static aom_cdf_prob default_region_type_cdf[INTER_SDP_BSIZE_GROUP]
                                              // w * h <= 1024
                                              { AOM_CDF2(16384), 0 }
                                            };
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
 // clang-format off
 #if CONFIG_FLEX_PARTITION
@@ -7340,9 +7340,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc,
   av1_copy(fc->filter_dir_cdf, default_filter_dir_cdf);
 #endif  // CONFIG_ENABLE_MHCCP
   av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
   av1_copy(fc->region_type_cdf, default_region_type_cdf);
-#endif
+#endif  // CONFIG_EXTENDED_SDP
 #if CONFIG_EXT_RECUR_PARTITIONS
   av1_copy(fc->do_split_cdf, default_do_split_cdf);
 #if CONFIG_BLOCK_256

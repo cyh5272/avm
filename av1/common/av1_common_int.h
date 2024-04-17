@@ -1967,14 +1967,14 @@ static INLINE int frame_is_intra_only(const AV1_COMMON *const cm) {
          cm->current_frame.frame_type == INTRA_ONLY_FRAME;
 }
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
 static INLINE int is_inter_sdp_chroma(const AV1_COMMON *const cm,
                                       REGION_TYPE cur_region_type,
                                       TREE_TYPE cur_tree_type) {
   return !frame_is_intra_only(cm) && cur_region_type == INTRA_REGION &&
          cur_tree_type == CHROMA_PART;
 }
-#endif
+#endif  // CONFIG_EXTENDED_SDP
 
 static INLINE int frame_is_sframe(const AV1_COMMON *cm) {
   return cm->current_frame.frame_type == S_FRAME;
@@ -2584,7 +2584,7 @@ static INLINE void update_ext_partition_context(MACROBLOCKD *xd, int mi_row,
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 }
 
-#if CONFIG_INTER_SDP
+#if CONFIG_EXTENDED_SDP
 static INLINE int get_intra_region_context(BLOCK_SIZE bsize) {
   const int width = block_size_wide[bsize];
   const int height = block_size_high[bsize];
@@ -2600,7 +2600,7 @@ static INLINE int get_intra_region_context(BLOCK_SIZE bsize) {
   else
     return 4;
 }
-#endif  // CONFIG_INTER_SDP
+#endif  // CONFIG_EXTENDED_SDP
 
 #if CONFIG_BLOCK_256
 /*!\brief Returns the context used by \ref PARTITION_SPLIT. */

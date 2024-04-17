@@ -2421,10 +2421,6 @@ static void loopfilter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
     lf->filter_level[1] = 0;
   }
 
-#if CONFIG_INTER_SDP_DEBUG
-  is_decoding_process = 0;
-#endif  // CONFIG_INTER_SDP_DEBUG
-
   if (lf->filter_level[0] || lf->filter_level[1]) {
     if (num_workers > 1
 #if CONFIG_LF_SUB_PU
@@ -2447,9 +2443,6 @@ static void loopfilter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
 #if CONFIG_COLLECT_COMPONENT_TIMING
   end_timing(cpi, loop_filter_time);
 #endif
-#if CONFIG_INTER_SDP_DEBUG
-  is_decoding_process = -1;
-#endif  // CONFIG_INTER_SDP_DEBUG
 
   cdef_restoration_frame(cpi, cm, xd, use_restoration, use_cdef);
 }
