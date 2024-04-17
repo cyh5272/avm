@@ -4494,9 +4494,8 @@ static void rectangular_partition_search(
 
     // Check if the HORZ / VERT partition search is to be performed.
     if (!is_rect_part_allowed(cpi, part_search_state, active_edge_type, i,
-                              mi_pos_rect[i][0][i])) {
+                              mi_pos_rect[i][0][i]))
       continue;
-    }
 
     // Sub-partition idx.
     const PARTITION_TYPE partition_type = rect_partition_type[i];
@@ -7351,20 +7350,6 @@ partition outperforms previously tested partitions
 * best partition found.
 */
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
-
-PARTITION_TYPE adjusted_partitioning(PC_TREE *pc_tree) {
-  if (pc_tree->partitioning == PARTITION_HORZ &&
-      pc_tree->horizontal[0]->partitioning == PARTITION_VERT &&
-      pc_tree->horizontal[1]->partitioning == PARTITION_VERT) {
-    return PARTITION_SPLIT;
-  } else if (pc_tree->partitioning == PARTITION_VERT &&
-             pc_tree->vertical[0]->partitioning == PARTITION_HORZ &&
-             pc_tree->vertical[1]->partitioning == PARTITION_HORZ) {
-    return PARTITION_SPLIT;
-  } else {
-    return pc_tree->partitioning;
-  }
-}
 
 enum { PRUNE_OTHER = 0, PRUNE_VERT = 1, PRUNE_HORZ = 2 };
 
