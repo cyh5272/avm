@@ -557,10 +557,9 @@ static TX_SIZE set_lpf_parameters(
   if (mbmi == NULL) return TX_INVALID;
 
 #if CONFIG_EXTENDED_SDP
-  const bool is_sdp_eligible =
-      cm->seq_params.enable_sdp && !cm->seq_params.monochrome &&
-      (frame_is_intra_only(cm) ||
-       (!frame_is_intra_only(cm) && mbmi->region_type == INTRA_REGION));
+  const bool is_sdp_eligible = cm->seq_params.enable_sdp &&
+                               !cm->seq_params.monochrome &&
+                               mbmi->region_type == INTRA_REGION;
   if (is_sdp_eligible) {
     tree_type = (plane == AOM_PLANE_Y) ? LUMA_PART : CHROMA_PART;
   }
@@ -613,9 +612,11 @@ static TX_SIZE set_lpf_parameters(
           TREE_TYPE prev_tree_type = SHARED_PART;
           const bool is_prev_sdp_eligible =
               cm->seq_params.enable_sdp && !cm->seq_params.monochrome &&
-              (frame_is_intra_only(cm) ||
-               (!frame_is_intra_only(cm) &&
-                mi_prev->region_type == INTRA_REGION));
+              mi_prev->region_type == INTRA_REGION;
+          // With SDP in inter frames, the tree type of current block can be
+          // different with previous block, so we can't copy the tree type of
+          // current block to previous block, and we need to fetch the tree type
+          // of a previous block.
           if (is_prev_sdp_eligible) {
             prev_tree_type = (plane == AOM_PLANE_Y) ? LUMA_PART : CHROMA_PART;
           }

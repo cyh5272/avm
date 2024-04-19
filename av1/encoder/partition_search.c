@@ -7443,11 +7443,7 @@ static INLINE void search_partition_horz_4a(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -7485,7 +7481,8 @@ static INLINE void search_partition_horz_4a(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_4A];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_HORZ_4A))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -7582,11 +7579,7 @@ static INLINE void search_partition_horz_4b(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -7628,7 +7621,8 @@ static INLINE void search_partition_horz_4b(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_4B];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_HORZ_4A))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -7721,11 +7715,7 @@ static INLINE void search_partition_vert_4a(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -7767,7 +7757,8 @@ static INLINE void search_partition_vert_4a(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_4A];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_VERT_4A))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -7860,11 +7851,7 @@ static INLINE void search_partition_vert_4b(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -7906,7 +7893,8 @@ static INLINE void search_partition_vert_4b(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_4B];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_VERT_4A))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -8000,11 +7988,7 @@ static INLINE void search_partition_horz_3(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -8048,7 +8032,8 @@ static INLINE void search_partition_horz_3(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_3];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_HORZ_3))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -8144,11 +8129,7 @@ static INLINE void search_partition_vert_3(
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
     LevelBanksRDO *level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-    SB_MULTI_PASS_MODE multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-    PARTITION_TYPE parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-    int max_recursion_depth) {
+    SB_MULTI_PASS_MODE multi_pass_mode, int max_recursion_depth) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &td->mb;
   const int num_planes = av1_num_planes(cm);
@@ -8193,7 +8174,8 @@ static INLINE void search_partition_vert_3(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_3];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      is_inter_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
+      is_inter_sdp_allowed(pc_tree->parent->block_size,
+                           pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_inter_sdp(bsize, PARTITION_VERT_3))
     sum_rdc.rate +=
         part_search_state->region_type_cost[MIXED_INTER_INTRA_REGION];
@@ -9259,11 +9241,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                           &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                          multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                          parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                          ext_recur_depth);
+                          multi_pass_mode, ext_recur_depth);
 
   // PARTITION_VERT_3
   search_partition_vert_3(&part_search_state, cpi, td, tile_data, tp, &best_rdc,
@@ -9272,11 +9250,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                           &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                          multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                          parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                          ext_recur_depth);
+                          multi_pass_mode, ext_recur_depth);
 
 #if CONFIG_EXTENDED_SDP
   if ((pc_tree->region_type != INTRA_REGION || frame_is_intra_only(cm))) {
@@ -9292,11 +9266,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                              &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                             multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                             parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                             ext_recur_depth);
+                             multi_pass_mode, ext_recur_depth);
 
     // PARTITION_HORZ_4B
     search_partition_horz_4b(&part_search_state, cpi, td, tile_data, tp,
@@ -9306,11 +9276,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                              &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                             multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                             parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                             ext_recur_depth);
+                             multi_pass_mode, ext_recur_depth);
 
     // PARTITION_VERT_4A
     search_partition_vert_4a(&part_search_state, cpi, td, tile_data, tp,
@@ -9320,11 +9286,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                              &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                             multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                             parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                             ext_recur_depth);
+                             multi_pass_mode, ext_recur_depth);
 
     // PARTITION_VERT_4B
     search_partition_vert_4b(&part_search_state, cpi, td, tile_data, tp,
@@ -9334,11 +9296,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
                              &level_banks,
 #endif  // CONFIG_MVP_IMPROVEMENT || WARP_CU_BANK
-                             multi_pass_mode,
-#if CONFIG_EXTENDED_SDP
-                             parent_partition,
-#endif  // CONFIG_EXTENDED_SDP
-                             ext_recur_depth);
+                             multi_pass_mode, ext_recur_depth);
 #if CONFIG_EXTENDED_SDP
   }
 #endif  // CONFIG_EXTENDED_SDP

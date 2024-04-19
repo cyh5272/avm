@@ -432,7 +432,7 @@ typedef struct MB_MODE_INFO {
   /*! \brief The prediction mode used */
 #if CONFIG_EXTENDED_SDP
   /*! \brief The region type used for the current block. */
-  PARTITION_TYPE region_type;
+  REGION_TYPE region_type;
 #endif  // CONFIG_EXTENDED_SDP
   PREDICTION_MODE mode;
   /*! \brief The JMVD scaling mode for the current coding block. The supported
@@ -752,8 +752,8 @@ typedef struct PARTITION_TREE {
   PARTITION_TYPE partition;
 #if CONFIG_EXTENDED_SDP
   /*! \brief The region type used for the current block. */
-  PARTITION_TYPE region_type;
-  /*! \brief The region type used for the current block. */
+  REGION_TYPE region_type;
+  /*! \brief Whethe SDP is allowed for one block in inter frame. */
   int inter_sdp_allowed_flag;
 #endif  // CONFIG_EXTENDED_SDP
   /*! \brief Block size of the current block. */
@@ -1017,7 +1017,7 @@ static AOM_INLINE bool is_uneven_4way_partition_allowed_at_bsize(
     return false;
   }
 #else
-    //(void)rect_type;
+  (void)rect_type;
 #endif                         // CONFIG_CB1TO4_SPLIT
   if (bsize >= BLOCK_32X64) {  // 32x64, 64x32, 64x64
     assert(bsize <= BLOCK_64X64);
@@ -1381,8 +1381,7 @@ static INLINE int is_bsize_allowed_for_inter_sdp(BLOCK_SIZE bsize,
   return bw <= 32 && bh <= 32 && bw >= 8 && bh >= 8 &&
          partition < PARTITION_HORZ_4A;
 }
-// Decide whether a block needs coding multiple chroma coding blocks in it at
-// once to get around sub-4x4 coding.
+// Decide whether SDP is allowed for one block in inter frame.
 static INLINE int is_inter_sdp_allowed(BLOCK_SIZE parent_bsize,
                                        PARTITION_TYPE parent_partition) {
   const int bw = block_size_wide[parent_bsize];

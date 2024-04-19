@@ -1968,6 +1968,7 @@ static INLINE int frame_is_intra_only(const AV1_COMMON *const cm) {
 }
 
 #if CONFIG_EXTENDED_SDP
+// Check whether this is chroma component of an intra region in inter frame
 static INLINE int is_inter_sdp_chroma(const AV1_COMMON *const cm,
                                       REGION_TYPE cur_region_type,
                                       TREE_TYPE cur_tree_type) {
