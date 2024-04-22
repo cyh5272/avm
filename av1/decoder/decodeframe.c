@@ -1358,11 +1358,7 @@ static AOM_INLINE void dec_build_inter_predictor(const AV1_COMMON *cm,
 
 #if CONFIG_MORPH_PRED
   if (mbmi->morph_pred) {
-#if CONFIG_EXTENDED_SDP
-    assert(av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type));
-#else
-    assert(av1_allow_intrabc(cm));
-#endif  // CONFIG_EXTENDED_SDP
+    assert(av1_allow_intrabc(cm, xd));
     assert(is_intrabc_block(mbmi, xd->tree_type));
     av1_build_morph_pred(cm, xd, bsize, mi_row, mi_col);
   }
@@ -8471,11 +8467,7 @@ uint32_t av1_decode_frame_headers_and_setup(AV1Decoder *pbi,
       (uint32_t)aom_rb_bytes_read(rb);  // Size of the uncompressed header
   YV12_BUFFER_CONFIG *new_fb = &cm->cur_frame->buf;
   xd->cur_buf = new_fb;
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, MIXED_INTER_INTRA_REGION)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
     av1_setup_scale_factors_for_frame(
         &cm->sf_identity, xd->cur_buf->y_crop_width, xd->cur_buf->y_crop_height,
         xd->cur_buf->y_crop_width, xd->cur_buf->y_crop_height);

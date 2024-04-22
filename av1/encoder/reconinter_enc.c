@@ -358,11 +358,7 @@ void av1_enc_build_inter_predictor(const AV1_COMMON *cm, MACROBLOCKD *xd,
 
 #if CONFIG_MORPH_PRED
   if (mbmi->morph_pred) {
-#if CONFIG_EXTENDED_SDP
-    assert(av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type));
-#else
-    assert(av1_allow_intrabc(cm));
-#endif  // CONFIG_EXTENDED_SDP
+    assert(av1_allow_intrabc(cm, xd));
     assert(is_intrabc_block(mbmi, xd->tree_type));
     av1_build_morph_pred(cm, xd, bsize, mi_row, mi_col);
   }

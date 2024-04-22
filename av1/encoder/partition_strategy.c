@@ -1471,17 +1471,13 @@ int evaluate_ab_partition_based_on_split(
   REGION_TYPE cur_region_type = pc_tree->region_type;
   if (pc_tree->split[cur_region_type][split_idx1]) {
     num_win += (pc_tree->split[cur_region_type][split_idx1]->partitioning ==
-                PARTITION_NONE)
-                   ? 1
-                   : 0;
+                PARTITION_NONE);
   } else {
     num_win += 1;
   }
   if (pc_tree->split[cur_region_type][split_idx2]) {
     num_win += (pc_tree->split[cur_region_type][split_idx2]->partitioning ==
-                PARTITION_NONE)
-                   ? 1
-                   : 0;
+                PARTITION_NONE);
 #else
   if (pc_tree->split[split_idx1]) {
     num_win +=

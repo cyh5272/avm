@@ -2417,11 +2417,8 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
     write_is_inter(cm, xd, mbmi->segment_id, w, is_inter);
 
 #if CONFIG_IBC_SR_EXT
-#if CONFIG_EXTENDED_SDP
-    if (!is_inter && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-    if (!is_inter && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+    if (!is_inter && av1_allow_intrabc(cm, xd) &&
+        xd->tree_type != CHROMA_PART) {
       const int use_intrabc = is_intrabc_block(mbmi, xd->tree_type);
       if (xd->tree_type == CHROMA_PART) assert(use_intrabc == 0);
 #if CONFIG_NEW_CONTEXT_MODELING
@@ -2520,11 +2517,7 @@ static AOM_INLINE void pack_inter_mode_mvs(AV1_COMP *cpi, aom_writer *w) {
 #endif  // !CONFIG_SKIP_TXFM_OPT
 
 #if CONFIG_IBC_SR_EXT
-#if CONFIG_EXTENDED_SDP
-  if (!is_inter && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (!is_inter && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (!is_inter && av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
     write_intrabc_info(
 #if CONFIG_IBC_BV_IMPROVEMENT && CONFIG_IBC_MAX_DRL
         cm->features.max_bvp_drl_bits,
@@ -3116,11 +3109,7 @@ static AOM_INLINE void write_mb_modes_kf(
     write_segment_id(cpi, mbmi, w, seg, segp, 0);
 
 #if CONFIG_SKIP_TXFM_OPT
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
     const int use_intrabc = is_intrabc_block(mbmi, xd->tree_type);
     if (xd->tree_type == CHROMA_PART) assert(use_intrabc == 0);
 #if CONFIG_NEW_CONTEXT_MODELING
@@ -3159,11 +3148,7 @@ static AOM_INLINE void write_mb_modes_kf(
 #endif
 
   write_delta_q_params(cpi, skip, w);
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
     write_intrabc_info(
 #if CONFIG_IBC_BV_IMPROVEMENT && CONFIG_IBC_MAX_DRL
         cm->features.max_bvp_drl_bits,

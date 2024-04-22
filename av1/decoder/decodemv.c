@@ -1906,11 +1906,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 #endif  // CONFIG_MORPH_PRED
 
 #if CONFIG_SKIP_TXFM_OPT
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
 #if CONFIG_NEW_CONTEXT_MODELING
     mbmi->use_intrabc[0] = 0;
     mbmi->use_intrabc[1] = 0;
@@ -1977,11 +1973,7 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   xd->left_txfm_context =
       xd->left_txfm_context_buffer + (mi_row & MAX_MIB_MASK);
 #endif  // !CONFIG_TX_PARTITION_CTX
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
     read_intrabc_info(cm, dcb, r);
     if (is_intrabc_block(mbmi, xd->tree_type)) {
 #if CONFIG_LOSSLESS_DPCM
@@ -4358,11 +4350,8 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
   }
 
 #if CONFIG_IBC_SR_EXT
-#if CONFIG_EXTENDED_SDP
-  if (!inter_block && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (!inter_block && av1_allow_intrabc(cm, xd) &&
+      xd->tree_type != CHROMA_PART) {
 #if CONFIG_NEW_CONTEXT_MODELING
     mbmi->use_intrabc[0] = 0;
     mbmi->use_intrabc[1] = 0;
@@ -4434,11 +4423,8 @@ static void read_inter_frame_mode_info(AV1Decoder *const pbi,
 #endif  // !CONFIG_TX_PARTITION_CTX
 
 #if CONFIG_IBC_SR_EXT
-#if CONFIG_EXTENDED_SDP
-  if (!inter_block && av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (!inter_block && av1_allow_intrabc(cm, xd) &&
+      xd->tree_type != CHROMA_PART) {
     mbmi->ref_frame[0] = INTRA_FRAME;
     mbmi->ref_frame[1] = NONE_FRAME;
     mbmi->palette_mode_info.palette_size[0] = 0;

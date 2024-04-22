@@ -586,21 +586,12 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   }
 
   if (!dry_run) {
-#if CONFIG_EXTENDED_SDP
-    if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type) &&
-        is_intrabc_block(mbmi, xd->tree_type))
-#else
-    if (av1_allow_intrabc(cm) && is_intrabc_block(mbmi, xd->tree_type))
-#endif  // CONFIG_EXTENDED_SDP
+    if (av1_allow_intrabc(cm, xd) && is_intrabc_block(mbmi, xd->tree_type))
       td->intrabc_used = 1;
 #if CONFIG_MORPH_PRED
     if (mbmi->morph_pred) {
-#if CONFIG_EXTENDED_SDP
-      assert(av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type));
-#else
-      assert(av1_allow_intrabc(cm));
-#endif  // CONFIG_EXTENDED_SDP      assert(is_intrabc_block(mbmi,
-        // xd->tree_type));
+      assert(av1_allow_intrabc(cm, xd));
+      // xd->tree_type));
     }
 #endif  // CONFIG_MORPH_PRED
     if (txfm_params->tx_mode_search_type == TX_MODE_SELECT &&
@@ -663,6 +654,10 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
         intra_tx_size = mbmi->tx_size;
       }
 #if CONFIG_EXTENDED_SDP
+      // Since transform partitioning is only allowed for luma component,
+      // and tx_size variable represents the transform size of the luma
+      // component in one coded block, so chroma block should not change the
+      // tx_size.
       if (xd->tree_type != CHROMA_PART || frame_is_intra_only(cm)) {
 #endif  // CONFIG_EXTENDED_SDP
         for (j = 0; j < mi_height; j++)
@@ -1336,12 +1331,8 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #endif  // CONFIG_ENTROPY_STATS
       update_cdf(fc->intra_inter_cdf[intra_inter_ctx], inter_block, 2);
     }
-#if CONFIG_EXTENDED_SDP
-    if (!inter_block &&
-        av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-    if (!inter_block && av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+    if (!inter_block && av1_allow_intrabc(cm, xd) &&
+        xd->tree_type != CHROMA_PART) {
 #if CONFIG_NEW_CONTEXT_MODELING
       const int intrabc_ctx = get_intrabc_ctx(xd);
       update_cdf(fc->intrabc_cdf[intrabc_ctx], use_intrabc, 2);
@@ -1435,11 +1426,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
   if (!is_inter_block(mbmi, xd->tree_type)) {
     av1_sum_intra_stats(cm, td->counts, xd, mbmi);
   }
-#if CONFIG_EXTENDED_SDP
-  if (av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)) {
-#else
-  if (av1_allow_intrabc(cm) && xd->tree_type != CHROMA_PART) {
-#endif  // CONFIG_EXTENDED_SDP
+  if (av1_allow_intrabc(cm, xd) && xd->tree_type != CHROMA_PART) {
 #if !CONFIG_SKIP_TXFM_OPT
     const int use_intrabc = is_intrabc_block(mbmi, xd->tree_type);
 #if CONFIG_NEW_CONTEXT_MODELING
@@ -1606,7 +1593,7 @@ static void update_stats(const AV1_COMMON *const cm, ThreadData *td) {
 #else
       assert(ref0 < ref1);
       for (int i = 0; i < n_refs + n_bits - 2 && n_bits < 2; i++) {
-        const int bit = ref0 == i || ref1 == i;
+            const int bit = ref0 == i || ref1 == i;
 #endif  // CONFIG_IMPROVED_SAME_REF_COMPOUND
           const int bit_type = n_bits == 0 ? -1
                                            : av1_get_compound_ref_bit_type(
@@ -6856,7 +6843,7 @@ static AOM_INLINE void prune_ext_partitions_3way(
 }
 
 #if CONFIG_EXTENDED_SDP
-// Early termination about inter-sdp
+// Early termination of SDP for intra blocks in inter frames
 static INLINE void early_termination_inter_sdp(PC_TREE *pc_tree,
                                                float *total_count,
                                                float *inter_mode_count) {
@@ -6946,6 +6933,7 @@ static INLINE void early_termination_inter_sdp(PC_TREE *pc_tree,
   }
 }
 
+// Search SDP for intra blocks in inter frames
 static INLINE void search_intra_region_partitioning(
     PartitionSearchState *search_state, AV1_COMP *const cpi, ThreadData *td,
     TileDataEnc *tile_data, TokenExtra **tp, RD_STATS *best_rdc,
@@ -6962,7 +6950,7 @@ static INLINE void search_intra_region_partitioning(
   const int num_planes = av1_num_planes(cm);
   MACROBLOCKD *const xd = &x->e_mbd;
 
-  // add one encoder fast method for early terminating inter-sdp
+  // Add one encoder fast method for early terminating inter-sdp
   float total_count = 0;
   float inter_mode_count = 0;
   early_termination_inter_sdp(pc_tree, &total_count, &inter_mode_count);

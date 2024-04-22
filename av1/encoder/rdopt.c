@@ -6595,11 +6595,7 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
                                        int64_t best_rd) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
-#if CONFIG_EXTENDED_SDP
-  if (!av1_allow_intrabc(cm, xd->tree_type, xd->mi[0]->region_type) ||
-#else
-  if (!av1_allow_intrabc(cm) || (xd->tree_type == CHROMA_PART) ||
-#endif  // CONFIG_EXTENDED_SDP
+  if (!av1_allow_intrabc(cm, xd) || (xd->tree_type == CHROMA_PART) ||
       !cpi->oxcf.kf_cfg.enable_intrabc)
     return INT64_MAX;
   const int num_planes = av1_num_planes(cm);
@@ -10586,15 +10582,10 @@ void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
 
 #if CONFIG_IBC_SR_EXT
   if (search_state.best_skip2 == 0) {
-    const int try_intrabc =
-        cpi->oxcf.kf_cfg.enable_intrabc &&
-        cpi->oxcf.kf_cfg.enable_intrabc_ext &&
-#if CONFIG_EXTENDED_SDP
-        av1_allow_intrabc(cm, xd->tree_type, mbmi->region_type)
-#else
-        av1_allow_intrabc(cm) && (xd->tree_type != CHROMA_PART)
-#endif  // CONFIG_EXTENDED_SDP
-        ;
+    const int try_intrabc = cpi->oxcf.kf_cfg.enable_intrabc &&
+                            cpi->oxcf.kf_cfg.enable_intrabc_ext &&
+                            av1_allow_intrabc(cm, xd) &&
+                            (xd->tree_type != CHROMA_PART);
     if (try_intrabc) {
       this_rd_cost.rdcost = INT64_MAX;
       mbmi->ref_frame[0] = INTRA_FRAME;
