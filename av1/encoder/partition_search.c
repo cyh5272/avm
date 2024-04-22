@@ -4075,7 +4075,7 @@ static void init_partition_search_state_params(
   part_search_state->prune_partition_none = false;
 #if CONFIG_ML_PART_SPLIT
   part_search_state->prune_partition_split = false;
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   av1_zero(part_search_state->prune_partition_3);
   av1_zero(part_search_state->prune_partition_4a);
   av1_zero(part_search_state->prune_partition_4b);
@@ -4258,7 +4258,7 @@ static void rd_pick_rect_partition(
 #if CONFIG_ML_PART_SPLIT
     ,
     int next_force_prune_flags[3]
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
 ) {
   const PARTITION_TYPE partition_type = rect_partition_type[rect_type];
   RD_STATS *sum_rdc = &part_search_state->sum_rdc;
@@ -4281,7 +4281,7 @@ static void rd_pick_rect_partition(
 #if CONFIG_ML_PART_SPLIT
       ,
       next_force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   );
   av1_rd_cost_update(x->rdmult, &this_rdc);
   if (!partition_found) {
@@ -4306,7 +4306,7 @@ static void rd_pick_rect_partition(
 #if CONFIG_ML_PART_SPLIT
         ,
         next_force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
     );
     av1_rd_cost_update(x->rdmult, &this_rdc);
     part_search_state->rect_part_rd[rect_type][1] = this_rdc.rdcost;
@@ -4401,7 +4401,7 @@ static void rectangular_partition_search(
 #if CONFIG_ML_PART_SPLIT
     ,
     int next_force_prune_flags[2][3]
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
 ) {
   const AV1_COMMON *const cm = &cpi->common;
   PartitionBlkParams blk_params = part_search_state->part_blk_params;
@@ -4547,7 +4547,7 @@ static void rectangular_partition_search(
 #if CONFIG_ML_PART_SPLIT
         ,
         next_force_prune_flags[i]
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
     );
 #else
     int sub_part_idx = 0;
@@ -5463,7 +5463,7 @@ static void split_partition_search(
   if (part_search_state->prune_partition_split) {
     return;
   }
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   if (max_recursion_depth < 0) {
     return;
   }
@@ -5535,7 +5535,7 @@ static void split_partition_search(
 #if CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_ML_PART_SPLIT
     int force_prune_flags[3] = { 0, 0, 0 };
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
     if (!av1_rd_pick_partition(
             cpi, td, tile_data, tp, mi_row + y_idx, mi_col + x_idx, subsize,
             &part_search_state->this_rdc, best_remain_rdcost, sub_tree[idx],
@@ -5545,7 +5545,7 @@ static void split_partition_search(
 #if CONFIG_ML_PART_SPLIT
             ,
             force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
             )) {
       break;
     }
@@ -5685,7 +5685,7 @@ static int rd_try_subblock_new(AV1_COMP *const cpi, ThreadData *td,
 
 #if CONFIG_ML_PART_SPLIT
   int force_prune_flags[3] = { 0, 0, 0 };
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   if (!av1_rd_pick_partition(cpi, td, tile_data, tp, mi_row, mi_col, bsize,
                              &this_rdc, rdcost_remaining, rdo_data->pc_tree,
                              rdo_data->ptree_luma, rdo_data->template_tree,
@@ -5694,7 +5694,7 @@ static int rd_try_subblock_new(AV1_COMP *const cpi, ThreadData *td,
 #if CONFIG_ML_PART_SPLIT
                              ,
                              force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
                              )) {
     av1_invalid_rd_stats(sum_rdc);
     return 0;
@@ -7351,7 +7351,9 @@ partition outperforms previously tested partitions
 */
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 
+#if CONFIG_ML_PART_SPLIT
 enum { PRUNE_OTHER = 0, PRUNE_VERT = 1, PRUNE_HORZ = 2 };
+#endif  // CONFIG_ML_PART_SPLIT
 
 bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
                            TileDataEnc *tile_data, TokenExtra **tp, int mi_row,
@@ -7368,7 +7370,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
 #if CONFIG_ML_PART_SPLIT
                            ,
                            int force_prune_flags[3]
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
 ) {
   const AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
@@ -7608,12 +7610,12 @@ BEGIN_PARTITION_SEARCH:
 #else
     reset_part_limitations(cpi, &part_search_state);
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
+#if CONFIG_ML_PART_SPLIT
     part_search_state.prune_rect_part[HORZ] = 0;
     part_search_state.prune_rect_part[VERT] = 0;
     part_search_state.prune_partition_none = 0;
-#if CONFIG_ML_PART_SPLIT
     part_search_state.prune_partition_split = 0;
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   }
 
   // Partition block source pixel variance.
@@ -7789,7 +7791,7 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_ML_PART_SPLIT
       ,
       next_force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
   );
 
   if (pb_source_variance == UINT_MAX) {

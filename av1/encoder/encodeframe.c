@@ -577,7 +577,7 @@ static AOM_INLINE void perform_one_partition_pass(
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
 #if CONFIG_ML_PART_SPLIT
     int force_prune_flags[3] = { 0, 0, 0 };
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
     av1_rd_pick_partition(
         cpi, td, tile_data, tp, mi_row, mi_col, sb_size, &dummy_rdc, dummy_rdc,
         pc_root,
@@ -589,7 +589,7 @@ static AOM_INLINE void perform_one_partition_pass(
 #if CONFIG_ML_PART_SPLIT
         ,
         force_prune_flags
-#endif
+#endif  // CONFIG_ML_PART_SPLIT
     );
     sb_enc->min_partition_size = min_partition_size;
   }
