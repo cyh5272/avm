@@ -7088,8 +7088,12 @@ static int64_t rd_pick_intrabc_mode_sb(const AV1_COMP *cpi, MACROBLOCK *x,
         best_rd = rd_stats_yuv.rdcost;
         best_mbmi = *mbmi;
         best_rdstats = rd_stats_yuv;
-        memcpy(best_blk_skip, txfm_info->blk_skip,
-               sizeof(txfm_info->blk_skip[0]) * xd->height * xd->width);
+        for (int i = 0; i < num_planes; ++i) {
+          const int num_blk_plane =
+              (xd->plane[i].height * xd->plane[i].width) >> (2 * MI_SIZE_LOG2);
+          memcpy(best_blk_skip[i], txfm_info->blk_skip[i],
+                 sizeof(*txfm_info->blk_skip[i]) * num_blk_plane);
+        }
         av1_copy_array(best_tx_type_map, xd->tx_type_map,
                        xd->height * xd->width);
         av1_copy_array(best_cctx_type_map, xd->cctx_type_map,
