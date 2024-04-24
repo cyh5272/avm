@@ -591,7 +591,6 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 #if CONFIG_MORPH_PRED
     if (mbmi->morph_pred) {
       assert(av1_allow_intrabc(cm, xd));
-      // xd->tree_type));
     }
 #endif  // CONFIG_MORPH_PRED
     if (txfm_params->tx_mode_search_type == TX_MODE_SELECT &&
