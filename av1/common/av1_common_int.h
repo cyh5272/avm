@@ -2326,7 +2326,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
 #else
         assert(IMPLIES(xd->tree_type == SHARED_PART,
                        xd->chroma_above_mbmi->chroma_ref_info.is_chroma_ref));
-#endif
+#endif  // CONFIG_EXTENDED_SDP
       } else {
         xd->chroma_above_mbmi = NULL;
       }
@@ -2353,7 +2353,7 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
 #else
         assert(IMPLIES(xd->tree_type == SHARED_PART,
                        xd->chroma_left_mbmi->chroma_ref_info.is_chroma_ref));
-#endif
+#endif  // CONFIG_EXTENDED_SDP
       } else {
         xd->chroma_left_mbmi = NULL;
       }
