@@ -602,7 +602,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
       dst->none_chroma =
           av1_alloc_pmc(cm, tree_type, mi_row, mi_col, bsize, dst,
                         PARTITION_NONE, 0, ss_x, ss_y, shared_bufs);
-      av1_copy_tree_context(dst->none_chroma, src->none_chroma);
+      av1_copy_tree_context(dst->none_chroma, src->none_chroma, num_planes);
     }
   }
 #endif  // CONFIG_EXTENDED_SDP
@@ -619,7 +619,7 @@ void av1_copy_pc_tree_recursive(MACROBLOCKD *xd, const AV1_COMMON *cm,
             av1_alloc_pmc(cm, tree_type, mi_row, mi_col, bsize, dst,
                           PARTITION_NONE, 0, ss_x, ss_y, shared_bufs);
         av1_copy_tree_context(dst->none[cur_region_type],
-                              src->none[cur_region_type]);
+                              src->none[cur_region_type], num_planes);
 #if CONFIG_MVP_IMPROVEMENT
         if (is_inter_block(&src->none[cur_region_type]->mic, xd->tree_type)) {
 #if WARP_CU_BANK
