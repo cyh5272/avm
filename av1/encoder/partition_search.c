@@ -4580,7 +4580,7 @@ static void rd_pick_rect_partition(
   sum_rdc->rate = part_search_state->partition_cost[partition_type];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size, parent_partition) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_HORZ))
     sum_rdc->rate +=
@@ -7471,7 +7471,7 @@ static INLINE void search_partition_horz_4a(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_4A];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_HORZ_4A))
@@ -7612,7 +7612,7 @@ static INLINE void search_partition_horz_4b(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_4B];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_HORZ_4A))
@@ -7749,7 +7749,7 @@ static INLINE void search_partition_vert_4a(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_4A];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_VERT_4A))
@@ -7886,7 +7886,7 @@ static INLINE void search_partition_vert_4b(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_4B];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_VERT_4A))
@@ -8026,7 +8026,7 @@ static INLINE void search_partition_horz_3(
   sum_rdc.rate = search_state->partition_cost[PARTITION_HORZ_3];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_HORZ_3))
@@ -8169,7 +8169,7 @@ static INLINE void search_partition_vert_3(
   sum_rdc.rate = search_state->partition_cost[PARTITION_VERT_3];
 #if CONFIG_EXTENDED_SDP
   if (pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      (&cpi->common)->seq_params.enable_sdp &&
+      cpi->common.seq_params.enable_sdp &&
       is_extended_sdp_allowed(pc_tree->parent->block_size,
                               pc_tree->parent->partitioning) &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_VERT_3))
@@ -9340,7 +9340,7 @@ BEGIN_PARTITION_SEARCH:
   if (frame_is_intra_only(cm)) pc_tree->extended_sdp_allowed_flag = 0;
   if (!frame_is_intra_only(cm) &&
       pc_tree->region_type == MIXED_INTER_INTRA_REGION && pc_tree->parent &&
-      cm->seq_params.enable_sdp && pc_tree->extended_sdp_allowed_flag == 1 &&
+      cm->seq_params.enable_sdp && pc_tree->extended_sdp_allowed_flag &&
       is_bsize_allowed_for_extended_sdp(bsize, PARTITION_HORZ)) {
     search_intra_region_partitioning(
         &part_search_state, cpi, td, tile_data, tp, &best_rdc, pc_tree,

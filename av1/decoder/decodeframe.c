@@ -2720,10 +2720,7 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
   if (is_sb_root) {
     if (!frame_is_intra_only(cm)) {
       ptree->region_type = MIXED_INTER_INTRA_REGION;
-      if (cm->seq_params.enable_sdp)
-        ptree->extended_sdp_allowed_flag = 1;
-      else
-        ptree->extended_sdp_allowed_flag = 0;
+      ptree->extended_sdp_allowed_flag = cm->seq_params.enable_sdp;
     } else {
       ptree->region_type = INTRA_REGION;
       ptree->extended_sdp_allowed_flag = 0;
@@ -2789,7 +2786,7 @@ static AOM_INLINE void decode_partition(AV1Decoder *const pbi,
 
 #if CONFIG_EXTENDED_SDP
     if (!is_sb_root && parent) {
-      if (parent->extended_sdp_allowed_flag == 1)
+      if (parent->extended_sdp_allowed_flag)
         ptree->extended_sdp_allowed_flag =
             cm->seq_params.enable_sdp &&
             is_extended_sdp_allowed(parent->bsize, parent->partition);

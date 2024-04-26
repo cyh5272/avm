@@ -233,7 +233,7 @@ PC_TREE *av1_alloc_pc_tree_node(TREE_TYPE tree_type, int mi_row, int mi_col,
 #if CONFIG_EXTENDED_SDP
   if (parent) {
     pc_tree->region_type = parent->region_type;
-    if (parent->extended_sdp_allowed_flag == 1)
+    if (parent->extended_sdp_allowed_flag)
       pc_tree->extended_sdp_allowed_flag =
           is_extended_sdp_allowed(parent->block_size, parent_partition);
     else
