@@ -3129,7 +3129,9 @@ static AOM_INLINE void decode_partition_sb(AV1Decoder *const pbi,
        cm->seq_params.enable_sdp)
           ? 2
           : 1;
-  xd->tree_type = (total_loop_num == 1 ? SHARED_PART : LUMA_PART);
+  xd->tree_type =
+      (total_loop_num == 1 && !cm->seq_params.monochrome ? SHARED_PART
+                                                         : LUMA_PART);
   if (parse_decode_flag & 1) {
     av1_reset_ptree_in_sbi(xd->sbi, xd->tree_type);
   }
