@@ -558,9 +558,9 @@ static AOM_INLINE void perform_one_partition_pass(
 #endif  // CONFIG_EXT_RECUR_PARTITIONS
   for (int loop_idx = 0; loop_idx < total_loop_num; loop_idx++) {
     const BLOCK_SIZE min_partition_size = sb_enc->min_partition_size;
-    xd->tree_type = (total_loop_num == 1 && !cm->seq_params.monochrome
-                         ? SHARED_PART
-                         : (loop_idx == 0 ? LUMA_PART : CHROMA_PART));
+    xd->tree_type =
+        (total_loop_num == 1 ? SHARED_PART
+                             : (loop_idx == 0 ? LUMA_PART : CHROMA_PART));
     init_encode_rd_sb(cpi, td, tile_data, sms_root, &dummy_rdc, mi_row, mi_col,
                       1);
     PC_TREE *const pc_root =
@@ -828,9 +828,9 @@ static AOM_INLINE void encode_rd_sb(AV1_COMP *cpi, ThreadData *td,
     av1_set_fixed_partitioning(cpi, tile_info, mi, mi_row, mi_col, bsize);
     for (int loop_idx = 0; loop_idx < total_loop_num; loop_idx++) {
       const BLOCK_SIZE min_partition_size = x->sb_enc.min_partition_size;
-      xd->tree_type = (total_loop_num == 1 && !cm->seq_params.monochrome
-                           ? SHARED_PART
-                           : (loop_idx == 0 ? LUMA_PART : CHROMA_PART));
+      xd->tree_type =
+          (total_loop_num == 1 ? SHARED_PART
+                               : (loop_idx == 0 ? LUMA_PART : CHROMA_PART));
       init_encode_rd_sb(cpi, td, tile_data, sms_root, &dummy_rdc, mi_row,
                         mi_col, 1);
       PC_TREE *const pc_root =

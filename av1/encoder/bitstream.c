@@ -4006,9 +4006,7 @@ static AOM_INLINE void write_modes(AV1_COMP *const cpi,
            cm->seq_params.enable_sdp)
               ? 2
               : 1;
-      xd->tree_type =
-          (total_loop_num == 1 && !cm->seq_params.monochrome ? SHARED_PART
-                                                             : LUMA_PART);
+      xd->tree_type = (total_loop_num == 1 ? SHARED_PART : LUMA_PART);
       write_modes_sb(cpi, tile, w, &tok, tok_end,
                      xd->sbi->ptree_root[av1_get_sdp_idx(xd->tree_type)],
 #if CONFIG_EXT_RECUR_PARTITIONS
