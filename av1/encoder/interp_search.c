@@ -573,6 +573,13 @@ int64_t av1_interpolation_filter_search(
   int skip_ver = interp_search_flags->default_interp_skip_flags;
   calc_interp_skip_pred_flag(x, cpi, &skip_hor, &skip_ver);
 
+  // Store original buffers in xd->plane
+  struct macroblockd_plane *pd = xd->plane;
+  const BUFFER_SET pd_dst = {
+    { pd[0].dst.buf, pd[1].dst.buf, pd[2].dst.buf },
+    { pd[0].dst.stride, pd[1].dst.stride, pd[2].dst.stride },
+  };
+
   // do interp_filter search
   restore_dst_buf(xd, *tmp_dst, num_planes);
   const BUFFER_SET *dst_bufs[2] = { tmp_dst, orig_dst };
@@ -600,5 +607,8 @@ int64_t av1_interpolation_filter_search(
         mbmi, *rd, x->pred_sse[ref_frame], args->interp_filter_stats,
         args->interp_filter_stats_idx);
   }
+  // Restore buffers that were in xd->plane before the first restore_dst_buf()
+  // call, to ensure there is not change in state of xd.
+  restore_dst_buf(xd, pd_dst, num_planes);
   return 0;
 }
