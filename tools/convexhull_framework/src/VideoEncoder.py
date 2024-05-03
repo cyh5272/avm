@@ -14,7 +14,7 @@ import os
 import math
 import Utils
 from Config import AOMENC, AV1ENC, SVTAV1, EnableTimingInfo, Platform, UsePerfUtil, CTC_VERSION, HEVCCfgFile, \
-     HMENC, EnableOpenGOP, GOP_SIZE, SUB_GOP_SIZE, EnableTemporalFilter
+     HMENC, EnableOpenGOP, GOP_SIZE, SUB_GOP_SIZE, EnableTemporalFilter, EnableVerificationTestConfig
 from Utils import ExecuteCmd, ConvertY4MToYUV, DeleteFile, GetShortContentName
 
 def get_qindex_from_QP(QP):
@@ -30,21 +30,22 @@ def get_qindex_from_QP(QP):
     return quantizer_to_qindex[QP]
 
 def EncodeWithAOM_AV2(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
-                      enc_log, LogCmdOnly=False):
+                      enc_log, start_frame=0, LogCmdOnly=False):
     args = " --verbose --codec=av1 -v --psnr --obu --frame-parallel=0" \
-           " --cpu-used=%s --limit=%d --passes=1 --end-usage=q --i%s " \
+           " --cpu-used=%s --limit=%d --skip=%d --passes=1 --end-usage=q --i%s " \
            " --use-fixed-qp-offsets=1 --deltaq-mode=0 " \
            " --enable-tpl-model=0 --fps=%d/%d -w %d -h %d" \
-           % (preset, framenum, clip.fmt, clip.fps_num, clip.fps_denom, clip.width, clip.height)
+           % (preset, framenum, start_frame, clip.fmt, clip.fps_num, clip.fps_denom,
+              clip.width, clip.height)
 
     # config enoding bitdepth
-    if ((CTC_VERSION in ['6.0']) and (clip.file_class in ['A2', 'A4', 'B1'])):
+    if ((CTC_VERSION in ['6.0', '7.0']) and (clip.file_class in ['A2', 'A4', 'B1'])):
         # CWG-D088
         args += " --input-bit-depth=%d --bit-depth=10" % (clip.bit_depth)
     else:
         args += " --input-bit-depth=%d --bit-depth=%d" % (clip.bit_depth, clip.bit_depth)
 
-    if CTC_VERSION in ['2.0', '3.0', '4.0', '5.0', '6.0']:
+    if CTC_VERSION in ['2.0', '3.0', '4.0', '5.0', '6.0', '7.0']:
         args += " --qp=%d" % QP
     else:
         args += " --use-16bit-internal --cq-level=%d" % QP
@@ -57,10 +58,47 @@ def EncodeWithAOM_AV2(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
         args += " --tile-rows=1 --tile-columns=1 --threads=4 --row-mt=0 "
     elif ((CTC_VERSION in ['6.0']) and (clip.file_class in ['E', 'G1']) and (test_cfg == "RA")):
         args += " --tile-rows=1 --tile-columns=1 --threads=4 --row-mt=0 "
+    elif (CTC_VERSION in ['7.0']):
+        if EnableVerificationTestConfig:
+            args += " --tile-rows=0 --tile-columns=0 --threads=1 --row-mt=0 "
+        elif (test_cfg == "RA"):
+            if (clip.file_class in ['A1', 'E', 'G1']):
+                # 4 column tiles should be used
+                args += " --tile-rows=0 --tile-columns=2 --threads=4 --row-mt=0 "
+            elif (clip.file_class in ['A2', 'B1']):
+                # 2 column tiles should be used
+                args += " --tile-rows=0 --tile-columns=1 --threads=2 --row-mt=0 "
+            else:
+                # 1 tile should be used
+                args += " --tile-rows=0 --tile-columns=0 --threads=1 --row-mt=0 "
+        elif (test_cfg == "AS"):
+            # use the same configuration as RA
+            if ((clip.width == 3840 and clip.height == 2160) or (clip.width == 2560 and clip.height == 1440)):
+                # 4 column tiles should be used
+                args += " --tile-rows=0 --tile-columns=2 --threads=4 --row-mt=0 "
+            elif (clip.width == 1920 and clip.height == 1080):
+                # 2 column tiles should be used
+                args += " --tile-rows=0 --tile-columns=1 --threads=2 --row-mt=0 "
+            else:
+                # 1 tile should be used
+                args += " --tile-rows=0 --tile-columns=0 --threads=1 --row-mt=0 "
+        elif (test_cfg == "LD"):
+            if (clip.file_class in ['A2', 'B1']):
+                # 8 tiles should be used
+                args += " --tile-rows=1 --tile-columns=2 --threads=8 --row-mt=0 "
+            elif (clip.file_class in ['A3']):
+                # 2 column tiles should be used
+                args += " --tile-rows=0 --tile-columns=1 --threads=2 --row-mt=0 "
+            else:
+                # 1 tile should be used
+                args += " --tile-rows=0 --tile-columns=0 --threads=1 --row-mt=0 "
+        elif (test_cfg in ['AI', 'STILL']) and (clip.width >= 3840 and clip.height >= 2160):
+            # 2 tiles should be used
+            args += " --tile-rows=0 --tile-columns=1 --threads=2 --row-mt=0 "
     elif (clip.width >= 3840 and clip.height >= 2160):
-        args += " --tile-columns=1 --threads=2 --row-mt=0 "
+        args += " --tile-rows=0 --tile-columns=1 --threads=2 --row-mt=0 "
     else:
-        args += " --tile-columns=0 --threads=1 "
+        args += " --tile-rows=0 --tile-columns=0 --threads=1 --row-mt=0 "
 
     if EnableOpenGOP:
         args += " --enable-fwd-kf=1 "
@@ -73,9 +111,9 @@ def EncodeWithAOM_AV2(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
         args += " --enable-keyframe-filtering=0 "
 
     # CWG-D082
-    if CTC_VERSION in ['6.0']:
+    if CTC_VERSION in ['6.0', '7.0']:
         if clip.file_class in ['B2']:
-            args += " --tune-content=screen"
+            args += " --tune-content=screen --enable-intrabc-ext=1"
         else:
             args += " --enable-intrabc-ext=2"
 
@@ -114,7 +152,7 @@ def EncodeWithAOM_AV2(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
     ExecuteCmd(cmd, LogCmdOnly)
 
 def EncodeWithAOM_AV1(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
-                      enc_log, LogCmdOnly=False):
+                      enc_log, start_frame=0, LogCmdOnly=False):
     args = " --verbose --codec=av1 -v --psnr --obu --frame-parallel=0" \
            " --cpu-used=%s --limit=%d --passes=1 --end-usage=q --i%s " \
            " --use-fixed-qp-offsets=1 --deltaq-mode=0 " \
@@ -174,7 +212,7 @@ def EncodeWithAOM_AV1(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
     ExecuteCmd(cmd, LogCmdOnly)
 
 def EncodeWithSVT_AV1(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
-                      enc_log, LogCmdOnly=False):
+                      enc_log, start_frame=0, LogCmdOnly=False):
     #TODO: update svt parameters
     # -enable-tpl-la 0 to disable the content based per layer QP adjustment(i.e.use
     # fixed offsets @ QP scaling ), and the content based per block QP adjustment(i.e.TPL
@@ -228,7 +266,7 @@ def EncodeWithSVT_AV1(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
 
 
 def EncodeWithHM_HEVC(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
-                      enc_log, LogCmdOnly=False):
+                      enc_log, start_frame=0, LogCmdOnly=False):
     input_yuv_file = GetShortContentName(outfile, False) + ".yuv"
     bs_path = os.path.dirname(outfile)
     input_yuv_file = os.path.join(bs_path, input_yuv_file)
@@ -277,25 +315,25 @@ def EncodeWithHM_HEVC(clip, test_cfg, QP, framenum, outfile, preset, enc_perf,
     DeleteFile(input_yuv_file, LogCmdOnly)
 
 def VideoEncode(EncodeMethod, CodecName, clip, test_cfg, QP, framenum, outfile,
-                preset, enc_perf, enc_log, LogCmdOnly=False):
+                preset, enc_perf, enc_log, start_frame=0, LogCmdOnly=False):
     Utils.CmdLogger.write("::Encode\n")
     if CodecName == 'av2':
         if EncodeMethod == "aom":
             EncodeWithAOM_AV2(clip, test_cfg, QP, framenum, outfile, preset,
-                              enc_perf, enc_log, LogCmdOnly)
+                              enc_perf, enc_log, start_frame, LogCmdOnly)
     elif CodecName == 'av1':
         if EncodeMethod == 'aom':
             EncodeWithAOM_AV1(clip, test_cfg, QP, framenum, outfile, preset,
-                              enc_perf, enc_log, LogCmdOnly)
+                              enc_perf, enc_log, start_frame, LogCmdOnly)
         elif EncodeMethod == "svt":
             EncodeWithSVT_AV1(clip, test_cfg, QP, framenum, outfile, preset,
-                              enc_perf, enc_log, LogCmdOnly)
+                              enc_perf, enc_log, start_frame, LogCmdOnly)
         else:
             raise ValueError("invalid parameter for encode.")
     elif CodecName == 'hevc':
         if EncodeMethod == 'hm':
             EncodeWithHM_HEVC(clip, test_cfg, QP, framenum, outfile, preset,
-                              enc_perf, enc_log, LogCmdOnly)
+                              enc_perf, enc_log, start_frame, LogCmdOnly)
         else:
             raise ValueError("invalid parameter for encode.")
     else:
