@@ -1253,40 +1253,41 @@ int gaussian_elimination(int64_t *mat, int64_t *sol, int *precbits,
   // precbits[i]-f+si shifts will be applied to b at the end. Making all these
   // shifts negative means there is no loss of precision during the Gaussian
   // elimination procedure. One quick solution is given as follows:
-  //     si=floor(min(K-dim+1-MSB(Aii), min(MSB(Aii))-MSB(Aii))/2)
-  //     f=max_i(precbits[i]+si)
-  //     e=min(K-dim+1-MSB(bi)-si) - max(precbits[i]+si)
-  int bd_cap = MAX_LS_BITS - dim;
+  //     f=max(precbits[i]+K-dim-1-MSB(bi))>>1
+  //     si=min(K-dim-1-MSB(Aii)-f, -((MSB(Aii)-min(MSB(Aii)))>>1))
+  //     e=min(K-dim-1-MSB(Aii)-2*si)
+  int bd_cap = MAX_LS_BITS - dim - 1;
   int a_extra_shift = 64;
-  int b_extra_shift = -64;
+  int b_extra_shift = 0;
   int min_diag_msb = 64;
-  int mat_diag_bits[MAX_LS_DIM] = { 0 };
-  int sol_bits[MAX_LS_DIM] = { 0 };
+  int mat_diag_msb[MAX_LS_DIM] = { 0 };
+  int vec_msb[MAX_LS_DIM] = { 0 };
   for (int i = 0; i < dim; i++) {
-    mat_diag_bits[i] = 1 + get_msb_signed_64(mat[i * dim + i]);
-    min_diag_msb = AOMMIN(min_diag_msb, mat_diag_bits[i]);
-    sol_bits[i] = 1 + get_msb_signed_64(sol[i]);
+    mat_diag_msb[i] = get_msb_signed_64(mat[i * dim + i]);
+    min_diag_msb = AOMMIN(min_diag_msb, mat_diag_msb[i]);
+    vec_msb[i] = get_msb_signed_64(sol[i]);
+    b_extra_shift =
+        AOMMAX(b_extra_shift, (precbits[i] + bd_cap - vec_msb[i]) >> 1);
   }
   for (int i = 0; i < dim; i++) {
-    shifts[i] =
-        -(AOMMAX(mat_diag_bits[i] - bd_cap, mat_diag_bits[i] - min_diag_msb) >>
-          1);
-    a_extra_shift = AOMMIN(a_extra_shift, bd_cap - sol_bits[i] - shifts[i]);
-    b_extra_shift = AOMMAX(b_extra_shift, precbits[i] + shifts[i]);
+    shifts[i] = AOMMIN(bd_cap - vec_msb[i] - b_extra_shift,
+                       -((mat_diag_msb[i] - min_diag_msb) >> 1));
+    a_extra_shift =
+        AOMMIN(a_extra_shift, bd_cap - mat_diag_msb[i] - 2 * shifts[i]);
   }
-  a_extra_shift -= b_extra_shift;
+  assert(a_extra_shift < 64);
+  assert(b_extra_shift < 64);
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
       int abits = a_extra_shift + shifts[i] + shifts[j];
-      assert(a_extra_shift < 64);
       mat[i * dim + j] =
           abits >= 0 ? (mat[i * dim + j] * (1 << abits))
                      : ROUND_POWER_OF_TWO_SIGNED_64(mat[i * dim + j], -abits);
     }
-    int bbits = shifts[i] + a_extra_shift + b_extra_shift;
+    int bbits = shifts[i] + b_extra_shift;
     sol[i] = bbits >= 0 ? (sol[i] * (1 << bbits))
                         : ROUND_POWER_OF_TWO_SIGNED_64(sol[i], -bbits);
-    precbits[i] = precbits[i] - b_extra_shift + shifts[i];
+    precbits[i] = precbits[i] + a_extra_shift - b_extra_shift + shifts[i];
   }
 
   // Elimination for the i-th column
