@@ -127,10 +127,12 @@ static aom_codec_err_t decoder_destroy(aom_codec_alg_priv_t *ctx) {
   printf(
       "avg_ctx_syms : %lld\t avg_bypass_syms : %lld\t max_ctx_syms : %lld\t "
       "max_bypass_syms : %lld\t max_bits : %lld\t total_bits : %lld\t "
-      "context_switches : %lld\t total_hits : %lld\n",
+      "avg_bypass_cycles : %lld\t context_switches : %lld\t total_hits : "
+      "%lld\n",
       (long long)(tot_ctx_syms / tot_frames),
       (long long)(tot_bypass_syms / tot_frames), max_ctx_syms, max_bypass_syms,
       (long long)(max_bits / 65536), (long long)(tot_bits / 65536),
+      (long long)(tot_bypass_cycles / tot_frames),
       (long long)(total_context_switch / tot_frames),
       (long long)(total_total_hits / tot_frames));
 #endif  // CONFIG_THROUGHPUT_ANALYSIS

@@ -98,6 +98,8 @@ void aom_accounting_reset(Accounting *accounting) {
   accounting->syms.total_hits = 0;
   accounting->syms.prev_context_id = NULL;
   accounting->syms.num_ctx_coded = 0;
+  accounting->syms.counter_bypass_string = 0;
+  accounting->syms.cycles_bypass_coded = 0;
   accounting->context.x = -1;
   accounting->context.y = -1;
   accounting->last_tell_frac = 0;

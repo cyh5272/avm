@@ -25,6 +25,7 @@ extern int64_t max_bypass_syms;
 extern int64_t max_bits;
 extern int64_t tot_bits;
 extern int64_t tot_frames;
+extern int64_t tot_bypass_cycles;
 extern int64_t total_context_switch;
 extern int64_t total_total_hits;
 #endif  // CONFIG_THROUGHPUT_ANALYSIS
